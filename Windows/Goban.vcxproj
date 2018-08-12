@@ -1,0 +1,280 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{A574B82F-610B-44BD-A26B-51330364B942}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectName>Goban</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="Goban.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="Goban.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="Goban.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="Goban.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <IntDir>Build\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\..\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_USE_MATH_DEFINES;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>D:\Projekty\deponejo\goban\src\sgf\include;D:\Projekty\deponejo\goban\src\shell\include;$(LIBROCKET_BASEDIR)\include;$(LIBSNDFILE_BASEDIR)\include;$(GNUGO_BASEDIR)\sgf;$(GNUGO_BASEDIR)\utils;$(GNUGO_BASEDIR)\engine;$(GNUGO_BASEDIR)\;$(PORTAUDIO_BASEDIR)\include;$(BOOST_BASEDIR)\;$(GLEW_BASEDIR)\include;D:\Projekty\glm;D:\Projekty\glsl-optimizer\src;D:\Projekty\glyphy\src;D:\Projekty\freetype2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <AdditionalOptions>-D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>glyphy.lib;freetype255.lib;glew32s.lib;glu32.lib;opengl32.lib;engine.lib;board.lib;patterns.lib;sgf.lib;utils.lib;portaudio.lib;libsndfile-1.lib;user32.lib;gdi32.lib;advapi32.lib;RocketCore.lib;RocketDebugger.lib;RocketControls.lib;glsl_optimizer_lib-win32.lib;shell32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\Projekty\glyphy\win32\Debug;D:\Projekty\freetype2\objs\vc2010\Win32;$(LIBROCKET_BASEDIR)\buildDir\Debug;$(LIBSNDFILE_BASEDIR)\lib;$(BOOST_BASEDIR)\stage.bak\lib;$(GLEW_BASEDIR)\lib\Release\Win32;$(GNUGO_BASEDIR)\patterns\Release;$(GNUGO_BASEDIR)\engine\Release;$(GNUGO_BASEDIR)\sgf\Release;$(GNUGO_BASEDIR)\utils\Release;$(PORTAUDIO_BASEDIR)\build\msvc\Win32\ReleaseMinDependency;d:\Projekty\glsl-optimizer\projects\vs2010\build\glsl_optimizer_lib\Debug\</AdditionalLibraryDirectories>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>C:\Program Files\boost\boost_1_55_0;D:\projekty\freeglut-2.8.1\include;D:\projekty\glew-1.10.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <AdditionalOptions>-D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>freeglut_static.lib;glew32s.lib;glu32.lib;opengl32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\boost\boost_1_55_0\stage\lib;D:\projekty\freeglut-2.8.1\lib\x86;D:\projekty\glew-1.10.0\lib\Release\Win32</AdditionalLibraryDirectories>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_USE_MATH_DEFINES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <AdditionalIncludeDirectories>D:\Projekty\deponejo\goban\src\shell\include;D:\Projekty\deponejo\goban\src\sgf\include;$(LIBROCKET_BASEDIR)\include;$(LIBSNDFILE_BASEDIR)\include;$(GNUGO_BASEDIR)\sgf;$(GNUGO_BASEDIR)\utils;$(GNUGO_BASEDIR)\engine;$(GNUGO_BASEDIR)\;$(PORTAUDIO_BASEDIR)\include;$(BOOST_BASEDIR)\;$(GLEW_BASEDIR)\include;D:\Projekty\glm;D:\Projekty\glsl-optimizer\src;D:\Projekty\freetype2\include;D:\Projekty\glyphy\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <AdditionalOptions>-D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+      <Optimization>MaxSpeed</Optimization>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>glyphy.lib;freetype255.lib;glew32s.lib;glu32.lib;opengl32.lib;engine.lib;board.lib;patterns.lib;sgf.lib;utils.lib;portaudio.lib;libsndfile-1.lib;user32.lib;gdi32.lib;advapi32.lib;RocketCore.lib;RocketDebugger.lib;RocketControls.lib;glsl_optimizer_lib-win32.lib;shell32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(LIBROCKET_BASEDIR)\buildDir\MinSizeRel;$(LIBSNDFILE_BASEDIR)\lib;$(BOOST_BASEDIR)\stage\lib;$(GLEW_BASEDIR)\lib\Release\Win32;$(GNUGO_BASEDIR)\patterns\Release;$(GNUGO_BASEDIR)\engine\Release;$(GNUGO_BASEDIR)\sgf\Release;$(GNUGO_BASEDIR)\utils\Release;$(PORTAUDIO_BASEDIR)\build\msvc\Win32\ReleaseMinDependency;D:\Projekty\glsl-optimizer\projects\vs2010\build\Win32\Release;D:\Projekty\glyphy\win32\Release;D:\Projekty\freetype2\objs\vc2010\Win32</AdditionalLibraryDirectories>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+    </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)..\data" "$(TargetDir)data" /D /Y /S /I
+xcopy "$(LIBSNDFILE_BASEDIR)\bin\libsndfile-1.dll" "$(TargetDir)" /D /Y</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <AdditionalIncludeDirectories>D:\projekty\formulky;D:\projekty\portaudio\include;C:\Program Files\boost\boost_1_55_0;D:\projekty\freeglut-2.8.1\include;D:\projekty\glew-1.10.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <AdditionalOptions>-D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>freeglut_static.lib;glew32s.lib;glu32.lib;opengl32.lib;portaudio.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\projekty\portaudio\build\msvc\Win32\ReleaseMinDependency;C:\Program Files\boost\boost_1_55_0\stage\lib;D:\projekty\freeglut-2.8.1\lib\x86;D:\projekty\glew-1.10.0\lib\Release\Win32</AdditionalLibraryDirectories>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <AdditionalOptions>/nodefaultlib:libcmt.lib %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="../src/Camera.cpp" />
+    <ClCompile Include="../src/Complex.cpp" />
+    <ClCompile Include="../src/Quaternion.cpp" />
+    <ClCompile Include="../src/Vector.cpp" />
+    <ClCompile Include="..\src\Board.cpp" />
+    <ClCompile Include="..\src\ElementGame.cpp" />
+    <ClCompile Include="..\src\Event.cpp" />
+    <ClCompile Include="..\src\EventHandler.cpp" />
+    <ClCompile Include="..\src\EventHandlerNewGame.cpp" />
+    <ClCompile Include="..\src\EventInstancer.cpp" />
+    <ClCompile Include="..\src\EventManager.cpp" />
+    <ClCompile Include="..\src\GameState.cpp" />
+    <ClCompile Include="..\src\GameThread.cpp" />
+    <ClCompile Include="..\src\glyphy\demo-atlas.cc" />
+    <ClCompile Include="..\src\glyphy\demo-buffer.cc" />
+    <ClCompile Include="..\src\glyphy\demo-font.cc" />
+    <ClCompile Include="..\src\glyphy\demo-glstate.cc" />
+    <ClCompile Include="..\src\glyphy\demo-shader.cc" />
+    <ClCompile Include="..\src\glyphy\matrix4x4.c" />
+    <ClCompile Include="..\src\GobanControl.cpp" />
+    <ClCompile Include="..\src\GobanModel.cpp" />
+    <ClCompile Include="..\src\GobanOverlay.cpp" />
+    <ClCompile Include="..\src\GobanShader.cpp" />
+    <ClCompile Include="..\src\GobanView.cpp" />
+    <ClCompile Include="..\src\gtpclient.cpp" />
+    <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\Metrics.cpp" />
+    <ClCompile Include="..\src\player.cpp" />
+    <ClCompile Include="..\src\shell\src\Input.cpp" />
+    <ClCompile Include="..\src\shell\src\Shell.cpp" />
+    <ClCompile Include="..\src\shell\src\ShellFileInterface.cpp" />
+    <ClCompile Include="..\src\shell\src\ShellRenderInterfaceOpenGL.cpp" />
+    <ClCompile Include="..\src\shell\src\ShellSystemInterface.cpp" />
+    <ClCompile Include="..\src\shell\src\win32\InputWin32.cpp" />
+    <ClCompile Include="..\src\shell\src\win32\ShellRenderInterfaceExtensionsOpenGL_Win32.cpp" />
+    <ClCompile Include="..\src\shell\src\win32\ShellWin32.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\Board.h" />
+    <ClInclude Include="..\src\Camera.h" />
+    <ClInclude Include="..\src\ElementGame.h" />
+    <ClInclude Include="..\src\Event.h" />
+    <ClInclude Include="..\src\EventHandler.h" />
+    <ClInclude Include="..\src\EventHandlerNewGame.h" />
+    <ClInclude Include="..\src\EventInstancer.h" />
+    <ClInclude Include="..\src\EventManager.h" />
+    <ClInclude Include="..\src\GameState.h" />
+    <ClInclude Include="..\src\GameThread.h" />
+    <ClInclude Include="..\src\glyphy\demo-atlas-glsl.h" />
+    <ClInclude Include="..\src\glyphy\demo-buffer.h" />
+    <ClInclude Include="..\src\glyphy\demo-common.h" />
+    <ClInclude Include="..\src\glyphy\demo-fshader-glsl.h" />
+    <ClInclude Include="..\src\glyphy\demo-glstate.h" />
+    <ClInclude Include="..\src\glyphy\demo-shader.h" />
+    <ClInclude Include="..\src\glyphy\demo-vshader-glsl.h" />
+    <ClInclude Include="..\src\GobanControl.h" />
+    <ClInclude Include="..\src\GobanModel.h" />
+    <ClInclude Include="..\src\GobanOverlay.h" />
+    <ClInclude Include="..\src\GobanShader.h" />
+    <ClInclude Include="..\src\GobanView.h" />
+    <ClInclude Include="..\src\gtpclient.h" />
+    <ClInclude Include="..\src\Metrics.h" />
+    <ClInclude Include="..\src\OldGame.h" />
+    <ClInclude Include="..\src\player.h" />
+    <ClInclude Include="..\src\sgf\include\sgf\sgf.hpp" />
+    <ClInclude Include="..\src\shell\include\Input.h" />
+    <ClInclude Include="..\src\shell\include\Shell.h" />
+    <ClInclude Include="..\src\shell\include\ShellFileInterface.h" />
+    <ClInclude Include="..\src\shell\include\ShellOpenGL.h" />
+    <ClInclude Include="..\src\shell\include\ShellRenderInterfaceExtensions.h" />
+    <ClInclude Include="..\src\shell\include\ShellRenderInterfaceOpenGL.h" />
+    <ClInclude Include="..\src\shell\include\ShellSystemInterface.h" />
+    <ClInclude Include="..\src\shell\include\win32\InputWin32.h" />
+    <ClInclude Include="opengl.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../data/glsl/fragment.glsl" />
+    <None Include="..\src\glyphy\demo-fshader.glsl" />
+    <None Include="libsndfile-1.dll" />
+    <None Include="../data/glsl/vertex.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="../data/sound/stone.wav" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Goban.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="../res/sgoban.ico" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
