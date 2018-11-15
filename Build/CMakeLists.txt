@@ -65,7 +65,6 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/shell/include
     ${PROJECT_SOURCE_DIR}/src/glyphy/
     ${PROJECT_SOURCE_DIR}/src/sgf/include
-#    ${GNUGO_INCLUDE_DIRS}
     ${OPENGL_INCLUDE_DIRS}
     ${GLUT_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}

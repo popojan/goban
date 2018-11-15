@@ -23,7 +23,7 @@ include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set LIBROCKET_FOUND to TRUE
 # if all listed variables are TRUE
 find_package_handle_standard_args(LibRocket DEFAULT_MSG
-                                  LIBROCKET_LIBRARY LIBROCKET_INCLUDE_DIR)
+                                  LIBROCKET_LIBRARIES LIBROCKET_INCLUDE_DIR)
 
-mark_as_advanced(LIBROCKET_INCLUDE_DIR LIBROCKET_LIBRARY )
+mark_as_advanced(LIBROCKET_INCLUDE_DIR LIBROCKET_LIBRARIES)
 
