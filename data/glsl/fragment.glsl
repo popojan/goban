@@ -86,11 +86,7 @@ uniform float bowlRadius2;
 
 struct Material {
 	int id;
-	float diffuseWeight;
-	float specularWeight;
-	float ambientWeight;
-	float bacWeight;
-	float fresnelWeight;
+	vec3 diffuseAmbientSpecularWeight;
 	float specularPower;
 	vec3 clrA;
 	vec3 clrB;
@@ -102,7 +98,6 @@ struct Intersection {
 	vec2 t;
 	vec3 p;
 	vec3 n;
-	vec3 nn;
 	int m;
 	float d;
 	float d2;
@@ -135,15 +130,15 @@ const int idBowlWhiteStone = 18;
 const vec3 bgA = vec3(0.0, 0.0, 0.0);
 const vec3 bgB = vec3(0.0, 0.0, 0.0);
 
-const Material mCupBlack = Material(idCupBlack, 0.4, 0.15, 0.6, 0.0, 0.0, 64.0, vec3(0.65826, 0.528209, 0.238209), vec3(0.387763, 0.3289191, 0.12761), vec3(0.22005, 0.180002, 0.1244), 1.3);
-const Material mCupWhite = Material(idCupWhite, 0.4, 0.15, 0.6, 0.0, 0.0, 64.0, vec3(0.45826, 0.428209, 0.238209), vec3(0.287763, 0.289191, 0.12761), vec3(0.12005, 0.120002, 0.085744), 1.3);
-const Material mBoard = Material(idBoard, 0.7, 0.15, 0.3, 0.0, 0.0, 128.0, vec3(0.93333, 0.713725, 0.38039), vec3(0.53333,0.313725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
-const Material mTable = Material(idTable, 1.2, 0.1, 0.05, 0.0, 0.0, 16.0, vec3(0.566,0.1196,0.0176), vec3(0.766,0.3196,0.2176), vec3(0.666,0.2196,0.1176), 0.0);
-const Material mWhite = Material(idWhiteStone, 0.23, 0.2, 0.63, 0.3, 0.4, 128.0, vec3(0.92), vec3(0.94), vec3(1.0), 0.5);
-const Material mBlack = Material(idBlackStone, 0.23, 0.6, 0.83, 0.3, 0.4, 128.0, vec3(0.08), vec3(0.04), vec3(0.16), 0.5);
-const Material mRed = Material(idLastBlackStone, 0.3, 0.25, 0.7, 0.3, 0.4, 16.0, vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
-const Material mBack = Material(idBack, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, bgA, bgB, bgA, 0.0);
-const Material mGrid  = Material(idGrid, 1.5, 0.15, 0.4, 0.4, 0.4, 128.0, vec3(0.0),vec3(0.0), vec3(0.0), 0.0);
+const Material mCupBlack = Material(idCupBlack, vec3(0.4, 0.6, 0.15), 16.0, vec3(0.65826, 0.528209, 0.238209), vec3(0.387763, 0.3289191, 0.12761), vec3(0.22005, 0.180002, 0.1244), 1.3);
+const Material mCupWhite = Material(idCupWhite, vec3(0.4, 0.6, 0.15), 16.0, vec3(0.45826, 0.428209, 0.238209), vec3(0.287763, 0.289191, 0.12761), vec3(0.12005, 0.120002, 0.085744), 1.3);
+const Material mBoard = Material(idBoard, vec3(0.7, 0.3, 0.15), 42.0, vec3(0.93333, 0.713725, 0.38039), vec3(0.53333,0.313725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
+const Material mTable = Material(idTable, vec3(1.2, 0.15, 0.0), 4.0, vec3(0.566,0.1196,0.0176), vec3(0.766,0.3196,0.2176), vec3(0.666,0.2196,0.1176), 0.0);
+const Material mWhite = Material(idWhiteStone, vec3(0.23, 0.63, 0.2), 42.0, vec3(0.92), vec3(0.94), vec3(1.0), 0.5);
+const Material mBlack = Material(idBlackStone, vec3(0.23, 0.83, 0.6), 42.0, vec3(0.08), vec3(0.04), vec3(0.16), 0.5);
+const Material mRed = Material(idLastBlackStone, vec3(0.3, 0.7, 0.25), 4.0, vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
+const Material mBack = Material(idBack, vec3(0.0, 1.0, 0.0), 1.0, bgA, bgB, bgA, 0.0);
+const Material mGrid  = Material(idGrid, vec3(1.5, 0.4, 0.15), 42.0, vec3(0.0),vec3(0.0), vec3(0.0), 0.0);
 
 uniform vec3 cc[2];
 const int maxCaptured = 32;
@@ -1219,8 +1214,10 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
 		scrd = 13.3*scoord;
 		noisy = true;
         const float al = 0.15;
-        mcolb = mcol + (al)*(vec3(1.0) - mcol);
-        mcolc = (1.0 - al)*mcol;
+		float mixt = exp(-0.35*max(0.0, length(ip.p)));
+        mcolb = mixt*(mcol + (al)*(vec3(1.0) - mcol));
+        mcolc = mixt*((1.0 - al)*mcol);
+        mcol *= mixt;
 	}
 	float rnd = 0.0;
 	//if (noisy) {
@@ -1243,28 +1240,16 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
 	return mat;
 }
 
-vec3 shading(in vec3 ro, in Intersection ip, const Material mat, vec3 col){
+vec3 shading(in vec3 ro, in vec3 rd, in Intersection ip, const Material mat, vec3 col){
 	vec3 ret;
 	if (mat.id == mBack.id) {
 		ret = mat.clrA;
 	}
 	else {
-				vec3 rd = normalize(ip.p - ro);
-		vec3 smult0 = vec3(0.01);
-		smult0 = clamp(abs(col - mat.clrB) / abs(mat.clrA.x - mat.clrB), 0.0, 1.0);
-		float smult = (smult0.x + smult0.y + smult0.z) / 3.0;
-		vec3 nn = ip.n;//ip.isBoard ? ip.nn : ip.n;// mat.id != mWhite.id && mat.id != mBlack.id ? ip.nn : ip.n;//normalize(mix(ip.n, ip.nn, 0.15));
+		//vec3 smult0 = clamp(abs(col - mat.clrB) / abs(mat.clrA.x - mat.clrB), 0.0, 1.0);
+		//float smult = 0.333 * dot(smult0, vec3(1.0));
+		vec3 nn = ip.n;
 		vec3 ref = reflect(rd, nn);
-		//max4x3 ligs = mat4x3(lig,lig2,lig3,lig);
-		//mat4x4 ress = ligs*ligs;
-		float alpha = 0.0; //2.1*iTime;
-		float cosa = cos(alpha);
-		float sina = sin(alpha);
-		mat2 mm = mat2(cosa, sina, -sina, cosa);
-
-		vec3 lpos = vec3(mm * lpos.xz, lpos.y).xzy;
-		vec3 lpos2 = vec3(mm * lpos2.xz, lpos2.y).xzy;
-		vec3 lpos3 = vec3(mm * lpos3.xz, lpos3.y).xzy;
 		vec3 lig = normalize(lpos - ip.p);
 		vec3 lig2 = normalize(lpos2 - ip.p);
 		vec3 lig3 = normalize(lpos3 - ip.p);
@@ -1272,24 +1257,12 @@ vec3 shading(in vec3 ro, in Intersection ip, const Material mat, vec3 col){
 		//shadow += 0.4*pow(softshadow(ip.p, ip.n, lpos2, ldia, ip.m, false, ip.uid), vec2(1.0,0.25));
 
 		float nny = 0.5 + 0.5*nn.y;
-		vec2 ads =
-			0.6*clamp(vec2(nny, dot(nn, lig)), 0.0, 1.0) +
-			0.3*clamp(vec2(nny, dot(nn, lig2)), 0.0, 1.0) +
-			0.3*clamp(vec2(nny, dot(nn, lig3)), 0.0, 1.0);
-		//0.2*clamp(vec2(nny, dot(nn, lig4)),0.0,1.0);
-
+		float adsy = dot(vec3(0.6,0.3,0.3), vec3(dot(nn, lig), dot(nn, lig2), dot(nn, lig3)));
 		vec4 pws = clamp(vec4(dot(ref, lig), dot(ref, lig2), dot(ref, lig3), dot(ref, lig3)), 0.0, 1.0);
-		float pw = exp(mat.refl*(-0.5 - smult));
-		float cupsa = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? 0.9 : 1.0;
-		float cupsb = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? 0.5 : 1.0;
-		ret = dot(
-			vec2(mat.diffuseWeight, mat.ambientWeight),
-			vec2(ads.y * shadow.x, shadow.y)
-			)*col + vec3(1.0)*mat.specularWeight*(0.25*pow(pws.x, 0.125*mat.specularPower) + pow(pws.y, cupsb*pw*mat.specularPower)
-			+ pow(pws.z, cupsb*0.5*pw*mat.specularPower));
-		if (ip.m == idTable) {
-			ret = mix(mBack.clrA, ret, exp(-0.35*max(0.0, length(ip.p))));
-		}
+		vec3 cupsab = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? vec3(0.125,0.9,0.25) : vec3(0.125,1.0,0.5);
+        vec3 pwr = pow(pws.xyz, mat.specularPower*cupsab);
+		vec3 score  = mat.diffuseAmbientSpecularWeight * vec3(adsy * shadow.x, shadow.y,0.25*pwr.x + pwr.y + pwr.z);
+        ret = (score.x + score.y)*col + score.z;
 	}
 	ret = pow(ret, gamma*exp(contrast*(vec3(0.5) - ret)));
 	return ret;
@@ -1311,10 +1284,12 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
 	mat = getMaterialColor(ret[0], mcol, rd, ro);
     float w = alpha1;
     float wcol = (1.0-w);
-	col = shading(ro, ret[0], mat, mcol);
+	col = shading(ro, rd, ret[0], mat, mcol);
 	if (ret[0].m == idBoard) {
 	    float alpha3 = smoothstep(boardaa, 0.0, -ret[0].d2);
-        col = mix(col, shading(ro, ret[0], mGrid, mGrid.clrA), alpha3);
+        if(alpha3 > 0.0) {
+            col = mix(col, shading(ro, rd, ret[0], mGrid, mGrid.clrA), alpha3);
+        }
     }
     col *= (1.0-w);
 	gl_FragDepth = (ret[0].m == mBlack.id || ret[0].m == mWhite.id) ? 0.5 : (ret[0].p.y < -0.001 ? 0.25 : 0.75);//; distance(ro, ret[0].p) / 100.0;
@@ -1323,12 +1298,13 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
 		mat = getMaterialColor(ret[1], mcol, rd, ro);
 		//mcol = 0.5*(mat.clrA+mat.clrB);
 
-		col1 = shading(ro, ret[1], mat, mcol);
+		col1 = shading(ro, rd, ret[1], mat, mcol);
 		if (ret[1].m == idBoard) {
-			col2 = shading(ro, ret[1], mBoard, mBoard.clrA);
-			vec3 col3 = shading(ro, ret[1], mGrid, mGrid.clrA);
-	        float alpha3 = smoothstep(boardaa, 0.0, -ret[1].d2);
-			col1 = mix(col2, col3, alpha3);
+            float alpha3 = smoothstep(boardaa, 0.0, -ret[1].d2);
+			if(alpha3 > 0.0) {
+                vec3 col3 = shading(ro, rd, ret[1], mGrid, mGrid.clrA);
+                col1 = mix(col1, col3, alpha3);
+            }
 			col += alpha1*col1;
             wcol += alpha1;
 		}
