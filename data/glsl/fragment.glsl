@@ -105,6 +105,7 @@ struct Intersection {
 	vec3 nn;
 	int m;
 	float d;
+	float d2;
 	vec4 dummy;
 	bool isBoard;
 	int uid;
@@ -779,6 +780,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 		ret.t = vec2(tb, tb);
 		ret.m = idBoard;
 		ret.d = -farClip;
+		ret.d2 = -farClip;
 		ret.p = ip;
 		ret.isBoard = isBoardTop;
 
@@ -805,20 +807,13 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 		vec3 w = cross(v, u);
 		ret.nn = normalize(mix(normalize(ret.n), normalize((cos(phi)*v - sin(phi)*w)), sqrt(0.15*len)));
 		*/
-
-		if (dd < 1.0 && dist0 < -dd*boardaa) {
-			ret.d = dist0;
-			ret.m = idGrid;
-			ret.p = ip;
-			updateResult(result, ret);
-		}
-		if (dd > 0.0) {
-			ret.m = idBoard;
-			dist0 = max(dist0, -dd*boardaa);
-			ret.p = ip;
-			ret.d = dist0;
-			updateResult(result, ret);
-		}
+		ret.p = ip;
+        bool upit = false;
+        ret.d = dist0;
+        dist0 = max(dist0, -dd*boardaa);
+        ret.d2 = dist0;
+        ret.m = idBoard;
+        updateResult(result, ret);
 		ret.isBoard = false;
 	}
 	float t1, t2;
@@ -1497,69 +1492,39 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
 	castRay(ro, rd, ret);
 
 	float alpha1 = smoothstep(boardaa, 0.0, -ret[0].d);
+	float alpha2 = smoothstep(boardaa, 0.0, -ret[1].d);
 	vec3 col, mcol;
 	Material mat;
-	/*if(ret[0].m == idTable) {
-	vec4 c = vec4(0.0);
 	mat = getMaterialColor(ret[0], mcol, rd, ro);
-
-	vec3 pos = ret[0].p;
-	vec3 col8 = shading(ro, ret[0], mTable, mcol);;
-	for(int i=0; i<furLayers; i++) {
-	vec3 Pi0;
-	vec4 sampleCol;
-	sampleCol.a = furDensity(pos, Pi0);
-	if (sampleCol.a > 0.0) {
-	sampleCol.rgb = furShade(pos, ro, sampleCol.a, col8, Pi0);
-	// pre-multiply alpha
-	sampleCol.rgb *= sampleCol.a;
-	if (c.a > 0.95) break;
-	c = c + sampleCol*(1.0 - c.a);
-	}
-	float t = dot(vec3(0.0,bnx.y-legh-float(i+1)*rayStep,0.0)-ro,nBoard)/dot(rd,nBoard);
-	pos = ro + t*rd;
-	}
-	col = mix(c.rgb, col8, 0.75);
-
-	//col = col8;
-	alpha1 = 0.0;
-	}
-	else {*/
-	mat = getMaterialColor(ret[0], mcol, rd, ro);
-	col0 = shading(ro, ret[0], mat, mcol);
-	/*if(ret[0].m != idCup && (ret[0].isBoard || ret[0].m != idBoard)) {
-	vec3 rd = reflect(rd, ret[0].n);
-	ro = ret[0].p + 0.0001*ret[0].n;
-	Intersection ret[2];
-	castRay(ro, rd, ret);
-	Material mat = getMaterialColor(ret[0], mcol, rd, ro);
-	col0 += (vec3(1.0) - col0)*0.25*shading(ro, ret[0], mat, mcol);
-	}*/
-	
+    float w = alpha1;
+    float wcol = (1.0-w);
+	col = shading(ro, ret[0], mat, mcol);
+	if (ret[0].m == idBoard) {
+	    float alpha3 = smoothstep(boardaa, 0.0, -ret[0].d2);
+        col = mix(col, shading(ro, ret[0], mGrid, mGrid.clrA), alpha3);
+    }
+    col *= (1.0-w);
 	gl_FragDepth = (ret[0].m == mBlack.id || ret[0].m == mWhite.id) ? 0.5 : (ret[0].p.y < -0.001 ? 0.25 : 0.75);//; distance(ro, ret[0].p) / 100.0;
-	if (alpha1 > 0.05) {
+	if (alpha1 > 0.0) {
 		//ret[0] = mix(ret[0].n, ret[1].n, alpha1)
 		mat = getMaterialColor(ret[1], mcol, rd, ro);
 		//mcol = 0.5*(mat.clrA+mat.clrB);
 
 		col1 = shading(ro, ret[1], mat, mcol);
-		float alpha2 = smoothstep(boardaa, 0.0, -ret[1].d);
-		if (ret[1].m == idBoard && alpha2 > 0.0) {
+		if (ret[1].m == idBoard) {
 			col2 = shading(ro, ret[1], mBoard, mBoard.clrA);
-			col = mix(col0, mix(col1, col2, alpha2), alpha1);
+			vec3 col3 = shading(ro, ret[1], mGrid, mGrid.clrA);
+	        float alpha3 = smoothstep(boardaa, 0.0, -ret[1].d2);
+			col1 = mix(col2, col3, alpha3);
+			col += alpha1*col1;
+            wcol += alpha1;
 		}
 		else {
-			alpha2 = 0.0;
-			col = mix(col0, col1, alpha1);
+			col += alpha1*(1.0-alpha2)*col1;
+            wcol += alpha1*(1.0-alpha2);
 		}
 	}
-	else {
-		alpha1 = 0.0;
-		col = col0;
-	}
-	//}
-	
-	return col;
+	return col/wcol;
 }
 
 
