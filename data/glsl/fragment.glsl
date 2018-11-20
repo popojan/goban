@@ -1007,8 +1007,8 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 		//float sina = sin(alpha);
 		//vec2 xz = mat2(cosa,sina, -sina, cosa)*ret.p.xz;
 		//vec3 retp = vec3(xz, ret.p.y).xzy;
-		vec3 nn = 2.0*vec3(-0.5 + surface3(ret.p, 212.0), 0.0, -0.5 + surface3(ret.p, 213.0));
-		ret.n = normalize(mix(nBoard, nn, 0.15*exp(-0.075*length(ret.p - ro))));
+		//vec3 nn = 2.0*vec3(-0.5 + surface3(ret.p, 212.0), 0.0, -0.5 + surface3(ret.p, 213.0));
+		ret.n = nBoard;//normalize(mix(nBoard, nn, 0.15*exp(-0.075*length(ret.p - ro))));
 		ret.d = -farClip;
 		updateResult(result, ret);
 	}
@@ -1315,13 +1315,11 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
 			float sina = sin(alpha);
 			xz = mat2(cosa, sina, -sina, cosa)*ip.p.xz;
 			scoord = 16.0*vec3(xz.x, ip.p.y, xz.y) + vec3(0.0, 0.25, 0.0);
-		//scoord.z *= 0.24;
-		//scoord.y += 1.2;
-		scoord.x *= 6.14;
-		scoord.y *= 5.14;
-		//noisy = true;
-		scrd = 0.5*scoord;
-		noisy = false;
+		scrd = 13.3*scoord;
+		noisy = true;
+        const float al = 0.15;
+        mcolb = mcol + (al)*(vec3(1.0) - mcol);
+        mcolc = (1.0 - al)*mcol;
 	}
 	float rnd = 0.0;
 	//if (noisy) {
@@ -1334,25 +1332,13 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
 		smult2 = mix(rnd, 1.0, 0.05)*(clamp(0.25*(sin(1.5*w1)), 0.0, 1.0));
 		smult3 = 1.0 - smult2;
 	}
-	else if (mat.id == mBlack.id || mat.id == mGrid.id || mat.id == mWhite.id) {
+	else if (mat.id == mBlack.id || mat.id == mGrid.id || mat.id == mWhite.id || mat.id == mTable.id) {
 		smult1 = rnd;
 		smult2 = 0.2;//5;
 		smult3 = 1.0 - smult2;
 		mixmult = 1.0;
-	}/*
-	else if (mat.id == mWhite.id) {
-		//scoord.x = length(scoord.xy);
-		smult1 = rnd;
-		//smult1 = abs(sin(11.0 + 131.0*scoord.x));
-		smult2 = 0.2;//abs(sin(1.3 - 101.0*scoord.x) + sin(1.3 - 121.0*scoord.x));
-		smult3 = 1.0 - smult2;
 	}
-	else {
-		smult3 = 1.0 - smult2;
-	}*/
-	//smult1 = mix(0.5, smult1, exp(-0.05*length(ip.p - ro)));
-	//smult2 = mix(0.5, smult2, exp(-0.05*length(ip.p - ro)));
-	mcol = mix(mix(mcol, mcolb, smult2), mix(mcol, mcolc, 1.0 - smult2), smult1);
+    mcol = mix(mix(mcol, mcolb, smult2), mix(mcol, mcolc, 1.0 - smult2), smult1);
 	return mat;
 }
 
