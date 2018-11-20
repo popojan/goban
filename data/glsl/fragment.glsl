@@ -135,30 +135,17 @@ const int idBowlWhiteStone = 18;
 const vec3 bgA = vec3(0.0, 0.0, 0.0);
 const vec3 bgB = vec3(0.0, 0.0, 0.0);
 
-//*žlutá*//
-//const Material mBoard = Material(idBoard, 0.7, 0.05, 0.25, 0.0, 0.0, 32.0, vec3(0.68826, 0.680998, 0.428209), vec3(0.787763, 0.789191, 0.4761), vec3(0.858005, 0.780002, 0.405744), 1.2);
-//const Material mBoard = Material(idBoard, 0.5, 0.25, 0.4, 0.0, 0.0, 64.0, vec3(0.75826, 0.728209, 0.438209), vec3(0.787763, 0.789191, 0.4761), vec3(0.758005, 0.780002, 0.405744), 1.3);
-//const Material mBoard = Material(idBoard, 0.6, 0.15, 0.4, 0.0, 0.0, 64.0, vec3(0.55826, 0.528209, 0.238209), vec3(0.487763, 0.489191, 0.3761), vec3(0.52005, 0.520002, 0.385744), 1.3);
 const Material mCupBlack = Material(idCupBlack, 0.4, 0.15, 0.6, 0.0, 0.0, 64.0, vec3(0.65826, 0.528209, 0.238209), vec3(0.387763, 0.3289191, 0.12761), vec3(0.22005, 0.180002, 0.1244), 1.3);
 const Material mCupWhite = Material(idCupWhite, 0.4, 0.15, 0.6, 0.0, 0.0, 64.0, vec3(0.45826, 0.428209, 0.238209), vec3(0.287763, 0.289191, 0.12761), vec3(0.12005, 0.120002, 0.085744), 1.3);
-//const Material mBoard = Material(idBoard, 0.6, 0.15, 0.6, 0.0, 0.0, 128.0, vec3(0.55, 0.55, 0.3), vec3(0.5,0.5,0.3), vec3(0.45,0.45, 0.3), 1.5);
-////const Material mBoard = Material(idBoard, 0.6, 0.15, 0.6, 0.0, 0.0, 128.0, vec3(0.45826, 0.328209, 0.238209), vec3(0.287763, 0.189191, 0.12761), vec3(0.22005, 0.120002, 0.105744), 1.5);
-///const Material mBoard = Material(idBoard, 0.7, 0.15, 0.3, 0.0, 0.0, 128.0, vec3(0.88, 0.78, 0.43), vec3(0.7,0.6,0.3), vec3(0.7,0.65, 0.2), 1.5);
 const Material mBoard = Material(idBoard, 0.7, 0.15, 0.3, 0.0, 0.0, 128.0, vec3(0.93333, 0.713725, 0.38039), vec3(0.53333,0.313725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
-//const Material mBoard = Material(idBoard, 0.5, 0.05, 0.25, 0.0, 0.0, 32.0, vec3(0.48826, 0.328209, 0.228209), vec3(0.587763, 0.589191, 0.4761), vec3(0.658005, 0.580002, 0.405744), 0.5);
-//const Material mBoard = Material(idBoard, 0.7, 0.05, 0.25, 0.0, 0.0, 15.0, vec3(0.7,0.7,0.3), vec3(0.65,0.65,0.3), vec3(0.6,0.6,0.3), 0.5);
-////const Material mTable = Material(idTable, 1.2, 0.1, 0.05, 0.0, 0.0, 16.0, vec3(0.566, 0.1196, 0.0176), vec3(0.666, 0.3196, 0.2176), vec3(0.666, 0.2196, 0.1176), 0.0);//vec3(0.8,0.2,0.2), vec3(0.7,0.1,0.1), vec3(0.6,0.2,0.2));
-const Material mTable = Material(idTable, 1.2, 0.1, 0.05, 0.0, 0.0, 16.0, vec3(0.566,0.1196,0.0176), vec3(0.766,0.3196,0.2176), vec3(0.666,0.2196,0.1176), 0.0);//vec3(0.8,0.2,0.2), vec3(0.7,0.1,0.1), vec3(0.6,0.2,0.2));
+const Material mTable = Material(idTable, 1.2, 0.1, 0.05, 0.0, 0.0, 16.0, vec3(0.566,0.1196,0.0176), vec3(0.766,0.3196,0.2176), vec3(0.666,0.2196,0.1176), 0.0);
 const Material mWhite = Material(idWhiteStone, 0.23, 0.2, 0.63, 0.3, 0.4, 128.0, vec3(0.92), vec3(0.94), vec3(1.0), 0.5);
 const Material mBlack = Material(idBlackStone, 0.23, 0.6, 0.83, 0.3, 0.4, 128.0, vec3(0.08), vec3(0.04), vec3(0.16), 0.5);
 const Material mRed = Material(idLastBlackStone, 0.3, 0.25, 0.7, 0.3, 0.4, 16.0, vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
 const Material mBack = Material(idBack, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, bgA, bgB, bgA, 0.0);
-////const Material mGrid = Material(idGrid, 1.5, 0.15, 0.4, 0.4, 0.4, 128.0, 
-////	vec3(0.67826, 0.488209, 0.348209), vec3(0.67826, 0.488209, 0.348209), vec3(0.67826, 0.488209, 0.348209),/* vec3(0.45826, 0.328209, 0.238209), vec3(0.45826, 0.328209, 0.238209), */ 0.0);
 const Material mGrid  = Material(idGrid, 1.5, 0.15, 0.4, 0.4, 0.4, 128.0, vec3(0.0),vec3(0.0), vec3(0.0), 0.0);
 
 uniform vec3 cc[2];
-//float ddcy = 0.5*h-bowlRadius;
 const int maxCaptured = 32;
 uniform vec3 ddc[6 * maxCaptured];
 
@@ -383,38 +370,6 @@ float distanceRaySquare(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 bmin, in vec
 	ret = -distance(q1, q2) / distance(ro, q1);
 	return ret;
 }
-/*float func(in vec3 ro, in vec3 rd, in vec3 cc, float t) {
-vec3 a = ro + t*rd - cc;
-return (dot(a.xz,a.xz) + 8.0*(1.0 + dot(a.xz, a.xz))*a.y*a.y)/(r1*r1) - 1.0;
-}
-
-bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out vec4 res, out float t2){
-float tn1 = length(ro - dd) - r1;
-float tn0 = length(ro - dd);
-float tn2;
-bool found = false;
-float e = 0.01;
-float y1, y2;
-float d;
-for(int i = 0; i < 16; i++){
-float y1 = func(ro, rd, dd,tn1);
-float y2 = func(ro, rd, dd,tn0);
-tn2 = tn1 - y1*(tn1-tn0)/(y1 - y2);
-d = min(y1,y2);
-if(abs(y2) < e && abs(y1) < e && abs(tn1-tn0)<e) {
-found = true;
-break;
-}
-tn0 = tn1;
-tn1 = tn2;
-}
-res = noIntersection4;
-if (found) {
-vec3 ip = ro+rd*tn2;
-res = vec4(normalize(vec3(2.0*ip.x+8.0*ip.x*ip.y*ip.y,8.0*(1.0+dot(ip.xz, ip.xz))*ip.y, 2.0*ip.z+8.0*ip.z*ip.y*ip.y)), tn2);
-}
-return found;
-}*/
 
 bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out vec4 res, out float t2){
 	vec2 dpre = intersectionRaySphereR(ro, rd, dd, r1*r1);
@@ -453,22 +408,6 @@ bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out ve
 	return rval;
 }
 
-//
-// GLSL textureless classic 3D noise "cnoise",
-// with an RSL-style periodic variant "pnoise".
-// Author:  Stefan Gustavson (stefan.gustavson@liu.se)
-// Version: 2011-10-11
-//
-// Many thanks to Ian McEwan of Ashima Arts for the
-// ideas for permutation and gradient selection.
-//
-// Copyright (c) 2011 Stefan Gustavson. All rights reserved.
-// Distributed under the MIT license. See LICENSE file.
-// https://github.com/ashima/webgl-noise
-//
-
-// Classic Perlin noise
-
 // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
 uint hash(uint x) {
 	x += (x << 10u);
@@ -478,14 +417,9 @@ uint hash(uint x) {
 	x += (x << 15u);
 	return x;
 }
-
-
-
-// Compound versions of the hashing algorithm I whipped together.
 uint hash(uvec2 v) { return hash(v.x ^ hash(v.y)); }
 uint hash(uvec3 v) { return hash(v.x ^ hash(v.y) ^ hash(v.z)); }
 uint hash(uvec4 v) { return hash(v.x ^ hash(v.y) ^ hash(v.z) ^ hash(v.w)); }
-
 
 
 // Construct a float with half-open range [0:1] using low 23 bits.
@@ -500,7 +434,6 @@ float floatConstruct(uint m) {
 	float  f = uintBitsToFloat(m);       // Range [1:2]
 	return f - 1.0;                        // Range [0:1]
 }
-
 
 // Pseudo-random value in half-open range [0:1].
 float rand(float x) { return floatConstruct(hash(floatBitsToUint(x))); }
@@ -518,9 +451,7 @@ highp float rand_(vec3 co)
 	//return sn;
 }
 
-float cnoise(vec3 P)
-{
-
+float cnoise(vec3 P) {
 	vec3 Pi0 = floor(P); // Integer part for indexing
 	vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1
 	//Pi0 = mod289(Pi0);
@@ -584,14 +515,6 @@ float surface3(vec3 coord, float frequency) {
 }
 
 void updateResult(inout Intersection result[2], Intersection ret) {
-	/*	float phi = 2.0*3.14*surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
-	float len = surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
-	vec3 u = ret.n;
-	vec3 v = cross(u, vec3(1.0));
-	vec3 w = cross(v, u);
-	ret.nn = normalize(mix(normalize(ret.n), normalize((cos(phi)*v - sin(phi)*w)), sqrt(0.05*len)));
-	*/
-	//result[idx] = ret;
 	if (ret.t.x <= result[0].t.x) {
 		result[1] = result[0];
 		result[0] = ret;
@@ -600,69 +523,6 @@ void updateResult(inout Intersection result[2], Intersection ret) {
 		result[1] = ret;
 	}
 }
-
-
-void finalizeStoneIntersection(in vec3 ro, in vec3 rd, inout Intersection ret[2], const int i) {
-	vec3 dd = ret[i].dummy.xyz;
-	bvec3 isStone = bvec3(ret[i].m == idBlackStone || ret[i].m == idWhiteStone || ret[i].m == idBowlBlackStone || ret[i].m == idBowlWhiteStone,
-		ret[i].m == idCapturedBlackStone || ret[i].m == idCapturedWhiteStone,
-		ret[i].m == idLastBlackStone || ret[i].m == idLastWhiteStone);
-	vec3 dist0a;
-	Intersection r2 = ret[i];
-	if (any(isStone)) {
-		dist0a = distanceRayStoneSphere(ro, rd, dd - dn, stoneRadius);
-		vec3 dist0b = distanceRayStoneSphere(ro, rd, dd + dn, stoneRadius);
-		dist0a = dist0a.y > dist0b.y ? dist0a : dist0b;
-		dist0b.yz = distanceRayStone(ro, rd, dd);
-		ret[i].d = mix(dist0a.y / dist0a.z, dist0b.y / dist0b.z, step(0.0, dist0a.x));
-		//ret[i].d = mix(dist0a.y, dist0b.y, step(0.0, dist0a.x))/distance(ro, dd);
-		//float dn = surface3(vec3(153.0,52.0,151.0)*ret[i].p.xyz, 1.0);
-		//dn *= 0.25*abs(-1.0+2.0/(1.0+exp(-80.0*max(0.0, length(ret[i].p.xz - dd.xz)-0.25*ww))));
-		//ret[i].n = normalize(ret[i].n - dn * normalize(ret[i].p.xyz - dd));
-	}
-	if (any(isStone.yz)) {
-		int idStoneInside = ret[i].m;
-        int idStone = idStoneInside;
-        if(idStone == idCapturedBlackStone){
-            idStone = idBlackStone;
-            idStoneInside = idWhiteStone;
-        }
-        else if(idStone == idCapturedWhiteStone){
-            idStone = idWhiteStone;
-            idStoneInside = idBlackStone;
-        }
-        else if(idStone == idLastBlackStone){
-            idStone = idBlackStone;
-            idStoneInside = idLastBlackStone;
-        }
-        else if(idStone == idLastWhiteStone){
-            idStone = idWhiteStone;
-            idStoneInside = idLastWhiteStone;
-        }
-		ret[i].m = idStoneInside;
-
-		vec3 cc = dd;
-		cc.y -= dn.y - sqrt(stoneRadius2 - 0.25*r1*r1);
-		vec3 ip0 = ro + rd*dot(cc - ro, nBoard) / dot(rd, nBoard);
-		vec3 q2;
-
-		//idStone = (ret[i].m == idLastBlackStone || ret[i].m == idCapturedBlackStone) ? idBlackStone : idWhiteStone;
-		bool isNotArea = length(ret[i].p.xz - cc.xz) > 0.5*r1;
-		if (isNotArea) {
-			vec2 rr = distanceRayCircle(ro, rd, ip0, ret[i].t, cc, 0.5*r1, q2);
-			r2.d = abs(rr.y);
-			if (rr.x <0.0 && r2.d < boardaa){
-				r2.d = max(-r2.d, ret[i].d);
-				r2.m = idStone;
-				updateResult(ret, r2);
-			}
-			else{
-				ret[i].m = idStone;
-			}
-		}
-	}
-}
-
 
 void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 
@@ -1002,13 +862,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 		ret.m = idTable;
 		ret.t = vec2(t);
 		ret.p = ro + t*rd;
-		//float alpha = iTime;
-		//float cosa = cos(alpha);
-		//float sina = sin(alpha);
-		//vec2 xz = mat2(cosa,sina, -sina, cosa)*ret.p.xz;
-		//vec3 retp = vec3(xz, ret.p.y).xzy;
-		//vec3 nn = 2.0*vec3(-0.5 + surface3(ret.p, 212.0), 0.0, -0.5 + surface3(ret.p, 213.0));
-		ret.n = nBoard;//normalize(mix(nBoard, nn, 0.15*exp(-0.075*length(ret.p - ro))));
+		ret.n = nBoard;
 		ret.d = -farClip;
 		updateResult(result, ret);
 	}
@@ -1020,7 +874,6 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 			ret.d = distanceRaySphere(ro, rd, cc, r);
 			vec3 ip = ro + ts.x*rd;
 			cc.y = bnx.y - legh;
-			//if(aboveTable) ret.d = max(dist0, distanceRayCircle(ro, rd, ip, ts, cc, rc).y);
 			ret.t = ts;
 			ret.m = idLeg1 + i;
 			ret.p = ip;
@@ -1028,9 +881,61 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 			updateResult(result, ret);
 		}
 	}
-	finalizeStoneIntersection(ro, rd, result, 0);
-	finalizeStoneIntersection(ro, rd, result, 1);
-	
+	//finalizeStoneIntersection(ro, rd, result, 0);
+	vec3 dd = result[0].dummy.xyz;
+	bvec3 isStone = bvec3(result[0].m == idBlackStone || result[0].m == idWhiteStone || result[0].m == idBowlBlackStone || result[0].m == idBowlWhiteStone,
+		result[0].m == idCapturedBlackStone || result[0].m == idCapturedWhiteStone,
+		result[0].m == idLastBlackStone || result[0].m == idLastWhiteStone);
+	vec3 dist0a;
+	Intersection r2 = result[0];
+	if (any(isStone)) {
+		dist0a = distanceRayStoneSphere(ro, rd, dd - dn, stoneRadius);
+		vec3 dist0b = distanceRayStoneSphere(ro, rd, dd + dn, stoneRadius);
+		dist0a = dist0a.y > dist0b.y ? dist0a : dist0b;
+		dist0b.yz = distanceRayStone(ro, rd, dd);
+		result[0].d = mix(dist0a.y / dist0a.z, dist0b.y / dist0b.z, step(0.0, dist0a.x));
+	}
+	if (any(isStone.yz)) {
+		int idStoneInside = result[0].m;
+        int idStone = idStoneInside;
+        if(idStone == idCapturedBlackStone){
+            idStone = idBlackStone;
+            idStoneInside = idWhiteStone;
+        }
+        else if(idStone == idCapturedWhiteStone){
+            idStone = idWhiteStone;
+            idStoneInside = idBlackStone;
+        }
+        else if(idStone == idLastBlackStone){
+            idStone = idBlackStone;
+            idStoneInside = idLastBlackStone;
+        }
+        else if(idStone == idLastWhiteStone){
+            idStone = idWhiteStone;
+            idStoneInside = idLastWhiteStone;
+        }
+		result[0].m = idStoneInside;
+
+		vec3 cc = dd;
+		cc.y -= dn.y - sqrt(stoneRadius2 - 0.25*r1*r1);
+		vec3 ip0 = ro + rd*dot(cc - ro, nBoard) / dot(rd, nBoard);
+		vec3 q2;
+
+		bool isNotArea = length(result[0].p.xz - cc.xz) > 0.5*r1;
+		if (isNotArea) {
+			vec2 rr = distanceRayCircle(ro, rd, ip0, result[0].t, cc, 0.5*r1, q2);
+			r2.d = abs(rr.y);
+			if (rr.x <0.0 && r2.d < boardaa){
+				r2.d = max(-r2.d, result[0].d);
+				r2.m = idStone;
+				updateResult(result, r2);
+			}
+			else{
+				result[0].m = idStone;
+			}
+		}
+	}
+	//finalizeStoneIntersection(ro, rd, result, 1);
 }
 
 vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int m, bool ao, int uid){
@@ -1242,10 +1147,6 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
 	vec3 mcolc = m0.clrC;
 	vec3 scrd;
 	float degrade = (1.0 + floor(length(ro) / 3.0));
-	//float alpha = iTime;
-	//float cosa = cos(alpha);
-	//float sina = sin(alpha);
-	//vec2 xz = mat2(cosa,sina, -sina, cosa)*ip.p.xz;
 	vec2 xz;
 	xz = ip.p.xz;
 	if (mat.id == mBoard.id || mat.id == mCupBlack.id || mat.id == mCupWhite.id) {
@@ -1367,13 +1268,8 @@ vec3 shading(in vec3 ro, in Intersection ip, const Material mat, vec3 col){
 		vec3 lig = normalize(lpos - ip.p);
 		vec3 lig2 = normalize(lpos2 - ip.p);
 		vec3 lig3 = normalize(lpos3 - ip.p);
-		//vec3 lig4 = normalize(lpos4 - ip.p);
-		//vec3 ligA = normalize(lposA - ip.p);
-		//vec3 ligB = normalize(lposB - ip.p);
-		//vec3 ligC = normalize(lposC - ip.p);
-		//vec3 ligD = normalize(lposD - ip.p);
-		vec2 shadow = 0.6*pow(softshadow(ip.p, ip.n, lpos, ldia, ip.m, false, ip.uid), vec2(1.0, 0.25));
-		shadow += 0.4*pow(softshadow(ip.p, ip.n, lpos2, ldia, ip.m, false, ip.uid), vec2(1.0,0.25));
+		vec2 shadow = pow(softshadow(ip.p, ip.n, lpos, ldia, ip.m, false, ip.uid), vec2(1.0, 0.25));//0.6
+		//shadow += 0.4*pow(softshadow(ip.p, ip.n, lpos2, ldia, ip.m, false, ip.uid), vec2(1.0,0.25));
 
 		float nny = 0.5 + 0.5*nn.y;
 		vec2 ads =
@@ -1383,10 +1279,6 @@ vec3 shading(in vec3 ro, in Intersection ip, const Material mat, vec3 col){
 		//0.2*clamp(vec2(nny, dot(nn, lig4)),0.0,1.0);
 
 		vec4 pws = clamp(vec4(dot(ref, lig), dot(ref, lig2), dot(ref, lig3), dot(ref, lig3)), 0.0, 1.0);
-		//ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligA), 0.0), 0.0,1.0);
-		//ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligB), 0.0), 0.0,1.0);
-		//ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligC), 0.0), 0.0,1.0);
-		//ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligD), 0.0), 0.0,1.0);
 		float pw = exp(mat.refl*(-0.5 - smult));
 		float cupsa = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? 0.9 : 1.0;
 		float cupsb = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? 0.5 : 1.0;
@@ -1395,77 +1287,12 @@ vec3 shading(in vec3 ro, in Intersection ip, const Material mat, vec3 col){
 			vec2(ads.y * shadow.x, shadow.y)
 			)*col + vec3(1.0)*mat.specularWeight*(0.25*pow(pws.x, 0.125*mat.specularPower) + pow(pws.y, cupsb*pw*mat.specularPower)
 			+ pow(pws.z, cupsb*0.5*pw*mat.specularPower));
-		//		+pow(pws.w, pw*mat.specularPower));
 		if (ip.m == idTable) {
 			ret = mix(mBack.clrA, ret, exp(-0.35*max(0.0, length(ip.p))));
 		}
 	}
 	ret = pow(ret, gamma*exp(contrast*(vec3(0.5) - ret)));
 	return ret;
-}
-
-// fur ball
-// (c) simon green 2013
-// @simesgreen
-// v1.1
-
-const float uvScale = 1.0;
-const float colorUvScale = 0.1;
-const float furDepth = 0.055;
-const int furLayers = 32;
-const float rayStep = furDepth / float(furLayers);
-const float furThreshold = 0.85;
-const float shininess = 50.0;
-
-vec3 rotateX(vec3 p, float a)
-{
-	float sa = sin(a);
-	float ca = cos(a);
-	return vec3(p.x, ca*p.y - sa*p.z, sa*p.y + ca*p.z);
-}
-
-vec3 rotateY(vec3 p, float a)
-{
-	float sa = sin(a);
-	float ca = cos(a);
-	return vec3(ca*p.x + sa*p.z, p.y, -sa*p.x + ca*p.z);
-}
-
-vec2 cartesianToSpherical(vec3 p)
-{
-	float r = length(p);
-
-	float t = (r - (1.0 - furDepth)) / furDepth;
-	p = rotateX(p.zyx, -cos(1.5)*t*t*0.4).zyx;	// curl
-
-	p /= r;
-	vec2 uv = vec2(atan(p.y, p.x), acos(p.z));
-
-	//uv.x += cos(iGlobalTime*1.5)*t*t*0.4;	// curl
-	//uv.y += sin(iGlobalTime*1.7)*t*t*0.2;
-	uv.y -= t*t*0.1;	// curl down
-	return uv;
-}
-
-// returns fur density at given position
-float furDensity(vec3 pos, out vec3 Pi0)
-{
-	float r = abs(bnx.y - legh - pos.y);//length(pos);
-	float t = 1.0 - r / furDepth;
-
-	Pi0 = vec3(250.0*pos.x, 0.0, 250.0*pos.z);
-	float tex = cnoise(Pi0);
-
-	float density = smoothstep(furThreshold - 0.5, furThreshold + 0.5, tex);
-	return density;
-}
-
-vec3 furShade(vec3 pos, vec3 ro, float density, inout vec3 col7, vec3 Pi0)
-{
-	float r = abs(bnx.y - legh - pos.y);
-	float t = 1.0 - r / furDepth;
-	t = clamp(t*t, 0.0, 1.0);
-	return t*col7;
 }
 
 vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
