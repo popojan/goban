@@ -58,7 +58,7 @@ foreach (_variableName ${_variableNames})
     message(STATUS "${_variableName}=${${_variableName}}")
 endforeach()
 
-set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/..)
+set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/src

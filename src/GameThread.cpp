@@ -387,7 +387,7 @@ void GameThread::loadEngines(const std::string& dir) {
     }
     //int sgf = addPlayer(new SgfPlayer("SGF Record", "../problems/alphago/master04_Xie_Erhao.sgf"));
     //int sgf = addPlayer(new SgfPlayer("SGF Record", "./problems/download/Yasui-Chitetsu-Honinbo-Dosaku-classic-game-commentary-An-Younggil-8p.sgf"));
-    sgf = addPlayer(new SgfPlayer("SGF Record", "../problems/alphago-2016/3/13/Tictactoe.sgf"));
+    sgf = addPlayer(new SgfPlayer("SGF Record", "./problems/alphago-2016/3/13/Tictactoe.sgf"));
 //../problems/alphago/master04_Xie_Erhao.sgf
     
     human = addPlayer(new LocalHumanPlayer("Human"));
