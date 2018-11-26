@@ -1,5 +1,5 @@
 # Red Carpet Goban
-Ray traced 3D igo/baduk/weigi/go board and GUI rendered using GLSL.
+Ray traced 3D igo/baduk/weiqi/go board and GUI rendered using GLSL.
 
 External GTP engines supported, GnuGo required as the main engine.
 
