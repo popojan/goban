@@ -1,0 +1,38 @@
+Download dependencies
+
+powershell -executionpolicy bypass ./getall.ps1
+
+freetype 2.3.5	https://download.savannah.gnu.org/releases/freetype/freetype-old/freetype-2.3.5.tar.gz
+
+(Get-ItemProperty -Path HKLM:\SOFTWARE\Microsoft\MSBuild\ToolsVersions\12.0 -Name MSBuildToolsPath).M
+SBuildToolsPath
+
+"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" freetype-2.9\builds\windows\vc2010\freetype.sln /t:Build /p:Configuration=Release
+
+git clone https://github.com/libRocket/libRocket.git
+cd libRocket
+mkdir BuildDir
+cd BuildDir
+cmake ../Build  ^
+	-DFREETYPE_INCLUDE_DIR_freetype2=../../freetype-2.9/include ^
+	-DFREETYPE_LIBRARY=../../freetype-2.9/objs/Win32/Release/freetype
+
+"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" libRocket.sln /t:Build /p:Configuration=Release
+
+cmake .. -DLIBROCKET_INCLUDE_DIR=../deps/libRocket/Include ^
+	-DGLEW_INCLUDE_DIR=../deps/glew/include ^
+	-DGLEW_LIBRARY=../deps/glew/lib/Release/Win32/glew32s ^
+	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
+	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/Release/glyphy.lib ^
+	-DBOOST_ROOT="C:/Program Files/boost_1_55_0" ^
+	-DBOOST_INCLUDE_DIRS="C:/Program Files/boost_1_55_0/" ^
+	-DFREETYPE_INCLUDE_DIR_freetype2=../deps/freetype-2.9/include ^
+	-DFREETYPE_LIBRARY=../deps/freetype-2.9/objs/Win32/Release/freetype
+
+"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" goban.sln /t:Build /p:Configuration=Release
+
+cd ..
+copy deps\libRocket\buildDir\Release\Rocket*.dll .
+copy deps\freetype-2.9\objs\Win32\Release\freetype.dll .
+copy build\Release\goban.exe .
+

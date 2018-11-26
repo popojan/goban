@@ -20,6 +20,10 @@
 #include <config.h>
 #endif
 
+#ifndef M_PI
+	#define M_PI 3.14159265358979323846
+	#define M_SQRT2 1.41421356237309504880
+#endif
 #include "demo-font.h"
 
 #include <glyphy-freetype.h>

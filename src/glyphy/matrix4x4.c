@@ -51,6 +51,10 @@
 #include "matrix4x4.h"
 #include <math.h>
 
+#ifndef M_PI
+	#define M_PI 3.14159265358979323846
+#endif
+
 /*
  * A simple 4x4 matrix utility implementation
  */

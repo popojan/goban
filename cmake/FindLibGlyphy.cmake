@@ -5,14 +5,14 @@
 #  LIBGLYPHY_LIBRARIES - The libraries needed to use libglyphy
 #  LIBGLYPHY_DEFINITIONS - Compiler switches required for using libglyphy
 
-find_path(LIBGLYPHY_INCLUDE_DIR NAMES glyphy/glyphy.h)
+find_path(LIBGLYPHY_INCLUDE_DIR NAMES glyphy.h)
 
 find_library(LIBGLYPHY_LIBRARY NAMES glyphy)
 
 set(LIBGLYPHY_LIBRARIES
     ${LIBGLYPHY_LIBRARY}
 )
-set(LIBGLYPHY_INCLUDE_DIRS ${LIBGLYPHY_INCLUDE_DIR}/glyphy )
+set(LIBGLYPHY_INCLUDE_DIRS ${LIBGLYPHY_INCLUDE_DIR})
 
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set LIBGLYPHY_FOUND to TRUE

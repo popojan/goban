@@ -28,24 +28,32 @@ if(NOT CMAKE_BUILD_TYPE)
         FORCE)
 endif()
 
+if(NOT WIN32)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O0 -g")
 SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -s")
+endif()
 
-set(Boost_USE_STATIC_LIBS OFF)
+if (WIN32) 
+  set(Boost_USE_STATIC_LIBS ON)
+else()
+  set(Boost_USE_STATIC_LIBS OFF)
+endif()
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 
 find_package(LibRocket REQUIRED)
 #find_package(GnuGo REQUIRED)
 find_package(OpenGL REQUIRED)
-find_package(GLUT REQUIRED)
+#find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
-find_package(Portaudio REQUIRED)
-find_package(LibSndFile REQUIRED)
+#find_package(Portaudio REQUIRED)
+#find_package(LibSndFile REQUIRED)
 find_package(Boost COMPONENTS thread system iostreams filesystem)
-find_package(Curses REQUIRED)
-find_package(X11 REQUIRED)
+if (NOT WIN32)
+	find_package(Curses REQUIRED)
+	find_package(X11 REQUIRED)
+endif (NOT WIN32)
 find_package(LibGlyphy REQUIRED)
 find_package(Freetype REQUIRED)
 
@@ -61,15 +69,13 @@ endforeach()
 set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 
 include_directories(
+    ${PROJECT_SOURCE_DIR}/deps/glm
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/shell/include
-    ${PROJECT_SOURCE_DIR}/src/glyphy/
+    ${PROJECT_SOURCE_DIR}/src/glyphy
     ${PROJECT_SOURCE_DIR}/src/sgf/include
     ${OPENGL_INCLUDE_DIRS}
-    ${GLUT_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}
-    ${PORTAUDIO_INCLUDE_DIRS}
-    ${LIBSNDFILE_INCLUDE_DIRS}
     ${BOOST_INCLUDE_DIRS}
     ${CURSES_INCLUDE_DIR}
     ${LIBROCKET_INCLUDE_DIR}
@@ -80,6 +86,19 @@ include_directories(
 # Include list of source files
 #include(FileList)
 
+if (WIN32)
+set(SHELL_SRC_FILES
+    ${PROJECT_SOURCE_DIR}/src/shell/src/Input.cpp
+    ${PROJECT_SOURCE_DIR}/src/shell/src/Shell.cpp
+    ${PROJECT_SOURCE_DIR}/src/shell/src/ShellFileInterface.cpp
+    ${PROJECT_SOURCE_DIR}/src/shell/src/ShellRenderInterfaceOpenGL.cpp
+    ${PROJECT_SOURCE_DIR}/src/shell/src/ShellSystemInterface.cpp
+    ${PROJECT_SOURCE_DIR}/src/shell/src/Win32
+    ${PROJECT_SOURCE_DIR}/src/shell/src/Win32/ShellRenderInterfaceExtensionsOpenGL_Win32.cpp
+    ${PROJECT_SOURCE_DIR}/src/shell/src/Win32/InputWin32.cpp
+    ${PROJECT_SOURCE_DIR}/src/shell/src/Win32/ShellWin32.cpp
+)
+else()
 set(SHELL_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/shell/src/Input.cpp
     ${PROJECT_SOURCE_DIR}/src/shell/src/Shell.cpp
@@ -91,6 +110,7 @@ set(SHELL_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/shell/src/x11/InputX11.cpp
     ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellX11.cpp
 )
+endif()
 
 set(GLYPHY_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-atlas.cc
@@ -146,7 +166,9 @@ set(GOBAN_SRC_FILES
         ../src/Metrics.cpp ../src/Metrics.h ../src/GobanOverlay.cpp ../src/GobanOverlay.h ../src/GameState.cpp ../src/GameState.h)
 
 if (WIN32)
-    add_executable(goban WIN32 ${GOBAN_SRC_FILES})
+	add_definitions(-DWIN32 -D_WINDOWS)
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
+	add_executable(goban WIN32 ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES})
 else()
     add_executable(goban ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES})
 endif()

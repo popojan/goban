@@ -6,11 +6,14 @@
 #  LIBROCKET_DEFINITIONS - Compiler switches required for using LibRocket
 
 find_path(LIBROCKET_INCLUDE_DIR Rocket/Core.h
-          PATH_SUFFIXES Rocket )
+        PATH_SUFFIXES Rocket )
 
-find_library(LIBROCKET_CORE_LIBRARY NAMES RocketCore)
-find_library(LIBROCKET_CONTROLS_LIBRARY NAMES RocketControls)
-find_library(LIBROCKET_DEBUGGER_LIBRARY NAMES RocketDebugger)
+find_library(LIBROCKET_CORE_LIBRARY NAMES RocketCore
+	HINTS deps/libRocket/buildDir/Release)
+find_library(LIBROCKET_CONTROLS_LIBRARY NAMES RocketControls
+	HINTS deps/libRocket/buildDir/Release)
+find_library(LIBROCKET_DEBUGGER_LIBRARY NAMES RocketDebugger
+	HINTS deps/libRocket/buildDir/Release)
 
 set(LIBROCKET_LIBRARIES
     ${LIBROCKET_CORE_LIBRARY}
