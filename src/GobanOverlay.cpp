@@ -146,7 +146,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 			m4Translate(mat, x, y, -0.5f*d - near + z);
 		}
 		m4Scale(mat, 1, 1, -1);
-		glm::mat4 rm(glm::transpose(m)*glm::rotate(glm::mat4(), 3.141592656f / 2, glm::vec3(1.0f, 0.0f, 0.0f)));
+		glm::mat4 rm(glm::transpose(m)*glm::rotate(glm::mat4(1.0f), 3.141592656f / 2, glm::vec3(1.0f, 0.0f, 0.0f)));
 
 		m4MultMatrix(mat, glm::value_ptr(rm));
 		m4Scale(mat, 1, -1, 1);

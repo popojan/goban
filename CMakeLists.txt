@@ -36,6 +36,7 @@ endif()
 
 if (WIN32) 
   set(Boost_USE_STATIC_LIBS ON)
+  set(GLEW_USE_STATIC_LIBS ON)
 else()
   set(Boost_USE_STATIC_LIBS OFF)
 endif()
@@ -43,12 +44,8 @@ set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 
 find_package(LibRocket REQUIRED)
-#find_package(GnuGo REQUIRED)
 find_package(OpenGL REQUIRED)
-#find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
-#find_package(Portaudio REQUIRED)
-#find_package(LibSndFile REQUIRED)
 find_package(Boost COMPONENTS thread system iostreams filesystem)
 if (NOT WIN32)
 	find_package(Curses REQUIRED)
@@ -79,12 +76,11 @@ include_directories(
     ${BOOST_INCLUDE_DIRS}
     ${CURSES_INCLUDE_DIR}
     ${LIBROCKET_INCLUDE_DIR}
-    ${LIBGLYPHY_INCLUDE_DIRS}
+    ${LIBGLYPHY_INCLUDE_DIR}
     ${FREETYPE_INCLUDE_DIRS}
 )
 
 # Include list of source files
-#include(FileList)
 
 if (WIN32)
 set(SHELL_SRC_FILES
@@ -177,12 +173,8 @@ ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
 target_link_libraries(goban
     ${LIBROCKET_LIBRARIES}
-#    ${GNUGO_LIBRARIES}
     ${OPENGL_LIBRARIES}
-    ${GLUT_LIBRARY}
     ${GLEW_LIBRARY}
-    ${PORTAUDIO_LIBRARIES}
-#    ${LIBSNDFILE_LIBRARY}
     ${CMAKE_THREAD_LIBS_INIT}
     ${Boost_LIBRARIES}
     ${CURSES_LIBRARY}
