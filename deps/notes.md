@@ -1,7 +1,6 @@
 # Tools
 
 PowerShell
-Make http://gnuwin32.sourceforge.net/packages/make.htm
 CMake https://cmake.org/download/
 
 # PowerScript automation notes
@@ -13,7 +12,7 @@ CMake https://cmake.org/download/
 * get `msbuild.exe` path
 * `(Get-ItemProperty -Path HKLM:\SOFTWARE\Microsoft\MSBuild\ToolsVersions\12.0 -Name MSBuildToolsPath).MSBuildToolsPath`
 * `powershell.exe -NoP -NonI -Command "(Get-ItemProperty -Path HKLM:\SOFTWARE\Microsoft\MSBuild\ToolsVersions\12.0 -Name MSBuildToolsPath).MSBuildToolsPath"`
-* `powershell.exe -NoP -NonI -Command "(new-object System.Net.WebClient).DownloadFile('https://download.savannah.gnu.org/releases/freetype/ft291.zip', 'ft291.zip')"
+* `powershell.exe -NoP -NonI -Command "(new-object System.Net.WebClient).DownloadFile('https://download.savannah.gnu.org/releases/freetype/ft291.zip', 'ft291.zip')"`
 
 # Dependencies
  
@@ -48,15 +47,29 @@ cmake ../Build  ^
 
 ```
 git clone https://github.com/tamaskenez/glew-with-extensions
-cd glew\build\vc12\
-"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" glew_static.vcxproj /t:Build /p:Configuration=Release
+copy _patches\glew_static.vcxproj glew-with-extensions\build\vc12\
+"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" glew-with-extensions\build\vc12\glew_static.vcxproj /t:Build /p:Configuration=Release
 ```
 
 ## GLM
 
-TODO
+```
+git clone https://github.com/g-truc/glm.git 
+cd glm
+mkdir build
+cd build
+cmake ..
+"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" glm.sln /t:Build /p:Configuration=Release
+```
 
 ## Glyphy
+
+```
+git clone https://github.com/behdad/glyphy.git 
+copy _patches\goban_glyphy.vcxproj glyphy\win32
+copy _patches\glyphy_config.h glyphy\win32\config.h
+"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" glyphy\win32\goban_glyphy.vcxproj /t:Build /p:Configuration=Release
+```
 
 TODO
 
@@ -67,7 +80,7 @@ cmake .. -DLIBROCKET_INCLUDE_DIR=../deps/libRocket/Include ^
 	-DGLEW_INCLUDE_DIR=../deps/glew-with-extensions/include ^
 	-DGLEW_LIBRARY=../deps/glew-with-extensions/lib/Release/Win32/glew32s ^
 	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
-	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/Release/glyphy.lib ^
+	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/Release/goban_glyphy.lib ^
 	-DBOOST_ROOT="C:/Program Files/boost_1_55_0" ^
 	-DBOOST_INCLUDE_DIRS="C:/Program Files/boost_1_55_0/" ^
 	-DFREETYPE_INCLUDE_DIR_freetype2=../deps/freetype-2.9.1/include ^
@@ -79,4 +92,5 @@ cd ..
 copy deps\libRocket\buildDir\Release\Rocket*.dll .
 copy deps\freetype-2.9\objs\Win32\Release\freetype.dll .
 copy build\Release\goban.exe .
+
 ```
