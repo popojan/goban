@@ -6,5 +6,5 @@ dependencies:
 
 build: dependencies
 	mkdir -p build && cd build && \
-	cmake .. && cd ..
+	cmake .. && make && cd ..
 	cp build/goban .
