@@ -34,7 +34,7 @@ SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O0 -g")
 SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -s")
 endif()
 
-if (WIN32) 
+if (WIN32)
   set(Boost_USE_STATIC_LIBS ON)
   set(GLEW_USE_STATIC_LIBS ON)
 else()
@@ -46,7 +46,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 find_package(LibRocket REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
-find_package(Boost COMPONENTS thread system iostreams filesystem)
+find_package(Boost 1.62 COMPONENTS thread system iostreams filesystem)
 if (NOT WIN32)
 	find_package(Curses REQUIRED)
 	find_package(X11 REQUIRED)
@@ -71,9 +71,10 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/shell/include
     ${PROJECT_SOURCE_DIR}/src/glyphy
     ${PROJECT_SOURCE_DIR}/src/sgf/include
+    ${PROJECT_SOURCE_DIR}/deps/boost-process
+    ${PROJECT_SOURCE_DIR}/deps/boost
     ${OPENGL_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}
-    ${BOOST_INCLUDE_DIRS}
     ${CURSES_INCLUDE_DIR}
     ${LIBROCKET_INCLUDE_DIR}
     ${LIBGLYPHY_INCLUDE_DIR}
@@ -163,6 +164,7 @@ set(GOBAN_SRC_FILES
 
 if (WIN32)
 	add_definitions(-DWIN32 -D_WINDOWS)
+	option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 	add_executable(goban WIN32 ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES})
 else()
@@ -176,7 +178,9 @@ target_link_libraries(goban
     ${OPENGL_LIBRARIES}
     ${GLEW_LIBRARY}
     ${CMAKE_THREAD_LIBS_INIT}
-    ${Boost_LIBRARIES}
+    ${Boost_SYSTEM_LIBRARY}
+    ${Boost_IOSTREAMS_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
     ${CURSES_LIBRARY}
     ${X11_LIBRARIES}
     ${LIBGLYPHY_LIBRARIES}
