@@ -13,6 +13,7 @@ CMake https://cmake.org/download/
 * `(Get-ItemProperty -Path HKLM:\SOFTWARE\Microsoft\MSBuild\ToolsVersions\12.0 -Name MSBuildToolsPath).MSBuildToolsPath`
 * `powershell.exe -NoP -NonI -Command "(Get-ItemProperty -Path HKLM:\SOFTWARE\Microsoft\MSBuild\ToolsVersions\12.0 -Name MSBuildToolsPath).MSBuildToolsPath"`
 * `powershell.exe -NoP -NonI -Command "(new-object System.Net.WebClient).DownloadFile('https://download.savannah.gnu.org/releases/freetype/ft291.zip', 'ft291.zip')"`
+* replace in file `powershell -Command "(gc myFile.txt) -replace 'foo', 'bar' | Out-File myFile.txt"`
 
 # Dependencies
  
@@ -71,22 +72,42 @@ copy _patches\glyphy_config.h glyphy\win32\config.h
 "C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" glyphy\win32\goban_glyphy.vcxproj /t:Build /p:Configuration=Release
 ```
 
-TODO
+## Boost 1.62
+
+```
+git clone --recurse-submodules https://github.com/boostorg/boost.git
+cd boost
+git checkout boost-1.62.0
+git submodule foreach --recursive "git checkout boost-1.62.0 || echo 1"
+bootstrap.bat
+b2 headers
+b2 --build-type=complete --toolset=msvc-12.0 --with-system --with-iostreams --with-thread --with-filesystem --variant=release --link=static --threading=multi --runtime-link=shared stage
+```
+
+## Boost Process 0.5
+
+```
+git clone https://github.com/BorisSchaeling/boost-process.git
+```
 
 # Build
 ```
 cd build
-cmake .. -DLIBROCKET_INCLUDE_DIR=../deps/libRocket/Include ^
+C:/Program Files/boost_1_55_0
+cmake .. -DCMAKE_BUILD_TYPE=Release ^
+	-DLIBROCKET_INCLUDE_DIR=../deps/libRocket/Include ^
 	-DGLEW_INCLUDE_DIR=../deps/glew-with-extensions/include ^
 	-DGLEW_LIBRARY=../deps/glew-with-extensions/lib/Release/Win32/glew32s ^
 	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
 	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/Release/goban_glyphy.lib ^
-	-DBOOST_ROOT="C:/Program Files/boost_1_55_0" ^
-	-DBOOST_INCLUDE_DIRS="C:/Program Files/boost_1_55_0/" ^
+	-DBoost_NO_SYSTEM_PATHS=TRUE ^
+	-DBoost_NO_BOOST_CMAKE=TRUE ^
+	-DBOOST_ROOT="V:/Projekty/github/Goban/deps/boost" ^
+	-DBOOST_INCLUDE_DIRS="V:/Projekty/github/Goban/deps/boost" ^
 	-DFREETYPE_INCLUDE_DIR_freetype2=../deps/freetype-2.9.1/include ^
 	-DFREETYPE_LIBRARY=../deps/freetype-2.9.1/objs/Win32/Release/freetype
 
-"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" goban.sln /t:Build /p:Configuration=Release
+"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe" goban.sln /t:ReBuild /p:Configuration=Release
 
 cd ..
 copy deps\libRocket\buildDir\Release\Rocket*.dll .
