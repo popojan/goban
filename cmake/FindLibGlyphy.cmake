@@ -5,9 +5,9 @@
 #  LIBGLYPHY_LIBRARIES - The libraries needed to use libglyphy
 #  LIBGLYPHY_DEFINITIONS - Compiler switches required for using libglyphy
 
-find_path(LIBGLYPHY_INCLUDE_DIR NAMES glyphy.h)
+find_path(LIBGLYPHY_INCLUDE_DIR NAMES glyphy.h HINTS deps/glyphy/src)
 
-find_library(LIBGLYPHY_LIBRARY NAMES glyphy)
+find_library(LIBGLYPHY_LIBRARY NAMES glyphy HINTS deps/glyphy/src)
 
 set(LIBGLYPHY_LIBRARIES
     ${LIBGLYPHY_LIBRARY}
