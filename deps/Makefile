@@ -6,7 +6,7 @@ libRocket:
 
 glyphy:
 	git clone https://github.com/behdad/glyphy.git
-	cd glyphy && ./autogen.sh && make
+	cd glyphy && ./autogen.sh && ./configure --enable-static && make
 
 boost-process:
 	git clone https://github.com/BorisSchaeling/boost-process.git
