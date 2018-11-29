@@ -1,5 +1,6 @@
 #include "GameThread.h"
-
+#include <fstream>
+ 
 GameThread::GameThread(GobanModel &m) :
         game(m), thread(0), colorToMove(Color::BLACK), interruptRequested(false), hasThreadRunning(false),
         playerToMove(0), human(0), numPlayers(0), activePlayer({0, 0}),
