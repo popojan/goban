@@ -1,4 +1,6 @@
 # Red Carpet Goban
+[![Build Status](https://travis-ci.com/popojan/goban.svg?branch=automate-linux-build)](https://travis-ci.com/popojan/goban)
+
 Ray traced 3D igo/baduk/weiqi/go board and GUI rendered using GLSL.
 
 External GTP engines supported, GnuGo required as the main engine.
