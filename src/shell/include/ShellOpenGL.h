@@ -52,7 +52,7 @@
 #include <GL/glx.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
-#include <GL/glut.h>
+//#include <GL/glut.h>
 #include <GL/glext.h>
 //#include <GL/glx.h>
 //#include <GL/gl.h>

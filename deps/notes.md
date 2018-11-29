@@ -114,4 +114,21 @@ copy deps\libRocket\buildDir\Release\Rocket*.dll .
 copy deps\freetype-2.9\objs\Win32\Release\freetype.dll .
 copy build\Release\goban.exe .
 
+# Clean Ubuntu 16.04 build
+
+    3  sudo apt-get update
+    4  sudo apt install git cmake libtool autoconf
+    8  git checkout automate-linux-build
+   15  sudo apt-get install libfreetype6-dev
+   22  sudo apt install libgl1-mesa-dev
+   35  sudo apt-get install libglew-dev
+   38  sudo apt install libncurses5-dev
+   64  sudo apt install libboost-dev
+   99  sudo apt install libglm-dev
+  112  sudo apt-get install mesa-common-dev
+  118  sudo sudo apt-get install libglu1-mesa-dev
+  146  sudo apt-get install libboost-filesystem1.58.0 libboost-iostreams1.58.0 libboost-system1.58.0 libboost-thread1.58.0
+  171  sudo apt-get install libboost-filesystem1.58.0 libboost-iostreams1.58.0 libboost-system1.58.0 libboost-thread1.58.0
+  FindBoost.cmake fails 
+
 ```

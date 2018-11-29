@@ -7,7 +7,7 @@
 
 find_path(LIBGLYPHY_INCLUDE_DIR NAMES glyphy.h HINTS deps/glyphy/src)
 
-find_library(LIBGLYPHY_LIBRARY NAMES glyphy HINTS deps/glyphy/src)
+find_library(LIBGLYPHY_LIBRARY NAMES libglyphy.a HINTS deps/glyphy/src/.libs)
 
 set(LIBGLYPHY_LIBRARIES
     ${LIBGLYPHY_LIBRARY}
