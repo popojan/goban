@@ -1,0 +1,24 @@
+language: cpp
+
+addons:
+  apt:
+    update: true
+    packages:
+      - cmake
+      - libtool
+      - autoconf
+      - g++-4.8
+      - libfreetype6-dev
+      - libgl1-mesa-dev
+      - libglew-dev
+      - libncurses5-dev
+      - libglm-dev
+      - libboost-all-dev
+      - gnugo
+
+matrix:
+  include:
+    - os: linux
+      compiler: gcc-4.8
+      script:
+          - make
