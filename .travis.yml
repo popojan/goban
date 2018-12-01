@@ -23,8 +23,7 @@ matrix:
       compiler: gcc-4.8
       script:
           - make
-  include:
     - os: windows
       script:
-        - choco install innounp
+        - choco install innounp grep
         - ./make.bat
