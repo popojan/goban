@@ -19,7 +19,7 @@ addons:
       - gnugo
 
 matrix:
-  exclude:
+  include:
     - os: linux
       compiler: gcc-4.8
       script:
