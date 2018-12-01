@@ -35,14 +35,14 @@ SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -s")
 endif()
 
 if (WIN32)
-  #set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_STATIC_LIBS ON)
   set(GLEW_USE_STATIC_LIBS ON)
 else()
   set(OpenGL_GL_PREFERENCE "GLVND")
- #set(Boost_USE_STATIC_LIBS OFF)
+  set(Boost_USE_STATIC_LIBS OFF)
 endif()
-#set(Boost_USE_MULTITHREADED ON)
-#set(Boost_USE_STATIC_RUNTIME OFF)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
 
 find_package(LibRocket REQUIRED)
 find_package(OpenGL REQUIRED)
@@ -73,7 +73,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/glyphy
     ${PROJECT_SOURCE_DIR}/src/sgf/include
     ${PROJECT_SOURCE_DIR}/deps/boost-process
-    #${PROJECT_SOURCE_DIR}/deps/boost
+    ${PROJECT_SOURCE_DIR}/deps/boost
     ${OPENGL_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}
     ${CURSES_INCLUDE_DIR}
@@ -177,12 +177,9 @@ ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 target_link_libraries(goban
     ${LIBROCKET_LIBRARIES}
     ${OPENGL_LIBRARIES}
-    ${GLEW_LIBRARY}
+    ${GLEW_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
-    ${Boost_SYSTEM_LIBRARY}
-    ${Boost_IOSTREAMS_LIBRARY}
     ${Boost_LIBRARIES}
-    ${Boost_FILESYSTEM_LIBRARY}
     ${CURSES_LIBRARY}
     ${X11_LIBRARIES}
     ${LIBGLYPHY_LIBRARIES}

@@ -9,11 +9,11 @@ find_path(LIBROCKET_INCLUDE_DIR Rocket/Core.h
         PATH_SUFFIXES Rocket HINTS deps/libRocket/Include)
 
 find_library(LIBROCKET_CORE_LIBRARY NAMES RocketCore
-	HINTS deps/libRocket/build/)
+	HINTS deps/libRocket/buildDir/ deps/libRocket/buildDir/Release)
 find_library(LIBROCKET_CONTROLS_LIBRARY NAMES RocketControls
-	HINTS deps/libRocket/build/)
+	HINTS deps/libRocket/buildDir/ deps/libRocket/buildDir/Release)
 find_library(LIBROCKET_DEBUGGER_LIBRARY NAMES RocketDebugger
-	HINTS deps/libRocket/build/)
+	HINTS deps/libRocket/buildDir/ deps/libRocket/buildDir/Release)
 
 set(LIBROCKET_LIBRARIES
     ${LIBROCKET_CORE_LIBRARY}
