@@ -29,4 +29,4 @@ matrix:
       script:
         - choco list -li
         - choco install innounp
-        - make
+        - ./make.bat
