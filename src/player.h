@@ -292,7 +292,7 @@ protected:
         std::mutex mut;
         std::string fname;
         std::vector<std::shared_ptr<sgf::GameTree> > sgf;
-        int ni;
+        std::size_t ni;
         sgf::GameTree* variation;
         sgf::Node* node;
         std::vector<sgf::Node* > history;

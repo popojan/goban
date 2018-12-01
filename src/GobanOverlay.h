@@ -28,7 +28,7 @@ public:
     bool init();
     void use();
     void unuse();
-    void draw(const GobanModel&, const DDG::Camera&, int updateFlag, float time, int);
+    void draw(const GobanModel&, const DDG::Camera&, int updateFlag, float time, unsigned);
     ~GobanOverlay();
     void setReady() { overlayReady = true; }
 	void Update(const Board::Overlay& overlay, const GobanModel& model);

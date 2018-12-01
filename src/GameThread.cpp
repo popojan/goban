@@ -360,9 +360,6 @@ void GameThread::loadEngines(const std::string& dir) {
     boost::filesystem::path p(dir);
 
     bool hasCouch(false);
-    std::size_t activeId = 0;
-    
-    
 
     if(boost::filesystem::is_directory(p)) {
         for (auto it = boost::filesystem::directory_iterator(p); it != boost::filesystem::directory_iterator(); ++it) {
@@ -383,23 +380,16 @@ void GameThread::loadEngines(const std::string& dir) {
             };
             std::size_t id = addEngine(new GtpEngine(exe, cmd, path, name));
             setRole(id, role, true);
-            activeId = id;
         }
     }
-    //int sgf = addPlayer(new SgfPlayer("SGF Record", "../problems/alphago/master04_Xie_Erhao.sgf"));
-    //int sgf = addPlayer(new SgfPlayer("SGF Record", "./problems/download/Yasui-Chitetsu-Honinbo-Dosaku-classic-game-commentary-An-Younggil-8p.sgf"));
     sgf = addPlayer(new SgfPlayer("SGF Record", "./problems/alphago-2016/3/13/Tictactoe.sgf"));
-//../problems/alphago/master04_Xie_Erhao.sgf
-    
+
     human = addPlayer(new LocalHumanPlayer("Human"));
 
     numPlayers = human + 1;
     activePlayer[0] = sgf;
     activePlayer[1] = human;
 }
-
-/// playLocalMove()
-// gameThread.playLocalMove(Move(Move::PASS, gameThread.getCurrentColor()));
 
 Move GameThread::getLocalMove(std::pair<int, int>& coord) {
     return Move(Position(static_cast<unsigned>(coord.first), static_cast<unsigned>(coord.second)), colorToMove);
