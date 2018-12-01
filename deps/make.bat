@@ -1,9 +1,3 @@
-REM boost
-wget https://dl.bintray.com/boostorg/release/1.65.0/binaries/boost_1_65_0-msvc-14.1-32.exe
-innounp -x boost_1_65_0-msvc-14.1-32.exe
-
-move {app} boost
-
 REM freetype 2.9.1
 wget "https://download.savannah.gnu.org/releases/freetype/ft291.zip"
 7z x ft291.zip
@@ -41,4 +35,11 @@ git clone https://github.com/g-truc/glm.git
 REM glyphy
 git clone https://github.com/behdad/glyphy.git
 copy _patches\goban_glyphy.vcxproj glyphy\win32
-MSBuild.exe  glyphy\win32\goban_glyphy.vcxproj /t:Build /p:Configuration=Release /p:PlatformToolset=v141 /p:WindowsTargetPlatformVersion=10.0.17763.0
+MSBuild.exe  glyphy\win32\goban_glyphy.vcxproj /t:Build /p:Configuration=Release /p:PlatformToolset=v141
+
+::/p:WindowsTargetPlatformVersion=10.0.17763.0
+
+REM boost
+wget https://dl.bintray.com/boostorg/release/1.65.0/binaries/boost_1_65_0-msvc-14.1-32.exe
+innounp -x boost_1_65_0-msvc-14.1-32.exe
+move {app} boost
