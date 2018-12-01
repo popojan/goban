@@ -1,5 +1,5 @@
 REM freetype 2.9.1
-wget "https://download.savannah.gnu.org/releases/freetype/ft291.zip"
+wget --progress=dot:mega "https://download.savannah.gnu.org/releases/freetype/ft291.zip"
 7z x ft291.zip
 cd freetype-2.9.1
 mkdir build
@@ -40,6 +40,6 @@ MSBuild.exe  glyphy\win32\goban_glyphy.vcxproj /t:Build /p:Configuration=Release
 ::/p:WindowsTargetPlatformVersion=10.0.17763.0
 
 REM boost
-wget https://dl.bintray.com/boostorg/release/1.65.0/binaries/boost_1_65_0-msvc-14.1-32.exe
+wget --progress=dot:giga https://dl.bintray.com/boostorg/release/1.65.0/binaries/boost_1_65_0-msvc-14.1-32.exe
 innounp -x boost_1_65_0-msvc-14.1-32.exe
 move {app} boost
