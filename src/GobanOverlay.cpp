@@ -51,7 +51,7 @@ bool GobanOverlay::init() {
 
     demo_glstate_setup(st);
 
-	for (int i = 0; i < layers.size(); ++i) {
+	for (std::size_t i = 0; i < layers.size(); ++i) {
 		buffer[i] = demo_buffer_create();
 		demo_buffer_add_text(buffer[i], "0123456789", font, 12.0);
 	}
@@ -67,7 +67,7 @@ void GobanOverlay::unuse() { }
 void GobanOverlay::Update(const Board::Overlay& overlay, const GobanModel& model) {
 	font_size = 0.8 / model.getBoardSize();
 	
-	for (int layer = 0; layer < layers.size(); ++layer) {
+	for (std::size_t layer = 0; layer < layers.size(); ++layer) {
 		int cnt = 0;
 		demo_buffer_clear(buffer[layer]);
 		for (auto oit = overlay.begin(); oit != overlay.end(); ++oit) {
@@ -82,7 +82,7 @@ void GobanOverlay::Update(const Board::Overlay& overlay, const GobanModel& model
 	}
 
 }
-void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int updateFlag, float time, int which) {
+void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int updateFlag, float time, unsigned which) {
 	if (!overlayReady
 		|| std::all_of(layers.begin(), layers.end(), [](const Layer& x){return x.empty; }))
 			return;
@@ -107,7 +107,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 
 	demo_glstate_set_depth(st, which < 1 ? 0.6 : 0.4);
 		
-	for (int layer = which; layer < (which == 0 ? 1 : layers.size()); ++layer) {
+	for (std::size_t layer = which; layer < (which == 0 ? 1 : layers.size()); ++layer) {
 		
 		if (layers[layer].empty)
 			continue;
@@ -202,7 +202,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 }
 
 GobanOverlay::~GobanOverlay() {
-	for (int i = 0; i < layers.size(); ++i)
+	for (std::size_t i = 0; i < layers.size(); ++i)
 		demo_buffer_destroy(buffer[i]);
 
     demo_font_destroy(font);

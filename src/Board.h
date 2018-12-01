@@ -104,7 +104,7 @@ private:
 
 struct CoordText {
     std::string text;
-	int layer;
+	unsigned layer;
     float x;
     float y;
 };

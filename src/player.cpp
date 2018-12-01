@@ -114,7 +114,7 @@
 	    std::cerr << "Before parsing SGF" << std::endl;
         auto problems(sgf::parse(fname));
 	    std::cerr << "Parsed SGF" << std::endl;
-        for(int i = 0; i < problems.size(); ++i) {
+        for(std::size_t i = 0; i < problems.size(); ++i) {
             sgf.push_back(std::shared_ptr<sgf::GameTree>(new sgf::GameTree(problems[i])));
         }
         std::cerr << sgf.size() << std::endl;

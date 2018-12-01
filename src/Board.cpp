@@ -8,12 +8,8 @@ const float Board::mBlack = 5.0;
 const float Board::mWhite = 6.0;
 const float Board::mDeltaCaptured = 0.5;
 
-//BoardGL::BoardGL() : boardSize(0), ord(0), dist(0.0f, 0.05f) {
-//	stones.fill(mEmpty);
-//}
-
-Board::Board(unsigned size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f), order(0), dist(0.0f, 0.05f),
-invalidated(false) {
+Board::Board(unsigned size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
+    dist(0.0f, 0.05f), invalidated(false), order(0)  {
     clear(size);
     positionNumber = generator();;
 }
@@ -175,7 +171,8 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 		int change = 0;
 		if (stones[idx] != mValue) {
 			bool territoryToggle = std::abs(stones[idx] - mValue) == mDeltaCaptured;
-			placeStone = !territoryToggle && /*dif != mDeltaLastMove &&*/ mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea;
+			placeStone = !territoryToggle && /*dif != mDeltaLastMove &&*/ mValue != mEmpty
+			        &&  mValue != mBlackArea && mValue != mWhiteArea;
 			if (placeStone) {
 				placedSomeStone = true;
 				float x = j - halfN + std::max(-3.0f*r1, std::min(3.0f*r1, dist(generator)));
@@ -206,7 +203,7 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 			changed = std::max(1, change);
 			bool isCaptured = mValue == mWhite + mDeltaCaptured || mValue == mBlack + mDeltaCaptured;
 			bool isArea = mValue == mBlackArea || mValue == mWhiteArea;
-			bool isEmpty = mValue == mEmpty;
+			//bool isEmpty = mValue == mEmpty;
 			bool isStone = mValue == mWhite || mValue == mBlack || isCaptured;
 			if (isArea) {
 				if (mValue == mBlackArea) {
@@ -252,7 +249,7 @@ unsigned  Board::capturedCount(const Color& whose) const {
 void Board::clear(unsigned boardsize) {
 	this->boardSize = boardsize;
     stones.fill(mEmpty);
-    overlay.fill({ "", -1, 0, 0});
+    overlay.fill({ "", -1u, 0, 0});
     order = 0;
     board.fill(Color::EMPTY);
     capturedBlack = 0;

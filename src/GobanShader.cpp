@@ -233,7 +233,7 @@ void GobanShader::setMetrics(const Metrics &m) {
 
     float fNDIM(m.fNDIM);
 
-    float boardaa(sqrt(4.0f/width/height));
+    float boardaa(sqrt(2.0f/width/height));
     float boardbb(sqrt(1.0f/width/height));
     float r1 = m.stoneRadius;
     float px = m.px;
