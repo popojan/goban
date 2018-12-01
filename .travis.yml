@@ -16,7 +16,6 @@ addons:
       - libncurses5-dev
       - libglm-dev
       - libboost-all-dev
-      - gnugo
 
 matrix:
   include:
@@ -27,6 +26,5 @@ matrix:
   include:
     - os: windows
       script:
-        - choco list -li
         - choco install innounp
         - ./make.bat
