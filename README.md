@@ -11,7 +11,6 @@ For windows binaries and more screenshots see [hraj.si](http://hraj.si).
 [![screen06](/res/screen06_s.png)](https://www.youtube.com/watch?v=S3kmepVEipk)]
 
 ## Tasks
-* automate build process
 * refactor and clean-up code
 * add SGF support to replay and save games
 * add stone placement sound
