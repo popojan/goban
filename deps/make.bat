@@ -41,5 +41,5 @@ MSBuild.exe  glyphy\win32\goban_glyphy.vcxproj /t:Build /p:Configuration=Release
 
 REM boost
 wget --progress=dot:giga https://dl.bintray.com/boostorg/release/1.65.0/binaries/boost_1_65_0-msvc-14.1-32.exe
-innounp -b -x boost_1_65_0-msvc-14.1-32.exe | grep "#[0-9]\+000"
+innounp -b -x boost_1_65_0-msvc-14.1-32.exe | grep "#[0-9]\+00"
 move {app} boost
