@@ -164,7 +164,7 @@ set(GOBAN_SRC_FILES
         ../src/Metrics.cpp ../src/Metrics.h ../src/GobanOverlay.cpp ../src/GobanOverlay.h ../src/GameState.cpp ../src/GameState.h)
 
 if (WIN32)
-	add_definitions(-DWIN32 -D_WINDOWS)
+    add_definitions(-DWIN32 -D_WINDOWS)
 	option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 	add_executable(goban WIN32 ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES})

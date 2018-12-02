@@ -26,4 +26,5 @@ matrix:
     - os: windows
       script:
         - choco install innounp grep
+        - set -e
         - ./make.bat
