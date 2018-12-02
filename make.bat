@@ -14,7 +14,7 @@ set PROJECT_DIR=%PROJECT_DIR:~0,-1%
 
 REM build dependencies
 cd deps
-make.bat
+call make.bat
 
 REM build goban
 cd %PROJECT_DIR%
