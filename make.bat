@@ -36,8 +36,4 @@ cmake .. -DCMAKE_BUILD_TYPE=Release ^
 	-DFREETYPE_INCLUDE_DIR_ft2build=../deps/freetype-2.9.1/include ^
 	-DFREETYPE_LIBRARY=../deps/freetype-2.9.1/build/Release/freetype
 
-MSBuild.exe goban.sln /t:Build /p:Configuration=Release /p:PlatformToolset=v141
-
-cd ..
-REM copy deps\libRocket\buildDir\Release\Rocket*.dll .
-REM copy build\Release\goban.exe .
+MSBuild.exe goban.sln /t:Build /p:Configuration=Release /p:PlatformToolset=v141 /p:TargetPlatformVersion=10.0.17134.0
