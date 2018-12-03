@@ -44,7 +44,6 @@ Engine* GameThread::currentCoach() {
 }
 Player* GameThread::currentPlayer() {
     int roleToMove = colorToMove == Color::BLACK ? Player::BLACK : Player::WHITE;
-    //std::cerr << "LOCK currentPlayer" << std::endl;
     std::unique_lock<std::mutex> lock(mutex);
     for(auto pit = players.begin(); pit != players.end(); ++pit) {
         if((*pit)->hasRole(roleToMove)) return *pit;
@@ -54,13 +53,8 @@ Player* GameThread::currentPlayer() {
 
 void GameThread::setRole(size_t playerIndex, int role, bool add) {
     if(players.size() > playerIndex) {
-        //Player* current = currentPlayer();
         std::unique_lock<std::mutex> lock(mutex);
         Player* player = players[playerIndex];
-        /*std::cerr << playerIndex
-            << "oldType = [human = " << (int)player->isTypeOf(Player::HUMAN) << ", computer = " << (int)player->isTypeOf(Player::ENGINE) << "] "
-            << "oldRole = [black = " << (int)player->hasRole(Player::BLACK) << ", white = " << (int)player->hasRole(Player::WHITE) << "]"
-            << std::endl;*/
         player->setRole(role, add);
         std::cerr << playerIndex
             << "newType = [human = " << (int)player->isTypeOf(Player::HUMAN) << ", computer = " << (int)player->isTypeOf(Player::ENGINE) << "] "

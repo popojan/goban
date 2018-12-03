@@ -1,4 +1,4 @@
-all: libRocket glyphy boost-process
+all: libRocket glyphy boost-process spdlog
 
 libRocket:
 	git clone https://github.com/libRocket/libRocket.git
@@ -10,3 +10,6 @@ glyphy:
 
 boost-process:
 	git clone https://github.com/BorisSchaeling/boost-process.git
+
+spdlog:
+	git clone https://github.com/gabime/spdlog.git
