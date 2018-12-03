@@ -8,6 +8,9 @@ REM choco install innounp
 set MSBUILD_PATH="C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\MSBuild\15.0\Bin"
 set CMAKE_PATH="C:\Program Files\CMake\bin"
 set PATH=%CMAKE_PATH%;%MSBUILD_PATH%;%PATH%
+set TOOLSET=v141
+set TARGET=10.0.17763.0
+set STUDIO="Visual Studio 15 2017 Win64"
 
 set PROJECT_DIR=%~dp0
 set PROJECT_DIR=%PROJECT_DIR:~0,-1%
@@ -20,20 +23,20 @@ REM build goban
 cd %PROJECT_DIR%
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release ^
+cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
 	-DLIBROCKET_INCLUDE_DIR=../deps/libRocket/Include ^
-	-DGLEW_INCLUDE_DIR=../deps/glew-with-extensions/include ^
-	-DGLEW_LIBRARY=../deps/glew-with-extensions/builddir/lib/Release/libglew32 ^
+	-DGLEW_INCLUDE_DIR="../deps/glew-with-extensions/include" ^
+	-DGLEW_LIBRARY="../deps/glew-with-extensions/builddir/lib/Release/libglew32" ^
 	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
-	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/Release/goban_glyphy.lib ^
+	-DLIBGLYPHY_LIBRARY="../deps/glyphy/win32/x64/Release/goban_glyphy.lib" ^
 	-DBoost_NO_SYSTEM_PATHS=TRUE ^
 	-DBoost_NO_BOOST_CMAKE=TRUE ^
 	-DBOOST_ROOT:PATHNAME="%PROJECT_DIR%\deps\boost" ^
 	-DBOOST_INCLUDEDIR="%PROJECT_DIR%\deps\boost" ^
-	-DBOOST_LIBRARYDIR="%PROJECT_DIR%\deps\boost\lib32-msvc-14.1" ^
-	-DFREETYPE_INCLUDE_DIRS=../deps/freetype-2.9.1/include ^
-	-DFREETYPE_INCLUDE_DIR_freetype2=../deps/freetype-2.9.1/include ^
-	-DFREETYPE_INCLUDE_DIR_ft2build=../deps/freetype-2.9.1/include ^
-	-DFREETYPE_LIBRARY=../deps/freetype-2.9.1/build/Release/freetype
+	-DBOOST_LIBRARYDIR="%PROJECT_DIR%\deps\boost\lib64-msvc-14.1" ^
+	-DFREETYPE_INCLUDE_DIRS=../deps/freetype2/include ^
+	-DFREETYPE_INCLUDE_DIR_freetype2=../deps/freetype2/include ^
+	-DFREETYPE_INCLUDE_DIR_ft2build=../deps/freetype2/include ^
+	-DFREETYPE_LIBRARY=../deps/freetype2/build/Release/freetype
 
-MSBuild.exe goban.sln /t:Build /p:Configuration=Release /p:PlatformToolset=v141 /p:TargetPlatformVersion=10.0.17134.0
+MSBuild.exe goban.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
