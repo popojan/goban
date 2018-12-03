@@ -18,6 +18,8 @@
 #include "EventManager.h"
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 Rocket::Core::Context* context = NULL;
 static ElementGame* gameElement = NULL;
@@ -26,10 +28,14 @@ void GameLoop() {
     gameElement->gameLoop();
 }
 
+
 #if defined ROCKET_PLATFORM_WIN32
 #include <windows.h>
 #include <io.h>
 #include <fcntl.h>
+
+
+
 void DoAllocConsole()
 {
     static const WORD MAX_CONSOLE_LINES = 500;
@@ -77,6 +83,9 @@ int APIENTRY WinMain(HINSTANCE ROCKET_UNUSED_PARAMETER(instance_handle), HINSTAN
 int main(int ROCKET_UNUSED_PARAMETER(argc), char** ROCKET_UNUSED_PARAMETER(argv))
 #endif
 {
+    auto console = spdlog::stderr_color_mt("console");
+    spdlog::set_level(spdlog::level::info);
+    console->info("TODO log using spdlog!");
 #ifdef ROCKET_PLATFORM_WIN32
     ROCKET_UNUSED(instance_handle);
     ROCKET_UNUSED(previous_instance_handle);
