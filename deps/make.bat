@@ -1,46 +1,47 @@
-REM freetype 2.9.1
-wget --progress=dot:mega "https://download.savannah.gnu.org/releases/freetype/ft291.zip"
-7z x ft291.zip
-cd freetype-2.9.1
-mkdir build
+REM freetype2
+if not exist freetype2 git clone http://git.sv.nongnu.org/r/freetype/freetype2.git
+cd freetype2
+if not exist build mkdir build
 cd build
-cmake ..
-MSBuild.exe freetype.sln /t:Build /p:Configuration=Release
-
+cmake .. -G%STUDIO%
+MSBuild.exe freetype.vcxproj /t:Build /p:Configuration=Release  /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
 cd ..\..
 
 REM libRocket
-git clone https://github.com/libRocket/libRocket.git
+if not exist libRocket git clone https://github.com/libRocket/libRocket.git
 cd libRocket
-mkdir BuildDir
+if not exist BuildDir mkdir BuildDir
 cd BuildDir
-cmake ../Build -DFREETYPE_INCLUDE_DIRS=../../freetype-2.9.1/include -DFREETYPE_LIBRARY=../../freetype-2.9.1/build/Release/freetype
-MSBuild.exe libRocket.sln /t:Build /p:Configuration=Release
+cmake ../Build -G%STUDIO% -DFREETYPE_INCLUDE_DIRS=../../freetype2/include -DFREETYPE_LIBRARY=../../freetype2/build/Release/freetype
+MSBuild.exe libRocket.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
 
 cd ..\..
 
 REM glew
-git clone https://github.com/tamaskenez/glew-with-extensions
+if not exist glew-with-extensions git clone https://github.com/tamaskenez/glew-with-extensions
 cd glew-with-extensions
-mkdir BuildDir
+if not exist BuildDir mkdir BuildDir
 cd BuildDir
-cmake ..\build\cmake -UGLEW_USE_STATIC_LIBS
-MSBuild.exe glew_s.vcxproj /t:Build /p:Configuration=Release
+cmake ..\build\cmake -G%STUDIO% -UGLEW_USE_STATIC_LIBS
+MSBuild.exe glew_s.vcxproj /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
 
 cd ..\..
 
 REM glm
-git clone https://github.com/g-truc/glm.git
+if not exist glm git clone https://github.com/g-truc/glm.git
 
 REM glyphy
-git clone https://github.com/behdad/glyphy.git
+if not exist glyphy git clone https://github.com/behdad/glyphy.git
 copy _patches\goban_glyphy.vcxproj glyphy\win32
-MSBuild.exe  glyphy\win32\goban_glyphy.vcxproj /t:Build /p:Configuration=Release /p:PlatformToolset=v141
+MSBuild.exe  glyphy\win32\goban_glyphy.vcxproj /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET% /p:Platform=x64
 
-::/p:WindowsTargetPlatformVersion=10.0.17763.0
+REM boost-process
+if not exist boost-process git clone https://github.com/BorisSchaeling/boost-process.git
 
 REM boost
-wget --progress=dot:giga https://dl.bintray.com/boostorg/release/1.65.0/binaries/boost_1_65_0-msvc-14.1-32.exe
-innounp -b -q -x boost_1_65_0-msvc-14.1-32.exe {app}\boost\*
-innounp -b -x boost_1_65_0-msvc-14.1-32.exe {app}\lib32-msvc-14.1\libboost_*-vc141-mt-1_65.lib
-move {app} boost
+if not exist boost (
+  if not exist boost_1_65_0-msvc-14.1-64.exe wget --progress=dot:giga https://dl.bintray.com/boostorg/release/1.65.0/binaries/boost_1_65_0-msvc-14.1-64.exe
+  innounp -b -q -x boost_1_65_0-msvc-14.1-64.exe {app}\boost\*
+  innounp -b -x boost_1_65_0-msvc-14.1-64.exe {app}\lib64-msvc-14.1\libboost_*-vc141-mt-1_65.lib 
+  move {app} boost
+)

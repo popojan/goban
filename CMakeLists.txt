@@ -35,6 +35,8 @@ SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -s")
 endif()
 
 if (WIN32)
+  add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINDOWS=0x0A00)
+  option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
   set(Boost_USE_STATIC_LIBS ON)
   set(GLEW_USE_STATIC_LIBS ON)
 else()
@@ -164,8 +166,6 @@ set(GOBAN_SRC_FILES
         ../src/Metrics.cpp ../src/Metrics.h ../src/GobanOverlay.cpp ../src/GobanOverlay.h ../src/GameState.cpp ../src/GameState.h)
 
 if (WIN32)
-    add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINDOWS=0x0A00)
-	option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 	add_executable(goban WIN32 ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES})
 else()
@@ -179,6 +179,10 @@ target_link_libraries(goban
     ${OPENGL_LIBRARIES}
     ${GLEW_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
+    ${Boost_SYSTEM_LIBRARY}
+    ${Boost_IOSTREAMS_LIBRARY}
+    ${Boost_THREAD_LIBRARY}
+    ${Boost_FILESYSTEM_LIBRARY}
     ${Boost_LIBRARIES}
     ${CURSES_LIBRARY}
     ${X11_LIBRARIES}
