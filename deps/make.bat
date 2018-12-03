@@ -12,7 +12,7 @@ if not exist libRocket git clone https://github.com/libRocket/libRocket.git
 cd libRocket
 if not exist BuildDir mkdir BuildDir
 cd BuildDir
-cmake ../Build -G%STUDIO% -DFREETYPE_INCLUDE_DIRS=../../freetype2/include -DFREETYPE_LIBRARY=../../freetype2/build/Release/freetype
+cmake -G%STUDIO% ../Build -DFREETYPE_INCLUDE_DIRS=../../freetype2/include -DFREETYPE_LIBRARY=../../freetype2/build/Release/freetype
 MSBuild.exe libRocket.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
 
 cd ..\..

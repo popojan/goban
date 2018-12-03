@@ -10,6 +10,7 @@ set CMAKE_PATH="C:\Program Files\CMake\bin"
 set PATH=%CMAKE_PATH%;%MSBUILD_PATH%;%PATH%
 set TOOLSET=v141
 set TARGET=10.0.17134.0
+REM set TARGET=10.0.17763.0
 set STUDIO="Visual Studio 15 2017 Win64"
 
 set PROJECT_DIR=%~dp0
