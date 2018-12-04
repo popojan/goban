@@ -60,6 +60,7 @@ namespace DDG
         pLast( 1. ),
         rLast( x, y, z, w),
      momentum( 1. ),
+         tLast( 0 ),
          zoom( 1. )
    { }
 

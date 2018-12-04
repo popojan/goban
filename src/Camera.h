@@ -61,7 +61,7 @@ namespace DDG
          Quaternion momentum;
          // camera momentum
 
-         int tLast = 0;
+         int tLast;
          // time of previous drag
 
          double zoom, vZoom;

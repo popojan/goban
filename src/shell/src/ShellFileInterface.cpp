@@ -41,11 +41,10 @@ Rocket::Core::FileHandle ShellFileInterface::Open(const Rocket::Core::String& pa
 {
 	// Attempt to open the file relative to the application's root.
 	FILE* fp = fopen((root + path).CString(), "rb");
-	if (fp != NULL)
-		return (Rocket::Core::FileHandle) fp;
-
-	// Attempt to open the file relative to the current working directory.
-	fp = fopen(path.CString(), "rb");
+	if (fp == NULL) {
+	    // Attempt to open the file relative to the current working directory.
+	    fp = fopen(path.CString(), "rb");
+    }
 	return (Rocket::Core::FileHandle) fp;
 }
 
