@@ -16,7 +16,6 @@ DDG::Quaternion& rst(DDG::Quaternion& q) {
 
 static DDG::Quaternion toQuaternion(double pitch, double roll, double yaw)
 {
-	
 	double t0 = std::cos(yaw * 0.5);
 	double t1 = std::sin(yaw * 0.5);
 	double t2 = std::cos(roll * 0.5);
@@ -161,8 +160,7 @@ namespace DDG
 		  else {
 			  pClick = pDrag = pLast = clickToSphere(x, y, w, h);
 		  }
-			  
-         momentum = 1.;
+          momentum = 1.;
       }
       if( state == 0 )
       {
