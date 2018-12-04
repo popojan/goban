@@ -181,7 +181,7 @@ static int GetKeyModifierState(EventRef event)
 static void InitialiseKeymap()
 {
 	// Initialise the key map with default values.
-	memset(key_identifier_map, sizeof(key_identifier_map), 0);
+	memset(key_identifier_map, 0, sizeof(key_identifier_map));
 
 	key_identifier_map[0x00] = Rocket::Core::Input::KI_A;
 	key_identifier_map[0x01] = Rocket::Core::Input::KI_S;
