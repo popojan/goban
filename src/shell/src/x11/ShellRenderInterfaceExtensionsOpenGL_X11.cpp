@@ -14,7 +14,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -35,7 +35,7 @@
 
 void ShellRenderInterfaceOpenGL::SetContext(void *context)
 {
-	m_rocket_context = context;
+    m_rocket_context = context;
 }
 
 void ShellRenderInterfaceOpenGL::Invalidate() {
@@ -44,85 +44,85 @@ void ShellRenderInterfaceOpenGL::Invalidate() {
 
 void ShellRenderInterfaceOpenGL::SetViewport(int width, int height)
 {
-	if(m_width != width || m_height != height) {
-		m_width = width;
-		m_height = height;
-		
-		glViewport(0, 0, width, height);
-#ifndef DEBUG_NVIDIA
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glOrtho(0, width, height, 0, -1, 1);
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
+    if(m_width != width || m_height != height) {
+        m_width = width;
+        m_height = height;
 
-	}
-	if(m_rocket_context != NULL)
-	{
-		((Rocket::Core::Context*)m_rocket_context)->SetDimensions(Rocket::Core::Vector2i(width, height));
-	}
+        glViewport(0, 0, width, height);
+#ifndef DEBUG_NVIDIA
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, width, height, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+    }
+    if(m_rocket_context != NULL)
+    {
+        ((Rocket::Core::Context*)m_rocket_context)->SetDimensions(Rocket::Core::Vector2i(width, height));
+    }
 #endif
 }
 
 bool ShellRenderInterfaceOpenGL::AttachToNative(void *nativeWindow)
 {
-	this->nwData.display = ((__X11NativeWindowData *)nativeWindow)->display;
-	this->nwData.window = ((__X11NativeWindowData *)nativeWindow)->window;
-	this->nwData.visual_info = ((__X11NativeWindowData *)nativeWindow)->visual_info;
+    this->nwData.display = (reinterpret_cast<__X11NativeWindowData *>(nativeWindow))->display;
+    this->nwData.window = (reinterpret_cast<__X11NativeWindowData *>(nativeWindow))->window;
+    this->nwData.visual_info = (reinterpret_cast<__X11NativeWindowData *>(nativeWindow))->visual_info;
 
-	this->gl_context = glXCreateContext(nwData.display, nwData.visual_info, NULL, GL_TRUE);
-	if (this->gl_context == NULL)
-		return false;
-	
-	if (!glXMakeCurrent(nwData.display, nwData.window, this->gl_context))
-		return false;
-	
-	if (!glXIsDirect(nwData.display, this->gl_context))
-		Shell::Log("OpenGL context does not support direct rendering; performance is likely to be poor.");
+    this->gl_context = glXCreateContext(nwData.display, nwData.visual_info, NULL, GL_TRUE);
+    if (this->gl_context == NULL)
+        return false;
 
-	Window root_window;
-	int x, y;
-	unsigned int width, height;
-	unsigned int border_width, depth;
-	XGetGeometry(nwData.display, nwData.window, &root_window, &x, &y, &width, &height, &border_width, &depth);	
+    if (!glXMakeCurrent(nwData.display, nwData.window, this->gl_context))
+        return false;
+
+    if (!glXIsDirect(nwData.display, this->gl_context))
+        Shell::Log("OpenGL context does not support direct rendering; performance is likely to be poor.");
+
+    Window root_window;
+    int x, y;
+    unsigned int width, height;
+    unsigned int border_width, depth;
+    XGetGeometry(nwData.display, nwData.window, &root_window, &x, &y, &width, &height, &border_width, &depth);    
 #ifndef DEBUG_NVIDIA
-	
-	// Set up the GL state.
-	glClearColor(0, 0, 0, 1);
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_COLOR_ARRAY);
-	
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, 1024, 768, 0, -1, 1);
-	
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+
+    // Set up the GL state.
+    glClearColor(0, 0, 0, 1);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, 1024, 768, 0, -1, 1);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
 #endif
-	return true;
+    return true;
 }
 
 void ShellRenderInterfaceOpenGL::DetachFromNative()
 {
-	// Shutdown OpenGL	
-	glXMakeCurrent(nwData.display, None, NULL);
-	glXDestroyContext(nwData.display, gl_context);
-	m_rocket_context = NULL;
-	this->gl_context = NULL;
+    // Shutdown OpenGL
+    glXMakeCurrent(nwData.display, None, NULL);
+    glXDestroyContext(nwData.display, gl_context);
+    m_rocket_context = NULL;
+    this->gl_context = NULL;
 }
 
 void ShellRenderInterfaceOpenGL::PrepareRenderBuffer()
 {
-	//glClear(GL_COLOR_BUFFER_BIT);
+    //glClear(GL_COLOR_BUFFER_BIT);
 }
 
 void ShellRenderInterfaceOpenGL::PresentRenderBuffer()
 {
 
     valid = true;
-	// Flips the OpenGL buffers.
+    // Flips the OpenGL buffers.
     glXSwapBuffers(this->nwData.display, this->nwData.window);
 }

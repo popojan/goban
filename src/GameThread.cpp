@@ -231,10 +231,10 @@ void GameThread::gameLoop() {
         Player* player = currentPlayer();
         hasThreadRunning = true;
         if(coach && player) {
-            bool success = false;
             bool locked = false;
-            bool doubleUndo = false;
             {
+                bool success = false;
+                bool doubleUndo = false;
                 if (!interruptRequested && player == currentPlayer()) {
                     playerToMove = player;
                     if(!player->isTypeOf(Player::HUMAN)){
@@ -285,7 +285,7 @@ void GameThread::gameLoop() {
                         for (auto pit = players.begin(); pit != players.end(); ++pit) {
                             Player* p = *pit;
                             if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
-                                    && p != (Player*)coach && p != player) {
+                                    && p != reinterpret_cast<Player*>(coach) && p != player) {
                                 std::cerr << "DEBUG play iter" << std::endl;
                                 if(move == Move::UNDO) {
                                     p->undo();
@@ -359,9 +359,10 @@ Move GameThread::getLastMove() {
 void GameThread::loadEngines(const std::string& dir) {
     boost::filesystem::path p(dir);
 
-    bool hasCouch(false);
-
     if(boost::filesystem::is_directory(p)) {
+
+        bool hasCouch(false);
+
         for (auto it = boost::filesystem::directory_iterator(p); it != boost::filesystem::directory_iterator(); ++it) {
             std::string fengine(it->path().string());
             std::ifstream fin(fengine.c_str());

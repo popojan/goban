@@ -181,7 +181,7 @@ enum class TokenType {
  */
 class Token {
  public:
-  Token(TokenType type) : type_(type) {}
+  explicit Token(TokenType type) : type_(type) {}
   Token(TokenType type, char c) : type_(type), value_(std::string(1, c)) {}
 
   TokenType type() const { return type_; }

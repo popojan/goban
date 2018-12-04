@@ -135,11 +135,11 @@ void InputX11::ProcessXEvent(Display* display, const XEvent& event)
 
 		case KeyPress: 
 		{
-			int group_index = 0; // this is always 0 for our limited example
 			Rocket::Core::Input::KeyIdentifier key_identifier;
 #ifdef HAS_X11XKBLIB
 			if(has_xkblib)
 			{
+			    int group_index = 0; // this is always 0 for our limited example
 				KeySym sym = XkbKeycodeToKeysym(display, event.xkey.keycode, 0, group_index);
 
 				key_identifier = key_identifier_map[sym & 0xFF];
@@ -147,6 +147,7 @@ void InputX11::ProcessXEvent(Display* display, const XEvent& event)
 			else
 #endif // HAS_X11XKBLIB
 			{
+			    int group_index = 0; // this is always 0 for our limited example
 				KeySym sym = x11_key_mapping[(event.xkey.keycode - min_keycode) * keysyms_per_keycode + group_index];
 
 				KeySym lower_sym, upper_sym;

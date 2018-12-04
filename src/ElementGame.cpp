@@ -18,13 +18,12 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
 void ElementGame::gameLoop() {
 	static int cnt = 0;
 	static float lastTime = -1;
-	static int frames = 1;
-
 	auto context = GetContext();
 
 	float currentTime = Shell::GetElapsedTime();
 	if (currentTime - lastTime >= 1.0) {
-		auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
+	    static int frames = 1;
+        auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
 		const Rocket::Core::String sfps(128, "FPS: %.1f", cnt / (currentTime - lastTime));
 		if (debugElement != 0) {
 			debugElement->SetInnerRML(sfps.CString());

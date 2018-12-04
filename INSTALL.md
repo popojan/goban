@@ -1,5 +1,5 @@
 # Build on clean Ubuntu 16.04
-```
+```bash
 sudo add-apt-repository universe
 sudo apt-get update
 sudo apt-get install git cmake libtool autoconf \

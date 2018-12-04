@@ -54,7 +54,7 @@ demo_font_t *
 demo_font_create (FT_Face       face,
 		  demo_atlas_t *atlas)
 {
-  demo_font_t *font = (demo_font_t *) calloc (1, sizeof (demo_font_t));
+  demo_font_t *font = reinterpret_cast<demo_font_t *>(calloc (1, sizeof (demo_font_t)));
   font->refcount = 1;
 
   font->face = face;

@@ -31,7 +31,7 @@ std::ostream& operator<< (std::ostream& stream, const Color& color) {
 }
 
 std::ostream& operator<< (std::ostream& stream, const Board& board) {
-    for (unsigned i = board.boardSize; i >= 0; --i) {
+    for (unsigned i = board.boardSize; i != 0; --i) {
         for(unsigned j = 0; j < board.boardSize; ++j)
             stream << board[Position(j, i)] << " ";
         stream << std::endl;
@@ -167,11 +167,10 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
         }
         unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
 
-		bool placeStone = false;
-		int change = 0;
 		if (stones[idx] != mValue) {
+		    int change = 0;
 			bool territoryToggle = std::abs(stones[idx] - mValue) == mDeltaCaptured;
-			placeStone = !territoryToggle && /*dif != mDeltaLastMove &&*/ mValue != mEmpty
+			bool placeStone = !territoryToggle && /*dif != mDeltaLastMove &&*/ mValue != mEmpty
 			        &&  mValue != mBlackArea && mValue != mWhiteArea;
 			if (placeStone) {
 				placedSomeStone = true;
@@ -271,11 +270,12 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
         if(lines.front().at(0) == '=') {
             std::istringstream ssin(lines.at(2));
 
-            unsigned size = 0u, bcaptured = 0u, wcaptured = 0u;
+            unsigned size = 0u;
             ssin >> size;
-			bool white = true;
             if(size >= MINBOARD && size <= MAXBOARD) {
+                unsigned bcaptured = 0u, wcaptured = 0u;
                 std::cerr << lines.at(1) << std::endl;
+			    bool white = true;
                 for(unsigned i = 2; i < 2 + size; ++i) {
                     std::cerr << lines.at(i) << std::endl;
                     for(unsigned j = 3; j < 3 + (size << 1); j += 2) {
@@ -311,7 +311,6 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                 success = true;
                 capturedBlack = bcaptured;
                 capturedWhite = wcaptured;
-                //++positionNumber;
                 std::cerr << lines.at(2 + size) << std::endl;
             }
         }

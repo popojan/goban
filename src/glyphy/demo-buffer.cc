@@ -38,7 +38,7 @@ struct demo_buffer_t {
 demo_buffer_t *
 demo_buffer_create (void)
 {
-  demo_buffer_t *buffer = (demo_buffer_t *) calloc (1, sizeof (demo_buffer_t));
+  demo_buffer_t *buffer = reinterpret_cast<demo_buffer_t *>(calloc (1, sizeof (demo_buffer_t)));
   buffer->refcount = 1;
 
   buffer->vertices = new std::vector<glyph_vertex_t>;
