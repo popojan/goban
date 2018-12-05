@@ -17,8 +17,8 @@ set PROJECT_DIR=%~dp0
 set PROJECT_DIR=%PROJECT_DIR:~0,-1%
 
 REM build dependencies
-cd deps
-call make.bat
+#cd deps
+#call make.bat
 
 REM build goban
 cd %PROJECT_DIR%
@@ -39,4 +39,4 @@ cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
 	-DFREETYPE_INCLUDE_DIR_ft2build=../deps/freetype2/include ^
 	-DFREETYPE_LIBRARY=../deps/freetype2/build/Release/freetype
 
-MSBuild.exe goban.sln /t:ReBuild /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
+MSBuild.exe goban.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%

@@ -17,7 +17,7 @@ if defined CLEAN rmdir /s /q BuildDir
 if not exist BuildDir mkdir BuildDir
 cd BuildDir
 cmake -G%STUDIO% ../Build -DBUILD_SHARED_LIBS= -DFREETYPE_INCLUDE_DIRS=../../freetype2/include -DFREETYPE_LIBRARY=../../freetype2/build/Release/freetype
-MSBuild.exe libRocket.sln /t:ReBuild /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
+MSBuild.exe libRocket.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
 
 cd ..\..
 
@@ -54,4 +54,4 @@ if not exist boost (
 )
 
 REM spdlog
-if not exist spdlog git clone https://github.com/gabime/spdlog.git
+if not exist spdlog git clone --recursive https://github.com/gabime/spdlog.git

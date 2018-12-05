@@ -18,6 +18,11 @@
 #include "EventManager.h"
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
+
+#if defined ROCKET_PLATFORM_WIN32
+  #undef __GNUC__
+#endif
+
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
@@ -83,9 +88,6 @@ int APIENTRY WinMain(HINSTANCE ROCKET_UNUSED_PARAMETER(instance_handle), HINSTAN
 int main(int ROCKET_UNUSED_PARAMETER(argc), char** ROCKET_UNUSED_PARAMETER(argv))
 #endif
 {
-    auto console = spdlog::stderr_color_mt("console");
-    spdlog::set_level(spdlog::level::info);
-    console->info("TODO log using spdlog!");
 #ifdef ROCKET_PLATFORM_WIN32
     ROCKET_UNUSED(instance_handle);
     ROCKET_UNUSED(previous_instance_handle);
@@ -103,6 +105,9 @@ const char * WINDOW_NAME = "Goban";
 #ifdef ROCKET_PLATFORM_WIN32
         DoAllocConsole();
 #endif
+    auto console = spdlog::stderr_color_mt("console");
+    spdlog::set_level(spdlog::level::info);
+    console->info("TODO log using spdlog!");
 
     unsigned window_width = 1024;
     unsigned window_height = 768;
