@@ -53,7 +53,7 @@ static void toEulerianAngle(const DDG::Quaternion& q, double& roll, double& pitc
 }
 
 namespace DDG
-{ 
+{
    Camera :: Camera(float x, float y, float z, float w)
    :   pClick( 1. ),
         pDrag( 1. ),
