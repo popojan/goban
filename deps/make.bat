@@ -52,3 +52,6 @@ if not exist boost (
   innounp -b -x boost_1_65_0-msvc-14.1-64.exe {app}\lib64-msvc-14.1\libboost_*-vc141-mt-1_65.lib 
   move {app} boost
 )
+
+REM spdlog
+if not exist spdlog git clone https://github.com/gabime/spdlog.git
