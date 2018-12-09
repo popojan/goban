@@ -22,6 +22,5 @@ For windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/gob
 *   `freetype2`
 *   `libRocket`
 *   `boost`
-*   `boost.process`
 *   `GLM`
 *   `glyphy`

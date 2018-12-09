@@ -18,7 +18,9 @@ public:
     enum Role { NONE = 0, WHITE = 1, BLACK = 2, COACH = 4, SPECTATOR = 8, STANDBY = 16};
     enum Type { LOCAL = 1, HUMAN = 2, ENGINE = 4 };
 
-    Player(const std::string& name, int role, int type) : name(name), role(role), type(type) {}
+    Player(const std::string& name, int role, int type) : name(name), role(role), type(type) {
+        console = spdlog::get("console");
+    }
     virtual Move genmove(const Color& colorToMove) = 0;
 
     virtual bool play(const Move& move) { (void)move;  return true; }
@@ -42,6 +44,7 @@ protected:
     std::string name;
     int role;
     int type;
+    std::shared_ptr<spdlog::logger> console;
 };
 
 class LocalHumanPlayer: public Player {
@@ -113,7 +116,7 @@ public:
 
     virtual bool fixed_handicap(int handicap, std::vector<Position>& stones) {
         std::stringstream ssout;
-        ssout << "fixed_handicap " << handicap << std::endl;
+        ssout << "fixed_handicap " << handicap;
         GtpClient::CommandOutput out = GtpClient::issueCommand(ssout.str());
         if (GtpClient::success(out)) {
             stones.clear();
@@ -129,7 +132,7 @@ public:
 
     virtual bool komi(float komi) {
         std::stringstream ssout;
-        ssout << "komi " << komi << std::endl;
+        ssout << "komi " << komi;
         return GtpClient::success(GtpClient::issueCommand(ssout.str()));
     }
 
@@ -140,7 +143,7 @@ public:
     }
     virtual bool boardsize(int boardSize) {
         std::stringstream ssout;
-        ssout << "boardsize " << boardSize << std::endl;
+        ssout << "boardsize " << boardSize;
         return GtpClient::success(GtpClient::issueCommand(ssout.str()));
     }
     virtual bool clear() {
@@ -166,7 +169,7 @@ public:
         }
         else {
             std::stringstream ss;
-            ss << "initial_influence " << colorToMove << " influence_regions" << std::endl;
+            ss << "initial_influence " << colorToMove << " influence_regions";
             GtpClient::CommandOutput ret = GtpClient::issueCommand(ss.str());
             territory.clear(board.getSize());
             territory.parseGtpInfluence(ret);

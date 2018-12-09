@@ -1,10 +1,10 @@
 #ifndef ROCKETINVADERSELEMENTGAME_H
 #define ROCKETINVADERSELEMENTGAME_H
 
+#include "GobanControl.h"
 #include <Rocket/Core/Element.h>
 #include <Rocket/Core/EventListener.h>
 #include <Rocket/Core/StyleSheet.h>
-#include "GobanControl.h"
 
 class ElementGame : public Rocket::Core::Element,
     public Rocket::Core::EventListener

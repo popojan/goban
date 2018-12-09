@@ -44,7 +44,7 @@ public:
     ~GobanView() {
         gobanShader.destroy();
     }
-    void Render(float, float);
+    void Render(int, int);
 
     void updateTranslation();
     //bool invalidate(int inc = 1);

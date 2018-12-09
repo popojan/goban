@@ -5,9 +5,10 @@
 #ifndef GOBAN_GOBANCONTROL_H
 #define GOBAN_GOBANCONTROL_H
 
+#include "GameThread.h"
 #include "GobanModel.h"
 #include "GobanView.h"
-#include "GameThread.h"
+
 
 class ElementGame;
 

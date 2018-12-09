@@ -1,60 +1,41 @@
 #ifndef GTPCLIENT_H
 #define GTPCLIENT_H
 
-#ifdef  WIN_32
-#pragma warning( disable : 4512 4702 4996)
-#endif
 #include <boost/process.hpp>
 #include <boost/filesystem/path.hpp>
-#undef __GNUC__
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream.hpp>
-#define __GNUC__ 1
-#pragma GCC diagnostic pop
-#ifdef  WIN_32
-#pragma warning( default: 4512 4702 4996)
-#endif
-
 #include <string>
 #include <vector>
 #include <iostream>
+#include <sstream>
+#include "spdlog/spdlog.h"
 
 class GtpClient {
 private:
-    boost::iostreams::stream<boost::iostreams::file_descriptor_sink> pis;
-    boost::iostreams::stream<boost::iostreams::file_descriptor_source> pos;
+    boost::process::opstream pis;
+    boost::process::ipstream pos;
+    boost::process::child c;
+    std::shared_ptr<spdlog::logger> console;
 public:
     typedef std::vector<std::string> CommandOutput;
     GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path) {
-        std::string gnugo = boost::process::search_path(exe, path);
+        console = spdlog::get("console");
+        console->info(exe);
+        console->info(cmdline);
+
+        auto gnugo = boost::process::search_path(exe, {path});
 
         std::cerr << gnugo << std::endl;
 
         boost::filesystem::path file(gnugo);
 
-        boost::process::pipe pout = boost::process::create_pipe();
-        boost::process::pipe pin  = boost::process::create_pipe();
-
-        boost::iostreams::file_descriptor_sink psink(pout.sink, boost::iostreams::file_descriptor_flags::close_handle);
-        boost::iostreams::file_descriptor_source psource(pin.source, boost::iostreams::file_descriptor_flags::close_handle);
-
-        boost::process::execute(
-            boost::process::initializers::run_exe(file),
-            boost::process::initializers::set_cmd_line(cmdline),
-            boost::process::initializers::bind_stdout(psink),
-            boost::process::initializers::bind_stdin(psource)
-        );
-
-        boost::iostreams::file_descriptor_source source(pout.source, boost::iostreams::file_descriptor_flags::close_handle);
-        boost::iostreams::file_descriptor_sink sink(pin.sink, boost::iostreams::file_descriptor_flags::close_handle);
-
-        pis.open(sink);
-        pos.open(source);
-
+        std::istringstream iss(cmdline);
+        std::vector<std::string> params((std::istream_iterator<std::string>(iss)),
+                                         std::istream_iterator<std::string>());
+        c = boost::process::child(file, params, boost::process::std_out > pos, boost::process::std_in < pis, boost::process::std_err.close());
+        console->info("running child");
     }
     ~GtpClient() {
-        pis.close();
-        pos.close();
+
     }
 
     CommandOutput showboard() {
@@ -68,13 +49,13 @@ public:
     }
     CommandOutput issueCommand(const std::string& command) {
         CommandOutput ret;
-        std::cerr << "sendline = [" << command << "]" << std::endl;
+        console->info("sendline = [{0}]", command);
         pis << command << std::endl;
-        pis.flush();
         std::string line;
+        console->info("get line");
         while (std::getline(pos, line)) {
             line.erase(line.find_last_not_of(" \n\r\t") + 1);
-            std::cerr << "getline = [" << line << "]" << std::endl;
+            console->info("getline = [{0}]", line);
             if (line.empty()) break;
             ret.push_back(line);
         }

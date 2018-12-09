@@ -130,7 +130,7 @@ public:
 
     unsigned getSize() const { return boardSize;}
 
-    int getSizeOf() const { return 4*sizeof(float)*stones.size(); }
+    std::size_t getSizeOf() const { return 4*sizeof(float)*stones.size(); }
 
     void copyStateFrom(const Board&);
 
