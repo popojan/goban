@@ -22,7 +22,9 @@ public:
         console->info(exe);
         console->info(cmdline);
 
-        auto gnugo = boost::process::search_path(exe, {path});
+        auto where(::boost::this_process::path());
+        where.push_back(path);
+        auto gnugo = boost::process::search_path(exe, where);
 
         std::cerr << gnugo << std::endl;
 
