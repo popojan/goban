@@ -1,13 +1,13 @@
 #ifndef GAMETHREAD_H
 #define GAMETHREAD_H
 
+#include "player.h"
+#include "GobanModel.h"
+#include "Board.h"
+
 #include <thread>
 #include <mutex>
 #include <string>
-
-#include "GobanModel.h"
-#include "Board.h"
-#include "player.h"
 
 class GameThread
 {

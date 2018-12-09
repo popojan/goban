@@ -175,7 +175,7 @@ void GobanView::shadeit(float time, GobanShader& gobanShader) {
 	gobanShader.unuse();
 }
 
-void GobanView::Render(float w, float h)
+void GobanView::Render(int w, int h)
 {
 	
 	if(!gobanShader.isReady())
