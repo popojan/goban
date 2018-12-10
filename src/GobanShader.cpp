@@ -180,7 +180,6 @@ void GobanShader::initProgram(int which) {
     iTranslate = glGetUniformLocation(gobanProgram, "iTranslate");
     iTime = glGetUniformLocation(gobanProgram, "iTime");
     iResolution = glGetUniformLocation(gobanProgram, "iResolution");
-    iAA = glGetUniformLocation(gobanProgram, "AA");
     iGamma = glGetUniformLocation(gobanProgram, "gamma");
     iContrast = glGetUniformLocation(gobanProgram, "contrast");
     iBlackCapturedCount = glGetUniformLocation(gobanProgram, "iBlackCapturedCount");
@@ -219,9 +218,6 @@ void GobanShader::initProgram(int which) {
     iddc = glGetUniformLocation(gobanProgram, "ddc");
 
     glUseProgram(gobanProgram);
-
-    AA = 1;
-    glUniform1i(iAA, AA);
     glUniform1f(iAnimT, animT);
     glUseProgram(0);
     console->info("postShaderUniformsLocations = {0}", glGetError());
@@ -230,10 +226,12 @@ void GobanShader::initProgram(int which) {
 }
 
 void GobanShader::setGamma(float gamma) {
+    console->info("setting gamma = {0}", gamma);
     this->gamma = gamma;
 }
 
 void GobanShader::setContrast(float contrast) {
+    console->info("setting contrast = {0}", contrast);
     this->contrast = contrast;
 }
 
