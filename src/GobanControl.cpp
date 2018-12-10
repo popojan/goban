@@ -195,16 +195,23 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     }
     else {
         if (key == Rocket::Core::Input::KI_RIGHT) {
+            console->info("new gamma = {0}", view.getGamma() + 0.025f);
             view.setGamma(view.getGamma() + 0.025f);
         }
         else if (key == Rocket::Core::Input::KI_LEFT) {
+            console->info("new gamma = {0}", view.getGamma() + 0.025f);
             view.setGamma(view.getGamma() - 0.025f);
         }
         else if (key == Rocket::Core::Input::KI_UP) {
+            console->info("new contrast = {0}", view.getContrast() + 0.025f);
             view.setContrast(view.getContrast() + 0.025f);
         }
         else if (key == Rocket::Core::Input::KI_DOWN) {
+            console->info("new contrast = {0}", view.getContrast() - 0.025f);
             view.setContrast(view.getContrast() - 0.025f);
+        }
+        else if (key == Rocket::Core::Input::KI_HOME) {
+            view.resetAdjustments();
         }
         else if (key == Rocket::Core::Input::KI_D) {
             view.initPan(mouseX, mouseY);

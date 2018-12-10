@@ -62,14 +62,22 @@ public:
 
     void setGamma(float gamma) {
         gobanShader.setGamma(gamma);
+        updateFlag |= UPDATE_SHADER;
     };
 
     void setContrast(float contrast) {
 		gobanShader.setContrast(contrast);
+        updateFlag |= UPDATE_SHADER;
     }
 
     float getGamma() {
 		return gobanShader.getGamma();
+    }
+
+    void resetAdjustments() {
+        gobanShader.setGamma(1.0);
+        gobanShader.setContrast(0.0);
+        updateFlag |= UPDATE_SHADER;
     }
 
     float getContrast() {

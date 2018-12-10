@@ -163,8 +163,8 @@ void GobanView::shadeit(float time, GobanShader& gobanShader) {
 	gobanShader.setPan(newTranslate);
 
 	if (updateFlag & UPDATE_SHADER) {
-		gobanShader.setGamma(1.0f);
-		gobanShader.setContrast(0.0f);
+		//gobanShader.setGamma(1.0f);
+		//gobanShader.setContrast(0.0f);
 		gobanShader.setMetrics(model.metrics);
 	}
 

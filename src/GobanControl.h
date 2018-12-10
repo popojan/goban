@@ -8,7 +8,7 @@
 #include "GameThread.h"
 #include "GobanModel.h"
 #include "GobanView.h"
-
+#include "spdlog/spdlog.h"
 
 class ElementGame;
 
@@ -16,7 +16,9 @@ class GobanControl {
 public:
     GobanControl(ElementGame& p, GobanModel& m, GobanView& v, GameThread& e)
             : parent(p), model(m), view(v), engine(e), rButtonDown(false), mButtonDown(false), startX(-1),
-              startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true) {
+              startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true)
+    {
+        console = spdlog::get("console");
     };
     ~GobanControl() { destroy(); }
 
@@ -42,6 +44,7 @@ private:
     bool exit;
     float mouseX, mouseY;
     bool firstGame;
+    std::shared_ptr<spdlog::logger> console;
 };
 
 
