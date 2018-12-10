@@ -116,8 +116,19 @@ std::string createShader(const std::string& fname, bool optimize) {
 #endif
 
 void GobanShader::initProgram(int which) {
-	std::cerr << "preShaderInitProgram = " << glGetError() << std::endl;
-	const char* program[3] = { "data/glsl/fragment.glsl", "data/glsl/fragment.2D.glsl", "data/glsl/fragment.25D.glsl"};
+    console->info("preShaderInitProgram = {0}", glGetError());
+    const char* vprogram[4] = {
+        "data/glsl/vertex.glsl",
+        "data/glsl/vertex.anaglyph.glsl",
+        "data/glsl/vertex.glsl",
+        "data/glsl/vertex.glsl"
+    };
+    const char* program[4] = {
+        "data/glsl/fragment.glsl",
+        "data/glsl/fragment.anaglyph.glsl",
+	"data/glsl/fragment.2D.glsl",
+        "data/glsl/fragment.25D.glsl"
+    };
     shadersReady = false;
     if (gobanProgram != 0) {
         glDeleteProgram(gobanProgram);
@@ -129,8 +140,8 @@ void GobanShader::initProgram(int which) {
     const std::string sFragmentShader = createShader(FRAGMENT_FILE, OPTIMIZE, ctx, glslopt_shader_type::kGlslOptShaderFragment);
     glslopt_cleanup(ctx);
 #else
-    const std::string sVertexShader = createShader(VERTEX_FILE, OPTIMIZE);
-    const std::string sFragmentShader = createShader(program[std::max(0, which % 3)], OPTIMIZE);
+    const std::string sVertexShader = createShader(vprogram[std::max(0, which % 4)], OPTIMIZE);
+    const std::string sFragmentShader = createShader(program[std::max(0, which % 4)], OPTIMIZE);
 #endif
     shaderAttachFromString(gobanProgram, GL_VERTEX_SHADER, sVertexShader);
     shaderAttachFromString(gobanProgram, GL_FRAGMENT_SHADER, sFragmentShader);
@@ -147,14 +158,14 @@ void GobanShader::initProgram(int which) {
         log = (char*)malloc(static_cast<std::size_t>(length));
         glGetProgramInfoLog(gobanProgram, length, &result, log);
 
-        std::cerr << "sceneInit(): Program linking failed: " << log << std::endl;
+        console->info("sceneInit(): Program linking failed: {0}", log);
         free(log);
 
         glDeleteProgram(gobanProgram);
         gobanProgram = 0;
     }
 
-	std::cerr << "postShaderGetProgram = " << glGetError() << std::endl;
+    console->info("postShaderGetProgram = {0}", glGetError());
 
     uBlockIndex = glGetUniformBlockIndex(gobanProgram, "iStoneBlock");
     glGenBuffers(1, &bufStones);
@@ -163,8 +174,8 @@ void GobanShader::initProgram(int which) {
     glUniformBlockBinding(gobanProgram, uBlockIndex, blockBindingPoint);
     glBindBufferRange(GL_UNIFORM_BUFFER, blockBindingPoint, bufStones, 0, 4 * sizeof(float)* Board::BOARDSIZE);
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	iStone = glGetUniformLocation(gobanProgram, "iStone");
-	iMouse = glGetUniformLocation(gobanProgram, "iMouse");
+    iStone = glGetUniformLocation(gobanProgram, "iStone");
+    iMouse = glGetUniformLocation(gobanProgram, "iMouse");
     iDim = glGetUniformLocation(gobanProgram, "NDIM");
     iTranslate = glGetUniformLocation(gobanProgram, "iTranslate");
     iTime = glGetUniformLocation(gobanProgram, "iTime");
@@ -184,7 +195,8 @@ void GobanShader::initProgram(int which) {
     fsu_ww = glGetUniformLocation(gobanProgram, "ww");
     fsu_iww = glGetUniformLocation(gobanProgram, "iww");
     fsu_w = glGetUniformLocation(gobanProgram, "w");
-    fsu_h = glGetUniformLocation(gobanProgram, "h");    iAnimT = glGetUniformLocation(gobanProgram, "iAnimT");
+    fsu_h = glGetUniformLocation(gobanProgram, "h");
+    iAnimT = glGetUniformLocation(gobanProgram, "iAnimT");
     fsu_stoneRadius = glGetUniformLocation(gobanProgram, "stoneRadius");
     fsu_d = glGetUniformLocation(gobanProgram, "d");
     fsu_stoneradius2 = glGetUniformLocation(gobanProgram, "stoneRadius2");
@@ -212,8 +224,8 @@ void GobanShader::initProgram(int which) {
     glUniform1i(iAA, AA);
     glUniform1f(iAnimT, animT);
     glUseProgram(0);
-	std::cerr << "postShaderUniformsLocations = " << glGetError() << std::endl;
-	shaderChanged = true;
+    console->info("postShaderUniformsLocations = {0}", glGetError());
+    shaderChanged = true;
 
 }
 
@@ -296,7 +308,7 @@ void GobanShader::destroy(void) {
     glDeleteProgram(gobanProgram);
 }
 
-const std::array<float, 3> GobanShader::programH = { { 0.85f, 0.0f, 0.85f } };
+const std::array<float, 4> GobanShader::programH = { { 0.85f, 0.85f, 0.0f, 0.85f } };
 
 void GobanShader::init() {
 	std::cerr << "preShaderInit = " << glGetError() << std::endl;
@@ -375,7 +387,7 @@ GLuint make_buffer(GLenum target, const void *buffer_data, GLsizei buffer_size) 
 }
 
 void GobanShader::cycleShaders() {
-    currentProgram = (currentProgram + 1) % 3;
+    currentProgram = (currentProgram + 1) % 4;
     initProgram(currentProgram);
     currentProgramH = programH[currentProgram];
 }
