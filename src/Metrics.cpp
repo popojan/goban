@@ -22,10 +22,10 @@ void Metrics::calc(unsigned NDIM) {
     stoneRadius = r1;
     innerBowlRadius = br;
     bowlsCenters[0] = -1.5f - dbr;
-    bowlsCenters[1] = -0.5f;
+    bowlsCenters[1] = -0.1f;
     bowlsCenters[2] = 0.55f - dbr;
     bowlsCenters[3] = 1.5f + dbr;
-    bowlsCenters[4] = -0.5f;
+    bowlsCenters[4] = -0.1f;
     bowlsCenters[5] = -0.55f + dbr;
     squareSize = ww;
     stoneHeight = 0.5f*h;

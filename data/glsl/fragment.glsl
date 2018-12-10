@@ -50,7 +50,7 @@ const vec3 nBoard = vec3(0.0, 1.0, 0.0);
 const vec3 minBound = vec3(-1.2, -0.02, -1.2);
 const vec3 p = vec3(0.0, -0.25, 0.0);
 const vec3 c = vec3(1.0, 0.25, 1.0);
-const vec4 bnx = vec4(-c.x, -0.6, -c.x, 0.0);
+const vec4 bnx = vec4(-c.x, -0.2, -c.x, 0.0);
 const float mw = 0.85;
 const float legh = 0.15;
 
@@ -746,7 +746,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 	int isInCup = 0;
 
 	for (int i = 0; i < 2; i++) {
-		vec2 tc = vec2(dot(-ro - vec3(0.3), nBoard), dot(bnx.xyz - vec3(2.0) - ro, nBoard)) / dot(rd, nBoard);
+		vec2 tc = vec2(dot(-ro - vec3(-0.1), nBoard), dot(bnx.xyz - vec3(2.0) - ro, nBoard)) / dot(rd, nBoard);
 		vec2 ts = intersectionRaySphereR(ro, rd, cc[i], bowlRadius2*bowlRadius2);
 		//vec2 tsx = intersectionRaySphereR(ro, rd, cc[i], 0.149);
 		float firstx = tc.x;
@@ -755,7 +755,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 		if (ts.x != noIntersection2.x && max(tc.x, ts.x) <= min(tc.y, ts.y)) {
 			float  rett = max(tc.x, ts.x);
 			vec3 cc2 = cc[i];
-			cc2.y = -0.3;
+			cc2.y = 0.1;
 			vec2 ts2 = intersectionRaySphereR(ro, rd, cc2, bowlRadius*bowlRadius);
 			ret.t = vec2(!between && ts2.x < rett && ts2.y > rett ? ts2.y : rett, ts.y);
 			ret.m = i == 0 ? idCupBlack : idCupWhite; //|ts2.x < rett && ts2.y > rett ? 
@@ -983,7 +983,7 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
 		}
 		ret.x *= 1.0 - A / (PI*ldia2);
 	}
-    if ((pos.y < -0.00001 && (m == idCupWhite || m == idCupBlack || m == idLeg1 || m == idLeg2 || m == idLeg3 || m == idLeg4 || m == idBoard))) {
+    if ((m == idCupWhite || m == idCupBlack) || ((m == idLeg1 || m == idLeg2 || m == idLeg3 || m == idLeg4 || m == idBoard) && pos.y < -0.00001)) {
 		vec3 u = normalize(cross(nor, nBoard));
 		vec3 v = cross(nor, u);
 		vec3 ip = pos + v*dot(lpos - pos, -nBoard) / dot(v, -nBoard);
