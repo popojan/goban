@@ -138,7 +138,7 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
             float ccx = cc0x;
             float ccz = cc0z;
             float rr = m.innerBowlRadius;
-            float ccy = -0.3f - rr;
+            float ccy = 0.1f - rr;
             vec3 s1 = s1a;
             vec3 s0 = s0a;
             int di = calcCapturedBlack;
