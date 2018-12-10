@@ -22,6 +22,7 @@ class GobanView;
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "spdlog/spdlog.h"
 
 #define OPTIMIZE_SHADERS
 #undef OPTIMIZE_SHADERS
@@ -64,8 +65,12 @@ std::string createShader(const std::string& fname, bool optimize);
 class GobanShader {
 public:
     GobanShader(const GobanView& view): shadersReady(false), shaderChanged(false),
-                                        currentProgram(-1), ww(-1.0f), stoneh(-1.0f),
-    width(0), height(0), gamma(1.0f), contrast(0.0f), view(view), animT(0.5f) { }
+        currentProgram(-1), ww(-1.0f), stoneh(-1.0f),
+        width(0), height(0), gamma(1.0f), contrast(0.0f),
+	view(view), animT(0.5f)
+    {
+        console = spdlog::get("console");
+    }
     void initProgram(int which);
     void setMetrics(const Metrics &);
     void init();
@@ -87,6 +92,7 @@ public:
     void setReady() { shadersReady = true; }
     int getCurrentProgram() const {return currentProgram;}
 private:
+    std::shared_ptr<spdlog::logger> console;
     GLuint gobanProgram = 0;
     GLuint iVertex = 0;
     GLint iMouse;
@@ -138,7 +144,7 @@ private:
 
     static const std::array<GLfloat, 16> vertexBufferData;
     static const GLushort elementBufferData[];
-    static const std::array<float, 3> programH;
+    static const std::array<float, 4> programH;
 
     GLint iTranslate;
     GLint iTime;
