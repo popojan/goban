@@ -119,7 +119,6 @@ set(GLYPHY_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-font.cc
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-glstate.cc
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-shader.cc
-    ${PROJECT_SOURCE_DIR}/src/glyphy/matrix4x4.c
 )
 
 set(GOBAN_HDR_FILES

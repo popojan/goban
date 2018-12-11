@@ -10,10 +10,6 @@
 #include "GobanView.h"
 #include <Shell.h>
 
-extern "C" {
-#include "glyphy/matrix4x4.h"
-}
-
 const GLushort GobanShader::elementBufferData[] = {0, 1, 2, 3};
 const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
 	-1.0f, -1.0f, 0.0f, 1.0f,
