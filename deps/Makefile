@@ -1,4 +1,4 @@
-all: libRocket glyphy boost-process spdlog
+all: libRocket glyphy spdlog
 
 libRocket:
 	git clone https://github.com/libRocket/libRocket.git
@@ -7,9 +7,6 @@ libRocket:
 glyphy:
 	git clone https://github.com/behdad/glyphy.git
 	cd glyphy && ./autogen.sh && ./configure --enable-static && make
-
-boost-process:
-	git clone https://github.com/BorisSchaeling/boost-process.git
 
 spdlog:
 	git clone https://github.com/gabime/spdlog.git
