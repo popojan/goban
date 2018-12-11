@@ -1,4 +1,4 @@
-# Red Carpet Goban &nbsp; [![Build Status](https://travis-ci.com/popojan/goban.svg?branch=master)](https://travis-ci.com/popojan/goban) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/152679e4f18742f3af1997ce6f0517e9)](https://www.codacy.com/app/popojan/goban?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=popojan/goban&amp;utm_campaign=Badge_Grade)
+# Red Carpet Goban
 
 Ray traced 3D igo/baduk/weiqi/go board and GUI rendered using GLSL.
 
@@ -21,6 +21,6 @@ For windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/gob
 *   `glew`
 *   `freetype2`
 *   `libRocket`
-*   `boost`
+*   `boost >= 1.64`
 *   `GLM`
 *   `glyphy`
