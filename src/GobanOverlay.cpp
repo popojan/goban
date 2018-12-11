@@ -18,10 +18,6 @@
 
 const char *font_path = NULL;
 
-extern "C" {
-#include "glyphy/matrix4x4.h"
-}
-
 static demo_glstate_t *st;
 static std::array<demo_buffer_t *, 3> buffer;
 
@@ -90,12 +86,11 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
     glPushAttrib(GL_ALL_ATTRIB_BITS);
 
     //rewrite using glm
-	float mat[16];
-	m4LoadIdentity(mat);
+	glm::mat4 mat(1.0);
 
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
-	glLoadMatrixf(mat);
+	glLoadMatrixf(glm::value_ptr(mat));
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
@@ -112,9 +107,9 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 		if (layers[layer].empty)
 			continue;
 
-		glm::mat4x4 m(cam.setView());
+		glm::mat4 m(cam.setView());
 		
-		m4LoadIdentity(mat);
+		mat = glm::mat4(1.0);
 
 		demo_glstate_set_color(st, glm::value_ptr(layers[layer].color));
 		demo_glstate_fast_setup(st);
@@ -123,12 +118,9 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 		vec4 ta = vec4(.0f, -layers[layer].height*model.metrics.h*view.gobanShader.getStoneHeight(), .0f, 0.0f);//-0.5*stoneh
 		vec4 up = vec4(.0f, .1f, .0f, 0.0f);
 		vec4 tt = vec4(view.newTranslate[0], view.newTranslate[1], view.newTranslate[2], 0.0f);
-		//vec4 roo = m*ro + tt;
 		ta += tt;
 		up = normalize(m*up);
-		//vec3 cw = vec3(normalize(ta - roo));
-		//vec3 cu = normalize(cross(vec3(up), cw));
-		//vec3 cv = cross(cw, cu);
+
 		glyphy_extents_t extents;
 		demo_buffer_extents(buffer[layer], NULL, &extents);
 		float content_scale = std::min(height / 2.0f, 10000.0f);
@@ -142,31 +134,29 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 			float near = d;
 			float factor = 0.01f * near / (2 * near + d);
 			float far = near + 10.0f * d;
-			m4Frustum(mat, -width * factor, width * factor, -height * factor, height * factor, 0.01f * near, far);
-			m4Translate(mat, x, y, -0.5f*d - near + z);
+			mat = glm::frustum(-width * factor, width * factor, -height * factor, height * factor, 0.01f * near, far);
+			mat = glm::translate(mat, glm::vec3(x, y, -0.5f*d - near + z));
 		}
-		m4Scale(mat, 1, 1, -1);
+		mat = glm::scale(mat, glm::vec3(1, 1, -1));
 		glm::mat4 rm(glm::transpose(m)*glm::rotate(glm::mat4(1.0f), 3.141592656f / 2, glm::vec3(1.0f, 0.0f, 0.0f)));
 
-		m4MultMatrix(mat, glm::value_ptr(rm));
-		m4Scale(mat, 1, -1, 1);
+		mat = mat*rm;
+		mat = glm::scale(mat, glm::vec3(1, -1, 1));
 
 		glMatrixMode(GL_MODELVIEW);
 		glPushMatrix();
 
-		glLoadMatrixf(mat);
+		glLoadMatrixf(glm::value_ptr(mat));
 
 
-		m4Scale(mat, text_scale, text_scale, text_scale);
+		mat = glm::scale(mat, glm::vec3(text_scale));
 		// Center buffer
 
-		m4Translate(mat,
+		mat = glm::translate(mat, glm::vec3(
 			-static_cast<float>(extents.max_x + extents.min_x) / 2.0f,
-			-static_cast<float>(extents.max_y + extents.min_y) / 2.0f, 0.0f);
+			-static_cast<float>(extents.max_y + extents.min_y) / 2.0f, 0.0f));
 
-		//m4Translate(mat, 2.0*content_scale, 2.0*content_scale, 0.0);
-
-		demo_glstate_set_matrix(st, mat);
+		demo_glstate_set_matrix(st, glm::value_ptr(mat));
 		demo_buffer_draw(buffer[layer]);
 
 		glPopMatrix();
