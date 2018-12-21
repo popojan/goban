@@ -5,8 +5,9 @@
 #include "GobanOverlay.h"
 #include "GobanView.h"
 
+#undef HAVE_CONFIG_H
 #include "glyphy/demo-buffer.h"
-#include "glyphy/demo-view.h"
+#include "glyphy/demo-glstate.h"
 
 #include <glm/vec3.hpp>
 #include <glm/geometric.hpp>

@@ -16,10 +16,6 @@
  * Google Author(s): Behdad Esfahbod
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #include "demo-shader.h"
 
 #include "demo-atlas-glsl.h"
