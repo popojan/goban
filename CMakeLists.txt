@@ -114,7 +114,7 @@ set(SHELL_SRC_FILES
 endif()
 
 set(GLYPHY_SRC_FILES
-    ${PROJECT_SOURCE_DIR}/src/glyphy/demo-atlas.cc
+    ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyAtlas.cc
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-buffer.cc
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-font.cc
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-glstate.cc

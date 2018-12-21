@@ -35,7 +35,7 @@ struct demo_font_t {
 
   FT_Face        face;
   glyph_cache_t *glyph_cache;
-  demo_atlas_t  *atlas;
+  std::shared_ptr<GlyphyAtlas> atlas;
   glyphy_arc_accumulator_t *acc;
 
   /* stats */
@@ -48,14 +48,14 @@ struct demo_font_t {
 
 demo_font_t *
 demo_font_create (FT_Face       face,
-		  demo_atlas_t *atlas)
+                  std::shared_ptr<GlyphyAtlas> atlas)
 {
   demo_font_t *font = reinterpret_cast<demo_font_t *>(calloc (1, sizeof (demo_font_t)));
   font->refcount = 1;
 
   font->face = face;
   font->glyph_cache = new glyph_cache_t ();
-  font->atlas = demo_atlas_reference (atlas);
+  font->atlas = atlas;
   font->acc = glyphy_arc_accumulator_create ();
 
   font->num_glyphs = 0;
@@ -81,7 +81,6 @@ demo_font_destroy (demo_font_t *font)
     return;
 
   glyphy_arc_accumulator_destroy (font->acc);
-  demo_atlas_destroy (font->atlas);
   delete font->glyph_cache;
   free (font);
 }
@@ -93,7 +92,7 @@ demo_font_get_face (demo_font_t *font)
   return font->face;
 }
 
-demo_atlas_t *
+std::shared_ptr<GlyphyAtlas>
 demo_font_get_atlas (demo_font_t *font)
 {
   return font->atlas;
@@ -228,7 +227,7 @@ _demo_font_upload_glyph (demo_font_t *font,
 
   glyph_info->is_empty = glyphy_extents_is_empty (&glyph_info->extents);
   if (!glyph_info->is_empty)
-    demo_atlas_alloc (font->atlas, buffer, output_len,
+    font->atlas->alloc(buffer, output_len,
 		      &glyph_info->atlas_x, &glyph_info->atlas_y);
 }
 
