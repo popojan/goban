@@ -49,7 +49,9 @@ bool GobanOverlay::init() {
     demo_glstate_setup(st);
 
 	for (std::size_t i = 0; i < layers.size(); ++i) {
-		buffer[i] = demo_buffer_create();
+		console->info("Creating overlay buffer[{0}]", i);
+	    buffer[i] = demo_buffer_create();
+		console->info("Adding text glyphs[{0}]", i);
 		demo_buffer_add_text(buffer[i], "0123456789", font, 12.0);
 	}
 

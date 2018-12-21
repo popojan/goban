@@ -18,10 +18,7 @@
 
 #include "demo-shader.h"
 
-#include "demo-atlas-glsl.h"
-#include "demo-vshader-glsl.h"
-#include "demo-fshader-glsl.h"
-
+#include "GobanShader.h"
 
 static unsigned int
 glyph_encode (unsigned int atlas_x ,  /* 7 bits */
@@ -195,17 +192,25 @@ demo_shader_create_program (void)
   TRACE();
 
   GLuint vshader, fshader, program;
-  const GLchar *vshader_sources[] = {GLSL_HEADER_STRING,
-				     demo_vshader_glsl};
+
+  std::string vshadersrc(createShader("data/glsl/overlay-vertex.glsl", false));
+  std::string fshadersrc(createShader("data/glsl/overlay-fragment.glsl", false));
+  std::string atlassrc(createShader("data/glsl/overlay-atlas.glsl", false));
+
+  const GLchar *vshader_sources[] = { GLSL_HEADER_STRING, vshadersrc.c_str() };
 
   vshader = compile_shader (GL_VERTEX_SHADER, ARRAY_LEN (vshader_sources), vshader_sources);
+
+
+
   const GLchar *fshader_sources[] = {GLSL_HEADER_STRING,
-				     demo_atlas_glsl,
+				     atlassrc.c_str(),
 				     glyphy_common_shader_source (),
 				     "#define GLYPHY_SDF_PSEUDO_DISTANCE 1\n",
 				     glyphy_sdf_shader_source (),
-				     demo_fshader_glsl};
-  fshader = compile_shader (GL_FRAGMENT_SHADER, ARRAY_LEN (fshader_sources), fshader_sources);
+				     fshadersrc.c_str() };
+
+   fshader = compile_shader (GL_FRAGMENT_SHADER, ARRAY_LEN (fshader_sources), fshader_sources);
 
   program = link_program (vshader, fshader);
   return program;

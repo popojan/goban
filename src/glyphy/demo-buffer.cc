@@ -17,6 +17,8 @@
  */
 
 #include "demo-buffer.h"
+#include <memory>
+#include <spdlog/spdlog.h>
 
 #undef max
 
@@ -29,6 +31,7 @@ struct demo_buffer_t {
   glyphy_extents_t logical_extents;
   bool dirty;
   GLuint buf_name;
+  std::shared_ptr<spdlog::logger> console;
 };
 
 demo_buffer_t *
@@ -41,6 +44,7 @@ demo_buffer_create (void)
   glGenBuffers (1, &buffer->buf_name);
 
   demo_buffer_clear (buffer);
+  buffer->console = spdlog::get("console");
 
   return buffer;
 }
@@ -113,9 +117,9 @@ demo_buffer_add_text (demo_buffer_t        *buffer,
   unsigned int unicode;
 
   double max_y = 0.0;
-  for (int extents_only = 1; extents_only >= 0; --extents_only) {
-	  for (const unsigned char *p = (const unsigned char *)utf8; *p; p++) {
-		  if (*p < 128) {
+    for (int extents_only = 1; extents_only >= 0; --extents_only) {
+        for (const unsigned char *p = (const unsigned char *)utf8; *p; p++) {
+		    if (*p < 128) {
 			  unicode = *p;
 		  }
 		  else {
@@ -144,10 +148,9 @@ demo_buffer_add_text (demo_buffer_t        *buffer,
 			  buffer->cursor.x = top_left.x;
 			  continue;
 		  }
-
 		  unsigned int glyph_index = FT_Get_Char_Index(face, unicode);
 		  glyph_info_t gi;
-		  demo_font_lookup_glyph(font, glyph_index, &gi);
+          demo_font_lookup_glyph(font, glyph_index, &gi);
 
 		  /* Update ink extents */
 		  glyphy_extents_t ink_extents;

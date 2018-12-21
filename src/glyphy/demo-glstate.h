@@ -22,8 +22,9 @@
 #include "demo-common.h"
 #include "demo-buffer.h"
 
-#include "demo-atlas.h"
+#include "GlyphyAtlas.h"
 #include "demo-shader.h"
+#include <memory>
 
 typedef struct demo_glstate_t demo_glstate_t;
 
@@ -43,7 +44,7 @@ demo_glstate_setup (demo_glstate_t *st);
 void
 demo_glstate_fast_setup(demo_glstate_t *st);
 
-demo_atlas_t *
+std::shared_ptr<GlyphyAtlas>
 demo_glstate_get_atlas (demo_glstate_t *st);
 
 void

@@ -17,12 +17,13 @@
  */
 
 #include "demo-glstate.h"
+#include <memory>
 
 struct demo_glstate_t {
   unsigned int   refcount;
 
   GLuint program;
-  demo_atlas_t *atlas;
+  std::shared_ptr<GlyphyAtlas> atlas;
 
   /* Uniforms */
   double u_debug;
@@ -45,7 +46,7 @@ demo_glstate_create (void)
   st->refcount = 1;
 
   st->program = demo_shader_create_program ();
-  st->atlas = demo_atlas_create (2048, 1024, 64, 32);
+  st->atlas = std::shared_ptr<GlyphyAtlas>(new GlyphyAtlas(2048, 1024, 64, 32));
 
   st->u_debug = false;
   st->u_contrast = 1.0;
@@ -75,7 +76,6 @@ demo_glstate_destroy (demo_glstate_t *st)
   if (!st || --st->refcount)
     return;
 
-  demo_atlas_destroy (st->atlas);
   glDeleteProgram (st->program);
 
   free (st);
@@ -97,7 +97,7 @@ demo_glstate_setup (demo_glstate_t *st)
 {
   glUseProgram (st->program);
 
-  demo_atlas_set_uniforms (st->atlas);
+  st->atlas->set_uniforms();
 
   SET_UNIFORM (u_debug, st->u_debug);
   SET_UNIFORM (u_contrast, st->u_contrast);
@@ -123,7 +123,7 @@ demo_glstate_fast_setup(demo_glstate_t *st)
 	SET_UNIFORM (u_depth, st->u_depth);
 }
 
-demo_atlas_t *
+std::shared_ptr<GlyphyAtlas>
 demo_glstate_get_atlas (demo_glstate_t *st)
 {
   return st->atlas;

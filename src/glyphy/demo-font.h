@@ -20,10 +20,11 @@
 #define DEMO_FONT_H
 
 #include "demo-common.h"
-#include "demo-atlas.h"
+#include "GlyphyAtlas.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <memory>
 
 #ifdef _WIN32
 #define DEFAULT_FONT "Calibri"
@@ -46,7 +47,7 @@ typedef struct demo_font_t demo_font_t;
 
 demo_font_t *
 demo_font_create (FT_Face       face,
-		  demo_atlas_t *atlas);
+		  std::shared_ptr<GlyphyAtlas> atlas);
 
 demo_font_t *
 demo_font_reference (demo_font_t *font);
@@ -58,7 +59,7 @@ demo_font_destroy (demo_font_t *font);
 FT_Face
 demo_font_get_face (demo_font_t *font);
 
-demo_atlas_t *
+std::shared_ptr<GlyphyAtlas>
 demo_font_get_atlas (demo_font_t *font);
 
 
