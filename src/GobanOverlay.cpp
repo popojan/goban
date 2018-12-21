@@ -7,7 +7,7 @@
 
 #undef HAVE_CONFIG_H
 #include "glyphy/demo-buffer.h"
-#include "glyphy/demo-glstate.h"
+#include "glyphy/GlyphyGLState.h"
 
 #include <glm/vec3.hpp>
 #include <glm/geometric.hpp>
@@ -19,7 +19,6 @@
 
 const char *font_path = NULL;
 
-static demo_glstate_t *st;
 static std::array<demo_buffer_t *, 3> buffer;
 
 std::array<Layer, 3> GobanOverlay::layers = {
@@ -30,7 +29,8 @@ std::array<Layer, 3> GobanOverlay::layers = {
 
 bool GobanOverlay::init() {
 	std::cerr << "preOverlayCreate = " << glGetError() << std::endl;
-	st = demo_glstate_create();
+
+	st = std::shared_ptr<GlyphyGLState>(new GlyphyGLState());
     //vu = demo_view_create(st);
     //demo_view_print_help(vu);
 
@@ -44,9 +44,9 @@ bool GobanOverlay::init() {
     }
     if (!ft_face)
         die("Failed to open font file");
-    font = demo_font_create(ft_face, demo_glstate_get_atlas(st));
+    font = demo_font_create(ft_face, st->get_atlas());
 
-    demo_glstate_setup(st);
+    st->setup();
 
 	for (std::size_t i = 0; i < layers.size(); ++i) {
 		console->info("Creating overlay buffer[{0}]", i);
@@ -103,7 +103,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 	GLint width = viewport[2];
 	GLint height = viewport[3];
 
-	demo_glstate_set_depth(st, which < 1 ? 0.6 : 0.4);
+	st->set_depth(which < 1 ? 0.6 : 0.4);
 		
 	for (std::size_t layer = which; layer < (which == 0 ? 1 : layers.size()); ++layer) {
 		
@@ -114,8 +114,8 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 		
 		mat = glm::mat4(1.0);
 
-		demo_glstate_set_color(st, glm::value_ptr(layers[layer].color));
-		demo_glstate_fast_setup(st);
+		st->set_color(glm::value_ptr(layers[layer].color));
+		st->fast_setup();
 
 		using namespace glm;
 		vec4 ta = vec4(.0f, -layers[layer].height*model.metrics.h*view.gobanShader.getStoneHeight(), .0f, 0.0f);//-0.5*stoneh
@@ -159,7 +159,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 			-static_cast<float>(extents.max_x + extents.min_x) / 2.0f,
 			-static_cast<float>(extents.max_y + extents.min_y) / 2.0f, 0.0f));
 
-		demo_glstate_set_matrix(st, glm::value_ptr(mat));
+		st->set_matrix(glm::value_ptr(mat));
 		demo_buffer_draw(buffer[layer]);
 
 		glPopMatrix();
@@ -202,5 +202,4 @@ GobanOverlay::~GobanOverlay() {
 
     FT_Done_Face(ft_face);
     FT_Done_FreeType(ft_library);
-    demo_glstate_destroy(st);
 }
