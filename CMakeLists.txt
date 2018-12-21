@@ -117,7 +117,7 @@ set(GLYPHY_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyAtlas.cc
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-buffer.cc
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-font.cc
-    ${PROJECT_SOURCE_DIR}/src/glyphy/demo-glstate.cc
+        ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyGLState.cc
     ${PROJECT_SOURCE_DIR}/src/glyphy/demo-shader.cc
 )
 

@@ -12,6 +12,7 @@
 #include "GobanModel.h"
 #include "Camera.h"
 #include <spdlog/spdlog.h>
+#include <GlyphyGLState.h>
 
 class GobanView;
 
@@ -42,6 +43,7 @@ private:
 	double font_size;
 	static std::array<Layer, 3> layers;
 	std::shared_ptr<spdlog::logger> console;
+	std::shared_ptr<GlyphyGLState> st;
 };
 
 
