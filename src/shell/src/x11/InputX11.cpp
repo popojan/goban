@@ -62,7 +62,6 @@ void InputX11::Shutdown()
 
 void InputX11::InitialiseX11Keymap(Display *display)
 {
-    std::cerr << "DISPLAY << " << display << std::endl;
     ROCKET_ASSERT(display != NULL);
 
 #ifdef HAS_X11XKBLIB

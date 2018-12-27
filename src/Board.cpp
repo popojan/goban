@@ -1,4 +1,5 @@
 #include "Board.h"
+#include <sstream>
 #include <algorithm>
 
 const float Board::mBlackArea = 2.0;
@@ -9,7 +10,9 @@ const float Board::mWhite = 6.0;
 const float Board::mDeltaCaptured = 0.5;
 
 Board::Board(unsigned size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
-    dist(0.0f, 0.05f), invalidated(false), order(0)  {
+    dist(0.0f, 0.05f), invalidated(false), order(0)
+{
+    console = spdlog::get("console");
     clear(size);
     positionNumber = generator();;
 }
@@ -71,6 +74,18 @@ std::ostream& operator<< (std::ostream& stream, const Move& move) {
         stream << move.pos;
     }
     return stream;
+}
+
+std::string Move::toString() const {
+    std::ostringstream ssout;
+    ssout << *this;
+    return ssout.str();
+}
+
+std::string Color::toString() const {
+    std::ostringstream ssout;
+    ssout << *this;
+    return ssout.str();
 }
 
 std::istream& operator>> (std::istream& stream, Move& move) {
@@ -274,10 +289,10 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
             ssin >> size;
             if(size >= MINBOARD && size <= MAXBOARD) {
                 unsigned bcaptured = 0u, wcaptured = 0u;
-                std::cerr << lines.at(1) << std::endl;
+                console->debug(lines.at(1));
 			    bool white = true;
                 for(unsigned i = 2; i < 2 + size; ++i) {
-                    std::cerr << lines.at(i) << std::endl;
+                    console->debug(lines.at(i));
                     for(unsigned j = 3; j < 3 + (size << 1); j += 2) {
                         char c = lines.at(i).at(j);
                         Position p(((j - 3u) >> 1u), size - i + 1u);
@@ -311,12 +326,12 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                 success = true;
                 capturedBlack = bcaptured;
                 capturedWhite = wcaptured;
-                std::cerr << lines.at(2 + size) << std::endl;
+                console->debug(lines.at(2 + size));
             }
         }
     }
     catch (const std::out_of_range& oor) {
-        std::cerr << "Gtp parse error: " << oor.what() << std::endl;
+        console->error("Gtp parse error: {}", oor.what());
     }
     return success;
 
@@ -326,7 +341,7 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
     bool success = false;
     try {
         for (unsigned i = 0; i < boardSize; ++i) {
-            std::cerr << boardSize << " " << i << std::endl;
+            console->debug("row = {}/{}", i, boardSize);
             std::istringstream ssin(lines.at(i));
             if (i == 0) {
                 char c;
@@ -348,7 +363,7 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
         success = true;
     }
     catch (const std::out_of_range& oor) {
-        std::cerr << "Gtp parse error: " << oor.what() << std::endl;
+        console->error("Gtp parse error: {}", oor.what());
     }
     return success;
 

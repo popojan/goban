@@ -1,13 +1,13 @@
 #ifndef GTPCLIENT_H
 #define GTPCLIENT_H
 
+#include "spdlog/spdlog.h"
 #include <boost/process.hpp>
 #include <boost/filesystem/path.hpp>
 #include <string>
 #include <vector>
 #include <iostream>
 #include <sstream>
-#include "spdlog/spdlog.h"
 
 class GtpClient {
 private:
@@ -15,26 +15,24 @@ private:
     boost::process::ipstream pos;
     boost::process::child c;
     std::shared_ptr<spdlog::logger> console;
+    std::string exe;
 public:
     typedef std::vector<std::string> CommandOutput;
-    GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path) {
+    GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path): exe(exe) {
         console = spdlog::get("console");
-        console->info(exe);
-        console->info(cmdline);
+        console->info("Starting GTP client [{}/{}]", path, exe);
 
         auto where(::boost::this_process::path());
         where.push_back(path);
         auto gnugo = boost::process::search_path(exe, where);
-
-        std::cerr << gnugo << std::endl;
 
         boost::filesystem::path file(gnugo);
 
         std::istringstream iss(cmdline);
         std::vector<std::string> params((std::istream_iterator<std::string>(iss)),
                                          std::istream_iterator<std::string>());
-        c = boost::process::child(file, params, boost::process::std_out > pos, boost::process::std_in < pis, boost::process::std_err.close());
         console->info("running child");
+        c = boost::process::child(file, params, boost::process::std_out > pos, boost::process::std_in < pis, boost::process::std_err.close());
     }
     ~GtpClient() {
 
@@ -51,13 +49,13 @@ public:
     }
     CommandOutput issueCommand(const std::string& command) {
         CommandOutput ret;
-        console->info("sendline = [{0}]", command);
+        console->info("{1} << {0}", command, exe);
         pis << command << std::endl;
         std::string line;
-        console->info("get line");
+        console->info("getting response...");
         while (std::getline(pos, line)) {
             line.erase(line.find_last_not_of(" \n\r\t") + 1);
-            console->info("getline = [{0}]", line);
+            console->info("{1} >> {0}", line, exe);
             if (line.empty()) break;
             ret.push_back(line);
         }

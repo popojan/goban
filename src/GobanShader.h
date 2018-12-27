@@ -3,7 +3,7 @@
 //
 
 #include <string>
-#include "glyphy/demo-font.h"
+#include "glyphy/GlyphyFont.h"
 #include "Metrics.h"
 #include "GobanModel.h"
 
@@ -162,6 +162,7 @@ private:
     float gamma, contrast;
 
     const GobanView& view;
+
 public:
     const float animT;
 };

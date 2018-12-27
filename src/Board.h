@@ -1,6 +1,7 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include <spdlog/spdlog.h>
 #include <array>
 #include <sstream>
 #include <stdexcept>
@@ -31,6 +32,8 @@ public:
     }
 
     friend std::ostream& operator<< (std::ostream& stream, const Color& color);
+
+    std::string toString() const;
 
 private:
     volatile Value col;
@@ -86,7 +89,6 @@ public:
     bool operator== (const Position& p) const { return pos == p; }
 
     static Move parseGtp(const std::string& s, const Color& col) {
-        std::cerr<< "DEBUG = " << s << std::endl;
         std::istringstream ss(s); Move m(Move::INVALID, col); ss >> m; return m;
     }
 
@@ -94,6 +96,7 @@ public:
 
     friend std::ostream& operator<< (std::ostream& stream, const Move& );
 
+    std::string toString() const;
 private:
     Special spec;
     Position pos;
@@ -177,6 +180,8 @@ public:
 	bool toggleTerritoryAuto(bool);
 
 private:
+    std::shared_ptr<spdlog::logger> console;
+
     const static float mBlackArea;
     const static float mWhiteArea;
     const static float mBlack;

@@ -13,43 +13,51 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Google Author(s): Behdad Esfahbod, Maysum Panju
+ * Google Author(s): Behdad Esfahbod
  */
 
-// MODIFIED
+#ifndef DEMO_BUFFER_H
+#define DEMO_BUFFER_H
 
-#ifndef DEMO_ATLAS_H
-#define DEMO_ATLAS_H
-
+#include <memory>
 #include <spdlog/spdlog.h>
+
 #include "demo-common.h"
-#include "opengl.h"
+#include "GlyphyFont.h"
+#include "GlyphyShader.h"
 
-class GlyphyAtlas {
+
+class GlyphyBuffer {
 public:
-	GlyphyAtlas(unsigned int w,
-			unsigned int h,
-			unsigned int item_w,
-			unsigned int item_h_quantum);
+	GlyphyBuffer();
+	~GlyphyBuffer();
 
-	~GlyphyAtlas();
+	void clear ();
 
-	void alloc(glyphy_rgba_t *data,
-			   unsigned int   len,
-			   unsigned int  *px,
-			   unsigned int  *py);
-	void bind_texture();
-	void set_uniforms();
+	void extents(
+			glyphy_extents_t *ink_extents,
+			glyphy_extents_t *logical_extents);
+
+	void move_to (const glyphy_point_t *p);
+
+	void current_point (glyphy_point_t *p);
+
+	void add_text (
+			const char *utf8,
+			std::shared_ptr<GlyphyFont> font,
+			double font_size
+	);
+
+	void draw ();
+
 private:
-	GLuint tex_unit;
-	GLuint tex_name;
-	GLuint tex_w;
-	GLuint tex_h;
-	GLuint item_w;
-	GLuint item_h_q; /* height quantum */
-	GLuint cursor_x;
-	GLuint cursor_y;
+	glyphy_point_t cursor;
+	std::vector<glyph_vertex_t> *vertices;
+	glyphy_extents_t ink_extents;
+	glyphy_extents_t logical_extents;
+	bool dirty;
+	GLuint buf_name;
 	std::shared_ptr<spdlog::logger> console;
 };
 
-#endif /* DEMO_ATLAS_H */
+#endif /* DEMO_BUFFER_H */

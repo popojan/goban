@@ -6,34 +6,6 @@
 #include "ElementGame.h"
 #include "GobanControl.h"
 
-
-/*void GobanControl::GobanControl() {}:
-needsUpdate(0), parent(parent), lastSize(0), vKeyDown(false), aKeyDown(false), fKeyDown(false), gamma(1.0f),
-contrast(0.0f), hasResults(false), shaderChanged(false), shadersReady(false), initThread(0), exit(false),
-gameThread(game) {
-    programH = { { 0.0f, 0.85f, 0.85f } };
-    currentProgram = 0;
-    currentProgramH = programH[currentProgram];
-    glewExperimental = 1; //win
-    GLenum err = glewInit(); //win
-    if (GLEW_OK != err)    { //win
-        printf("Error: %s\n",glewGetErrorString(err)); //win
-    }
-    std::cerr << "Init game..." << std::endl;
-    myInit();
-    std::cerr << "Init sound..." << std::endl;
-    //initSound();
-
-    std::string list("./config/engines.enabled");
-    loadEngines(list);
-
-    needsUpdate = 1;
-
-    newGame(19);
-    switchPlayer(0);
-    switchPlayer(1);
-}*/
-
 void GobanControl::newGame(int boardSize) {
 	engine.interrupt();
     engine.reset();
@@ -195,19 +167,19 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     }
     else {
         if (key == Rocket::Core::Input::KI_RIGHT) {
-            console->info("new gamma = {0}", view.getGamma() + 0.025f);
+            console->debug("new gamma = {0}", view.getGamma() + 0.025f);
             view.setGamma(view.getGamma() + 0.025f);
         }
         else if (key == Rocket::Core::Input::KI_LEFT) {
-            console->info("new gamma = {0}", view.getGamma() + 0.025f);
+            console->debug("new gamma = {0}", view.getGamma() + 0.025f);
             view.setGamma(view.getGamma() - 0.025f);
         }
         else if (key == Rocket::Core::Input::KI_UP) {
-            console->info("new contrast = {0}", view.getContrast() + 0.025f);
+            console->debug("new contrast = {0}", view.getContrast() + 0.025f);
             view.setContrast(view.getContrast() + 0.025f);
         }
         else if (key == Rocket::Core::Input::KI_DOWN) {
-            console->info("new contrast = {0}", view.getContrast() - 0.025f);
+            console->debug("new contrast = {0}", view.getContrast() - 0.025f);
             view.setContrast(view.getContrast() - 0.025f);
         }
         else if (key == Rocket::Core::Input::KI_HOME) {
@@ -256,6 +228,6 @@ void GobanControl::switchPlayer(int which) {
 }
 
 void GobanControl::destroy() {
-    std::cerr << "GAME DESTRUCT" << std::endl;
+    console->debug("GAME DESTRUCT");
     engine.interrupt();
 }

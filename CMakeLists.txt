@@ -115,10 +115,10 @@ endif()
 
 set(GLYPHY_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyAtlas.cc
-    ${PROJECT_SOURCE_DIR}/src/glyphy/demo-buffer.cc
-    ${PROJECT_SOURCE_DIR}/src/glyphy/demo-font.cc
-        ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyGLState.cc
-    ${PROJECT_SOURCE_DIR}/src/glyphy/demo-shader.cc
+    ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyBuffer.cc
+    ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyFont.cc
+    ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyState.cc
+    ${PROJECT_SOURCE_DIR}/src/glyphy/GlyphyShader.cc
 )
 
 set(GOBAN_HDR_FILES
@@ -141,7 +141,9 @@ set(GOBAN_HDR_FILES
     ${PROJECT_SOURCE_DIR}/src/GobanModel.h
     ${PROJECT_SOURCE_DIR}/src/GobanControl.h
     ${PROJECT_SOURCE_DIR}/src/GobanShader.h
-        ../src/Metrics.cpp ../src/Metrics.h ../src/GobanOverlay.cpp ../src/GobanOverlay.h ../src/GameState.cpp ../src/GameState.h)
+    ${PROJECT_SOURCE_DIR}/src/Metrics.h
+    ${PROJECT_SOURCE_DIR}/src/GobanOverlay.h
+    ${PROJECT_SOURCE_DIR}/src/GameState.h)
 
 set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/Board.cpp
@@ -163,7 +165,9 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/GobanModel.cpp
     ${PROJECT_SOURCE_DIR}/src/GobanControl.cpp
     ${PROJECT_SOURCE_DIR}/src/GobanShader.cpp
-        ../src/Metrics.cpp ../src/Metrics.h ../src/GobanOverlay.cpp ../src/GobanOverlay.h ../src/GameState.cpp ../src/GameState.h)
+    ${PROJECT_SOURCE_DIR}/src/Metrics.cpp
+    ${PROJECT_SOURCE_DIR}/src/GameState.cpp
+    ${PROJECT_SOURCE_DIR}/src/GobanOverlay.cpp)
 
 if (WIN32)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")

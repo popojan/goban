@@ -20,7 +20,7 @@
 #define DEMO_SHADERS_H
 
 #include "demo-common.h"
-#include "demo-font.h"
+#include "GlyphyFont.h"
 
 
 struct glyph_vertex_t {
@@ -42,7 +42,7 @@ demo_shader_add_glyph_vertices (const glyphy_point_t        &p,
 
 
 GLuint
-demo_shader_create_program (void);
+demo_shader_create_program (std::shared_ptr<spdlog::logger> console);
 
 
 #endif /* DEMO_SHADERS_H */

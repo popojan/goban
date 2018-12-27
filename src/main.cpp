@@ -107,7 +107,6 @@ const char * WINDOW_NAME = "Goban";
 #endif
     auto console = spdlog::stderr_color_mt("console");
     spdlog::set_level(spdlog::level::info);
-    console->info("TODO log using spdlog!");
 
     unsigned window_width = 1024;
     unsigned window_height = 768;
@@ -153,9 +152,7 @@ const char * WINDOW_NAME = "Goban";
     Rocket::Debugger::Initialise(context);
     //Rocket::Debugger::SetVisible(true);
     Input::SetContext(context);
-	std::cerr << "preSetContext = " << glGetError() << std::endl;
 	shell_renderer->SetContext(context);
-	std::cerr << "preLoadFonts = " << glGetError() << std::endl;
     Shell::LoadFonts("data/gui/");
 
     Rocket::Core::ElementInstancer* element_instancer = new Rocket::Core::ElementInstancerGeneric< ElementGame >();
@@ -170,24 +167,21 @@ const char * WINDOW_NAME = "Goban";
 
     //Shell::ToggleFullscreen();
 
-	std::cerr << "preLoadWindow = " << glGetError() << std::endl;
-
     if(EventManager::LoadWindow("goban")) {
         gameElement = dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"));
-		std::cerr << "postLoadWindow = " << glGetError() << std::endl;
 		Shell::EventLoop(GameLoop);
     }
 
-    std::cerr << "Before context destroy" << std::endl;
+    console->debug("Before context destroy");;
 
     context->RemoveReference();
     context = 0;
 
-    std::cerr << "Before Rocket shutdown" << std::endl;
+    console->debug("Before Rocket shutdown");
 
     Rocket::Core::ReleaseTextures();
     Rocket::Core::Shutdown();
-    std::cerr << "Before Window Close" << std::endl;
+    console->debug("Before Window Close");
 
     Shell::CloseWindow();
     Shell::Shutdown();

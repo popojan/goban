@@ -5,6 +5,7 @@ GameThread::GameThread(GobanModel &m) :
         game(m), thread(0), colorToMove(Color::BLACK), interruptRequested(false), hasThreadRunning(false),
         playerToMove(0), human(0), numPlayers(0), activePlayer({0, 0}),
         showTerritory(false) {
+    console = spdlog::get("console");
     std::string list("./config/engines.enabled");
     loadEngines(list);
 }
@@ -56,10 +57,13 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
         std::unique_lock<std::mutex> lock(mutex);
         Player* player = players[playerIndex];
         player->setRole(role, add);
-        std::cerr << playerIndex
-            << "newType = [human = " << (int)player->isTypeOf(Player::HUMAN) << ", computer = " << (int)player->isTypeOf(Player::ENGINE) << "] "
-            << "newRole = [black = " << (int)player->hasRole(Player::BLACK) << ", white = " << (int)player->hasRole(Player::WHITE) << "]"
-            << std::endl;
+        console->debug("Player[{}] newType = [human = {}, computer = {}] newRole = [black = {}, whsite = {}]",
+                playerIndex,
+                player->isTypeOf(Player::HUMAN),
+                player->isTypeOf(Player::ENGINE),
+                player->hasRole(Player::BLACK),
+                player->hasRole(Player::WHITE)
+        );
         if(!add && playerToMove != 0 && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
             playerToMove->suggestMove(Move(Move::INTERRUPT, colorToMove));
         }
@@ -67,7 +71,7 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
 }
 void GameThread::changeTurn() {
     game.state.colorToMove = colorToMove = Color::other(colorToMove);
-    std::cerr << "changeTurn = " << colorToMove << std::endl;
+    console->debug("changeTurn = {}", colorToMove.toString());
 }
 void GameThread::interrupt() {
     if(thread != 0) {
@@ -94,7 +98,7 @@ void GameThread::clearGame(int boardSize) {
 
 void GameThread::setKomi(float komi) {
     if (!game.started) {
-        std::cerr << "setting komi " << komi << std::endl;
+        console->debug("setting komi {}", komi);
         game.komi = komi;
         for (auto pit = players.begin(); pit != players.end(); ++pit) {
             Player* player = *pit;
@@ -123,10 +127,10 @@ int GameThread::activatePlayer(int which) {
     setRole(newp, role, true);
     if(players[oldp]->getRole() == Player::SPECTATOR && !players[oldp]->isTypeOf(Player::HUMAN)) {
         players[oldp]->clear();
-        std::cerr << "Clearing board" << std::endl;
+        console->debug("Clearing board");
     }
     if(newp == sgf || oldp == sgf) {
-        std::cerr << "newp == sgf" << std::endl;
+        console->debug("newp == sgf");
         int role = which == 0 ? Player::WHITE : Player::BLACK;
         std::size_t oldp = activePlayer[1-which];
         activePlayer[1-which] = newp;
@@ -134,17 +138,17 @@ int GameThread::activatePlayer(int which) {
         setRole(newp, role, true);
         if(players[oldp]->getRole() == Player::SPECTATOR && !players[oldp]->isTypeOf(Player::HUMAN)) {
             players[oldp]->clear();
-            std::cerr << "Clearing board" << std::endl;
+            console->debug("Clearing board");
         }
     }
     if(!((players[newp]->getRole() & (Player::COACH)) || players[newp]->isTypeOf(Player::HUMAN))) {
-        std::cerr << "Replaying history" << std::endl;
+        console->debug("Replaying history");
         for(auto it = game.history.begin(); it != game.history.end(); ++it) {
            players[newp]->play(*it); 
         }
+        console->debug("Needs replaying history size={} for player with role={}",
+                       game.history.size(), players[newp]->getRole());
     }
-    std::cerr << "Needs replaying history " << game.history.size() << "  " <<  players[newp]->getRole() << std::endl;
-    
     return newp;
 }
 
@@ -238,7 +242,7 @@ void GameThread::gameLoop() {
                     player->suggestMove(Move(Move::INVALID, colorToMove));
                     move = player->genmove(colorToMove);
                     playerToMove = 0;
-                    std::cerr << "MOVE to BOOL = " << (int)(bool)move << " " << move << std::endl;
+                    console->debug("MOVE to {}, valid = {}", move.toString(), move);
                     if(player->isTypeOf(Player::HUMAN)){
                         lock.lock();
                         locked = true;
@@ -272,7 +276,7 @@ void GameThread::gameLoop() {
                 }
                 if(success) {
                     if(game.over) {
-                        std::cerr << "Main Over! Reason " << game.state.reason << std::endl;
+                        console->debug("Main Over! Reason {}", game.state.reason);
                         showTerritory = true;
                     }
                     else {
@@ -280,7 +284,7 @@ void GameThread::gameLoop() {
                             Player* p = *pit;
                             if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
                                     && p != reinterpret_cast<Player*>(coach) && p != player) {
-                                std::cerr << "DEBUG play iter" << std::endl;
+                                console->debug("DEBUG play iter");
                                 if(move == Move::UNDO) {
                                     p->undo();
                                     if(doubleUndo)
@@ -294,7 +298,7 @@ void GameThread::gameLoop() {
 
                     {
                         const Board& newBoard = coach->showboard();
-                        std::cerr << "LOCK board" << std::endl;
+                        console->debug("LOCK board");
                         std::unique_lock<std::mutex> lock(mutex);
                         game.board.copyStateFrom(newBoard);
                         game.board.positionNumber += 1;
@@ -311,14 +315,14 @@ void GameThread::gameLoop() {
                     if (game.state.reason == GameState::DOUBLE_PASS) {
                         const Board& newTerritory = coach->showterritory(true, Color::other(colorToMove));
                         {
-                            std::cerr << "LOCK territory" << std::endl;
+                            console->debug("LOCK territory");
                             std::unique_lock<std::mutex> lock(mutex);
                             game.territory.copyStateFrom(newTerritory);
                             game.board.positionNumber += 1;
                         }
                     }
                     else {
-                        std::cerr << "LOCK territory" << std::endl;
+                        console->debug("LOCK territory");
                         Board newTerritory = coach->showterritory(false, Color::other(colorToMove));
                         std::unique_lock<std::mutex> lock(mutex);
                         game.territory.copyStateFrom(newTerritory);

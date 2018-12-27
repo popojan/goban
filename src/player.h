@@ -1,6 +1,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include "spdlog/spdlog.h"
 #include <string>
 #include "gtpclient.h"
 #include "Board.h"
@@ -53,7 +54,7 @@ public:
     virtual Move genmove(const Color& ) {
         Move ret(move);
         if(move == Move::INVALID) {
-            std::cerr << "LOCK human genmove" << std::endl;
+            console->debug("LOCK human genmove");
             std::unique_lock<std::mutex> lock(mut);
             waitingForInput = true;
             while(waitingForInput) {
@@ -68,7 +69,7 @@ public:
     virtual void suggestMove(const Move& move) {
         this->move = move;
         {
-            std::cerr << "LOCK suggest move = " << move << std::endl;
+            console->debug("LOCK suggest move = {}", move);
             std::lock_guard<std::mutex> lock(mut);
             waitingForInput = false;
         }
@@ -107,7 +108,12 @@ public:
 
     virtual Move genmove(const Color& colorToMove) {
         GtpClient::CommandOutput ret(issueCommand(colorToMove == Color::BLACK ? "genmove B" : "genmove W"));
-        return ret.size() < 1 ? Move(Move::INVALID, colorToMove) : Move::parseGtp(ret[0], colorToMove);
+        if(ret.size() < 1) {
+            Player::console->warn("Invalid GTP response.");
+            return Move(Move::INVALID, colorToMove);
+        }
+        Player::console->debug("Parsing move string [{}]", ret[0]);
+        return Move::parseGtp(ret[0], colorToMove);
     }
     virtual const Board& showboard() {
         board.parseGtp(GtpClient::showboard());
@@ -156,14 +162,14 @@ public:
         //GtpClient::CommandOutput ret = GtpClient::issueCommand("known_command final_status_list");
         //if(GtpClient::success(ret) && ret.front().substr(2).compare("true") == 0) {
         if (final) {
-        std::cerr << "initial territory" << std::endl;
+            Player::console->debug("initial territory");
             territory.clear(board.getSize());
             bool success = true;
-            std::cerr << "dead" << std::endl;
+            Player::console->debug("dead");
             success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), territory, Color::EMPTY);
-            std::cerr << "white" << std::endl;
+            Player::console->debug("white");
             success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), territory, Color::WHITE);
-            std::cerr << "black" << std::endl;
+            Player::console->debug("black");
             success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), territory, Color::BLACK);
             return success;
         }
@@ -175,7 +181,7 @@ public:
             territory.parseGtpInfluence(ret);
             ret = GtpClient::issueCommand("dragon_status");
             for (size_t i = 0; i < ret.size(); ++i) {
-                std::cerr << ret[i] << std::endl;
+                Player::console->debug(ret[i]);
                 std::stringstream ss(ret[i]);
                 char c;
                 if (i == 0) {
@@ -198,28 +204,7 @@ public:
                 }
             }
             return true;
-            /*bool success = true;
-            int boardSize = board.getSize();
-            for (int i = 0; i < boardSize; ++i) {
-                for (int j = 0; j < boardSize; ++j){
-                    Position p(i, j);
-                    std::stringstream ss;
-                    ss << "unconditional_status " << p << std::endl;
-                    GtpClient::CommandOutput ret(GtpClient::issueCommand(ss.str()));
-                    if (GtpClient::success(ret) && ret[0].length() >= 3) {
-                        char c = ret[0].at(2);
-                        Color col;
-                        if (c == 'a') col = board[p];
-                        else if (c == 'd') col = Color::other(board[p]);
-                        else if (c == 'w') col = Color::WHITE;
-                        else if (c == 'b') col = Color::BLACK;
-                        territory[p] = col;
-                    }
-                }
-            }*/
-            //return true;
         }
-        return false;
     }
     virtual const Board& showterritory(bool final = true, Color colorToMove = Color::EMPTY) {
         estimateTerritory(final, colorToMove);
@@ -238,15 +223,7 @@ protected:
             ss << ret.front().substr(2) << "\n";
             std::copy(++ret.begin(), ret.end(), std::ostream_iterator<std::string>(ss, "\n"));
             std::string s;
-            std::cerr << ss.str() << std::endl;
-            Position p;
-            while((ss >> p)) {
-                std::cerr << p << " ";
-                if(color == Color::EMPTY)
-                    b[p] = Color::other(board[p]);
-                else
-                    b[p] = color;
-            }
+            Player::console->debug(ss.str());
             return true;
         }
         return false;
@@ -254,18 +231,18 @@ protected:
 
     void setEngineName(const std::string& nameExtra) {
         GtpClient::CommandOutput retName = GtpClient::name();
-        std::cerr << "name" << std::endl;
+        Player::console->debug("name");
         GtpClient::CommandOutput retVersion = GtpClient::version();
-        std::cerr << "version" << std::endl;
+        Player::console->debug("version");
         std::ostringstream ss;
         try {
             ss << retName.at(0).substr(2) << " " << retVersion.at(0).substr(2);
-            std::cerr << "parsed" << std::endl;
+            Player::console->debug("parsed");
         }
         catch( std::out_of_range&) { }
         if (!nameExtra.empty())
             ss << " " << nameExtra;
-        std::cerr << ss.str() << std::endl;
+        Player::console->debug(ss.str());
         Engine::setName(ss.str());
     }
 };

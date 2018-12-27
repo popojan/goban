@@ -16,7 +16,7 @@
  * Google Author(s): Behdad Esfahbod
  */
 
-#include "demo-shader.h"
+#include "GlyphyShader.h"
 
 #include "GobanShader.h"
 
@@ -106,10 +106,9 @@ demo_shader_add_glyph_vertices (const glyphy_point_t        &p,
 static GLuint
 compile_shader (GLenum         type,
 		GLsizei        count,
-		const GLchar** sources)
+		const GLchar* const * sources,
+		std::shared_ptr<spdlog::logger> console)
 {
-  TRACE();
-
   GLuint shader;
   GLint compiled;
 
@@ -122,7 +121,7 @@ compile_shader (GLenum         type,
   glGetShaderiv (shader, GL_COMPILE_STATUS, &compiled);
   if (!compiled) {
     GLint info_len = 0;
-    LOGW ("%s shader failed to compile\n",
+    console->warn("{} shader failed to compile\n",
 	     type == GL_VERTEX_SHADER ? "Vertex" : "Fragment");
     glGetShaderiv (shader, GL_INFO_LOG_LENGTH, &info_len);
 
@@ -130,7 +129,7 @@ compile_shader (GLenum         type,
       char *info_log = (char*) malloc (info_len);
       glGetShaderInfoLog (shader, info_len, NULL, info_log);
 
-      LOGW ("%s\n", info_log);
+      console->warn(info_log);
       free (info_log);
     }
 
@@ -142,10 +141,9 @@ compile_shader (GLenum         type,
 
 static GLuint
 link_program (GLuint vshader,
-	      GLuint fshader)
+	      GLuint fshader,
+	      std::shared_ptr<spdlog::logger> console)
 {
-  TRACE();
-
   GLuint program;
   GLint linked;
 
@@ -159,14 +157,14 @@ link_program (GLuint vshader,
   glGetProgramiv (program, GL_LINK_STATUS, &linked);
   if (!linked) {
     GLint info_len = 0;
-    LOGW ("Program failed to link\n");
+    console->warn("Program failed to link");
     glGetProgramiv (program, GL_INFO_LOG_LENGTH, &info_len);
 
     if (info_len > 0) {
       char *info_log = (char*) malloc (info_len);
       glGetProgramInfoLog (program, info_len, NULL, info_log);
 
-      LOGW ("%s\n", info_log);
+      console->warn(info_log);
       free (info_log);
     }
 
@@ -187,31 +185,29 @@ link_program (GLuint vshader,
 #endif
 
 GLuint
-demo_shader_create_program (void)
+demo_shader_create_program(std::shared_ptr<spdlog::logger> console)
 {
-  TRACE();
-
   GLuint vshader, fshader, program;
 
   std::string vshadersrc(createShader("data/glsl/overlay-vertex.glsl", false));
   std::string fshadersrc(createShader("data/glsl/overlay-fragment.glsl", false));
   std::string atlassrc(createShader("data/glsl/overlay-atlas.glsl", false));
 
-  const GLchar *vshader_sources[] = { GLSL_HEADER_STRING, vshadersrc.c_str() };
+  const std::array<const GLchar * const ,2> vshader_sources = { GLSL_HEADER_STRING, vshadersrc.c_str() };
 
-  vshader = compile_shader (GL_VERTEX_SHADER, ARRAY_LEN (vshader_sources), vshader_sources);
+  vshader = compile_shader (GL_VERTEX_SHADER, vshader_sources.size(), vshader_sources.data(), console);
 
 
 
-  const GLchar *fshader_sources[] = {GLSL_HEADER_STRING,
+  const std::array<const GLchar * const, 6> fshader_sources = {GLSL_HEADER_STRING,
 				     atlassrc.c_str(),
 				     glyphy_common_shader_source (),
 				     "#define GLYPHY_SDF_PSEUDO_DISTANCE 1\n",
 				     glyphy_sdf_shader_source (),
 				     fshadersrc.c_str() };
 
-   fshader = compile_shader (GL_FRAGMENT_SHADER, ARRAY_LEN (fshader_sources), fshader_sources);
+   fshader = compile_shader (GL_FRAGMENT_SHADER, fshader_sources.size(), fshader_sources.data(), console);
 
-  program = link_program (vshader, fshader);
+  program = link_program (vshader, fshader, console);
   return program;
 }
