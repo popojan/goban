@@ -19,7 +19,7 @@
 #ifndef DEMO_FONT_H
 #define DEMO_FONT_H
 
-#include "demo-common.h"
+#include <glyphy.h>
 #include "GlyphyAtlas.h"
 
 #include <ft2build.h>

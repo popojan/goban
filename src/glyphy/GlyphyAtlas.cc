@@ -88,11 +88,11 @@ void GlyphyAtlas::alloc (glyphy_rgba_t *data,
   bind_texture();
 
   if (w * h == len)
-    gl(TexSubImage2D) (GL_TEXTURE_2D, 0, x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, data);
   else {
-	  gl(TexSubImage2D) (GL_TEXTURE_2D, 0, x, y, w, h - 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	  glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h - 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
     // Upload the last row separately
-    gl(TexSubImage2D) (GL_TEXTURE_2D, 0, x, y + h - 1, len - (w * (h - 1)), 1, GL_RGBA, GL_UNSIGNED_BYTE,
+    glTexSubImage2D(GL_TEXTURE_2D, 0, x, y + h - 1, len - (w * (h - 1)), 1, GL_RGBA, GL_UNSIGNED_BYTE,
 		       data + w * (h - 1));
   }
 

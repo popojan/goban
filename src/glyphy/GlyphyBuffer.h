@@ -19,10 +19,10 @@
 #ifndef DEMO_BUFFER_H
 #define DEMO_BUFFER_H
 
+#include <glyphy.h>
 #include <memory>
 #include <spdlog/spdlog.h>
 
-#include "demo-common.h"
 #include "GlyphyFont.h"
 #include "GlyphyShader.h"
 
