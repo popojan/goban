@@ -20,95 +20,54 @@
 	#define M_PI 3.14159265358979323846
 	#define M_SQRT2 1.41421356237309504880
 #endif
-#include "demo-font.h"
+#include "GlyphyFont.h"
 
 #include <glyphy-freetype.h>
 
-#include <map>
-
 #include <vector>
 
-typedef std::map<unsigned int, glyph_info_t> glyph_cache_t;
-
-struct demo_font_t {
-  unsigned int   refcount;
-
-  FT_Face        face;
-  glyph_cache_t *glyph_cache;
-  std::shared_ptr<GlyphyAtlas> atlas;
-  glyphy_arc_accumulator_t *acc;
-
-  /* stats */
-  unsigned int num_glyphs;
-  double       sum_error;
-  unsigned int sum_endpoints;
-  double       sum_fetch;
-  unsigned int sum_bytes;
-};
-
-demo_font_t *
-demo_font_create (FT_Face       face,
-                  std::shared_ptr<GlyphyAtlas> atlas)
+GlyphyFont::GlyphyFont(FT_Face face, std::shared_ptr<GlyphyAtlas> atlas):
+    face(face),
+    atlas(atlas),
+    num_glyphs(0),
+    sum_error(0.),
+    sum_endpoints(0),
+    sum_fetch(0.),
+    sum_bytes(0)
 {
-  demo_font_t *font = reinterpret_cast<demo_font_t *>(calloc (1, sizeof (demo_font_t)));
-  font->refcount = 1;
-
-  font->face = face;
-  font->glyph_cache = new glyph_cache_t ();
-  font->atlas = atlas;
-  font->acc = glyphy_arc_accumulator_create ();
-
-  font->num_glyphs = 0;
-  font->sum_error  = 0;
-  font->sum_endpoints  = 0;
-  font->sum_fetch  = 0;
-  font->sum_bytes  = 0;
-
-  return font;
+  glyph_cache = new glyph_cache_t ();
+  acc = glyphy_arc_accumulator_create ();
+  console = spdlog::get("console");
 }
 
-demo_font_t *
-demo_font_reference (demo_font_t *font)
+GlyphyFont::~GlyphyFont()
 {
-  if (font) font->refcount++;
-  return font;
-}
-
-void
-demo_font_destroy (demo_font_t *font)
-{
-  if (!font || --font->refcount)
-    return;
-
-  glyphy_arc_accumulator_destroy (font->acc);
-  delete font->glyph_cache;
-  free (font);
+  glyphy_arc_accumulator_destroy (acc);
+  delete glyph_cache;
 }
 
 
-FT_Face
-demo_font_get_face (demo_font_t *font)
+FT_Face GlyphyFont::get_face ()
 {
-  return font->face;
+  return face;
 }
 
 std::shared_ptr<GlyphyAtlas>
-demo_font_get_atlas (demo_font_t *font)
+GlyphyFont::get_atlas ()
 {
-  return font->atlas;
+  return atlas;
 }
 
-
 static glyphy_bool_t
-accumulate_endpoint (glyphy_arc_endpoint_t         *endpoint,
+accumulate_endpoint (glyphy_arc_endpoint_t  *endpoint,
 		     std::vector<glyphy_arc_endpoint_t> *endpoints)
 {
   endpoints->push_back (*endpoint);
   return true;
 }
 
-static void
-encode_ft_glyph (demo_font_t      *font,
+void
+GlyphyFont::encode_ft_glyph (
 		 unsigned int      glyph_index,
 		 double            tolerance_per_em,
 		 glyphy_rgba_t    *buffer,
@@ -122,7 +81,6 @@ encode_ft_glyph (demo_font_t      *font,
 /* Used for testing only */
 #define SCALE  (1. * (1 << 0))
 
-  FT_Face face = font->face;
   if (FT_Err_Ok != FT_Load_Glyph (face,
 				  glyph_index,
 				  FT_LOAD_NO_BITMAP |
@@ -131,26 +89,26 @@ encode_ft_glyph (demo_font_t      *font,
 				  FT_LOAD_NO_SCALE |
 				  FT_LOAD_LINEAR_DESIGN |
 				  FT_LOAD_IGNORE_TRANSFORM))
-    die ("Failed loading FreeType glyph");
+    console->error("Failed loading FreeType glyph");
 
   if (face->glyph->format != FT_GLYPH_FORMAT_OUTLINE)
-    die ("FreeType loaded glyph format is not outline");
+    console->error("FreeType loaded glyph format is not outline");
 
   unsigned int upem = face->units_per_EM;
   double tolerance = upem * tolerance_per_em; /* in font design units */
   double faraway = double (upem) / (MIN_FONT_SIZE * M_SQRT2);
   std::vector<glyphy_arc_endpoint_t> endpoints;
 
-  glyphy_arc_accumulator_reset (font->acc);
-  glyphy_arc_accumulator_set_tolerance (font->acc, tolerance);
-  glyphy_arc_accumulator_set_callback (font->acc,
+  glyphy_arc_accumulator_reset (acc);
+  glyphy_arc_accumulator_set_tolerance (acc, tolerance);
+  glyphy_arc_accumulator_set_callback (acc,
 				       (glyphy_arc_endpoint_accumulator_callback_t) accumulate_endpoint,
 				       &endpoints);
 
-  if (FT_Err_Ok != glyphy_freetype(outline_decompose) (&face->glyph->outline, font->acc))
-    die ("Failed converting glyph outline to arcs");
+  if (FT_Err_Ok != glyphy_freetype(outline_decompose) (&face->glyph->outline, acc))
+    console->error("Failed converting glyph outline to arcs");
 
-  assert (glyphy_arc_accumulator_get_error (font->acc) <= tolerance);
+  assert (glyphy_arc_accumulator_get_error (acc) <= tolerance);
 
   if (endpoints.size ())
   {
@@ -185,40 +143,39 @@ encode_ft_glyph (demo_font_t      *font,
 				    nominal_width,
 				    nominal_height,
 				    extents))
-    die ("Failed encoding arcs");
+    console->error("Failed encoding arcs");
 
   glyphy_extents_scale (extents, 1. / upem, 1. / upem);
   glyphy_extents_scale (extents, SCALE, SCALE);
 
   *advance = face->glyph->metrics.horiAdvance / (double) upem;
 
-  if (0)
-    LOGI ("gid%3u: endpoints%3u; err%3g%%; tex fetch%4.1f; mem%4.1fkb\n",
+  console->debug("gid{0:3d}: endpoints{1:3d}; err{2:3g}; tex fetch{3:4.1f}; mem{4:4.1f}kb",
 	  glyph_index,
-	  (unsigned int) glyphy_arc_accumulator_get_num_endpoints (font->acc),
-	  round (100 * glyphy_arc_accumulator_get_error (font->acc) / tolerance),
+	  (unsigned int) glyphy_arc_accumulator_get_num_endpoints (acc),
+	  round (100 * glyphy_arc_accumulator_get_error (acc) / tolerance),
 	  avg_fetch_achieved,
 	  (*output_len * sizeof (glyphy_rgba_t)) / 1024.);
 
-  font->num_glyphs++;
-  font->sum_error += glyphy_arc_accumulator_get_error (font->acc) / tolerance;
-  font->sum_endpoints += glyphy_arc_accumulator_get_num_endpoints (font->acc);
-  font->sum_fetch += avg_fetch_achieved;
-  font->sum_bytes += (*output_len * sizeof (glyphy_rgba_t));
+  num_glyphs++;
+  sum_error += glyphy_arc_accumulator_get_error (acc) / tolerance;
+  sum_endpoints += glyphy_arc_accumulator_get_num_endpoints (acc);
+  sum_fetch += avg_fetch_achieved;
+  sum_bytes += (*output_len * sizeof (glyphy_rgba_t));
 }
 
-static void
-_demo_font_upload_glyph (demo_font_t *font,
+void GlyphyFont::upload_glyph (
 			 unsigned int glyph_index,
 			 glyph_info_t *glyph_info)
 {
-  glyphy_rgba_t buffer[4096 * 16];
+  const int BUF_SIZE = 4096 * 16;
+  glyphy_rgba_t buffer[BUF_SIZE];
   unsigned int output_len;
 
-  encode_ft_glyph (font,
+  encode_ft_glyph (
 		   glyph_index,
 		   TOLERANCE,
-		   buffer, ARRAY_LEN (buffer),
+		   buffer, BUF_SIZE,
 		   &output_len,
 		   &glyph_info->nominal_w,
 		   &glyph_info->nominal_h,
@@ -227,29 +184,29 @@ _demo_font_upload_glyph (demo_font_t *font,
 
   glyph_info->is_empty = glyphy_extents_is_empty (&glyph_info->extents);
   if (!glyph_info->is_empty)
-    font->atlas->alloc(buffer, output_len,
+    atlas->alloc(buffer, output_len,
 		      &glyph_info->atlas_x, &glyph_info->atlas_y);
 }
 
-void
-demo_font_lookup_glyph (demo_font_t  *font,
+void GlyphyFont::lookup_glyph (
 			unsigned int  glyph_index,
 			glyph_info_t *glyph_info)
 {
-  if (font->glyph_cache->find (glyph_index) == font->glyph_cache->end ()) {
-    _demo_font_upload_glyph (font, glyph_index, glyph_info);
-    (*font->glyph_cache)[glyph_index] = *glyph_info;
+  if (glyph_cache->find (glyph_index) == glyph_cache->end ()) {
+    upload_glyph (glyph_index, glyph_info);
+    (*glyph_cache)[glyph_index] = *glyph_info;
   } else
-    *glyph_info = (*font->glyph_cache)[glyph_index];
+    *glyph_info = (*glyph_cache)[glyph_index];
 }
 
 void
-demo_font_print_stats (demo_font_t *font)
+GlyphyFont::print_stats ()
 {
-  LOGI ("%3u glyphs; avg num endpoints%6.2f; avg error%5.1f%%; avg tex fetch%5.2f; avg %5.2fkb per glyph\n",
-	font->num_glyphs,
-	(double) font->sum_endpoints / font->num_glyphs,
-	100. * font->sum_error / font->num_glyphs,
-	font->sum_fetch / font->num_glyphs,
-	font->sum_bytes / 1024. / font->num_glyphs);
+  console->debug("{0:3d} glyphs; avg num endpoints {1:6.2f}; avg error {2:5.1f};"
+                 "avg tex fetch {3:5.2f}; avg {4:5.2f}kb per glyph",
+	num_glyphs,
+	(double) sum_endpoints / num_glyphs,
+	100. * sum_error / num_glyphs,
+	sum_fetch / num_glyphs,
+	sum_bytes / 1024. / num_glyphs);
 }

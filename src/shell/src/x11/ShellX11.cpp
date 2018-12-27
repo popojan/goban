@@ -72,8 +72,7 @@ static ShellRenderInterfaceExtensions *shell_renderer = NULL;
 bool Shell::OpenWindow(const char* name, ShellRenderInterfaceExtensions *_shell_renderer, unsigned int width, unsigned int height, bool allow_resize)
 {
 	display = XOpenDisplay(0);
-    std::cerr << "DISPLAY " << display << std::endl;
-	if (display == NULL)
+  	if (display == NULL)
 		return false;
 
 	// This initialise they keyboard to keycode mapping system of X11

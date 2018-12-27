@@ -16,14 +16,13 @@
  * Google Author(s): Behdad Esfahbod, Maysum Panju, Wojciech Baranowski
  */
 
-#include "GlyphyGLState.h"
+#include "GlyphyState.h"
 #include <memory>
 
-GlyphyGLState::GlyphyGLState()
+GlyphyState::GlyphyState()
 {
-  TRACE();
-
-  program = demo_shader_create_program ();
+  console = spdlog::get("console");
+  program = demo_shader_create_program (console);
   atlas = std::shared_ptr<GlyphyAtlas>(new GlyphyAtlas(2048, 1024, 64, 32));
 
   u_debug = false;
@@ -40,21 +39,21 @@ GlyphyGLState::GlyphyGLState()
 }
 
 
-GlyphyGLState::~GlyphyGLState()
+GlyphyState::~GlyphyState()
 {
   glDeleteProgram (program);
 }
 
-void GlyphyGLState::set_uniform (GLuint program, const char *name, double *p, double value)
+void GlyphyState::set_uniform (GLuint program, const char *name, double *p, double value)
 {
   *p = value;
   glUniform1f (glGetUniformLocation (program, name), value);
-  LOGI ("Setting %s to %g\n", name + 2, value);
+  console->debug("Setting {} to {}", name + 2, value);
 }
 
 #define SET_UNIFORM(name, value) set_uniform (program, #name, &name, value)
 
-void GlyphyGLState::setup ()
+void GlyphyState::setup ()
 {
   glUseProgram (program);
 
@@ -73,7 +72,7 @@ void GlyphyGLState::setup ()
   glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void GlyphyGLState::fast_setup()
+void GlyphyState::fast_setup()
 {
 	glUseProgram(program);
 
@@ -83,48 +82,48 @@ void GlyphyGLState::fast_setup()
 	SET_UNIFORM (u_depth, u_depth);
 }
 
-void GlyphyGLState::scale_gamma_adjust (double factor)
+void GlyphyState::scale_gamma_adjust (double factor)
 {
   SET_UNIFORM (u_gamma_adjust, clamp (u_gamma_adjust * factor, .1, 10.));
 }
 
-void GlyphyGLState::scale_contrast (double factor)
+void GlyphyState::scale_contrast (double factor)
 {
   SET_UNIFORM (u_contrast, clamp (u_contrast * factor, .1, 10.));
 }
 
-void GlyphyGLState::toggle_debug () {
+void GlyphyState::toggle_debug () {
   SET_UNIFORM (u_debug, 1 - u_debug);
 }
 
-void GlyphyGLState::set_matrix (float mat[16])
+void GlyphyState::set_matrix (float mat[16])
 {
   glUniformMatrix4fv (glGetUniformLocation (program, "u_matViewProjection"), 1, GL_FALSE, mat);
 }
 
-void GlyphyGLState::toggle_outline ()
+void GlyphyState::toggle_outline ()
 {
   SET_UNIFORM (u_outline, 1 - u_outline);
 }
 
-void GlyphyGLState::scale_outline_thickness (double factor)
+void GlyphyState::scale_outline_thickness (double factor)
 {
   SET_UNIFORM (u_outline_thickness, clamp (u_outline_thickness * factor, .5, 3.));
 }
 
-void GlyphyGLState::adjust_boldness (double adjustment)
+void GlyphyState::adjust_boldness (double adjustment)
 {
   SET_UNIFORM (u_boldness, clamp (u_boldness + adjustment, -.2, .7));
 }
 
 
-void GlyphyGLState::set_color(float * color) {
+void GlyphyState::set_color(float * color) {
 	u_color[0] = color[0];
 	u_color[1] = color[1];
 	u_color[2] = color[2];
 	u_color[3] = color[3];
 }
 
-void GlyphyGLState::set_depth(float depth) {
+void GlyphyState::set_depth(float depth) {
 	u_depth = depth;
 }

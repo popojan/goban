@@ -6,8 +6,8 @@
 #include "GobanView.h"
 
 #undef HAVE_CONFIG_H
-#include "glyphy/demo-buffer.h"
-#include "glyphy/GlyphyGLState.h"
+#include "glyphy/GlyphyBuffer.h"
+#include "glyphy/GlyphyState.h"
 
 #include <glm/vec3.hpp>
 #include <glm/geometric.hpp>
@@ -19,7 +19,7 @@
 
 const char *font_path = NULL;
 
-static std::array<demo_buffer_t *, 3> buffer;
+static std::array<std::shared_ptr<GlyphyBuffer>, 3> buffer;
 
 std::array<Layer, 3> GobanOverlay::layers = {
 	{ { 0.0f, glm::vec4(0.0,0.0,0.0, 1.0) },
@@ -28,11 +28,7 @@ std::array<Layer, 3> GobanOverlay::layers = {
 };
 
 bool GobanOverlay::init() {
-	std::cerr << "preOverlayCreate = " << glGetError() << std::endl;
-
-	st = std::shared_ptr<GlyphyGLState>(new GlyphyGLState());
-    //vu = demo_view_create(st);
-    //demo_view_print_help(vu);
+	st = std::shared_ptr<GlyphyState>(new GlyphyState());
 
     FT_Init_FreeType(&ft_library);
     ft_face = NULL;
@@ -42,21 +38,22 @@ bool GobanOverlay::init() {
     else {
         FT_New_Face(ft_library, "data/gui/default-font.ttf", 0/*face_index*/, &ft_face);
     }
-    if (!ft_face)
-        die("Failed to open font file");
-    font = demo_font_create(ft_face, st->get_atlas());
+    if (!ft_face) {
+		console->error("Failed to open font file");
+	}
+    font = std::shared_ptr<GlyphyFont>(new GlyphyFont(ft_face, st->get_atlas()));
 
     st->setup();
 
 	for (std::size_t i = 0; i < layers.size(); ++i) {
-		console->info("Creating overlay buffer[{0}]", i);
-	    buffer[i] = demo_buffer_create();
-		console->info("Adding text glyphs[{0}]", i);
-		demo_buffer_add_text(buffer[i], "0123456789", font, 12.0);
+		console->debug("Creating overlay buffer[{0}]", i);
+	    auto b = std::shared_ptr<GlyphyBuffer>(new GlyphyBuffer());
+        console->debug("Adding text glyphs[{0}]", i);
+	    b->add_text("0123456789", font, 12.0);
+		buffer[i] = b;
 	}
 
-    demo_font_print_stats(font);
-    //demo_view_setup(vu);
+    font->print_stats();
     glUseProgram(0);
     return true;
 }
@@ -68,12 +65,12 @@ void GobanOverlay::Update(const Board::Overlay& overlay, const GobanModel& model
 	
 	for (std::size_t layer = 0; layer < layers.size(); ++layer) {
 		int cnt = 0;
-		demo_buffer_clear(buffer[layer]);
+		buffer[layer]->clear();
 		for (auto oit = overlay.begin(); oit != overlay.end(); ++oit) {
 			if (!oit->text.empty() && oit->layer == layer) {
 				glyphy_point_t pos = { model.metrics.squareSize * oit->x, -model.metrics.squareSize * oit->y };
-				demo_buffer_move_to(buffer[layer], &pos);
-				demo_buffer_add_text(buffer[layer], oit->text.c_str(), font, font_size);
+				buffer[layer]->move_to(&pos);
+				buffer[layer]->add_text(oit->text.c_str(), font, font_size);
 				cnt += 1;
 			}
 		}
@@ -125,7 +122,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 		up = normalize(m*up);
 
 		glyphy_extents_t extents;
-		demo_buffer_extents(buffer[layer], NULL, &extents);
+		buffer[layer]->extents(NULL, &extents);
 		float content_scale = std::min(height / 2.0f, 10000.0f);
 		float text_scale = content_scale;
 		float x = -content_scale * (glm::transpose(m) * ta).x;//(extents.max_x + extents.min_x) / 2.;
@@ -160,7 +157,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 			-static_cast<float>(extents.max_y + extents.min_y) / 2.0f, 0.0f));
 
 		st->set_matrix(glm::value_ptr(mat));
-		demo_buffer_draw(buffer[layer]);
+		buffer[layer]->draw();
 
 		glPopMatrix();
 	}
@@ -195,11 +192,6 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 }
 
 GobanOverlay::~GobanOverlay() {
-	for (std::size_t i = 0; i < layers.size(); ++i)
-		demo_buffer_destroy(buffer[i]);
-
-    demo_font_destroy(font);
-
     FT_Done_Face(ft_face);
     FT_Done_FreeType(ft_library);
 }

@@ -17,6 +17,7 @@ const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
 	-1.0f, 1.0f, 0.0f, 1.0f,
 	1.0f, 1.0f, 0.0f, 1.0f
 } };
+
 GLuint shaderCompileFromString(GLenum type, const std::string& source) {
     GLuint shader;
     GLint length;
@@ -36,7 +37,8 @@ GLuint shaderCompileFromString(GLenum type, const std::string& source) {
         log = new char[length];
         glGetShaderInfoLog(shader, length, &result, log);
 
-        std::cerr << "shaderCompileFromString(): Unable to compile: " << log << std::endl;
+        spdlog::get("console")->error("shaderCompileFromString(): Unable to compile: {}", log);
+
         delete [] log;
 
         glDeleteShader(shader);
@@ -112,7 +114,6 @@ std::string createShader(const std::string& fname, bool optimize) {
 #endif
 
 void GobanShader::initProgram(int which) {
-    console->info("preShaderInitProgram = {0}", glGetError());
     const char* vprogram[4] = {
         "data/glsl/vertex.glsl",
         "data/glsl/vertex.anaglyph.glsl",
@@ -154,14 +155,12 @@ void GobanShader::initProgram(int which) {
         log = (char*)malloc(static_cast<std::size_t>(length));
         glGetProgramInfoLog(gobanProgram, length, &result, log);
 
-        console->info("sceneInit(): Program linking failed: {0}", log);
+        console->error("sceneInit(): Program linking failed: {0}", log);
         free(log);
 
         glDeleteProgram(gobanProgram);
         gobanProgram = 0;
     }
-
-    console->info("postShaderGetProgram = {0}", glGetError());
 
     uBlockIndex = glGetUniformBlockIndex(gobanProgram, "iStoneBlock");
     glGenBuffers(1, &bufStones);
@@ -216,31 +215,29 @@ void GobanShader::initProgram(int which) {
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
     glUseProgram(0);
-    console->info("postShaderUniformsLocations = {0}", glGetError());
     shaderChanged = true;
 
 }
 
 void GobanShader::setGamma(float gamma) {
-    console->info("setting gamma = {0}", gamma);
+    console->debug("setting gamma = {0}", gamma);
     this->gamma = gamma;
 }
 
 void GobanShader::setContrast(float contrast) {
-    console->info("setting contrast = {0}", contrast);
+    console->debug("setting contrast = {0}", contrast);
     this->contrast = contrast;
 }
 
 void GobanShader::setMetrics(const Metrics &m) {
 
-    //std::cerr << width << " x " << height << " ... " << shadersReady << " ---" << m.fNDIM << std::endl;
     if(!shadersReady || m.fNDIM <= 0)
         return;
 
     float fNDIM(m.fNDIM);
 
-    float boardaa(sqrt(2.0f/width/height));
-    float boardbb(sqrt(1.0f/width/height));
+    float boardaa(sqrtf(2.0f/width/height));
+    float boardbb(sqrtf(1.0f/width/height));
     float r1 = m.stoneRadius;
     float px = m.px;
     float d = m.d;
@@ -253,7 +250,7 @@ void GobanShader::setMetrics(const Metrics &m) {
     float br2 = m.br2;
     float ww = m.squareSize;
 
-    float r2 = b*r1/(2.0f*sqrt(r1*r1-px*px)); //ellipsoid
+    float r2 = b*r1/(2.0f*sqrtf(r1*r1-px*px)); //ellipsoid
     float dn[3];
     dn[0] = dn[2] = 0.0f; dn[1] = d;
     float pxs = 0.5f*(0.5f*w - px);
@@ -263,13 +260,11 @@ void GobanShader::setMetrics(const Metrics &m) {
     maxBound[0] = maxBound[2] = 1.2f;
     maxBound[1] = h;
 
-    //ww = 2.0f/(fNDIM - 1.0f + 2.0f*0.85f);
-    //float stoneRadius = 0.25f * (w*w/h + h);
     glUniform1f(fsu_fNDIM, fNDIM);
-    glUniform1f(fsu_boardaa, boardaa); //aa
-    glUniform1f(fsu_boardbb, boardbb); //aa
-    glUniform1f(fsu_boardcc, 8.0f*boardaa); //aa
-    glUniform1f(fsu_ww, ww); //square size
+    glUniform1f(fsu_boardaa, boardaa);
+    glUniform1f(fsu_boardbb, boardbb);
+    glUniform1f(fsu_boardcc, 8.0f*boardaa);
+    glUniform1f(fsu_ww, ww);
     glUniform1f(fsu_iww, 1.0f/ww);
 
     glUniform1f(fsu_w, w); //initial width
@@ -305,8 +300,6 @@ void GobanShader::destroy(void) {
 const std::array<float, 4> GobanShader::programH = { { 0.85f, 0.85f, 0.0f, 0.85f } };
 
 void GobanShader::init() {
-	std::cerr << "preShaderInit = " << glGetError() << std::endl;
-	
 	vertexBuffer = make_buffer(GL_ARRAY_BUFFER, &vertexBufferData[0], sizeof(GLfloat)*vertexBufferData.size());
     elementBuffer = make_buffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferData, sizeof(elementBufferData));
 
@@ -347,7 +340,7 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
     if (updateFlag & GobanView::UPDATE_STONES) {
         glUniform1i(iBlackCapturedCount,  view.state.capturedBlack);
         glUniform1i(iWhiteCapturedCount, view.state.capturedWhite);
-		glUniform3fv(iddc, 2 * model.metrics.maxc, model.metrics.tmpc);
+		glUniform3fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);
         glBindBuffer(GL_UNIFORM_BUFFER, bufStones);
         glBufferData(GL_UNIFORM_BUFFER, view.board.getSizeOf(), view.board.getStones(), GL_DYNAMIC_DRAW);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
@@ -403,7 +396,7 @@ void GobanShader::setPan(glm::vec3 pan) {
 }
 
 void GobanShader::setRotation(glm::mat4x4 m) {
-    glUniformMatrix4fv(iModelView, 1,  false, glm::value_ptr(m));
+    glUniformMatrix4fv(iModelView, 1, 0, glm::value_ptr(m));
 }
 
 void GobanShader::setResolution(float w, float h) {

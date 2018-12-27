@@ -5,7 +5,7 @@
     Move SgfPlayer::genmove(const Color& ) {
         Move ret(move);
         if(move == Move::INVALID) {
-            std::cerr << "LOCK human genmove" << std::endl;
+            console->debug("LOCK human genmove");
             std::unique_lock<std::mutex> lock(mut);
             waitingForInput = true;
             while(waitingForInput) {
@@ -29,7 +29,7 @@
                         }
                         unsigned col = static_cast<unsigned>(c.at(0)- 'a');
                         unsigned row = 18 - static_cast<unsigned>(c.at(1) - 'a');
-                        std::cerr << "B " << c << std::endl;
+                        console->debug("B {}", c);
                         move = Move(Position(col, row), Color::BLACK);
                         colorToMove = Color::WHITE;
                         haswb = true;
@@ -44,7 +44,7 @@
                         }
                         unsigned col = static_cast<unsigned>(c.at(0) - 'a');
                         unsigned row = 18 - static_cast<unsigned>(c.at(1) - 'a');
-                        std::cerr << "W " << c << std::endl;
+                        console->debug("W {}", c);
                         move = Move(Position(col, row), Color::WHITE);
                         colorToMove = Color::BLACK;
                         haswb = true;
@@ -94,7 +94,7 @@
                 node = &nodes[ni];
             } else {
                 node = 0;
-                std::cerr << "PREMATURE END" << std::endl;
+                console->debug("PREMATURE END");
             }
         }
     }
@@ -104,20 +104,20 @@
         else
             this->move = Move();
         {
-            std::cerr << "LOCK suggest move = " << move << std::endl;
+            console->debug("LOCK suggest move [{}]", move.toString());
             std::lock_guard<std::mutex> lock(mut);
             waitingForInput = false;
         }
         cond.notify_one();
     }
     void SgfPlayer::parseSgf(const std::string& fname) {
-	    std::cerr << "Before parsing SGF" << std::endl;
+        console->debug("Before parsing SGF");
         auto problems(sgf::parse(fname));
-	    std::cerr << "Parsed SGF" << std::endl;
+        console->debug("Parsed SGF");
         for(std::size_t i = 0; i < problems.size(); ++i) {
             sgf.push_back(std::shared_ptr<sgf::GameTree>(new sgf::GameTree(problems[i])));
         }
-        std::cerr << sgf.size() << std::endl;
+        console->debug("sgf.size() = {}", sgf.size());
         variation = sgf.at(0).get();
         auto& nodes = variation->nodes();
         if(nodes.size() > 0) {

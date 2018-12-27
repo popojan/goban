@@ -20,17 +20,17 @@
 #define DEMO_GLSTATE_H
 
 #include "demo-common.h"
-#include "demo-buffer.h"
+#include "GlyphyBuffer.h"
 
 #include "GlyphyAtlas.h"
-#include "demo-shader.h"
+#include "GlyphyShader.h"
 #include <memory>
 
 
-class GlyphyGLState {
+class GlyphyState {
 public:
-    GlyphyGLState();
-    ~GlyphyGLState();
+    GlyphyState();
+    ~GlyphyState();
     void setup();
     void fast_setup();
     std::shared_ptr<GlyphyAtlas> get_atlas() { return atlas; }
@@ -57,6 +57,7 @@ private:
     double u_boldness;
     float u_color[4];
     double u_depth;
+    std::shared_ptr<spdlog::logger> console;
 };
 
 #endif /* DEMO_GLSTATE_H */

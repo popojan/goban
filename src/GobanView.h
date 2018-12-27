@@ -27,12 +27,13 @@ public:
 		animationRunning(false), isPanning(false), isZooming(false), isRotating(false), needsUpdate(0), cam(1.0, 0.0, 0.0, 0.0),
 		startX(0), startY(0), lastX(.0f), lastY(.0f),
 		updateFlag(0), currentProgram(-1), showOverlay(true) {
-		gobanOverlay.init();
+
+	    console = spdlog::get("console");
+
+	    gobanOverlay.init();
         gobanShader.init();
-		std::cerr << "postShaderOverlayInits = " << glGetError() << std::endl;
 		initCam();
 		updateTranslation();
-		std::cerr << "postInitTranslation = " << glGetError() << std::endl;
 		translate[0] = newTranslate[0];
         translate[1] = newTranslate[1];
         translate[2] = newTranslate[2];
@@ -104,6 +105,8 @@ public:
     void requestRepaint(int what = UPDATE_SOME);
 	void toggleOverlay();
 	void Update();
+private:
+    std::shared_ptr<spdlog::logger> console;
 public:
     GobanShader gobanShader;
     GobanOverlay gobanOverlay;

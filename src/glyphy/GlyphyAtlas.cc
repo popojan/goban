@@ -22,8 +22,6 @@
 
 GlyphyAtlas::GlyphyAtlas(unsigned int w, unsigned int h, unsigned int item_w, unsigned int item_h_quantum)
 {
-  TRACE();
-
   glGetIntegerv (GL_ACTIVE_TEXTURE, (GLint *) &tex_unit);
   glGenTextures (1, &tex_name);
   tex_w = w;
@@ -33,12 +31,13 @@ GlyphyAtlas::GlyphyAtlas(unsigned int w, unsigned int h, unsigned int item_w, un
   cursor_x = 0;
   cursor_y = 0;
 
+  console = spdlog::get("console");
+
   bind_texture();
 
-  glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-  gl(TexImage2D) (GL_TEXTURE_2D, 0, GL_RGBA, tex_w, tex_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex_w, tex_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 }
 
 GlyphyAtlas::~GlyphyAtlas() {
@@ -84,7 +83,7 @@ void GlyphyAtlas::alloc (glyphy_rgba_t *data,
     y = cursor_y;
     cursor_y += (h + item_h_q - 1) & ~(item_h_q - 1);
   } else
-    die ("Ran out of atlas memory");
+    console->error("Ran out of atlas memory");
 
   bind_texture();
 

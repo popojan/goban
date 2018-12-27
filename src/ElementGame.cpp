@@ -9,7 +9,8 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
         : Rocket::Core::Element(tag), model(*this), view(model), engine(model),
           control(*this, model, view, engine), hasResults(false), calculatingScore(false)
 {
-	std::cerr << "postPreconstructElement = " << glGetError() << std::endl;
+
+	console = spdlog::get("console");
 	engine.clearGame(19);
     control.switchPlayer(0);
     control.switchPlayer(1);
@@ -24,14 +25,14 @@ void ElementGame::gameLoop() {
 	if (currentTime - lastTime >= 1.0) {
 	    static int frames = 1;
         auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
-		const Rocket::Core::String sfps(128, "FPS: %.1f", cnt / (currentTime - lastTime));
-		if (debugElement != 0) {
-			debugElement->SetInnerRML(sfps.CString());
-			view.requestRepaint();
-		}
-		std::cerr << sfps.CString()	<< std::endl;
-		//if(frames % 10 == 0)
-		frames += 1;
+        const Rocket::Core::String sfps(128, "FPS: %.1f", cnt / (currentTime - lastTime));
+        if (debugElement != 0) {
+            debugElement->SetInnerRML(sfps.CString());
+            view.requestRepaint();
+        }
+        console->info(sfps.CString());
+        //if(frames % 10 == 0)
+        frames += 1;
 		lastTime = currentTime;
 		cnt = 0;
 	}
@@ -46,17 +47,11 @@ void ElementGame::gameLoop() {
 	if (view.updateFlag) {
 		auto shell_renderer = static_cast<ShellRenderInterfaceOpenGL*>(Rocket::Core::GetRenderInterface());
 		if (shell_renderer != 0) {
-			//std::cerr << "prePrepare = " << glGetError() << std::endl;
 			shell_renderer->PrepareRenderBuffer();
-			//std::cerr << "postPrepare = " << glGetError() << std::endl;
 			glPushAttrib(GL_ALL_ATTRIB_BITS);
-			//context->Update();
-			//std::cerr << "preRender = " << glGetError() << std::endl;
 			context->Render();
-			//std::cerr << "postRender = " << glGetError() << std::endl;
 			glPopAttrib();
 			shell_renderer->PresentRenderBuffer();
-			//std::cerr << "postPresent = " << glGetError() << std::endl;
 			cnt++;
 		}
 	}
@@ -96,7 +91,7 @@ void ElementGame::ProcessEvent(Rocket::Core::Event& event)
     if (event == "load")
     {
         //control.Initialise();
-        std::cerr << "Load" << std::endl;
+        console->debug("Load");
     }
 }
 

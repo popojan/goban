@@ -70,6 +70,7 @@ public:
 	void reset();
 
 private:
+	std::shared_ptr<spdlog::logger> console;
     GobanModel& game;
     std::vector<Engine*> engines; //engines know the rules
     std::vector<Player*> players; //all players including engines, humans, spectators
