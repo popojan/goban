@@ -19,7 +19,7 @@
 #ifndef DEMO_SHADERS_H
 #define DEMO_SHADERS_H
 
-#include "demo-common.h"
+#include <glyphy.h>
 #include "GlyphyFont.h"
 
 

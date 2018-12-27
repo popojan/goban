@@ -20,6 +20,10 @@
 	#define M_PI 3.14159265358979323846
 	#define M_SQRT2 1.41421356237309504880
 #endif
+
+#define MIN_FONT_SIZE 16
+#define TOLERANCE (1./2048)
+
 #include "GlyphyFont.h"
 
 #include <glyphy-freetype.h>

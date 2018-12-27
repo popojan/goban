@@ -21,8 +21,8 @@
 #ifndef DEMO_ATLAS_H
 #define DEMO_ATLAS_H
 
+#include <glyphy.h>
 #include <spdlog/spdlog.h>
-#include "demo-common.h"
 #include "opengl.h"
 
 class GlyphyAtlas {

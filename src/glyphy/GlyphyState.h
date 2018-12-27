@@ -19,7 +19,6 @@
 #ifndef DEMO_GLSTATE_H
 #define DEMO_GLSTATE_H
 
-#include "demo-common.h"
 #include "GlyphyBuffer.h"
 
 #include "GlyphyAtlas.h"

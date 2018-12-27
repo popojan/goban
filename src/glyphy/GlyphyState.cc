@@ -16,8 +16,9 @@
  * Google Author(s): Behdad Esfahbod, Maysum Panju, Wojciech Baranowski
  */
 
-#include "GlyphyState.h"
 #include <memory>
+#include <glm/glm.hpp>
+#include "GlyphyState.h"
 
 GlyphyState::GlyphyState()
 {
@@ -84,12 +85,12 @@ void GlyphyState::fast_setup()
 
 void GlyphyState::scale_gamma_adjust (double factor)
 {
-  SET_UNIFORM (u_gamma_adjust, clamp (u_gamma_adjust * factor, .1, 10.));
+  SET_UNIFORM (u_gamma_adjust, glm::clamp(u_gamma_adjust * factor, .1, 10.));
 }
 
 void GlyphyState::scale_contrast (double factor)
 {
-  SET_UNIFORM (u_contrast, clamp (u_contrast * factor, .1, 10.));
+  SET_UNIFORM (u_contrast, glm::clamp (u_contrast * factor, .1, 10.));
 }
 
 void GlyphyState::toggle_debug () {
@@ -108,12 +109,12 @@ void GlyphyState::toggle_outline ()
 
 void GlyphyState::scale_outline_thickness (double factor)
 {
-  SET_UNIFORM (u_outline_thickness, clamp (u_outline_thickness * factor, .5, 3.));
+  SET_UNIFORM (u_outline_thickness, glm::clamp (u_outline_thickness * factor, .5, 3.));
 }
 
 void GlyphyState::adjust_boldness (double adjustment)
 {
-  SET_UNIFORM (u_boldness, clamp (u_boldness + adjustment, -.2, .7));
+  SET_UNIFORM (u_boldness, glm::clamp (u_boldness + adjustment, -.2, .7));
 }
 
 

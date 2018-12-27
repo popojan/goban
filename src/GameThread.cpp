@@ -247,31 +247,30 @@ void GameThread::gameLoop() {
                         lock.lock();
                         locked = true;
                     }
-                    if(move == Move::UNDO) {
-                        success = coach->undo();
-                        changeTurn();
-                        if(currentPlayer()->isTypeOf(Player::ENGINE)) {
+                    if(interruptRequested == false) {
+                        if (move == Move::UNDO) {
                             success = coach->undo();
-                            doubleUndo = true;
+                            changeTurn();
+                            if (currentPlayer()->isTypeOf(Player::ENGINE)) {
+                                success = coach->undo();
+                                doubleUndo = true;
+                            }
+                            changeTurn();
+                        } else {
+                            success = move && (move == Move::RESIGN || player == coach || coach->play(move));
+                            game.history.push_back(move);
                         }
-                        changeTurn();
-                    }
-                    else {
-                        success = move && (move == Move::RESIGN || player == coach || coach->play(move));
-                        game.history.push_back(move);
-                    }
-                    if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
-                        game.state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
-                        game.over = true;
-                    }
-                    else if(move == Move::PASS) {
-                        prevPass = true;
-                        bool blackPass =  colorToMove == Color::BLACK;
-                        game.state.msg = blackPass ? GameState::BLACK_PASS : GameState::WHITE_PASS;
-                    }
-                    else {
-                        prevPass = false;
-                        game.state.msg = GameState::NONE;
+                        if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
+                            game.state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
+                            game.over = true;
+                        } else if (move == Move::PASS) {
+                            prevPass = true;
+                            bool blackPass = colorToMove == Color::BLACK;
+                            game.state.msg = blackPass ? GameState::BLACK_PASS : GameState::WHITE_PASS;
+                        } else {
+                            prevPass = false;
+                            game.state.msg = GameState::NONE;
+                        }
                     }
                 }
                 if(success) {
