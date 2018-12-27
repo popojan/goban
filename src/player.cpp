@@ -151,3 +151,150 @@
     std::string& SgfPlayer::getName(Color whose) {
         return whose == Color::BLACK ? names[0] : names[1];
     }
+
+
+Move GtpEngine::genmove(const Color& colorToMove) {
+    GtpClient::CommandOutput ret(issueCommand(colorToMove == Color::BLACK ? "genmove B" : "genmove W"));
+    if(ret.size() < 1) {
+        Player::console->warn("Invalid GTP response.");
+        return Move(Move::INVALID, colorToMove);
+    }
+    Player::console->debug("Parsing move string [{}]", ret[0]);
+    return Move::parseGtp(ret[0], colorToMove);
+}
+
+const Board& GtpEngine::showboard() {
+    board.parseGtp(GtpClient::showboard());
+    return board;
+}
+
+bool GtpEngine::fixed_handicap(int handicap, std::vector<Position>& stones) {
+    std::stringstream ssout;
+    ssout << "fixed_handicap " << handicap;
+    GtpClient::CommandOutput out = GtpClient::issueCommand(ssout.str());
+    if (GtpClient::success(out)) {
+        stones.clear();
+        std::stringstream ssin(out[0].substr(2));
+        Position pos;
+        while ((ssin >> pos)){
+            stones.push_back(pos);
+        }
+        return true;
+    };
+    return false;
+}
+
+bool GtpEngine::komi(float komi) {
+    std::stringstream ssout;
+    ssout << "komi " << komi;
+    return GtpClient::success(GtpClient::issueCommand(ssout.str()));
+}
+
+bool GtpEngine::play(const Move& m) {
+    std::stringstream ssout;
+    ssout << "play " << m;
+    return GtpClient::success(GtpClient::issueCommand(ssout.str()));
+}
+
+bool GtpEngine::boardsize(int boardSize) {
+    std::stringstream ssout;
+    ssout << "boardsize " << boardSize;
+    return GtpClient::success(GtpClient::issueCommand(ssout.str()));
+}
+
+bool GtpEngine::clear() {
+    return GtpClient::success(GtpClient::issueCommand("clear"));
+}
+
+bool GtpEngine::undo() {
+    return GtpClient::success(GtpClient::issueCommand("undo"));
+}
+
+bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
+    if (final) {
+        Player::console->debug("initial territory");
+        territory.clear(board.getSize());
+        bool success = true;
+        Player::console->debug("dead");
+        success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), territory, Color::EMPTY);
+        Player::console->debug("white");
+        success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), territory, Color::WHITE);
+        Player::console->debug("black");
+        success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), territory, Color::BLACK);
+        return success;
+    }
+    else {
+        std::stringstream ss;
+        ss << "initial_influence " << colorToMove << " influence_regions";
+        GtpClient::CommandOutput ret = GtpClient::issueCommand(ss.str());
+        territory.clear(board.getSize());
+        territory.parseGtpInfluence(ret);
+        ret = GtpClient::issueCommand("dragon_status");
+        for (size_t i = 0; i < ret.size(); ++i) {
+            Player::console->debug(ret[i]);
+            std::stringstream ss(ret[i]);
+            char c;
+            if (i == 0) {
+                ss >> c;
+            }
+            Position pos;
+            ss >> pos;
+            ss >> c >> c;
+            if (c == 'd') {
+                std::ostringstream ss;
+                ss << "dragon_stones " << pos;
+                GtpClient::CommandOutput ret = GtpClient::issueCommand(ss.str());
+                if (GtpClient::success(ret)) {
+                    std::istringstream ss(ret[0].substr(2));
+                    Position p;
+                    while ((ss >> p)){
+                        territory[p] = Color::other(board[p]);
+                    }
+                }
+            }
+        }
+        return true;
+    }
+}
+
+const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
+    estimateTerritory(final, colorToMove);
+    territory.invalidate();
+    return territory;
+}
+
+bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, const Color& color) {
+    if(GtpClient::success(ret) && ret.at(0).length() > 2) {
+        std::stringstream ss;
+        ss << ret.front().substr(2) << "\n";
+        std::copy(++ret.begin(), ret.end(), std::ostream_iterator<std::string>(ss, "\n"));
+        std::string s;
+        Player::console->debug(ss.str());
+        Position p;
+        while((ss >> p)) {
+            if(color == Color::EMPTY)
+                b[p] = Color::other(board[p]);
+            else
+                b[p] = color;
+        }
+        return true;
+    }
+    return false;
+}
+
+void GtpEngine::setEngineName(const std::string& nameExtra) {
+    GtpClient::CommandOutput retName = GtpClient::name();
+    Player::console->debug("name");
+    GtpClient::CommandOutput retVersion = GtpClient::version();
+    Player::console->debug("version");
+    std::ostringstream ss;
+    try {
+        ss << retName.at(0).substr(2) << " " << retVersion.at(0).substr(2);
+        Player::console->debug("parsed");
+    }
+    catch( std::out_of_range&) { }
+    if (!nameExtra.empty())
+        ss << " " << nameExtra;
+    Player::console->debug(ss.str());
+    Engine::setName(ss.str());
+}
