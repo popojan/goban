@@ -177,15 +177,13 @@ bool GameThread::setFixedHandicap(int handicap) {
                     }
 
                 }
+                colorToMove = Color::WHITE;
             }
         }
         else {
-            if (handicap == 1) {
-                colorToMove = Color::WHITE;
-            }
             success = true;
         }
-		game.handicap = handicap;
+        game.handicap = handicap;
 		game.board.copyStateFrom(coach->showboard());
 	}
 	return success;
