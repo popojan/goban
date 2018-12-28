@@ -338,6 +338,7 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
 	}
     glUniform2fv(iResolution, 1, glm::value_ptr(view.resolution));
     if (updateFlag & GobanView::UPDATE_STONES) {
+        console->debug("place stones via glBufferData()");
         glUniform1i(iBlackCapturedCount,  view.state.capturedBlack);
         glUniform1i(iWhiteCapturedCount, view.state.capturedWhite);
 		glUniform3fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);

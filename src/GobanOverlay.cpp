@@ -49,7 +49,7 @@ bool GobanOverlay::init() {
 		console->debug("Creating overlay buffer[{0}]", i);
 	    auto b = std::shared_ptr<GlyphyBuffer>(new GlyphyBuffer());
         console->debug("Adding text glyphs[{0}]", i);
-	    b->add_text("0123456789", font, 12.0);
+	    b->add_text("0123456789X", font, 12.0);
 		buffer[i] = b;
 	}
 

@@ -22,6 +22,7 @@ bool Board::isEmpty() const {
 }
 
 const float* Board::getStones() const { return &stones[0]; }
+float* Board::getStones() { return &stones[0]; }
 
 std::ostream& operator<< (std::ostream& stream, const Color& color) {
     if (color == Color::BLACK)
@@ -152,13 +153,13 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
     int changed = boardSize != newSize ? 1 : 0;
     boardSize = newSize;
     float halfN = 0.5f * boardSize - 0.5f;
-    Board::const_iterator bbegin = board.begin(), bend = board.end();
+    auto bbegin = board.begin(), bend = board.end();
 	this->showTerritory = board.showTerritory;
 	this->showTerritoryAuto = board.showTerritoryAuto;
 	int lpi = lastPlayed_i;
 	int lpj = lastPlayed_j;
 	bool placedSomeStone = false;
-    for (Board::const_iterator cit = bbegin, pit = territory.begin(); cit != bend; ++cit, ++pit) {
+    for (auto cit = bbegin, pit = territory.begin(); cit != bend; ++cit, ++pit) {
         unsigned pos = static_cast<unsigned>(cit - bbegin);
         int j = board.row(pos);
         int i = board.col(pos);
@@ -371,6 +372,10 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
 
 const Board::Overlay& Board::getOverlay() const {
 	return overlay;
+}
+
+Board::Overlay& Board::getOverlay() {
+    return overlay;
 }
 
 void Board::invalidate() {
