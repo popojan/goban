@@ -77,6 +77,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/sgf/include
     ${PROJECT_SOURCE_DIR}/deps/boost
     ${PROJECT_SOURCE_DIR}/deps/spdlog/include
+    ${PROJECT_SOURCE_DIR}/deps/clipp/include
     ${OPENGL_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}
     ${CURSES_INCLUDE_DIR}

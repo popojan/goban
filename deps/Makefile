@@ -1,4 +1,4 @@
-all: libRocket glyphy spdlog
+all: libRocket glyphy spdlog clipp
 
 libRocket:
 	git clone https://github.com/libRocket/libRocket.git
@@ -10,3 +10,6 @@ glyphy:
 
 spdlog:
 	git clone https://github.com/gabime/spdlog.git
+
+clipp:
+	git clone https://github.com/muellan/clipp.git

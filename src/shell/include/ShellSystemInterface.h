@@ -28,7 +28,11 @@
 #ifndef ROCKETSHELLSYSTEMINTERFACE_H
 #define ROCKETSHELLSYSTEMINTERFACE_H
 
+#include <spdlog/spdlog.h>
+#include <memory>
+
 #include <Rocket/Core/SystemInterface.h>
+#include <Rocket/Core/Log.h>
 
 /**
 	A custom system interface for Rocket. This provides timing information.
@@ -40,7 +44,11 @@ class ShellSystemInterface : public Rocket::Core::SystemInterface
 public:
 	/// Get the number of seconds elapsed since the start of the application
 	/// @returns Seconds elapsed
+    ShellSystemInterface();
 	virtual float GetElapsedTime();
+    virtual bool LogMessage(Rocket::Core::Log::Type logtype, const Rocket::Core::String& message);
+private:
+    std::shared_ptr<spdlog::logger> console;
 };
 
 #endif
