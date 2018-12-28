@@ -30,7 +30,6 @@
                 <div class="cmd" id="cntBlack" onmousedown="black">Black: 0</div><br/>
                 <div class="cmd" id="lblBlack" onmousedown="black">Black</div>
             </div>
-           
             <div id="grpWhite">
                 <div class="cmd" id="lblWhite" onmousedown="white">White</div><br/>
                 <div class="cmd" id="cntWhite" onmousedown="white">White: 0</div><br/>

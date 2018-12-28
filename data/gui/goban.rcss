@@ -28,7 +28,7 @@ div.grp {
 div.cmd {
     display:inline;
     padding-right: 0.5rem;
-    border-color: #fff; 
+    border-color: #fff;
 }
 div.fps, div#lblBlack, div#lblWhite, div#cntWhite, div#cntBlack {
     display:inline;

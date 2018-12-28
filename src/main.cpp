@@ -23,8 +23,9 @@
   #undef __GNUC__
 #endif
 
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
+#include <clipp.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 Rocket::Core::Context* context = NULL;
 static ElementGame* gameElement = NULL;
@@ -85,17 +86,22 @@ void DoAllocConsole()
 
 int APIENTRY WinMain(HINSTANCE ROCKET_UNUSED_PARAMETER(instance_handle), HINSTANCE ROCKET_UNUSED_PARAMETER(previous_instance_handle), char* ROCKET_UNUSED_PARAMETER(command_line), int ROCKET_UNUSED_PARAMETER(command_show))
 #else
-int main(int ROCKET_UNUSED_PARAMETER(argc), char** ROCKET_UNUSED_PARAMETER(argv))
+int main(int argc, char** argv)
 #endif
 {
+    using namespace clipp;
+    std::string loglevel("info");
+    auto cli = (
+        option("-v", "--verbosity") & word("level", loglevel)
+    );
 #ifdef ROCKET_PLATFORM_WIN32
     ROCKET_UNUSED(instance_handle);
     ROCKET_UNUSED(previous_instance_handle);
     ROCKET_UNUSED(command_line);
     ROCKET_UNUSED(command_show);
+    parse(__argc, __argv, cli);
 #else
-    ROCKET_UNUSED(argc);
-    ROCKET_UNUSED(argv);
+    parse(argc, argv, cli);
 #endif
 
 const Rocket::Core::String APP_PATH(".");
@@ -106,7 +112,7 @@ const char * WINDOW_NAME = "Goban";
         DoAllocConsole();
 #endif
     auto console = spdlog::stderr_color_mt("console");
-    spdlog::set_level(spdlog::level::info);
+    spdlog::set_level(spdlog::level::from_str(loglevel));
 
     unsigned window_width = 1024;
     unsigned window_height = 768;

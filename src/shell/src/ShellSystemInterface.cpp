@@ -28,8 +28,41 @@
 #include <ShellSystemInterface.h>
 #include <Shell.h>
 
-// Get the number of seconds elapsed since the start of the application
+ShellSystemInterface::ShellSystemInterface() {
+    console = spdlog::get("console");
+}
+
 float ShellSystemInterface::GetElapsedTime()
 {
 	return Shell::GetElapsedTime();
+}
+
+bool ShellSystemInterface::LogMessage(Rocket::Core::Log::Type logtype, const Rocket::Core::String& message) {
+    using namespace Rocket::Core;
+    switch (logtype) {
+        case Log::LT_ALWAYS:
+            {
+                auto level = console->level();
+                console->info(message.CString());
+                console->set_level(level);
+            }
+            break;
+        case Log::LT_ERROR:
+        case Log::LT_ASSERT:
+            console->error(message.CString());
+            break;
+        case Log::LT_WARNING:
+            console->warn(message.CString());
+            break;
+        case Log::LT_INFO:
+            //console->info(message.CString());
+            //break;
+        case Log::LT_DEBUG:
+            console->debug(message.CString());
+            break;
+        case Log::LT_MAX:
+            console->trace(message.CString());
+            break;
+  };
+  return true;
 }
