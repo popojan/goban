@@ -96,8 +96,9 @@ public:
 class GtpEngine : public Engine, protected GtpClient {
 public:
 
-    GtpEngine(const std::string& exe, const std::string& cmdline, const std::string& path = "", const std::string& nameExtra = "") :
-        Engine(nameExtra), GtpClient(exe, cmdline, path), board(19)
+    GtpEngine(const std::string& exe, const std::string& cmdline, const std::string& path = "",
+        const std::string& nameExtra = "")
+    : Engine(nameExtra), GtpClient(exe, cmdline, path), board(19)
     {
         //setEngineName(nameExtra);
     }
@@ -132,7 +133,9 @@ class Node;
 
 class SgfPlayer: public Player {
 public:
-    SgfPlayer(const std::string& name, const std::string& fname): Player(name, NONE, LOCAL | HUMAN), waitingForInput(false), fname(fname), sgf(0), ni(0), variation(0), node(0) {
+    SgfPlayer(const std::string& name, const std::string& fname): Player(name, NONE, LOCAL | HUMAN),
+        waitingForInput(false), fname(fname), sgf(0), ni(0), variation(0), node(0)
+    {
         parseSgf(fname);
     }
     virtual Move genmove(const Color& );

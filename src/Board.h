@@ -52,9 +52,13 @@ public:
 
     Position(): c(0), r(0) {}
 
-    Position(unsigned col, unsigned row):
+    Position(unsigned int col, unsigned int row):
         c(col),
         r(row) { }
+
+    Position(std::pair<int,int> coord):
+            c(coord.first),
+            r(coord.second) { }
 
     operator bool() const { return c >= 0 && r >= 0; }
 
@@ -130,6 +134,7 @@ public:
     typedef board_array::const_iterator const_iterator;
 
     const float* getStones() const;
+    float* getStones();
 
     unsigned getSize() const { return boardSize;}
 
@@ -142,6 +147,8 @@ public:
     bool fixStone(unsigned i, unsigned j, unsigned i0, unsigned j0);
 
     const Overlay& getOverlay() const;
+
+    Overlay& getOverlay();
 
     const Color  operator[](const Position& pos) const { return board[ord(pos)]; }
 
@@ -179,18 +186,18 @@ public:
 	bool toggleTerritory();
 	bool toggleTerritoryAuto(bool);
 
-private:
-    std::shared_ptr<spdlog::logger> console;
-
     const static float mBlackArea;
     const static float mWhiteArea;
     const static float mBlack;
     const static float mWhite;
     const static float mDeltaCaptured;
 
-    std::array<Color, BOARDSIZE> board;
+private:
+    std::shared_ptr<spdlog::logger> console;
 
     Overlay overlay;
+
+    std::array<Color, BOARDSIZE> board;
 
     unsigned capturedBlack;
     unsigned capturedWhite;

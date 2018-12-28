@@ -197,6 +197,7 @@ void GobanView::Render(int w, int h)
 	}
 
 	if (updateFlag & UPDATE_STONES) {
+	    console->debug("updating stones view from model");
 		board.updateStones(model.board, model.territory, model.board.showTerritory);
 		board.positionNumber = model.board.positionNumber;
 	}
