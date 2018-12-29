@@ -112,9 +112,9 @@ unsigned GobanModel::getBoardSize() const {
     return board.getSize();
 }
 
-bool GobanModel::isPointOnBoard(const std::pair<int, int>& coord) {
-    const int N = static_cast<int>(board.getSize());
-    return coord.first >= 0 && coord.first < N && coord.second >= 0 && coord.second < N;
+bool GobanModel::isPointOnBoard(const Position& p) {
+    const int N = board.getSize();
+    return p.col() >= 0 && p.col() < N && p.row() >= 0 && p.row() < N;
 }
 
 void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) {

@@ -9,7 +9,7 @@ const float Board::mBlack = 5.0;
 const float Board::mWhite = 6.0;
 const float Board::mDeltaCaptured = 0.5;
 
-Board::Board(unsigned size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
+Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
     dist(0.0f, 0.05f), invalidated(false), order(0)
 {
     console = spdlog::get("console");
@@ -35,8 +35,8 @@ std::ostream& operator<< (std::ostream& stream, const Color& color) {
 }
 
 std::ostream& operator<< (std::ostream& stream, const Board& board) {
-    for (unsigned i = board.boardSize; i != 0; --i) {
-        for(unsigned j = 0; j < board.boardSize; ++j)
+    for (int i = board.boardSize; i != 0; --i) {
+        for(int j = 0; j < board.boardSize; ++j)
             stream << board[Position(j, i)] << " ";
         stream << std::endl;
     }
@@ -47,11 +47,11 @@ std::istream& operator>> (std::istream& stream, Position& pos) {
     unsigned char c = '\x00';
     int d = -1;
     stream >> c >> d;
-    unsigned i, j;
+    int i, j;
     if(d < 0)
         return stream;
     if (c >= 'I') j = 7u + c - 'I'; else j = c - 'A';
-    i = d - 1u;
+    i = d - 1;
     pos = Position(j, i);
     return stream;
 }
@@ -113,17 +113,30 @@ std::istream& operator>> (std::istream& stream, Move& move) {
 
 }
 
-bool Board::fixStone(unsigned i, unsigned j, unsigned i0, unsigned j0) {
-    unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
-    unsigned idx0 = ((boardSize  * i0 + j0) << 2u) + 2u;
+bool Board::fixStone(int i, int j, int i0, int j0) {
+    console->debug("fixStone ({},{})/({},{})", i, j, i0, j0);
+    int idx = ((boardSize  * i + j) << 2) + 2;
+    int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
     float mValue = stones[idx0];
     float halfN = 0.5f * boardSize - 0.5f;
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
+        console->debug("1st IF");
         float x0 = stones[idx0 - 2];
         float y0 = stones[idx0 - 1];
         float x = stones[idx - 2];
         float y = stones[idx - 1];
-        float dd = 2.0f;
+        Position p(i0, j0);
+        glm::vec2 v(x0-x,y0-y);
+        if(glm::length(v) <= 1.05f*rStone) {
+            v = glm::vec2(x, y) + 1.05f * rStone * glm::normalize(v);
+            p.x = v.x;
+            p.y = v.y;
+            console->debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
+            unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
+            stones[idx - 2] = p.x;
+            stones[idx - 1] = p.y;
+        }
+        /*float dd = 2.0f;
         if (i == i0) dd = std::abs(x0 - x);
         if (j == j0) dd = std::abs(y0 - y);
         if (dd < rStone) {
@@ -143,13 +156,48 @@ bool Board::fixStone(unsigned i, unsigned j, unsigned i0, unsigned j0) {
 			overlay[oidx].x = stones[idx0 - 2];
 			overlay[oidx].y = stones[idx0 - 1];
             return false;
-        }
-        return true;
+        }*/
+        return false;
     }
     return true;
 }
+
+void Board::placeFuzzy(const Position& p){
+    int j = p.col();
+    int i = p.row();
+    const float halfN = 0.5f * boardSize - 0.5f;
+    float x = p.x;
+    float y = p.y;
+    if(x == 0 && y == 0) {
+        x = j - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
+        y = i - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
+    }
+    else {
+        glm::vec2 v(x - j, y - i);
+        glm::vec2 add(3.0f * r1 * glm::normalize(v)* glm::length(v)/0.71f);
+        x = j - halfN + add.x;
+        y = i - halfN + add.y;
+    }
+    unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
+    stones[idx - 2] = x;
+    stones[idx - 1] = y;
+    stones[idx + 1] = 3.14f*dist(generator);
+    for (int ii = i + 1u, i0 = i; ii < boardSize; i0 = ii, ++ii) {
+        if (fixStone(i0, j, ii, j)) break;
+    }
+    for (int ii = i - 1u, i0 = i; ii >= 0; i0 = ii, --ii) {
+        if (fixStone(i0, j, ii, j)) break;
+    }
+    for (int jj = j + 1u, j0 = j; jj < boardSize; j0 = jj, ++jj) {
+        if (fixStone(i, j0, i, jj)) break;
+    }
+    for (int jj = j - 1u, j0 = j; jj >= 0; j0 = jj, --jj) {
+        if (fixStone(i, j0, i, jj)) break;
+    }
+}
+
 int Board::updateStones(const Board& board, const Board& territory, bool showTerritory) {
-    unsigned newSize = board.getSize();
+    int newSize = board.getSize();
     int changed = boardSize != newSize ? 1 : 0;
     boardSize = newSize;
     float halfN = 0.5f * boardSize - 0.5f;
@@ -160,14 +208,14 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 	int lpj = lastPlayed_j;
 	bool placedSomeStone = false;
     for (auto cit = bbegin, pit = territory.begin(); cit != bend; ++cit, ++pit) {
-        unsigned pos = static_cast<unsigned>(cit - bbegin);
+        int pos = static_cast<unsigned>(cit - bbegin);
         int j = board.row(pos);
         int i = board.col(pos);
-        if(i < 0 || j < 0 || i >= static_cast<int>(boardSize) || j >= static_cast<int>(boardSize)) continue;
+        if(i < 0 || j < 0 || i >= boardSize || j >= boardSize) continue;
         const Color& stone = *cit;
         const Color& area = *pit;
         float mValue = mEmpty;
-		unsigned oidx = boardSize  * i + j;
+		int oidx = boardSize  * i + j;
 		if(stone != Color::EMPTY) {
             if (area == Color::EMPTY || area == stone || !showTerritory)
                 mValue = stone == Color::BLACK ? mBlack : mWhite;
@@ -190,24 +238,8 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 			        &&  mValue != mBlackArea && mValue != mWhiteArea;
 			if (placeStone) {
 				placedSomeStone = true;
-				float x = j - halfN + std::max(-3.0f*r1, std::min(3.0f*r1, dist(generator)));
-				float y = i - halfN + std::max(-3.0f*r1, std::min(3.0f*r1, dist(generator)));
-				stones[idx - 2] = x;
-				stones[idx - 1] = y;
-				stones[idx + 1] = 3.14f*dist(generator);
-				change = 2;
-				for (int ii = i + 1u, i0 = i; ii < static_cast<int>(boardSize); i0 = ii, ++ii) {
-					if (fixStone(i0, j, ii, j)) break;
-				}
-				for (int ii = i - 1u, i0 = i; ii >= 0; i0 = ii, --ii) {
-					if (fixStone(i0, j, ii, j)) break;
-				}
-				for (int jj = j + 1u, j0 = j; jj < static_cast<int>(boardSize); j0 = jj, ++jj) {
-					if (fixStone(i, j0, i, jj)) break;
-				}
-				for (int jj = j - 1u, j0 = j; jj >= 0; j0 = jj, --jj) {
-					if (fixStone(i, j0, i, jj)) break;
-				}
+                change = 2;
+				placeFuzzy(Position(j, i));
 				//order += 1;
 				overlay[oidx].x = stones[idx - 2];
 				overlay[oidx].y = stones[idx - 1];
@@ -243,25 +275,24 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 			}
 			else {
 				overlay[oidx].text = std::string("");
-				overlay[oidx].layer = -1;
+				overlay[oidx].layer = -1u;
 			}
 		}
 
 	}
 	if (placedSomeStone)  {
-		unsigned oidx = boardSize  * lpi + lpj;
+		int oidx = boardSize  * lpi + lpj;
 		overlay[oidx].text = std::string("");
-		overlay[oidx].layer = -1;
+		overlay[oidx].layer = -1u;
 	}
-
     return changed;
 }
 
-unsigned  Board::capturedCount(const Color& whose) const {
+int Board::capturedCount(const Color& whose) const {
     return whose == Color::WHITE ? capturedWhite : capturedBlack;
 }
 
-void Board::clear(unsigned boardsize) {
+void Board::clear(int boardsize) {
 	this->boardSize = boardsize;
     stones.fill(mEmpty);
     overlay.fill({ "", -1u, 0, 0});
@@ -286,17 +317,17 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
         if(lines.front().at(0) == '=') {
             std::istringstream ssin(lines.at(2));
 
-            unsigned size = 0u;
+            int size = 0;
             ssin >> size;
             if(size >= MINBOARD && size <= MAXBOARD) {
                 unsigned bcaptured = 0u, wcaptured = 0u;
                 console->debug(lines.at(1));
 			    bool white = true;
-                for(unsigned i = 2; i < 2 + size; ++i) {
-                    console->debug(lines.at(i));
-                    for(unsigned j = 3; j < 3 + (size << 1); j += 2) {
-                        char c = lines.at(i).at(j);
-                        Position p(((j - 3u) >> 1u), size - i + 1u);
+                for(int i = 2; i < 2 + size; ++i) {
+                    console->debug(lines[i]);
+                    for(int j = 3; j < 3 + (size << 1); j += 2) {
+                        char c = lines[i][j];
+                        Position p((j - 3) >> 1, size - i + 1);
                         Color color;
                         if(c == 'X') {
                             color = Color::BLACK;
@@ -306,10 +337,10 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                         }
                         board[ord(p)] = color;
                     }
-                    if(lines.at(i).back() == 's') {
+                    if(lines[i].back() == 's') {
                         std::string s;
-                        std::istringstream ssline(lines.at(i));
-                        while((ssline >> s) && s.compare("captured") != 0) {
+                        std::istringstream ssline(lines[i]);
+                        while((ssline >> s) && s == "captured") {
                           ssline >> s;
                         }
                         unsigned count = 0;
@@ -327,7 +358,7 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                 success = true;
                 capturedBlack = bcaptured;
                 capturedWhite = wcaptured;
-                console->debug(lines.at(2 + size));
+                console->debug(lines[2 + size]);
             }
         }
     }
@@ -341,7 +372,7 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
 bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
     bool success = false;
     try {
-        for (unsigned i = 0; i < boardSize; ++i) {
+        for (int i = 0; i < boardSize; ++i) {
             console->debug("row = {}/{}", i, boardSize);
             std::istringstream ssin(lines.at(i));
             if (i == 0) {
@@ -350,7 +381,7 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
                 success = (c == '=');
                 if (!success) return false;
             }
-            for (unsigned j = 0; j < boardSize; ++j) {
+            for (int j = 0; j < boardSize; ++j) {
                 float val = 0.0;
                 ssin >> val;
                 Color c;
@@ -403,4 +434,17 @@ bool Board::toggleTerritory() {
 	showTerritoryAuto = false;
 	positionNumber += 1;
 	return showTerritory;
+}
+
+bool Board::placeCursor(const Position& coord, const Color& col) {
+    //float halfN = 0.5f * boardSize - 0.5f;
+    int oidx = ((boardSize  * coord.row() + coord.col()) << 2u) + 2u;
+    console->debug("oidx = [{},{}] = {} ... {} {}", coord.col(), coord.row(), oidx, board[coord].toString(), col.toString());
+    placeFuzzy(coord);
+    //stones[oidx - 2] = coord.col() - halfN;
+    //stones[oidx - 1] = coord.row() - halfN;
+    stones[oidx + 0] = (col == Color::WHITE) ? mWhite : mBlack;
+    //stones[oidx + 1] = 0;
+    console->debug("overlay coord = [{},{}] = {}", stones[oidx - 2], stones[oidx - 1], stones[oidx + 0]);
+    return true;
 }

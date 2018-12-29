@@ -27,7 +27,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     mouseY = static_cast<float>(y);
     view.mouseMoved(mouseX, mouseY);
 
-    auto coord = view.getBoardCoordinate(x, y);
+    Position coord = view.getBoardCoordinate(x, y);
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
             bool playNow = true;
@@ -201,60 +201,7 @@ void GobanControl::mouseMove(int x, int y){
     mouseX = static_cast<float>(x);
     mouseY = static_cast<float>(y);
     view.mouseMoved(mouseX, mouseY);
-
-    //overlay cursor
-    /*
-    if(cursor > 0) {
-        auto& overlay = view.board.getOverlay();
-        overlay[cursor].text = "";
-        overlay[cursor].layer = -1;
-        view.requestRepaint(GobanView::UPDATE_OVERLAY);
-        cursor = 0;
-    }
-    auto coord = view.getBoardCoordinate(x, y);
-    if(model.isPointOnBoard(coord)) {
-        unsigned int boardSize = model.getBoardSize();
-        float halfN = 0.5f * boardSize - 0.5f;
-        unsigned int oidx = boardSize*coord.first + coord.second;
-        console->debug("oidx = {}", oidx);
-        auto& overlay = view.board.getOverlay();
-        overlay[oidx].text = "X";
-        overlay[oidx].x = coord.first - halfN;
-        overlay[oidx].y = coord.second - halfN;
-        overlay[oidx].layer = 0;
-        console->debug("overlay coord = [{},{}]", overlay[oidx].x, overlay[oidx].y);
-        view.requestRepaint(GobanView::UPDATE_OVERLAY);
-        cursor = oidx;
-    }
-    */
-    if(cursor.first > -1) {
-        float* stones = model.board.getStones();
-        unsigned int boardSize = model.getBoardSize();
-        unsigned int oidx = ((boardSize  * cursor.first + cursor.second) << 2u) + 2u;
-        stones[oidx + 0] = Board::mEmpty;
-        model.board[cursor] = Color::EMPTY;
-        view.requestRepaint(GobanView::UPDATE_STONES);
-        cursor = {-1, -1};
-    }
-    auto coord = view.getBoardCoordinate(x, y);
-    if(model.isPointOnBoard(coord)) {
-        unsigned int boardSize = model.getBoardSize();
-        float halfN = 0.5f * boardSize - 0.5f;
-        unsigned int oidx = ((boardSize  * coord.first + coord.second) << 2u) + 2u;
-        console->debug("oidx = {}", oidx);
-        float* stones = model.board.getStones();
-        if(model.board[coord] == Color::EMPTY) {
-            model.board[coord] = Color::BLACK;
-            stones[oidx - 2] = coord.first - halfN;
-            stones[oidx - 1] = coord.second - halfN;
-            stones[oidx + 0] = Board::mBlack;
-            stones[oidx + 1] = 0;
-            console->debug("overlay coord = [{},{}]", stones[oidx - 2], stones[oidx - 1]);
-            view.requestRepaint(GobanView::UPDATE_STONES);
-            cursor = coord;
-        }
-    }
-
+    view.moveCursor(mouseX, mouseY);
 }
 
 void GobanControl::increaseHandicap(){

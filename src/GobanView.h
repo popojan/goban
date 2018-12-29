@@ -23,10 +23,11 @@ public:
 
 	GobanView(GobanModel& m)
 		: gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),
-		translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f), startTime(0.0f),
-		animationRunning(false), isPanning(false), isZooming(false), isRotating(false), needsUpdate(0), cam(1.0, 0.0, 0.0, 0.0),
-		startX(0), startY(0), lastX(.0f), lastY(.0f),
-		updateFlag(0), currentProgram(-1), showOverlay(true) {
+		translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f),
+		startTime(0.0f), animationRunning(false), isPanning(false), isZooming(false), isRotating(false),
+		needsUpdate(0), cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
+		currentProgram(-1),	showOverlay(true),  cursor(-1,-1)
+	{
 
 	    console = spdlog::get("console");
 
@@ -95,7 +96,7 @@ public:
 
     void toggleAnimation(time_t);
 
-    std::pair<int, int> getBoardCoordinate(float x, float y)const ;
+    Position getBoardCoordinate(float x, float y)const ;
     glm::vec2 boardCoordinate(float x, float y) const;
 
     void resetView();
@@ -105,6 +106,8 @@ public:
     void requestRepaint(int what = UPDATE_SOME);
 	void toggleOverlay();
 	void Update();
+	void moveCursor(float, float);
+
 private:
     std::shared_ptr<spdlog::logger> console;
 public:
@@ -131,6 +134,7 @@ public:
     int updateFlag;
     int currentProgram;
 	bool showOverlay;
+    Position cursor, lastCursor;
 };
 
 

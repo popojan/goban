@@ -387,6 +387,6 @@ void GameThread::loadEngines(const std::string& dir) {
     activePlayer[1] = human;
 }
 
-Move GameThread::getLocalMove(std::pair<int, int>& coord) {
-    return Move(Position(static_cast<unsigned>(coord.first), static_cast<unsigned>(coord.second)), colorToMove);
+Move GameThread::getLocalMove(const Position& coord) {
+    return Move(coord, colorToMove);
 }

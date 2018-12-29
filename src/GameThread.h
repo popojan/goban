@@ -64,7 +64,7 @@ public:
 
 	int getActivePlayer(int which);
 
-	Move getLocalMove(std::pair<int, int>& coord);
+	Move getLocalMove(const Position& coord);
 
 	void init();
 	void reset();

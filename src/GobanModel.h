@@ -21,7 +21,7 @@ public:
 
 	void newGame(int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f);
 
-    bool isPointOnBoard(const std::pair<int, int>& coord);
+    bool isPointOnBoard(const Position& coord);
 
     void start() {
         started = true;
