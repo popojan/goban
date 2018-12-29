@@ -9,8 +9,7 @@
 #include <iostream>
 #include <random>
 #include <mutex>
-
-class BoardGL;
+#include <glm/glm.hpp>
 
 class Color {
 public:
@@ -41,33 +40,29 @@ private:
 };
 
 class Position {
-    unsigned c;
-    unsigned r;
+    int c;
+    int r;
 
-    Position(unsigned char col, unsigned char row):
-        c(col >= 'I' ? 7 + c - 'I' : c - 'A'),
-        r(row) { }
+    void fromGTP(char col, char row) {
+        c = col >= 'I' ? 7 + c - 'I' : c - 'A';
+        r = row;
+    }
 
 public:
+    float x;
+    float y;
+    Position(): c(0), r(0), x(0.0), y(0.0) { }
 
-    Position(): c(0), r(0) {}
-
-    Position(unsigned int col, unsigned int row):
-        c(col),
-        r(row) { }
-
-    Position(std::pair<int,int> coord):
-            c(coord.first),
-            r(coord.second) { }
+    Position(int col, int row): c(col), r(row), x(0), y(0) { }
 
     operator bool() const { return c >= 0 && r >= 0; }
 
-    unsigned col() const { return c; }
-    unsigned row() const { return r; }
+    int col() const { return c; }
+    int row() const { return r; }
 
-    friend std::istream& operator>> (std::istream& stream, Position& color);
+    friend std::istream& operator>> (std::istream&, Position&);
 
-    friend std::ostream& operator<< (std::ostream& stream, const Position& color);
+    friend std::ostream& operator<< (std::ostream&, const Position&);
 };
 
 class Move {
@@ -121,10 +116,10 @@ struct CoordText {
 class Board
 {
 public:
-    static const unsigned MAXBOARD = 19;
-    static const unsigned MINBOARD = 9;
-    static const unsigned BOARDSIZE = (MAXBOARD + 2) * (MAXBOARD + 1) + 1;
-    static const unsigned DEFAULTSIZE = 19;
+    static const int MAXBOARD = 19;
+    static const int MINBOARD = 9;
+    static const int BOARDSIZE = (MAXBOARD + 2) * (MAXBOARD + 1) + 1;
+    static const int DEFAULTSIZE = 19;
     typedef std::array<float, Board::MAXBOARD*Board::MAXBOARD << 2> Stones;
     typedef std::array<CoordText, Board::MAXBOARD*Board::MAXBOARD> Overlay;
 private:
@@ -136,7 +131,7 @@ public:
     const float* getStones() const;
     float* getStones();
 
-    unsigned getSize() const { return boardSize;}
+    int getSize() const { return boardSize;}
 
     std::size_t getSizeOf() const { return 4*sizeof(float)*stones.size(); }
 
@@ -144,7 +139,7 @@ public:
 
     void setStoneRadius(float r) { rStone = r; r1 = 0.5f*(1.0f - r); dist = std::normal_distribution<float>(0.0f, 3.0f*r1); r1 *= 0.98f; }
 
-    bool fixStone(unsigned i, unsigned j, unsigned i0, unsigned j0);
+    bool fixStone(int i, int j, int i0, int j0);
 
     const Overlay& getOverlay() const;
 
@@ -156,16 +151,16 @@ public:
         return board[ord(pos)];
     }
 
-    inline int row(unsigned pos) const { return (pos) / (MAXBOARD + 1u) - 1u; }
-    inline int col(unsigned pos) const { return (pos) % (MAXBOARD + 1u) - 1u; }
+    inline int row(int pos) const { return (pos) / (MAXBOARD + 1u) - 1u; }
+    inline int col(int pos) const { return (pos) % (MAXBOARD + 1u) - 1u; }
     inline int ord(const Position& p) const { return ord(p.col(), p.row()); }
-    inline int ord(unsigned i, unsigned j) const { return (MAXBOARD + 2) + (i) * (MAXBOARD + 1) + (j); }
+    inline int ord(int i, int j) const { return (MAXBOARD + 2) + (i) * (MAXBOARD + 1) + (j); }
 
-    unsigned capturedCount(const Color& whose) const;
+    int capturedCount(const Color& whose) const;
 
-    void clear(unsigned boardsize = DEFAULTSIZE);
+    void clear(int boardSize = DEFAULTSIZE);
 
-    Board(unsigned size = DEFAULTSIZE);
+    Board(int size = DEFAULTSIZE);
 
     bool parseGtp(const std::vector<std::string>& lines);
 
@@ -186,22 +181,25 @@ public:
 	bool toggleTerritory();
 	bool toggleTerritoryAuto(bool);
 
+	bool placeCursor(const Position& p, const Color& col);
+    void placeFuzzy(const Position& p);
+private:
+
     const static float mBlackArea;
     const static float mWhiteArea;
     const static float mBlack;
     const static float mWhite;
     const static float mDeltaCaptured;
 
-private:
     std::shared_ptr<spdlog::logger> console;
 
     Overlay overlay;
 
     std::array<Color, BOARDSIZE> board;
 
-    unsigned capturedBlack;
-    unsigned capturedWhite;
-    unsigned boardSize;
+    int capturedBlack;
+    int capturedWhite;
+    int boardSize;
 
     float r1, rStone;
 
@@ -213,7 +211,7 @@ public:
 	const static float mEmpty;
 	Stones stones;
 	int order;
-	volatile unsigned long positionNumber;
+	volatile long positionNumber;
 	bool showTerritory, showTerritoryAuto;
 	int lastPlayed_i, lastPlayed_j;
 };

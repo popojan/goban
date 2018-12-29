@@ -198,13 +198,17 @@ void GobanView::Render(int w, int h)
 
 	if (updateFlag & UPDATE_STONES) {
 	    console->debug("updating stones view from model");
-		board.updateStones(model.board, model.territory, model.board.showTerritory);
+	    console->debug("colorToMove = {}", state.colorToMove.toString());
+	    board.updateStones(model.board, model.territory, model.board.showTerritory);
+		if(model.isPointOnBoard(cursor) && model.board[cursor] == Color::EMPTY && board[cursor] == Color::EMPTY)
+		    board.placeCursor(cursor, model.state.colorToMove);
 		board.positionNumber = model.board.positionNumber;
 	}
 	
 
 	shadeit(time, gobanShader);
-	glEnable(GL_BLEND);
+
+   	glEnable(GL_BLEND);
 	//shadeit(time, gobanShaderStones);
 
 	glEnable(GL_DEPTH_TEST);
@@ -263,12 +267,16 @@ void GobanView::updateTranslation() {
 	newTranslate = glm::vec3(tt);
 }
 
-std::pair<int, int> GobanView::getBoardCoordinate(float x, float y) const {
+Position GobanView::getBoardCoordinate(float x, float y) const {
     glm::vec2 p = boardCoordinate(x, y);
-    return {
-        static_cast<int>(floor(p.x/model.metrics.squareSize + 0.5f*model.metrics.fNDIM)),
-        static_cast<int>(floor(p.y/model.metrics.squareSize + 0.5f*model.metrics.fNDIM))
-    };
+    float xx = p.x/model.metrics.squareSize + 0.5f*model.metrics.fNDIM;
+    float yy = p.y/model.metrics.squareSize + 0.5f*model.metrics.fNDIM;
+    int px = static_cast<int>(floorf(xx));
+    int py = static_cast<int>(floorf(yy));
+    Position ret(px, py);
+    ret.x = xx;
+    ret.y = yy;
+    return ret;
 }
 
 glm::vec2 GobanView::boardCoordinate(float x, float y) const {
@@ -277,7 +285,7 @@ glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     vec4 ro = vec4(.0f, .0f, -3.0f, 0.0f);
     vec4 up = vec4(.0f, .1f, .0f, 0.0f);
     mat4x4 m = cam.setView();
-    vec4 tt = vec4(this->translate, 0.0f);
+    vec4 tt = vec4(newTranslate, 0.0f);
     vec4 roo = m*ro + tt;
     ta += tt;
     up = normalize(m*up);
@@ -318,4 +326,44 @@ void GobanView::Update() {
 		updateFlag |= UPDATE_STONES | UPDATE_OVERLAY;
 		board.positionNumber = model.board.positionNumber;
 	}
+}
+
+void GobanView::moveCursor(float x, float y) {
+    //overlay cursor
+    /*
+    if(cursor > 0) {
+        auto& overlay = view.board.getOverlay();
+        overlay[cursor].text = "";
+        overlay[cursor].layer = -1;
+        view.requestRepaint(GobanView::UPDATE_OVERLAY);
+        cursor = 0;
+    }
+    auto coord = view.getBoardCoordinate(x, y);
+    if(model.isPointOnBoard(coord)) {
+        unsigned int boardSize = model.getBoardSize();
+        float halfN = 0.5f * boardSize - 0.5f;
+        unsigned int oidx = boardSize*coord.first + coord.second;
+        console->debug("oidx = {}", oidx);
+        auto& overlay = view.board.getOverlay();
+        overlay[oidx].text = "X";
+        overlay[oidx].x = coord.first - halfN;
+        overlay[oidx].y = coord.second - halfN;
+        overlay[oidx].layer = 0;
+        console->debug("overlay coord = [{},{}]", overlay[oidx].x, overlay[oidx].y);
+        view.requestRepaint(GobanView::UPDATE_OVERLAY);
+        cursor = oidx;
+    }
+    */
+    /*if(cursor.first > -1) {
+        float* stones = model.board.getStones();
+        unsigned int boardSize = model.getBoardSize();
+        unsigned int oidx = ((boardSize  * cursor.first + cursor.second) << 2u) + 2u;
+        stones[oidx + 0] = Board::mEmpty;
+        model.board[cursor] = Color::EMPTY;
+        requestRepaint(GobanView::UPDATE_STONES);
+        cursor = {-1, -1};
+    }*/
+    Position coord = getBoardCoordinate(x, y);
+    cursor = coord;
+    requestRepaint(GobanView::UPDATE_STONES);
 }

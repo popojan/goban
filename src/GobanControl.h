@@ -16,7 +16,7 @@ class GobanControl {
 public:
     GobanControl(ElementGame& p, GobanModel& m, GobanView& v, GameThread& e)
             : parent(p), model(m), view(v), engine(e), rButtonDown(false), mButtonDown(false), startX(-1),
-              startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true), cursor({-1,-1})
+              startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true)
     {
         console = spdlog::get("console");
     };
@@ -44,7 +44,6 @@ private:
     bool exit;
     float mouseX, mouseY;
     bool firstGame;
-    std::pair<int, int> cursor;
     std::shared_ptr<spdlog::logger> console;
 };
 
