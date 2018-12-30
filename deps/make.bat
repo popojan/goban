@@ -53,3 +53,6 @@ if not exist boost (
 
 REM spdlog
 if not exist spdlog git clone --recursive https://github.com/gabime/spdlog.git
+
+REM spdlog
+if not exist clipp git clone https://github.com/muellan/clipp.git

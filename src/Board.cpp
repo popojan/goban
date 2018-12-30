@@ -319,6 +319,7 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
 
             int size = 0;
             ssin >> size;
+            console->debug("Size: {}", size);
             if(size >= MINBOARD && size <= MAXBOARD) {
                 unsigned bcaptured = 0u, wcaptured = 0u;
                 console->debug(lines.at(1));
@@ -340,7 +341,7 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                     if(lines[i].back() == 's') {
                         std::string s;
                         std::istringstream ssline(lines[i]);
-                        while((ssline >> s) && s == "captured") {
+                        while((ssline >> s) && s != "captured") {
                           ssline >> s;
                         }
                         unsigned count = 0;
@@ -358,6 +359,7 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                 success = true;
                 capturedBlack = bcaptured;
                 capturedWhite = wcaptured;
+                console->debug("Captured: {}, {}", capturedBlack, capturedWhite);
                 console->debug(lines[2 + size]);
             }
         }
