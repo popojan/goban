@@ -17,22 +17,15 @@ set(GOBAN_VERSION_PATCH 0)
 set(GOBAN_VERSION_TWEAK 0)
 set(PROJECT_VERSION ${GOBAN_VERSION_MAJOR}.${GOBAN_VERSION_MINOR}.${GOBAN_VERSION_PATCH}.${GOBAN_VERSION_TWEAK})
 
+set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
+
 ExternalProject_Add(project_libsndfile
-    GIT_REPOSITORY      https://github.com/erikd/libsndfile.git
-    UPDATE_COMMAND ""
-    PREFIX              ${PROJECT_SOURCE_DIR}/deps/libsndfile
-    CONFIGURE_COMMAND   <SOURCE_DIR>/configure
-    BUILD_COMMAND       make
-    BUILD_IN_SOURCE     1
+    GIT_REPOSITORY     https://github.com/erikd/libsndfile.git
+    SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
+    BINARY_DIR  deps/libsndfile/build 
+    STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
-
-ExternalProject_Add_Step(project_libsndfile autogen
-   COMMAND              <SOURCE_DIR>/autogen.sh
-   DEPENDEES            update
-   DEPENDERS            configure
-)
-
 
 ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
 SET(libsndfile_lib_dir "${BINARY_DIR}/src/.libs")
@@ -46,14 +39,11 @@ SET_PROPERTY(TARGET libsndfile PROPERTY
 
 SET(LIBSNDFILE_INCLUDE_PATH "${install_dir}/src/project_libsndfile-build/src/")
 
-ExternalProject_Add(project_portaudio
-    SVN_REPOSITORY      https://subversion.assembla.com/svn/portaudio/portaudio/trunk
-    UPDATE_COMMAND ""
-    SVN_TRUST_CERT      1
-    PREFIX              ${PROJECT_SOURCE_DIR}/deps/portaudio
-    CONFIGURE_COMMAND   <SOURCE_DIR>/configure
-    BUILD_IN_SOURCE     1
-    BUILD_COMMAND       make
+ExternalProject_Add(project_portaudio 
+    GIT_REPOSITORY      https://git.assembla.com/portaudio.git
+    SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
+    BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/portaudio/build
+    STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for portaudio
 )
 
@@ -119,7 +109,6 @@ foreach (_variableName ${_variableNames})
     message(STATUS "${_variableName}=${${_variableName}}")
 endforeach()
 
-set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/deps/glm
@@ -138,6 +127,8 @@ include_directories(
     ${LIBROCKET_INCLUDE_DIR}
     ${LIBGLYPHY_INCLUDE_DIR}
     ${FREETYPE_INCLUDE_DIRS}
+    ${libsndfile_inc_dir}
+    ${portaudio_inc_dir}
 )
 
 # Include list of source files
@@ -239,6 +230,8 @@ else()
   add_executable(goban ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES})
   SET(EXTRA_LIBS rt asound jack pthread)
 endif()
+
+add_dependencies(goban project_portaudio project_libsndfile)
 
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
