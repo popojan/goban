@@ -139,7 +139,7 @@ public:
 
     void setStoneRadius(float r) { rStone = r; r1 = 0.5f*(1.0f - r); dist = std::normal_distribution<float>(0.0f, 3.0f*r1); r1 *= 0.98f; }
 
-    bool fixStone(int i, int j, int i0, int j0);
+    double fixStone(int i, int j, int i0, int j0);
 
     const Overlay& getOverlay() const;
 
@@ -181,8 +181,8 @@ public:
 	bool toggleTerritory();
 	bool toggleTerritoryAuto(bool);
 
-	bool placeCursor(const Position& p, const Color& col);
-    void placeFuzzy(const Position& p);
+	double placeCursor(const Position& p, const Color& col);
+    double placeFuzzy(const Position& p);
 private:
 
     const static float mBlackArea;
@@ -214,6 +214,7 @@ public:
 	volatile long positionNumber;
 	bool showTerritory, showTerritoryAuto;
 	int lastPlayed_i, lastPlayed_j;
+    volatile long moveNumber;
 };
 
 #endif // BOARD_H

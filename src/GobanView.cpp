@@ -1,6 +1,9 @@
 #include "GobanView.h"
 #include "Shell.h"
 #include <Rocket/Core/StyleSheet.h>
+#include "AudioPlayer.hpp"
+
+#include <iostream>
 
 void GobanView::initRotation(float x, float y) {
 	if (!isRotating) {
@@ -177,17 +180,17 @@ void GobanView::shadeit(float time, GobanShader& gobanShader) {
 
 void GobanView::Render(int w, int h)
 {
-	
+
 	if(!gobanShader.isReady())
         return;
     glDisable(GL_BLEND);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	//glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
-	
+
 
 	float time = Shell::GetElapsedTime();
-	
+
 	if (WINDOW_HEIGHT != h || WINDOW_WIDTH != w) {
 		reshape(w, h);
 		startTime = time;
@@ -197,14 +200,18 @@ void GobanView::Render(int w, int h)
 	}
 
 	if (updateFlag & UPDATE_STONES) {
-	    console->debug("updating stones view from model");
-	    console->debug("colorToMove = {}", state.colorToMove.toString());
+        if(board.moveNumber != model.board.moveNumber) {
+            player.play("data/sound/stone.wav", 1.0);
+        };
 	    board.updateStones(model.board, model.territory, model.board.showTerritory);
-		if(model.isPointOnBoard(cursor) && model.board[cursor] == Color::EMPTY && board[cursor] == Color::EMPTY)
-		    board.placeCursor(cursor, model.state.colorToMove);
+		if(model.isPointOnBoard(cursor) && model.board[cursor] == Color::EMPTY && board[cursor] == Color::EMPTY){
+		    double vol = board.placeCursor(cursor, model.state.colorToMove);
+            if(vol > 0.5 && player.playbackCount() < 5)
+                player.play("data/sound/collision.wav", vol);
+        }
 		board.positionNumber = model.board.positionNumber;
+		board.moveNumber = model.board.moveNumber;
 	}
-	
 
 	shadeit(time, gobanShader);
 
@@ -227,7 +234,6 @@ void GobanView::Render(int w, int h)
 
     glUseProgram(0);
 	//glDisable(GL_DEPTH_TEST);
-	
 
 	if (time - startTime >= gobanShader.animT) {
 		if (showOverlay) {

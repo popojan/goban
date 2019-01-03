@@ -10,7 +10,7 @@ const float Board::mWhite = 6.0;
 const float Board::mDeltaCaptured = 0.5;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
-    dist(0.0f, 0.05f), invalidated(false), order(0)
+    dist(0.0f, 0.05f), invalidated(false), order(0), moveNumber(0)
 {
     console = spdlog::get("console");
     clear(size);
@@ -113,12 +113,12 @@ std::istream& operator>> (std::istream& stream, Move& move) {
 
 }
 
-bool Board::fixStone(int i, int j, int i0, int j0) {
+double Board::fixStone(int i, int j, int i0, int j0) {
     console->debug("fixStone ({},{})/({},{})", i, j, i0, j0);
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
     float mValue = stones[idx0];
-    float halfN = 0.5f * boardSize - 0.5f;
+    double ret = 0.0;
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
         console->debug("1st IF");
         float x0 = stones[idx0 - 2];
@@ -135,6 +135,7 @@ bool Board::fixStone(int i, int j, int i0, int j0) {
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
             stones[idx - 2] = p.x;
             stones[idx - 1] = p.y;
+            ret = glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/0.71;
         }
         /*float dd = 2.0f;
         if (i == i0) dd = std::abs(x0 - x);
@@ -157,17 +158,18 @@ bool Board::fixStone(int i, int j, int i0, int j0) {
 			overlay[oidx].y = stones[idx0 - 1];
             return false;
         }*/
-        return false;
+        return ret;
     }
-    return true;
+    return ret;
 }
 
-void Board::placeFuzzy(const Position& p){
+double Board::placeFuzzy(const Position& p){
     int j = p.col();
     int i = p.row();
     const float halfN = 0.5f * boardSize - 0.5f;
     float x = p.x;
     float y = p.y;
+    double vol = 0.0, ret = 0.0;
     if(x == 0 && y == 0) {
         x = j - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
         y = i - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
@@ -183,17 +185,22 @@ void Board::placeFuzzy(const Position& p){
     stones[idx - 1] = y;
     stones[idx + 1] = 3.14f*dist(generator);
     for (int ii = i + 1u, i0 = i; ii < boardSize; i0 = ii, ++ii) {
-        if (fixStone(i0, j, ii, j)) break;
+        ret = std::max(vol, ret);
+        if ((vol = fixStone(i0, j, ii, j)) == 0.0) break;
     }
     for (int ii = i - 1u, i0 = i; ii >= 0; i0 = ii, --ii) {
-        if (fixStone(i0, j, ii, j)) break;
+        ret = std::max(vol, ret);
+        if ((vol = fixStone(i0, j, ii, j)) == 0.0) break;
     }
     for (int jj = j + 1u, j0 = j; jj < boardSize; j0 = jj, ++jj) {
-        if (fixStone(i, j0, i, jj)) break;
+        ret = std::max(vol, ret);
+        if ((vol = fixStone(i, j0, i, jj)) == 0.0) break;
     }
     for (int jj = j - 1u, j0 = j; jj >= 0; j0 = jj, --jj) {
-        if (fixStone(i, j0, i, jj)) break;
+        ret = std::max(vol, ret);
+        if ((vol = fixStone(i, j0, i, jj)) == 0.0) break;
     }
+    return ret;
 }
 
 int Board::updateStones(const Board& board, const Board& territory, bool showTerritory) {
@@ -309,6 +316,7 @@ void Board::copyStateFrom(const Board& b) {
     boardSize = b.boardSize;
     capturedBlack = b.capturedBlack;
     capturedWhite = b.capturedWhite;
+    moveNumber = b.moveNumber;
 }
 
 bool Board::parseGtp(const std::vector<std::string>& lines) {
@@ -361,6 +369,7 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                 capturedWhite = wcaptured;
                 console->debug("Captured: {}, {}", capturedBlack, capturedWhite);
                 console->debug(lines[2 + size]);
+                moveNumber += 1;
             }
         }
     }
@@ -438,15 +447,15 @@ bool Board::toggleTerritory() {
 	return showTerritory;
 }
 
-bool Board::placeCursor(const Position& coord, const Color& col) {
+double Board::placeCursor(const Position& coord, const Color& col) {
     //float halfN = 0.5f * boardSize - 0.5f;
     int oidx = ((boardSize  * coord.row() + coord.col()) << 2u) + 2u;
     console->debug("oidx = [{},{}] = {} ... {} {}", coord.col(), coord.row(), oidx, board[coord].toString(), col.toString());
-    placeFuzzy(coord);
+    double altered = placeFuzzy(coord);
     //stones[oidx - 2] = coord.col() - halfN;
     //stones[oidx - 1] = coord.row() - halfN;
     stones[oidx + 0] = (col == Color::WHITE) ? mWhite : mBlack;
     //stones[oidx + 1] = 0;
     console->debug("overlay coord = [{},{}] = {}", stones[oidx - 2], stones[oidx - 1], stones[oidx + 0]);
-    return true;
+    return altered;
 }
