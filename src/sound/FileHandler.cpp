@@ -23,7 +23,7 @@ bool FileHandler::containsSound(string filename)
 AudioFile & FileHandler::getSound(string filename)
 {
         if (!containsSound(filename)) {
-                string fullFilename = util::getApplicationPath() + "/" + filename;
+                string fullFilename = filename;
                 SF_INFO info;
                 info.format = 0;
                 SNDFILE * audioFile = sf_open(fullFilename.c_str(), SFM_READ, &info);

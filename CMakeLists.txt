@@ -22,19 +22,19 @@ set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 ExternalProject_Add(project_libsndfile
     GIT_REPOSITORY     https://github.com/erikd/libsndfile.git
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
-    BINARY_DIR  deps/libsndfile/build 
+    BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile/build 
     STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 
 ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
-SET(libsndfile_lib_dir "${BINARY_DIR}/src/.libs")
+SET(libsndfile_lib_dir "${BINARY_DIR}/Release")
 SET(libsndfile_inc_dir "${BINARY_DIR}/src")
 
 ADD_LIBRARY(libsndfile STATIC IMPORTED)
 
-SET_PROPERTY(TARGET libsndfile PROPERTY
-             IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
+SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/sndfile.lib)
+#SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
 
 
 SET(LIBSNDFILE_INCLUDE_PATH "${install_dir}/src/project_libsndfile-build/src/")
@@ -49,12 +49,12 @@ ExternalProject_Add(project_portaudio
 
 ExternalProject_Get_Property(project_portaudio BINARY_DIR)
 ExternalProject_Get_Property(project_portaudio SOURCE_DIR)
-SET(portaudio_lib_dir "${BINARY_DIR}/lib/.libs")
+SET(portaudio_lib_dir "${BINARY_DIR}/Release")
 SET(portaudio_inc_dir "${SOURCE_DIR}/include")
 
 
 ADD_LIBRARY(portaudio STATIC IMPORTED)
-SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
+SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/portaudio_static_x64.lib")
 
 
 # Search in the 'cmake' directory for additional CMake modules.
