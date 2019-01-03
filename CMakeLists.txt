@@ -9,11 +9,63 @@ cmake_minimum_required(VERSION 3.0)
 # paths
 include(GNUInstallDirs)
 
+INCLUDE(ExternalProject)
+
 set(GOBAN_VERSION_MAJOR 0)
 set(GOBAN_VERSION_MINOR 1)
 set(GOBAN_VERSION_PATCH 0)
 set(GOBAN_VERSION_TWEAK 0)
 set(PROJECT_VERSION ${GOBAN_VERSION_MAJOR}.${GOBAN_VERSION_MINOR}.${GOBAN_VERSION_PATCH}.${GOBAN_VERSION_TWEAK})
+
+ExternalProject_Add(project_libsndfile
+    GIT_REPOSITORY      https://github.com/erikd/libsndfile.git
+    UPDATE_COMMAND ""
+    PREFIX              ${PROJECT_SOURCE_DIR}/deps/libsndfile
+    CONFIGURE_COMMAND   <SOURCE_DIR>/configure
+    BUILD_COMMAND       make
+    BUILD_IN_SOURCE     1
+    INSTALL_COMMAND     echo Skipping install step for libsndfile
+)
+
+ExternalProject_Add_Step(project_libsndfile autogen
+   COMMAND              <SOURCE_DIR>/autogen.sh
+   DEPENDEES            update
+   DEPENDERS            configure
+)
+
+
+ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
+SET(libsndfile_lib_dir "${BINARY_DIR}/src/.libs")
+SET(libsndfile_inc_dir "${BINARY_DIR}/src")
+
+ADD_LIBRARY(libsndfile STATIC IMPORTED)
+
+SET_PROPERTY(TARGET libsndfile PROPERTY
+             IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
+
+
+SET(LIBSNDFILE_INCLUDE_PATH "${install_dir}/src/project_libsndfile-build/src/")
+
+ExternalProject_Add(project_portaudio
+    SVN_REPOSITORY      https://subversion.assembla.com/svn/portaudio/portaudio/trunk
+    UPDATE_COMMAND ""
+    SVN_TRUST_CERT      1
+    PREFIX              ${PROJECT_SOURCE_DIR}/deps/portaudio
+    CONFIGURE_COMMAND   <SOURCE_DIR>/configure
+    BUILD_IN_SOURCE     1
+    BUILD_COMMAND       make
+    INSTALL_COMMAND     echo Skipping install step for portaudio
+)
+
+ExternalProject_Get_Property(project_portaudio BINARY_DIR)
+ExternalProject_Get_Property(project_portaudio SOURCE_DIR)
+SET(portaudio_lib_dir "${BINARY_DIR}/lib/.libs")
+SET(portaudio_inc_dir "${SOURCE_DIR}/include")
+
+
+ADD_LIBRARY(portaudio STATIC IMPORTED)
+SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
+
 
 # Search in the 'cmake' directory for additional CMake modules.
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
@@ -78,6 +130,8 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/deps/boost
     ${PROJECT_SOURCE_DIR}/deps/spdlog/include
     ${PROJECT_SOURCE_DIR}/deps/clipp/include
+    ${PROJECT_SOURCE_DIR}/deps/clipp/include
+    ${PROJECT_SOURCE_DIR}/src/sound/
     ${OPENGL_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}
     ${CURSES_INCLUDE_DIR}
@@ -168,7 +222,13 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/GobanShader.cpp
     ${PROJECT_SOURCE_DIR}/src/Metrics.cpp
     ${PROJECT_SOURCE_DIR}/src/GameState.cpp
-    ${PROJECT_SOURCE_DIR}/src/GobanOverlay.cpp)
+    ${PROJECT_SOURCE_DIR}/src/GobanOverlay.cpp
+    ${PROJECT_SOURCE_DIR}/src/sound/AudioPlayer.cpp
+    ${PROJECT_SOURCE_DIR}/src/sound/FileHandler.cpp
+    ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
+    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp)
+
+
 
 if (WIN32)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
@@ -177,6 +237,7 @@ if (WIN32)
   set_property(TARGET goban PROPERTY CXX_STANDARD_REQUIRED ON)
 else()
   add_executable(goban ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES})
+  SET(EXTRA_LIBS rt asound jack pthread)
 endif()
 
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
@@ -195,7 +256,11 @@ target_link_libraries(goban
     ${LIBGLYPHY_LIBRARIES}
     ${FREETYPE_LIBRARIES}
     ${LIBROCKET_LIBRARIES}
+    ${EXTRA_LIBS}
+    libsndfile portaudio
 )
+
+
 set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/Release)
 
 file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
