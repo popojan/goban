@@ -9,8 +9,6 @@ cmake_minimum_required(VERSION 3.0)
 # paths
 include(GNUInstallDirs)
 
-INCLUDE(ExternalProject)
-
 set(GOBAN_VERSION_MAJOR 0)
 set(GOBAN_VERSION_MINOR 1)
 set(GOBAN_VERSION_PATCH 0)
@@ -19,21 +17,22 @@ set(PROJECT_VERSION ${GOBAN_VERSION_MAJOR}.${GOBAN_VERSION_MINOR}.${GOBAN_VERSIO
 
 set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 
+INCLUDE(ExternalProject)
+
 ExternalProject_Add(project_libsndfile
     GIT_REPOSITORY     https://github.com/erikd/libsndfile.git
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
-    BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile/build 
+    BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile/build
     STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 
 ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
-SET(libsndfile_lib_dir "${BINARY_DIR}/Release")
+SET(libsndfile_lib_dir "${BINARY_DIR}")
 SET(libsndfile_inc_dir "${BINARY_DIR}/src")
 
 ADD_LIBRARY(libsndfile STATIC IMPORTED)
 
-SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/sndfile.lib)
 #SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
 
 
@@ -49,14 +48,18 @@ ExternalProject_Add(project_portaudio
 
 ExternalProject_Get_Property(project_portaudio BINARY_DIR)
 ExternalProject_Get_Property(project_portaudio SOURCE_DIR)
-SET(portaudio_lib_dir "${BINARY_DIR}/Release")
+SET(portaudio_lib_dir "${BINARY_DIR}")
 SET(portaudio_inc_dir "${SOURCE_DIR}/include")
 
 
 ADD_LIBRARY(portaudio STATIC IMPORTED)
-SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/portaudio_static_x64.lib")
-
-
+if(WIN32)
+    SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/Release/sndfile.lib)
+    SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
+else()
+    SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
+    SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
+endif()
 # Search in the 'cmake' directory for additional CMake modules.
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 

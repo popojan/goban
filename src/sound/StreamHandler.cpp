@@ -12,6 +12,7 @@ int StreamHandler::PortAudioCallback(const void * input,
 
         unsigned long stereoFrameCount = frameCount * handler->CHANNEL_COUNT;
         memset((int *) output, 0, stereoFrameCount * sizeof(int));
+        int outputBuffer[8192];
 
         if (handler->data.size() > 0)
         {
@@ -21,7 +22,6 @@ int StreamHandler::PortAudioCallback(const void * input,
                         Playback * data = (*it);
                         AudioFile * audioFile = data->audioFile;
 
-                        int * outputBuffer = new int[stereoFrameCount];
                         int * bufferCursor = outputBuffer;
 
                         unsigned int framesLeft = (unsigned int) frameCount;
