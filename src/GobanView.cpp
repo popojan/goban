@@ -201,15 +201,9 @@ void GobanView::Render(int w, int h)
 	}
 
 	if (updateFlag & UPDATE_STONES) {
-        if(board.moveNumber != model.board.moveNumber) {
-            player.play("data/sound/stone.wav", 1.0);
-        };
 	    board.updateStones(model.board, model.territory, model.board.showTerritory);
-		if(model.isPointOnBoard(cursor) && model.board[cursor] == Color::EMPTY && board[cursor] == Color::EMPTY){
-		    double vol = board.placeCursor(cursor, model.state.colorToMove);
-            if(vol > 0.5 && player.playbackCount() < 5)
-                player.play("data/sound/collision.wav", vol);
-        }
+        if(model.placeCursor(board, cursor))
+            updateFlag |= UPDATE_OVERLAY;
 		board.positionNumber = model.board.positionNumber;
 		board.moveNumber = model.board.moveNumber;
 	}

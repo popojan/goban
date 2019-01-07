@@ -9,6 +9,7 @@
 #include "Board.h"
 #include "GameState.h"
 #include <spdlog/spdlog.h>
+#include "AudioPlayer.hpp"
 
 class ElementGame;
 
@@ -55,6 +56,8 @@ public:
 
     operator bool() { return !over && started; }
 
+    bool placeCursor(Board& board, const Position& p);
+
     //int boardChanged(Board&);
 public:
     ElementGame& parent;
@@ -77,6 +80,8 @@ public:
     int lastHandicap;
 	std::mutex mutex;
     std::shared_ptr<spdlog::logger> console;
+
+    AudioPlayer player;
 };
 
 

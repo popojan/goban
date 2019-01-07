@@ -13,7 +13,6 @@
 #include "GobanOverlay.h"
 #include "GameState.h"
 #include "Shell.h"
-#include "AudioPlayer.hpp"
 
 #ifndef GOBAN_GOBANVIEW_H
 #define GOBAN_GOBANVIEW_H
@@ -136,7 +135,6 @@ public:
     int currentProgram;
 	bool showOverlay;
     Position cursor, lastCursor;
-    AudioPlayer player;
     long lastMoveNumber;
 };
 

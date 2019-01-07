@@ -251,6 +251,9 @@ void GobanModel::update(const Move& move, const Board& result) {
     else {
         prevPass = false;
         state.msg = GameState::NONE;
+        if(move != Move::PASS) {
+            player.play("data/sound/stone.wav", 1.0);
+        }
     }
     changeTurn();
 }
@@ -260,4 +263,14 @@ void GobanModel::update(const Board& territory) {
     std::lock_guard<std::mutex> lock(mutex);
     this->territory.copyStateFrom(territory);
     board.positionNumber += 1;
+}
+
+bool GobanModel::placeCursor(Board& viewBoard, const Position& cursor){
+    if(isPointOnBoard(cursor) && board[cursor] == Color::EMPTY && viewBoard[cursor] == Color::EMPTY){
+        double vol = viewBoard.placeCursor(cursor, state.colorToMove);
+        if(vol > 0.5 && player.playbackCount() < 5)
+            player.play("data/sound/collision.wav", vol);
+        return vol > 0.0;
+    }
+    return false;
 }
