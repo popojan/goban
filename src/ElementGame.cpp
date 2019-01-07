@@ -99,7 +99,7 @@ void ElementGame::OnUpdate()
 {
     if(!view.gobanShader.isReady())
         return;
-    model.Update();
+    //model.update();
     view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSize);
     //view.board.updateStones(model.board, model.territory, view.showTerritory);
     //nstate = state;
@@ -189,11 +189,11 @@ void ElementGame::OnUpdate()
 			break;
 		case GameState::BLACK_RESIGNED:
 			msg->SetInnerRML("White wins by resignation.");
-			engine.showTerritory = model.board.toggleTerritoryAuto(true);
+			//engine.showTerritory = model.board.toggleTerritoryAuto(true);
 			break;
 		case GameState::WHITE_RESIGNED:
 			msg->SetInnerRML("Black wins by resignation.");
-			engine.showTerritory = model.board.toggleTerritoryAuto(true);
+			//engine.showTerritory = model.board.toggleTerritoryAuto(true);
 			break;
 		case GameState::BLACK_PASS:
 			msg->SetInnerRML("Black passes");
@@ -204,24 +204,24 @@ void ElementGame::OnUpdate()
 		case GameState::BLACK_WON:
 		case GameState::WHITE_WON:
 		{
-										Rocket::Core::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
-										Rocket::Core::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
-										elWhiteCnt->SetInnerRML(
-											Rocket::Core::String(128, "White: %d + %d + %d", model.state.adata.black_captured,
-											model.state.adata.black_prisoners,
-											model.state.adata.white_territory).CString());
-										elBlackCnt->SetInnerRML(
-											Rocket::Core::String(128, "Black: %d + %d + %d", model.state.adata.white_captured,
-											model.state.adata.white_prisoners,
-											model.state.adata.black_territory).CString());
-										if (view.state.msg == GameState::WHITE_WON)
-											msg->SetInnerRML(
-											Rocket::Core::String(128, "White wins by %.1f", model.state.adata.delta).CString());
-										else
-											msg->SetInnerRML(
-											Rocket::Core::String(128, "Black wins by %.1f", -model.state.adata.delta).CString());
+            Rocket::Core::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
+            Rocket::Core::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
+            elWhiteCnt->SetInnerRML(
+            Rocket::Core::String(128, "White: %d + %d + %d", model.state.adata.black_captured,
+            model.state.adata.black_prisoners,
+            model.state.adata.white_territory).CString());
+            elBlackCnt->SetInnerRML(
+            Rocket::Core::String(128, "Black: %d + %d + %d", model.state.adata.white_captured,
+            model.state.adata.white_prisoners,
+            model.state.adata.black_territory).CString());
+            if (view.state.msg == GameState::WHITE_WON)
+                msg->SetInnerRML(
+                    Rocket::Core::String(128, "White wins by %.1f", model.state.adata.delta).CString());
+            else
+                msg->SetInnerRML(
+                    Rocket::Core::String(128, "Black wins by %.1f", -model.state.adata.delta).CString());
 		}
-			engine.showTerritory = model.board.toggleTerritoryAuto(true);
+			//engine.showTerritory = model.board.toggleTerritoryAuto(true);
 			break;
 		default:
 			msg->SetInnerRML("");

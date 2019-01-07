@@ -47,7 +47,7 @@ const bool OPTIMIZE = false;
 
 GLuint shaderCompileFromString(GLenum type, const std::string& source);
 
-void shaderAttachFromString(GLuint program, GLenum type, const std::string& source);
+bool shaderAttachFromString(GLuint program, GLenum type, const std::string& source);
 
 GLuint make_buffer(GLenum target, const void *, GLsizei);
 
