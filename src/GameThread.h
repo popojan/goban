@@ -1,13 +1,13 @@
 #ifndef GAMETHREAD_H
 #define GAMETHREAD_H
 
-#include "player.h"
-#include "GobanModel.h"
-#include "Board.h"
-
 #include <thread>
 #include <mutex>
 #include <string>
+
+#include "player.h"
+#include "GobanModel.h"
+#include "Board.h"
 
 class GameThread
 {
@@ -78,7 +78,7 @@ private:
 	std::size_t numPlayers;
 	std::array<std::size_t, 2> activePlayer;
     std::mutex playerMutex;
-//public:
+ //public:
 //	bool showTerritory;
 };
 

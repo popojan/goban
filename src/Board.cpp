@@ -135,6 +135,9 @@ double Board::fixStone(int i, int j, int i0, int j0) {
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
             stones[idx - 2] = p.x;
             stones[idx - 1] = p.y;
+            int oidx = boardSize  * i0 + j0;
+            overlay[oidx].x = p.x;
+            overlay[oidx].y = p.y;
             ret = glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/0.71;
         }
         /*float dd = 2.0f;
