@@ -28,8 +28,6 @@ public:
 
     std::string& getName(size_t id, Color whose) { return players[id]->getName(whose); }
 
-    void changeTurn();
-
     void interrupt();
 
     void clearGame(int boardSize);
@@ -71,8 +69,7 @@ private:
     std::vector<Engine*> engines; //engines know the rules
     std::vector<Player*> players; //all players including engines, humans, spectators
     std::thread* thread;
-    Color colorToMove;
-    std::mutex mutex;
+    std::mutex mutex2;
     std::condition_variable cvPlayer;
     volatile bool interruptRequested, hasThreadRunning;
     Player* playerToMove;
