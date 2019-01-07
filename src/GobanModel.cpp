@@ -13,6 +13,7 @@ void GobanModel::newGame(int boardSize, int handicap, float komi) {
 	}
 	lastHandicap = this->handicap = handicap;
 	board.clear(boardSize);
+
 	territory.clear(boardSize);
 	over = false;
 	started = false;
@@ -21,16 +22,17 @@ void GobanModel::newGame(int boardSize, int handicap, float komi) {
 	state.komi = this->komi; //TODO jedno komi
 	state.handicap = this->handicap; //TODO jeden handicap
 	state.activePlayerId = activePlayerId;
+
 	//state.reason = GameState::NOREASON;
 	//state.adata = GameState::Result();
-	//state.metricsReady = false;
 	calcCapturedBlack = calcCapturedWhite = 0;
+
 	/*auto problems(sgf::parse("./problems/alphago/master04_Xie_Erhao.sgf"));
 	auto variations = problems.at(0).variations();
 	if (variations[0].nodehas("C")) {
 		std::cerr << "SGF " << node.get("C")[0] << std::endl;
 	}
-	
+
 	for (int i = 0; i < search()nodes.size(); ++i) {
 		if (nodes[i].has("B")) {
 			std::cerr << "SGF " << nodes[i].get("B")[0] << std::endl;
@@ -39,10 +41,14 @@ void GobanModel::newGame(int boardSize, int handicap, float komi) {
 			std::cerr << "SGF " << nodes[i].get("W")[0] << std::endl;
 		}
 	}*/
-		
+    if(!state.metricsReady) {
+        metrics.calc(board.getSize());
+        state.metricsReady = true;
+    }
+
 }
 
-float GobanModel::result(GameState::Result& ret, const Move& lastMove) {
+float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
     if (state.reason == GameState::DOUBLE_PASS) {
         ret.black_territory = ret.white_territory = 0;
         ret.black_prisoners = ret.white_prisoners = 0;
@@ -213,16 +219,39 @@ Move GobanModel::getUndoMove() {
     return Move(Move::UNDO, state.colorToMove);
 }
 
-void GobanModel::Update() {
-    if(!state.metricsReady) {
-        metrics.calc(board.getSize());
-        state.metricsReady = true;
-    }
+void GobanModel::update(const Move& move, const Board& result) {
+
+    board.copyStateFrom(result);
+    board.positionNumber += 1;
+    board.order += 1;
+
     state.capturedBlack = board.capturedCount(Color::BLACK);
     state.capturedWhite = board.capturedCount(Color::WHITE);
     calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
+
+    history.push_back(move);
+
+    if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
+        state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
+        over = true;
+        console->debug("Main Over! Reason {}", state.reason);
+    }
+    else if (move == Move::PASS) {
+        prevPass = true;
+        state.msg = state.colorToMove == Color::BLACK
+            ? GameState::BLACK_PASS
+            : GameState::WHITE_PASS;
+    }
+    else {
+        prevPass = false;
+        state.msg = GameState::NONE;
+    }
 }
 
+void GobanModel::update(const Board& territory) {
+    this->territory.copyStateFrom(territory);
+    board.positionNumber += 1;
+}
 /*
 
 int GobanModel::boardChanged(Board& previous) {

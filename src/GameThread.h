@@ -34,8 +34,6 @@ public:
 
     void clearGame(int boardSize);
 
-    bool getResult(GameState::Result& ret);
-
     void setKomi(float komi);
 
     bool setFixedHandicap(int handicap);
@@ -51,8 +49,6 @@ public:
     Color getCurrentColor();
 
     int boardChanged(Board&);
-
-    Move getLastMove();
 
     void toggleTerritory(int jak = -1);
 
@@ -71,23 +67,22 @@ public:
 
 private:
 	std::shared_ptr<spdlog::logger> console;
-    GobanModel& game;
+    GobanModel& model;
     std::vector<Engine*> engines; //engines know the rules
     std::vector<Player*> players; //all players including engines, humans, spectators
     std::thread* thread;
     Color colorToMove;
     std::mutex mutex;
-    std::mutex playerMutex;
     std::condition_variable cvPlayer;
     volatile bool interruptRequested, hasThreadRunning;
-    Move lastMove;
     Player* playerToMove;
 	std::size_t human;
 	std::size_t sgf;
 	std::size_t numPlayers;
 	std::array<std::size_t, 2> activePlayer;
-public:
-	bool showTerritory;
+    std::mutex playerMutex;
+//public:
+//	bool showTerritory;
 };
 
 #endif // GAMETHREAD_H

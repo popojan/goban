@@ -8,14 +8,15 @@
 #include "Metrics.h"
 #include "Board.h"
 #include "GameState.h"
-
+#include <spdlog/spdlog.h>
 
 class ElementGame;
 
 class GobanModel {
 public:
     GobanModel(ElementGame& p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
-            : parent(p), over(false), invalidated(false) {
+            : parent(p), prevPass(false), over(false), invalidated(false) {
+        console = spdlog::get("console");
         newGame(boardSize, handicap, komi);
     }
 
@@ -31,9 +32,6 @@ public:
     void toggleAnimation();
 
 
-    float result(GameState::Result& ret, const Move& lastMove);
-
-
     bool isGameOver() { return state.adata.reason != GameState::NOREASON;}
 
     unsigned getBoardSize() const;
@@ -43,7 +41,9 @@ public:
 
     //bool playMove(const Move& move);
 
-    void Update();
+    void update(const Move& move, const Board& result);
+    void update(const Board& territory);
+    float result(const Move& lastMove, GameState::Result& ret);
 
     void calcCaptured(Metrics& m, int capturedBlack, int capturedWhite);
 
@@ -56,6 +56,7 @@ public:
 
     float komi;
     int handicap;
+    bool prevPass;
     volatile bool over;
     volatile bool started;
     GameState state;
@@ -69,6 +70,7 @@ public:
     Metrics metrics;
     int lastHandicap;
 	std::mutex mutex;
+    std::shared_ptr<spdlog::logger> console;
 };
 
 

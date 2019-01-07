@@ -48,13 +48,15 @@ GLuint shaderCompileFromString(GLenum type, const std::string& source) {
     return shader;
 }
 
-void shaderAttachFromString(GLuint program, GLenum type, const std::string& source)
+bool shaderAttachFromString(GLuint program, GLenum type, const std::string& source)
 {
     GLuint shader = shaderCompileFromString(type, source);
     if (shader != 0) {
         glAttachShader(program, shader);
         glDeleteShader(shader);
+        return true;
     }
+    return false;
 }
 #ifdef OPTIMIZE_SHADERS
 
@@ -137,11 +139,16 @@ void GobanShader::initProgram(int which) {
     const std::string sFragmentShader = createShader(FRAGMENT_FILE, OPTIMIZE, ctx, glslopt_shader_type::kGlslOptShaderFragment);
     glslopt_cleanup(ctx);
 #else
-    const std::string sVertexShader = createShader(vprogram[std::max(0, which % 4)], OPTIMIZE);
-    const std::string sFragmentShader = createShader(program[std::max(0, which % 4)], OPTIMIZE);
+    const std::string fnVertexShader(vprogram[std::max(0, which % 4)]);
+    const std::string fnFragmentShader(program[std::max(0, which % 4)]);
+    const std::string sVertexShader = createShader(fnVertexShader, OPTIMIZE);
+    const std::string sFragmentShader = createShader(fnFragmentShader, OPTIMIZE);
 #endif
-    shaderAttachFromString(gobanProgram, GL_VERTEX_SHADER, sVertexShader);
-    shaderAttachFromString(gobanProgram, GL_FRAGMENT_SHADER, sFragmentShader);
+    if(!shaderAttachFromString(gobanProgram, GL_VERTEX_SHADER, sVertexShader))
+        console->error("Vertex shader [{}] failed to compile. Err {}", fnVertexShader, glGetError());
+    if(!shaderAttachFromString(gobanProgram, GL_FRAGMENT_SHADER, sFragmentShader))
+        console->error("Fragment Shader [{}] failed to compile. Err {}", fnFragmentShader, glGetError());
+
     glLinkProgram(gobanProgram);
 
     GLint result;
@@ -216,7 +223,6 @@ void GobanShader::initProgram(int which) {
     glUniform1f(iAnimT, animT);
     glUseProgram(0);
     shaderChanged = true;
-
 }
 
 void GobanShader::setGamma(float gamma) {
@@ -327,7 +333,7 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
 	else if(updateFlag & GobanView::UPDATE_SHADER) {
         setMetrics(model.metrics);
     }
-    
+
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
     if (view.animationRunning) {

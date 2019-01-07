@@ -1,10 +1,10 @@
 #include "GameThread.h"
 #include <fstream>
- 
+
 GameThread::GameThread(GobanModel &m) :
-        game(m), thread(0), colorToMove(Color::BLACK), interruptRequested(false), hasThreadRunning(false),
-        playerToMove(0), human(0), numPlayers(0), activePlayer({0, 0}),
-        showTerritory(false) {
+        model(m), thread(0), colorToMove(Color::BLACK), interruptRequested(false), hasThreadRunning(false),
+        playerToMove(0), human(0), numPlayers(0), activePlayer({0, 0})
+        /*, showTerritory(false)*/ {
     console = spdlog::get("console");
     std::string list("./config/engines.enabled");
     loadEngines(list);
@@ -45,7 +45,6 @@ Engine* GameThread::currentCoach() {
 }
 Player* GameThread::currentPlayer() {
     int roleToMove = colorToMove == Color::BLACK ? Player::BLACK : Player::WHITE;
-    std::unique_lock<std::mutex> lock(mutex);
     for(auto pit = players.begin(); pit != players.end(); ++pit) {
         if((*pit)->hasRole(roleToMove)) return *pit;
     }
@@ -70,7 +69,7 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
     }
 }
 void GameThread::changeTurn() {
-    game.state.colorToMove = colorToMove = Color::other(colorToMove);
+    model.state.colorToMove = colorToMove = Color::other(colorToMove);
     console->debug("changeTurn = {}", colorToMove.toString());
 }
 void GameThread::interrupt() {
@@ -84,22 +83,21 @@ void GameThread::interrupt() {
 }
 
 void GameThread::clearGame(int boardSize) {
-    game.newGame(boardSize);
+    model.newGame(boardSize);
     for (auto pit = players.begin(); pit != players.end(); ++pit) {
         Player* player = *pit;
         player->boardsize(boardSize);
     }
     players[sgf]->clear();
-    setKomi(game.komi);
-    setFixedHandicap(game.handicap);
+    setKomi(model.komi);
+    setFixedHandicap(model.handicap);
     colorToMove = Color::BLACK;
-    lastMove = Move(Move::INVALID, Color::EMPTY);
 }
 
 void GameThread::setKomi(float komi) {
-    if (!game.started) {
+    if (!model.started) {
         console->debug("setting komi {}", komi);
-        game.komi = komi;
+        model.komi = komi;
         for (auto pit = players.begin(); pit != players.end(); ++pit) {
             Player* player = *pit;
             player->komi(komi);
@@ -119,7 +117,7 @@ int GameThread::activatePlayer(int which) {
     activePlayer[which] = newp;
     int role = which == 0 ? Player::BLACK : Player::WHITE;
     if(newp == sgf) {
-        clearGame(game.getBoardSize());
+        clearGame(model.getBoardSize());
     } else if (oldp == sgf) {
         players[oldp]->clear();
     }
@@ -143,19 +141,19 @@ int GameThread::activatePlayer(int which) {
     }
     if(!((players[newp]->getRole() & (Player::COACH)) || players[newp]->isTypeOf(Player::HUMAN))) {
         console->debug("Replaying history");
-        for(auto it = game.history.begin(); it != game.history.end(); ++it) {
-           players[newp]->play(*it); 
+        for(auto it = model.history.begin(); it != model.history.end(); ++it) {
+           players[newp]->play(*it);
         }
         console->debug("Needs replaying history size={} for player with role={}",
-                       game.history.size(), players[newp]->getRole());
+                       model.history.size(), players[newp]->getRole());
     }
     return newp;
 }
 
 bool GameThread::setFixedHandicap(int handicap) {
     bool success = false;
-    if (!game.started) {
-        int lastSize = game.board.getSize();
+    if (!model.started) {
+        int lastSize = model.board.getSize();
         success = true;
 		Engine* coach = currentCoach();
 		if (handicap >= 2) {
@@ -183,158 +181,98 @@ bool GameThread::setFixedHandicap(int handicap) {
         else {
             success = true;
         }
-        game.handicap = handicap;
-		game.board.copyStateFrom(coach->showboard());
+        model.handicap = handicap;
+		model.board.copyStateFrom(coach->showboard());
 	}
 	return success;
 }
 void GameThread::run() {
-    game.start();
+    model.start();
     thread = new std::thread(&GameThread::gameLoop, this);
     while(!hasThreadRunning && !playerToMove);
 }
 
 bool GameThread::isRunning() { return hasThreadRunning;}
 
-bool GameThread::getResult(GameState::Result& ret) {
-    if (game.over && !hasThreadRunning) {
-        game.result(ret, lastMove);
-        if(thread) {
-            thread->join();
-            delete thread;
-            thread = 0;
-        }
-        return true;
-    }
-    return false;
-}
-
-void GameThread::toggleTerritory(int jak){
-    showTerritory = jak < 0 ? !showTerritory : (jak > 0);
+//void GameThread::toggleTerritory(int jak){
+    //showTerritory = jak < 0 ? !showTerritory : (jak > 0);
     //showTerritoryAuto = false;
-    if (showTerritory && playerToMove != 0 && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
-        playerToMove->suggestMove(Move(Move::INTERRUPT, colorToMove));
-    }
-}
+//    if (showTerritory && playerToMove != 0 && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+//        playerToMove->suggestMove(Move(Move::INTERRUPT, colorToMove));
+//    }
+//}
 
 void GameThread::gameLoop() {
+    hasThreadRunning = true;
     interruptRequested = false;
     bool prevPass = false;
-    std::unique_lock<std::mutex> lock(playerMutex, std::defer_lock);
-    while (game && !interruptRequested) {
-        Move move;
+    while (model && !interruptRequested) {
         Engine* coach = currentCoach();
         Player* player = currentPlayer();
-        hasThreadRunning = true;
-        if(coach && player) {
-            bool locked = false;
-            {
-                bool success = false;
-                bool doubleUndo = false;
-                if (!interruptRequested && player == currentPlayer()) {
-                    playerToMove = player;
-                    if(!player->isTypeOf(Player::HUMAN)){
-                        lock.lock();
-                        locked = true;
-                    }
-                    player->suggestMove(Move(Move::INVALID, colorToMove));
-                    move = player->genmove(colorToMove);
-                    playerToMove = 0;
-                    console->debug("MOVE to {}, valid = {}", move.toString(), move);
-                    if(player->isTypeOf(Player::HUMAN)){
-                        lock.lock();
-                        locked = true;
-                    }
-                    if(interruptRequested == false) {
-                        if (move == Move::UNDO) {
-                            success = coach->undo();
-                            changeTurn();
-                            if (currentPlayer()->isTypeOf(Player::ENGINE)) {
-                                success = coach->undo();
-                                doubleUndo = true;
-                            }
-                            changeTurn();
-                        } else {
-                            success = move && (move == Move::RESIGN || player == coach || coach->play(move));
-                            game.history.push_back(move);
-                        }
-                        if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
-                            game.state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
-                            game.over = true;
-                        } else if (move == Move::PASS) {
-                            prevPass = true;
-                            bool blackPass = colorToMove == Color::BLACK;
-                            game.state.msg = blackPass ? GameState::BLACK_PASS : GameState::WHITE_PASS;
-                        } else {
-                            prevPass = false;
-                            game.state.msg = GameState::NONE;
-                        }
-                    }
+        if(coach && player && !interruptRequested) {
+            bool success = false;
+            bool doubleUndo = false;
+            //std::lock_guard<std::mutex> lock(playerMutex);
+            playerToMove = player;
+            //cancel blocking wait for input if human player
+            player->suggestMove(Move(Move::INVALID, colorToMove));
+            //blocking wait for move
+            Move move = player->genmove(colorToMove);
+            console->debug("MOVE to {}, valid = {}", move.toString(), move);
+            playerToMove = 0;
+            if (move == Move::UNDO) {
+                success = coach->undo();
+                changeTurn();
+                if (currentPlayer()->isTypeOf(Player::ENGINE)) {
+                    success = coach->undo();
+                    changeTurn();
+                    doubleUndo = true;
                 }
-                if(success) {
-                    if(game.over) {
-                        console->debug("Main Over! Reason {}", game.state.reason);
-                        showTerritory = true;
-                    }
-                    else {
-                        for (auto pit = players.begin(); pit != players.end(); ++pit) {
-                            Player* p = *pit;
-                            if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
-                                    && p != reinterpret_cast<Player*>(coach) && p != player) {
-                                console->debug("DEBUG play iter");
-                                if(move == Move::UNDO) {
-                                    p->undo();
-                                    if(doubleUndo)
-                                       p->undo();
-                                }
-                                else
-                                    p->play(move);
-                            }
+            } else if (move) {
+                // coach plays
+                success = player == coach
+                    || move == Move::RESIGN
+                    || coach->play(move);
+                //other engines play
+                for (auto pit = players.begin(); pit != players.end(); ++pit) {
+                    Player* p = *pit;
+                    if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
+                            && p != reinterpret_cast<Player*>(coach) && p != player) {
+                        console->debug("DEBUG play iter");
+                        if(move == Move::UNDO) {
+                            p->undo();
+                            if(doubleUndo)
+                               p->undo();
                         }
+                        else
+                            p->play(move);
                     }
-
-                    {
-                        const Board& newBoard = coach->showboard();
-                        console->debug("LOCK board");
-                        std::unique_lock<std::mutex> lock(mutex);
-                        game.board.copyStateFrom(newBoard);
-                        game.board.positionNumber += 1;
-                        game.board.order += 1;
-                        lastMove = move;
-                        if(!doubleUndo)
-                            changeTurn();
-                    }
-                }
-                else if (!interruptRequested && move != Move::INTERRUPT) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                }
-                if (showTerritory && (success || move == Move::INTERRUPT)) {
-                    if (game.state.reason == GameState::DOUBLE_PASS) {
-                        const Board& newTerritory = coach->showterritory(true, Color::other(colorToMove));
-                        {
-                            console->debug("LOCK territory");
-                            std::unique_lock<std::mutex> lock(mutex);
-                            game.territory.copyStateFrom(newTerritory);
-                            game.board.positionNumber += 1;
-                        }
-                    }
-                    else {
-                        console->debug("LOCK territory");
-                        Board newTerritory = coach->showterritory(false, Color::other(colorToMove));
-                        std::unique_lock<std::mutex> lock(mutex);
-                        game.territory.copyStateFrom(newTerritory);
-                        game.board.positionNumber += 1;
-                    }
-                }
-                if (game.over == true) {
-                    game.result(game.state.adata, move);
-                    break;
                 }
             }
-            if(locked)
-                lock.unlock();
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            //update model
+            if(success) {
+                const Board& result = coach->showboard();
+                console->debug("LOCK board");
+                std::lock_guard<std::mutex> lock(mutex);
+                model.update(move, result);
+                changeTurn();
+            }
+            if (model.over || (model.board.showTerritory && (success || move == Move::INTERRUPT))) {
+                const Board& newTerritory = coach->showterritory(model.state.reason == GameState::DOUBLE_PASS, Color::other(colorToMove));
+                console->debug("LOCK territory");
+                std::lock_guard<std::mutex> lock(mutex);
+                model.update(newTerritory);
+            }
+            if(model.over){
+                model.result(move, model.state.adata);
+                if (model.state.reason == GameState::DOUBLE_PASS)
+                    model.board.toggleTerritoryAuto(true);
+                break;
+            }
+            if(success && move != Move::INTERRUPT)
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     hasThreadRunning = false;
 }
@@ -345,10 +283,6 @@ Color GameThread::getCurrentColor() {
 void GameThread::playLocalMove(const Move& move) {
     std::unique_lock<std::mutex> lock(playerMutex);
     if(playerToMove) playerToMove->suggestMove(move);
-}
-
-Move GameThread::getLastMove() { 
-    return lastMove;
 }
 
 void GameThread::loadEngines(const std::string& dir) {

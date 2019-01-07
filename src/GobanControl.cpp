@@ -10,7 +10,7 @@ void GobanControl::newGame(int boardSize) {
 	engine.interrupt();
     engine.reset();
 	engine.clearGame(boardSize);
-	engine.showTerritory = model.board.toggleTerritoryAuto(false);
+	model.board.toggleTerritoryAuto(false);
 	model.newGame(boardSize);
     view.board.clear(boardSize);
     //view.resetView();
@@ -28,6 +28,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     view.mouseMoved(mouseX, mouseY);
 
     Position coord = view.getBoardCoordinate(x, y);
+    console->debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
             bool playNow = true;
@@ -98,7 +99,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         }
         else if (key == Rocket::Core::Input::KI_T) {
             model.board.toggleTerritory();
-			engine.toggleTerritory();
+			//engine.toggleTerritory();
 			view.requestRepaint();
         }
 		else if (key == Rocket::Core::Input::KI_N) {
