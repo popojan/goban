@@ -29,6 +29,12 @@ public:
         over = false;
     }
 
+    Color changeTurn() {
+        state.colorToMove = Color::other(state.colorToMove);
+        console->debug("changeTurn = {}", state.colorToMove.toString());
+        return state.colorToMove;
+    }
+
     void toggleAnimation();
 
 

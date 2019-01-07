@@ -221,6 +221,9 @@ Move GobanModel::getUndoMove() {
 
 void GobanModel::update(const Move& move, const Board& result) {
 
+    console->debug("LOCK board");
+    std::lock_guard<std::mutex> lock(mutex);
+
     board.copyStateFrom(result);
     board.positionNumber += 1;
     board.order += 1;
@@ -235,6 +238,9 @@ void GobanModel::update(const Move& move, const Board& result) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
         over = true;
         console->debug("Main Over! Reason {}", state.reason);
+        this->result(move, state.adata);
+        if (state.reason == GameState::DOUBLE_PASS)
+            board.toggleTerritoryAuto(true);
     }
     else if (move == Move::PASS) {
         prevPass = true;
@@ -246,27 +252,12 @@ void GobanModel::update(const Move& move, const Board& result) {
         prevPass = false;
         state.msg = GameState::NONE;
     }
+    changeTurn();
 }
 
 void GobanModel::update(const Board& territory) {
+    console->debug("LOCK territory");
+    std::lock_guard<std::mutex> lock(mutex);
     this->territory.copyStateFrom(territory);
     board.positionNumber += 1;
 }
-/*
-
-int GobanModel::boardChanged(Board& previous) {
-    //if (mutex.try_lock()) {
-        int ret = previous.updateStones(board, territory, showTerritory);
-      //  mutex.unlock();
-        ret = ret | int(invalidated);
-        invalidated = false;
-        return ret;
-    }
-    else {
-        std::cerr << "Unable to refresh the board." << std::endl;
-        int ret = int(invalidated);
-        invalidated = false;
-        return ret;
-    }
-}
- */
