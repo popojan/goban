@@ -9,40 +9,23 @@ FileHandler::FileHandler()
 
 FileHandler::~FileHandler()
 {
-        for (auto entry : sounds)
+        /*for (auto entry : sounds)
         {
                 sf_close(entry.second.data);
-        }
+        }*/
 }
 
-bool FileHandler::containsSound(string filename)
+bool FileHandler::containsSound(const std::string& filename)
 {
         return sounds.find(filename) != sounds.end();
 }
 
-AudioFile & FileHandler::getSound(string filename)
+AudioFile & FileHandler::getSound(const std::string& filename)
 {
-        if (!containsSound(filename)) {
-                string fullFilename = filename;
-                SF_INFO info;
-                info.format = 0;
-                SNDFILE * audioFile = sf_open(fullFilename.c_str(), SFM_READ, &info);
-
-                AudioFile sound {
-                        audioFile,
-                        info
-                };
-
-                if (!audioFile)
-                {
-                        stringstream error;
-                        error << "Unable to open audio file '"
-                              << filename << "' with full filename '"
-                              << fullFilename << "'";
-                        spdlog::get("console")->error(error.str());
-                        throw error.str();
-                }
-                sounds[filename] = sound;
+        if(sounds.find(filename) == sounds.end()){
+            //spdlog::get("console")->info("Preloading sound [{}]...", filename);
+            sounds[filename] = AudioFile();
+            sounds[filename].load(filename);
         }
         return sounds[filename];
 }

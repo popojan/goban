@@ -18,6 +18,8 @@ public:
     GobanModel(ElementGame& p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
             : parent(p), prevPass(false), over(false), invalidated(false) {
         console = spdlog::get("console");
+        console->info("Preloading sounds...");
+        player.preload({"data/sound/collision.wav", "data/sound/stone.wav"});
         newGame(boardSize, handicap, komi);
     }
 

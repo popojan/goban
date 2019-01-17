@@ -12,7 +12,8 @@ int StreamHandler::PortAudioCallback(const void * input,
 
         unsigned long stereoFrameCount = frameCount * handler->CHANNEL_COUNT;
         memset((int *) output, 0, stereoFrameCount * sizeof(int));
-        int outputBuffer[8192];
+        static int outputBuffer[8192];
+        memset(outputBuffer, 0, 8192*sizeof(int));
 
         if (handler->data.size() > 0)
         {
@@ -25,16 +26,16 @@ int StreamHandler::PortAudioCallback(const void * input,
                         int * bufferCursor = outputBuffer;
 
                         unsigned int framesLeft = (unsigned int) frameCount;
-                        unsigned int framesRead;
+                        int framesRead;
 
                         bool playbackEnded = false;
                         while (framesLeft > 0)
                         {
-                                sf_seek(audioFile->data, data->position, SEEK_SET);
-
-                                if (framesLeft > (audioFile->info.frames - data->position))
+                                //sf_seek(audioFile->data, data->position, SEEK_SET);
+                                int pos = data->position;
+                                if (framesLeft > (audioFile->fh.frames() - data->position))
                                 {
-                                        framesRead = (unsigned int) (audioFile->info.frames - data->position);
+                                        framesRead = (unsigned int) (audioFile->fh.frames() - data->position);
                                         if (data->loop)
                                         {
                                                 data->position = 0;
@@ -49,15 +50,14 @@ int StreamHandler::PortAudioCallback(const void * input,
                                         data->position += framesRead;
                                 }
 
-                                sf_readf_int(audioFile->data, bufferCursor, framesRead);
+                                std::copy(&audioFile->data[pos], &audioFile->data[pos + framesRead], bufferCursor);
+
                                 bufferCursor += framesRead;
 
                                 framesLeft -= framesRead;
                         }
-
-
                         int * outputCursor = (int *) output;
-                        if (audioFile->info.channels == 1) {
+                        if (audioFile->fh.channels() == 1) {
                                 for (unsigned long i = 0; i < stereoFrameCount; ++i)
                                 {
                                         *outputCursor += (data->volume * 0.5 * outputBuffer[i]);
@@ -94,15 +94,12 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
                 {
                         Pa_StartStream(stream);
                 }
-                {
-                    std::lock_guard<std::mutex> lock(mut);
-                    data.push_back(new Playback {
-                            audioFile,
-                            0,
-                            loop,
-                            volume
-                    });
-                }
+                data.push_back(new Playback {
+                        audioFile,
+                        0,
+                        loop,
+                        volume
+                });
                 break;
         case stop:
                 Pa_StopStream(stream);
