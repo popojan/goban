@@ -217,6 +217,7 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/Metrics.cpp
     ${PROJECT_SOURCE_DIR}/src/GameState.cpp
     ${PROJECT_SOURCE_DIR}/src/GobanOverlay.cpp
+    ${PROJECT_SOURCE_DIR}/src/sound/AudioFile.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/AudioPlayer.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/FileHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
