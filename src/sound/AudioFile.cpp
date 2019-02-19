@@ -1,5 +1,3 @@
-#pragma once
-
 #include <sndfile.hh>
 #include "AudioFile.hpp"
 #include <spdlog/spdlog.h>

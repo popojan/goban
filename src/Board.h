@@ -183,6 +183,9 @@ public:
 
 	double placeCursor(const Position& p, const Color& col);
     double placeFuzzy(const Position& p);
+
+    bool collides(int i, int j, int i0, int j0);
+
 private:
 
     const static float mBlackArea;
@@ -190,6 +193,7 @@ private:
     const static float mBlack;
     const static float mWhite;
     const static float mDeltaCaptured;
+    const static float safedist;
 
     std::shared_ptr<spdlog::logger> console;
 
