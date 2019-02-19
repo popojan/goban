@@ -2,12 +2,13 @@
 #include <sstream>
 #include <algorithm>
 
-const float Board::mBlackArea = 2.0;
-const float Board::mWhiteArea = 3.0;
-const float Board::mEmpty = 0.0;
-const float Board::mBlack = 5.0;
-const float Board::mWhite = 6.0;
-const float Board::mDeltaCaptured = 0.5;
+const float Board::mBlackArea = 2.0f;
+const float Board::mWhiteArea = 3.0f;
+const float Board::mEmpty = 0.0f;
+const float Board::mBlack = 5.0f;
+const float Board::mWhite = 6.0f;
+const float Board::mDeltaCaptured = 0.5f;
+const float Board::safedist = 1.05f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
     dist(0.0f, 0.05f), invalidated(false), order(0), moveNumber(0)
@@ -113,6 +114,18 @@ std::istream& operator>> (std::istream& stream, Move& move) {
 
 }
 
+bool Board::collides(int i, int j, int i0, int j0) {
+    int idx = ((boardSize  * i + j) << 2) + 2;
+    int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
+    float x0 = stones[idx0 - 2];
+    float y0 = stones[idx0 - 1];
+    float x = stones[idx - 2];
+    float y = stones[idx - 1];
+    Position p(i0, j0);
+    glm::vec2 v(x0-x,y0-y);
+    return glm::length(v) <= safedist*rStone;
+}
+
 double Board::fixStone(int i, int j, int i0, int j0) {
     console->debug("fixStone ({},{})/({},{})", i, j, i0, j0);
     int idx = ((boardSize  * i + j) << 2) + 2;
@@ -121,14 +134,14 @@ double Board::fixStone(int i, int j, int i0, int j0) {
     double ret = 0.0;
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
         console->debug("1st IF");
-        float x0 = stones[idx0 - 2];
-        float y0 = stones[idx0 - 1];
-        float x = stones[idx - 2];
-        float y = stones[idx - 1];
-        Position p(i0, j0);
-        glm::vec2 v(x0-x,y0-y);
-        if(glm::length(v) <= 1.05f*rStone) {
-            v = glm::vec2(x, y) + 1.05f * rStone * glm::normalize(v);
+        if(collides(i, j, i0, j0)) {
+            float x0 = stones[idx0 - 2];
+            float y0 = stones[idx0 - 1];
+            float x = stones[idx - 2];
+            float y = stones[idx - 1];
+            Position p(i0, j0);
+            glm::vec2 v(x0-x,y0-y);
+            v = glm::vec2(x, y) + 1.01f*safedist * rStone * glm::normalize(v);
             p.x = v.x;
             p.y = v.y;
             console->debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
@@ -139,28 +152,15 @@ double Board::fixStone(int i, int j, int i0, int j0) {
             overlay[oidx].x = p.x;
             overlay[oidx].y = p.y;
             ret = glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/0.71;
+            if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0))
+                ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0));
+            if (i0 - 1 >= 0 &&  collides(i0, j0, i0 - 1, j0))
+                ret = std::max(ret, fixStone(i0, j0, i0 - 1, j0));
+            if (j0 + 1 < boardSize &&  collides(i0, j0, i0, j0 + 1))
+                ret = std::max(ret, fixStone(i0, j0, i0, j0 + 1));
+            if (j0 - 1 >= 0 &&  collides(i0, j0, i0, j0 - 1))
+                ret = std::max(ret, fixStone(i0, j0, i0, j0 - 1));
         }
-        /*float dd = 2.0f;
-        if (i == i0) dd = std::abs(x0 - x);
-        if (j == j0) dd = std::abs(y0 - y);
-        if (dd < rStone) {
-            if (i == i0) {
-                float delta = 0.0f;
-                for (int k = 0; k < 100 && std::abs(x0 - x) < rStone; ++k)
-                    x0 = delta + j0 - halfN + std::max(-r1, std::min(r1, dist(generator)));
-                stones[idx0 - 2] = x0;
-            }
-            if (j == j0) {
-                float delta = 0.0f;
-                for (int k = 0; k < 100 && std::abs(y0 - y) < rStone; ++k)
-                    y0 = delta + i0 - halfN + std::max(-r1, std::min(r1, dist(generator)));
-                stones[idx0 - 1] = y0;
-            }
-			std::size_t oidx = boardSize  * i0 + j0;
-			overlay[oidx].x = stones[idx0 - 2];
-			overlay[oidx].y = stones[idx0 - 1];
-            return false;
-        }*/
         return ret;
     }
     return ret;
@@ -172,7 +172,7 @@ double Board::placeFuzzy(const Position& p){
     const float halfN = 0.5f * boardSize - 0.5f;
     float x = p.x;
     float y = p.y;
-    double vol = 0.0, ret = 0.0;
+    double ret = 0.0;
     if(x == 0 && y == 0) {
         x = j - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
         y = i - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
@@ -187,22 +187,14 @@ double Board::placeFuzzy(const Position& p){
     stones[idx - 2] = x;
     stones[idx - 1] = y;
     stones[idx + 1] = 3.14f*dist(generator);
-    for (int ii = i + 1u, i0 = i; ii < boardSize; i0 = ii, ++ii) {
-        ret = std::max(vol, ret);
-        if ((vol = fixStone(i0, j, ii, j)) == 0.0) break;
-    }
-    for (int ii = i - 1u, i0 = i; ii >= 0; i0 = ii, --ii) {
-        ret = std::max(vol, ret);
-        if ((vol = fixStone(i0, j, ii, j)) == 0.0) break;
-    }
-    for (int jj = j + 1u, j0 = j; jj < boardSize; j0 = jj, ++jj) {
-        ret = std::max(vol, ret);
-        if ((vol = fixStone(i, j0, i, jj)) == 0.0) break;
-    }
-    for (int jj = j - 1u, j0 = j; jj >= 0; j0 = jj, --jj) {
-        ret = std::max(vol, ret);
-        if ((vol = fixStone(i, j0, i, jj)) == 0.0) break;
-    }
+    if (i + 1 < boardSize)
+        ret = std::max(ret, fixStone(i, j, i + 1u, j));
+    if(i -  1 >= 0)
+        ret = std::max(ret, fixStone(i, j, i -  1u, j));
+    if (j + 1 < boardSize)
+        ret = std::max(ret, fixStone(i, j, i, j + 1));
+    if(j -  1 >= 0)
+        ret = std::max(ret, fixStone(i, j, i, j -  1));
     return ret;
 }
 

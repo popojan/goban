@@ -17,6 +17,7 @@ void GobanModel::newGame(int boardSize, int handicap, float komi) {
 	territory.clear(boardSize);
 	over = false;
 	started = false;
+	holdsStone = false;
 	auto activePlayerId = state.activePlayerId;
 	state = GameState();
 	state.komi = this->komi; //TODO jedno komi
@@ -266,9 +267,9 @@ void GobanModel::update(const Board& territory) {
 }
 
 bool GobanModel::placeCursor(Board& viewBoard, const Position& cursor){
-    if(isPointOnBoard(cursor) && board[cursor] == Color::EMPTY && viewBoard[cursor] == Color::EMPTY){
+    if(holdsStone && isPointOnBoard(cursor) && board[cursor] == Color::EMPTY && viewBoard[cursor] == Color::EMPTY){
         double vol = viewBoard.placeCursor(cursor, state.colorToMove);
-        if(vol > 0.5 && player.playbackCount() < 5)
+        if(vol > 0.0 && player.playbackCount() < 5)
             player.play("data/sound/collision.wav", vol);
         return vol > 0.0;
     }
