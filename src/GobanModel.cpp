@@ -269,8 +269,10 @@ void GobanModel::update(const Board& territory) {
 bool GobanModel::placeCursor(Board& viewBoard, const Position& cursor){
     if(holdsStone && isPointOnBoard(cursor) && board[cursor] == Color::EMPTY && viewBoard[cursor] == Color::EMPTY){
         double vol = viewBoard.placeCursor(cursor, state.colorToMove);
-        if(vol > 0.0 && player.playbackCount() < 5)
+        if(vol > 0.0 && player.playbackCount() < 5){
+	    console->info("collision volume = {}", vol);
             player.play("data/sound/collision.wav", vol);
+	}
         return vol > 0.0;
     }
     return false;
