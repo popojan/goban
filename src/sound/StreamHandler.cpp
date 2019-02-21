@@ -140,6 +140,7 @@ StreamHandler::StreamHandler()
                                   paNoFlag,
                                   &PortAudioCallback,
                                   this);
+        Pa_StartStream(stream);
 
         if (errorCode)
         {

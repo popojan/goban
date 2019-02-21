@@ -148,12 +148,14 @@ double Board::fixStone(int i, int j, int i0, int j0) {
             p.y = v.y;
             console->debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
+	    x = stones[idx - 2];
+	    y = stones[idx - 1];
             stones[idx - 2] = p.x;
             stones[idx - 1] = p.y;
             int oidx = boardSize  * i0 + j0;
             overlay[oidx].x = p.x;
             overlay[oidx].y = p.y;
-            ret = glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/0.71;
+            ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/boardSize);
             if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0))
                 ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0));
             if (i0 - 1 >= 0 &&  collides(i0, j0, i0 - 1, j0))
@@ -180,8 +182,8 @@ double Board::placeFuzzy(const Position& p){
         y = i - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
     }
     else {
-        glm::vec2 v(x - j, y - i);
-        glm::vec2 add(3.0f * r1 * glm::normalize(v)* glm::length(v)/0.71f);
+        glm::vec2 v(x - j - 0.5f, y - i - 0.5f);
+        glm::vec2 add(6.0f * r1 * v);
         x = j - halfN + add.x;
         y = i - halfN + add.y;
     }
@@ -454,5 +456,5 @@ double Board::placeCursor(const Position& coord, const Color& col) {
     stones[oidx + 0] = (col == Color::WHITE) ? mWhite : mBlack;
     //stones[oidx + 1] = 0;
     console->debug("overlay coord = [{},{}] = {}", stones[oidx - 2], stones[oidx - 1], stones[oidx + 0]);
-    return altered;
+    return std::min(1.0, altered);
 }
