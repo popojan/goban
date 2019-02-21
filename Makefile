@@ -1,10 +1,10 @@
 all: build
-	cd build && make
+	cd build && make -j4
 
 dependencies:
-	make -C deps
+	make -j4 -C deps
 
 build: dependencies
 	mkdir -p build && cd build && \
-	cmake .. && make && cd ..
+	cmake .. && make -j4 && cd ..
 	cp build/goban .

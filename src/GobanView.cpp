@@ -201,11 +201,9 @@ void GobanView::Render(int w, int h)
 	}
 
 	if (updateFlag & UPDATE_STONES) {
-	    board.updateStones(model.board, model.territory, model.board.showTerritory);
-        if(model.placeCursor(board, cursor))
-            updateFlag |= UPDATE_OVERLAY;
-		board.positionNumber = model.board.positionNumber;
-		board.moveNumber = model.board.moveNumber;
+	    board.updateStones(model.board, model.board.showTerritory);
+        model.placeCursor(board, lastCursor);
+        lastCursor = model.cursor;
 	}
 
 	shadeit(time, gobanShader);
@@ -330,41 +328,7 @@ void GobanView::Update() {
 }
 
 void GobanView::moveCursor(float x, float y) {
-    //overlay cursor
-    /*
-    if(cursor > 0) {
-        auto& overlay = view.board.getOverlay();
-        overlay[cursor].text = "";
-        overlay[cursor].layer = -1;
-        view.requestRepaint(GobanView::UPDATE_OVERLAY);
-        cursor = 0;
-    }
-    auto coord = view.getBoardCoordinate(x, y);
-    if(model.isPointOnBoard(coord)) {
-        unsigned int boardSize = model.getBoardSize();
-        float halfN = 0.5f * boardSize - 0.5f;
-        unsigned int oidx = boardSize*coord.first + coord.second;
-        console->debug("oidx = {}", oidx);
-        auto& overlay = view.board.getOverlay();
-        overlay[oidx].text = "X";
-        overlay[oidx].x = coord.first - halfN;
-        overlay[oidx].y = coord.second - halfN;
-        overlay[oidx].layer = 0;
-        console->debug("overlay coord = [{},{}]", overlay[oidx].x, overlay[oidx].y);
-        view.requestRepaint(GobanView::UPDATE_OVERLAY);
-        cursor = oidx;
-    }
-    */
-    /*if(cursor.first > -1) {
-        float* stones = model.board.getStones();
-        unsigned int boardSize = model.getBoardSize();
-        unsigned int oidx = ((boardSize  * cursor.first + cursor.second) << 2u) + 2u;
-        stones[oidx + 0] = Board::mEmpty;
-        model.board[cursor] = Color::EMPTY;
-        requestRepaint(GobanView::UPDATE_STONES);
-        cursor = {-1, -1};
-    }*/
     Position coord = getBoardCoordinate(x, y);
-    cursor = coord;
-    requestRepaint(GobanView::UPDATE_STONES);
+    model.setCursor(coord);
+	updateFlag |= UPDATE_STONES | UPDATE_OVERLAY;
 }

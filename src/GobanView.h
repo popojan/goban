@@ -26,7 +26,7 @@ public:
 		translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f),
 		startTime(0.0f), animationRunning(false), isPanning(false), isZooming(false), isRotating(false),
 		needsUpdate(0), cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
-		currentProgram(-1),	showOverlay(true),  cursor(-1,-1), lastMoveNumber(0)
+		currentProgram(-1),	showOverlay(true),  lastCursor(-1,-1), lastMoveNumber(0)
 	{
 
 	    console = spdlog::get("console");
@@ -134,7 +134,7 @@ public:
     int updateFlag;
     int currentProgram;
 	bool showOverlay;
-    Position cursor, lastCursor;
+    Position lastCursor;
     long lastMoveNumber;
 };
 

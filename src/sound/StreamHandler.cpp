@@ -84,7 +84,7 @@ int StreamHandler::PortAudioCallback(const void * input,
                         }
                 }
         }
-	delete outputBuffer;
+	delete [] outputBuffer;
         return paContinue;
 }
 

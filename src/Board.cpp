@@ -12,7 +12,7 @@ const float Board::safedist = 1.05f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
     dist(0.0f, 0.05f), invalidated(false), order(0), showTerritory(false), showTerritoryAuto(false),
-    lastPlayed_i(-1), lastPlayed_j(-1), moveNumber(0)
+    lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0)
 
 {
     console = spdlog::get("console");
@@ -202,10 +202,60 @@ double Board::placeFuzzy(const Position& p){
     return ret;
 }
 
-int Board::updateStones(const Board& board, const Board& territory, bool showTerritory) {
-    int newSize = board.getSize();
-    int changed = boardSize != newSize ? 1 : 0;
+float Board::stoneChanged(const Position& p, const Color& c) {
+    float mValue = mEmpty;
+    float ret = 0.0;
+    if(c == Color::WHITE)
+        mValue = mWhite;
+    else if(c == Color::BLACK)
+        mValue = mBlack;
+    if(c == Color::WHITE || c == Color::BLACK) {
+        ret = placeFuzzy(p);
+    }
+    //TODO refactor arrays and indexing to simplify
+    int i = p.row();
+    int j = p.col();
+    unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
+	stones[idx + 0] = mValue;
+    (*this)[p] = c;
+    return ret;
+}
+
+
+int Board::areaChanged(const Position& p, const Color& col) {
+    return 1;
+}
+
+int Board::sizeChanged(int newSize) {
     boardSize = newSize;
+    return 1;
+}
+
+int Board::updateStones(const Board& board, bool showTerritory) {
+    int newSize = board.getSize();
+    int changed = 0;
+    if(newSize != boardSize) {
+        sizeChanged(newSize);
+        changed = 1;
+    }
+    for(int col = 0; col < newSize; ++col) {
+        for(int row = 0; row < newSize; ++row) {
+            Position pos(col, row);
+            Color newStone(board[pos]);
+            Color newArea(board(pos));
+            if(newStone != (*this)[pos]){
+                stoneChanged(pos, newStone);
+                changed = 1;
+            }
+            if(newArea != (*this)(pos)) {
+               areaChanged(pos, newArea);
+               changed = 1;
+            }
+        }
+    }
+    return changed;
+}
+    /*
     float halfN = 0.5f * boardSize - 0.5f;
     auto bbegin = board.begin(), bend = board.end();
 	this->showTerritory = board.showTerritory;
@@ -213,7 +263,7 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 	int lpi = lastPlayed_i;
 	int lpj = lastPlayed_j;
 	bool placedSomeStone = false;
-    for (auto cit = bbegin, pit = territory.begin(); cit != bend; ++cit, ++pit) {
+    for (auto cit = bbegin, pit = board.tbegin(); cit != bend; ++cit, ++pit) {
         int pos = static_cast<unsigned>(cit - bbegin);
         int j = board.row(pos);
         int i = board.col(pos);
@@ -236,16 +286,16 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 			overlay[oidx].y = y;
         }
         unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
-
+        bool placedOnCursor = cursor.row() == j && cursor.col() == i;
 		if (stones[idx] != mValue) {
 		    int change = 0;
 			bool territoryToggle = std::abs(stones[idx] - mValue) == mDeltaCaptured;
-			bool placeStone = !territoryToggle && /*dif != mDeltaLastMove &&*/ mValue != mEmpty
+			bool placeStone = !territoryToggle && mValue != mEmpty
 			        &&  mValue != mBlackArea && mValue != mWhiteArea;
 			if (placeStone) {
 				placedSomeStone = true;
                 change = 2;
-				placeFuzzy(Position(j, i));
+                placeFuzzy(Position(j, i));
 				//order += 1;
 				overlay[oidx].x = stones[idx - 2];
 				overlay[oidx].y = stones[idx - 1];
@@ -291,8 +341,8 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 		overlay[oidx].text = std::string("");
 		overlay[oidx].layer = -1u;
 	}
-    return changed;
-}
+    return changed;*/
+//}
 
 int Board::capturedCount(const Color& whose) const {
     return whose == Color::WHITE ? capturedWhite : capturedBlack;
@@ -304,14 +354,20 @@ void Board::clear(int boardsize) {
     overlay.fill({ "", -1u, 0, 0});
     order = 0;
     board.fill(Color::EMPTY);
+    territory.fill(Color::EMPTY);
     capturedBlack = 0;
     capturedWhite = 0;
     positionNumber += 1;
 }
 
+void Board::clearTerritory(int boardsize) {
+    territory.fill(Color::EMPTY);
+}
+
 void Board::copyStateFrom(const Board& b) {
     stones = b.stones;
     board = b.board;
+    territory = b.territory;
     boardSize = b.boardSize;
     capturedBlack = b.capturedBlack;
     capturedWhite = b.capturedWhite;
@@ -399,7 +455,7 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
                     c = Color::WHITE;
                 else if (val < -2)
                     c = Color::BLACK;
-                board[ord(Position(j, boardSize - i - 1))] = c;
+                territory[ord(Position(j, boardSize - i - 1))] = c;
             }
         }
         success = true;
@@ -447,14 +503,11 @@ bool Board::toggleTerritory() {
 }
 
 double Board::placeCursor(const Position& coord, const Color& col) {
-    //float halfN = 0.5f * boardSize - 0.5f;
-    int oidx = ((boardSize  * coord.row() + coord.col()) << 2u) + 2u;
+    return stoneChanged(coord, col);
+    /*int oidx = ((boardSize  * coord.row() + coord.col()) << 2u) + 2u;
     console->debug("oidx = [{},{}] = {} ... {} {}", coord.col(), coord.row(), oidx, board[coord].toString(), col.toString());
     double altered = placeFuzzy(coord);
-    //stones[oidx - 2] = coord.col() - halfN;
-    //stones[oidx - 1] = coord.row() - halfN;
     stones[oidx + 0] = (col == Color::WHITE) ? mWhite : mBlack;
-    //stones[oidx + 1] = 0;
-    console->debug("overlay coord = [{},{}] = {}", stones[oidx - 2], stones[oidx - 1], stones[oidx + 0]);
-    return std::min(1.0, altered);
+    console->debug("overlay coord = [{},{}] = {}", stones[oidx - 2], stones[oidx - 1], stones[oidx + 0]);*/
+    //return 0.2;//std::min(1.0, altered);
 }
