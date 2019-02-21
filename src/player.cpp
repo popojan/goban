@@ -213,7 +213,7 @@ bool GtpEngine::undo() {
 bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
     if (final) {
         Player::console->debug("initial territory");
-        territory.clear(board.getSize());
+        board.clearTerritory(board.getSize());
         bool success = true;
         Player::console->debug("dead");
         success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), territory, Color::EMPTY);
@@ -227,8 +227,8 @@ bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
         std::stringstream ss;
         ss << "initial_influence " << colorToMove << " influence_regions";
         GtpClient::CommandOutput ret = GtpClient::issueCommand(ss.str());
-        territory.clear(board.getSize());
-        territory.parseGtpInfluence(ret);
+        board.clearTerritory(board.getSize());
+        board.parseGtpInfluence(ret);
         ret = GtpClient::issueCommand("dragon_status");
         for (size_t i = 0; i < ret.size(); ++i) {
             Player::console->debug(ret[i]);
@@ -248,7 +248,7 @@ bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
                     std::istringstream ss(ret[0].substr(2));
                     Position p;
                     while ((ss >> p)){
-                        territory[p] = Color::other(board[p]);
+                        board(p) = board[p]; //Color::other(board[p]);
                     }
                 }
             }
@@ -259,8 +259,8 @@ bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
 
 const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
     estimateTerritory(final, colorToMove);
-    territory.invalidate();
-    return territory;
+    board.invalidate();
+    return board;
 }
 
 bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, const Color& color) {

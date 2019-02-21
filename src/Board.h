@@ -56,6 +56,8 @@ public:
     Position(int col, int row): c(col), r(row), x(0), y(0) { }
 
     operator bool() const { return c >= 0 && r >= 0; }
+    bool operator ==(const Position& b) const { return c == b.c && r == b.r;}
+    bool operator !=(const Position& b) const { return !(*this == b);}
 
     int col() const { return c; }
     int row() const { return r; }
@@ -136,6 +138,7 @@ public:
     std::size_t getSizeOf() const { return 4*sizeof(float)*stones.size(); }
 
     void copyStateFrom(const Board&);
+    void copyTerritoryFrom(const Board&);
 
     void setStoneRadius(float r) { rStone = r; r1 = 0.5f*(1.0f - r); dist = std::normal_distribution<float>(0.0f, 3.0f*r1); r1 *= 0.98f; }
 
@@ -150,6 +153,12 @@ public:
     Color& operator[](const Position& pos) {
         return board[ord(pos)];
     }
+    const Color operator()(const Position& pos) const {
+        return territory[ord(pos)];
+    }
+    Color& operator()(const Position& pos) {
+        return territory[ord(pos)];
+    }
 
     inline int row(int pos) const { return (pos) / (MAXBOARD + 1u) - 1u; }
     inline int col(int pos) const { return (pos) % (MAXBOARD + 1u) - 1u; }
@@ -159,6 +168,7 @@ public:
     int capturedCount(const Color& whose) const;
 
     void clear(int boardSize = DEFAULTSIZE);
+    void clearTerritory(int boardSize = DEFAULTSIZE);
 
     Board(int size = DEFAULTSIZE);
 
@@ -170,12 +180,19 @@ public:
     const_iterator end() const { return board.end(); }
     iterator begin() { return board.begin(); }
     iterator end() { return board.end(); }
+    const_iterator tbegin() const { return territory.begin(); }
+    const_iterator tend() const { return territory.end(); }
+    iterator tbegin() { return territory.begin(); }
+    iterator tend() { return territory.end(); }
 
     void invalidate();
 
     friend std::ostream& operator<< (std::ostream&, const Board&);
 
-    int updateStones(const Board& previous, const Board& current, bool showTerritory);
+    float stoneChanged(const Position& p, const Color& col);
+    int areaChanged(const Position& p, const Color& col);
+    int sizeChanged(int newSize);
+    int updateStones(const Board& previous, bool showTerritory);
 
     bool isEmpty() const;
 	bool toggleTerritory();
@@ -200,6 +217,7 @@ private:
     Overlay overlay;
 
     std::array<Color, BOARDSIZE> board;
+    std::array<Color, BOARDSIZE> territory;
 
     int capturedBlack;
     int capturedWhite;
@@ -218,6 +236,7 @@ public:
 	volatile long positionNumber;
 	bool showTerritory, showTerritoryAuto;
 	int lastPlayed_i, lastPlayed_j;
+	Position cursor;
     volatile long moveNumber;
 };
 

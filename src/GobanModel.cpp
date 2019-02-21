@@ -14,7 +14,6 @@ void GobanModel::newGame(int boardSize, int handicap, float komi) {
 	lastHandicap = this->handicap = handicap;
 	board.clear(boardSize);
 
-	territory.clear(boardSize);
 	over = false;
 	started = false;
 	holdsStone = false;
@@ -55,7 +54,7 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
         ret.black_prisoners = ret.white_prisoners = 0;
         ret.black_captured = board.capturedCount(Color::BLACK);
         ret.white_captured = board.capturedCount(Color::WHITE);
-        for (auto pos = board.begin(), iter = territory.begin(); pos != board.end(); ++pos, ++iter) {
+        for (auto pos = board.begin(), iter = board.tbegin(); pos != board.end(); ++pos, ++iter) {
             const Color& stone = *pos;
             const Color& area = *iter;
             if (stone == Color::EMPTY) {
@@ -259,20 +258,24 @@ void GobanModel::update(const Move& move, const Board& result) {
     changeTurn();
 }
 
-void GobanModel::update(const Board& territory) {
+void GobanModel::update(const Board& board) {
     console->debug("LOCK territory");
     std::lock_guard<std::mutex> lock(mutex);
-    this->territory.copyStateFrom(territory);
-    board.positionNumber += 1;
+    this->board.copyStateFrom(board);
+    this->board.positionNumber += 1;
 }
 
-bool GobanModel::placeCursor(Board& viewBoard, const Position& cursor){
-    if(holdsStone && isPointOnBoard(cursor) && board[cursor] == Color::EMPTY && viewBoard[cursor] == Color::EMPTY){
-        double vol = viewBoard.placeCursor(cursor, state.colorToMove);
+bool GobanModel::placeCursor(Board& target, const Position& lastCursor){
+    if(isPointOnBoard(lastCursor) && board[lastCursor] == Color::EMPTY) {
+        target.stoneChanged(lastCursor, Color::EMPTY);
+    }
+    if(holdsStone && isPointOnBoard(cursor) && board[cursor] == Color::EMPTY){
+        target.stoneChanged(cursor, Color::EMPTY);
+        double vol = target.placeCursor(cursor, state.colorToMove);
         if(vol > 0.0 && player.playbackCount() < 5){
-	    console->info("collision volume = {}", vol);
+	        console->info("collision volume = {}", vol);
             player.play("data/sound/collision.wav", vol);
-	}
+	    }
         return vol > 0.0;
     }
     return false;

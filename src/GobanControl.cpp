@@ -41,7 +41,8 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     engine.run();
             }
             if(playNow) {
-                if(model.holdsStone) {
+                bool humanMove = engine.humanToMove();
+                if(model.holdsStone || !humanMove) {
                     auto move = engine.getLocalMove(coord);
                     //model.playMove(move);
                     engine.playLocalMove(move);
@@ -49,7 +50,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     firstGame = false;
                     model.holdsStone = false;
                 }
-                else {
+                else if(humanMove) {
                     model.holdsStone = true;
                     view.requestRepaint(GobanView::UPDATE_STONES);
                 }

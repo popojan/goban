@@ -189,6 +189,14 @@ void GameThread::run() {
 
 bool GameThread::isRunning() { return hasThreadRunning;}
 
+bool GameThread::humanToMove() {
+    std::unique_lock<std::mutex> lock(playerMutex);
+    if(playerToMove) {
+        return currentPlayer()->isTypeOf(Player::HUMAN);
+    }
+    return false;
+}
+
 void GameThread::gameLoop() {
     hasThreadRunning = true;
     interruptRequested = false;

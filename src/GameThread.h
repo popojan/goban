@@ -43,6 +43,8 @@ public:
 
     void gameLoop();
 
+    bool humanToMove();
+
     void playLocalMove(const Move& move);
     Color getCurrentColor();
 
