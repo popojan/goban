@@ -52,7 +52,6 @@ class StreamHandler
         const int CHANNEL_COUNT = 2;
         const int SAMPLE_RATE = 44100;
         const PaStreamParameters * NO_INPUT = nullptr;
-
         PaStream * stream;
         vector<Playback *> data;
         std::mutex mut;
