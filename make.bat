@@ -25,10 +25,10 @@ cd %PROJECT_DIR%
 mkdir build
 cd build
 cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
-	-DGLEW_INCLUDE_DIR="../deps/glew-with-extensions/include" ^
-	-DGLEW_LIBRARY="../deps/glew-with-extensions/builddir/lib/Release/libglew32" ^
+	-DGLEW_INCLUDE_DIR=../deps/glew-with-extensions/include ^
+	-DGLEW_LIBRARY=../deps/glew-with-extensions/BuildDir/lib/Release/libglew32 ^
 	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
-	-DLIBGLYPHY_LIBRARY="../deps/glyphy/win32/x64/Release/goban_glyphy.lib" ^
+	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/x64/Release/goban_glyphy.lib ^
 	-DBoost_NO_SYSTEM_PATHS=TRUE ^
 	-DBoost_NO_BOOST_CMAKE=TRUE ^
 	-DBOOST_ROOT:PATHNAME="%PROJECT_DIR%\deps\boost" ^
@@ -40,3 +40,4 @@ cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
 	-DFREETYPE_LIBRARY=../deps/freetype2/build/Release/freetype
 
 MSBuild.exe goban.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
+cd %PROJECT_DIR%

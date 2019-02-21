@@ -19,7 +19,7 @@ public:
             : parent(p), prevPass(false), over(false), invalidated(false), holdsStone(false) {
         console = spdlog::get("console");
         console->info("Preloading sounds...");
-        //player.preload({"data/sound/collision.wav", "data/sound/stone.wav"});
+        player.preload({"data/sound/collision.wav", "data/sound/stone.wav"});
         newGame(boardSize, handicap, komi);
     }
 

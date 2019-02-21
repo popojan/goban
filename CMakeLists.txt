@@ -24,31 +24,32 @@ ExternalProject_Add(project_libsndfile
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
     BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile/build
     STEP_TARGETS build
+    UPDATE_COMMAND ""
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 
-ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
-SET(libsndfile_lib_dir "${BINARY_DIR}")
-SET(libsndfile_inc_dir "${BINARY_DIR}/src")
+ExternalProject_Get_Property(project_libsndfile SOURCE_DIR)
+SET(libsndfile_lib_dir "${SOURCE_DIR}/build")
+SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${SOURCE_DIR}/build/src")
 
 ADD_LIBRARY(libsndfile STATIC IMPORTED)
 
 #SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
 
 
-SET(LIBSNDFILE_INCLUDE_PATH "${install_dir}/src/project_libsndfile-build/src/")
+#SET(LIBSNDFILE_INCLUDE_PATH "${install_dir}/src/project_libsndfile-build/src/")
 
 ExternalProject_Add(project_portaudio 
     GIT_REPOSITORY      https://git.assembla.com/portaudio.git
     SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
     BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/portaudio/build
     STEP_TARGETS build
+    GIT_TAG 396fe4b6699ae929d3a685b3ef8a7e97396139a4
     INSTALL_COMMAND     echo Skipping install step for portaudio
 )
 
-ExternalProject_Get_Property(project_portaudio BINARY_DIR)
 ExternalProject_Get_Property(project_portaudio SOURCE_DIR)
-SET(portaudio_lib_dir "${BINARY_DIR}")
+SET(portaudio_lib_dir "${SOURCE_DIR}/build")
 SET(portaudio_inc_dir "${SOURCE_DIR}/include")
 
 
