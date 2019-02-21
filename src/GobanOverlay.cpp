@@ -41,13 +41,15 @@ bool GobanOverlay::init() {
     if (!ft_face) {
 		console->error("Failed to open font file");
 	}
-    font = std::shared_ptr<GlyphyFont>(new GlyphyFont(ft_face, st->get_atlas()));
-
     st->setup();
+
+    font = std::shared_ptr<GlyphyFont>(new GlyphyFont(ft_face, st->get_atlas()));
 
 	for (std::size_t i = 0; i < layers.size(); ++i) {
 		console->debug("Creating overlay buffer[{0}]", i);
 	    auto b = std::shared_ptr<GlyphyBuffer>(new GlyphyBuffer());
+        glyphy_point_t p = {.0, .0};
+        b->move_to(&p);
         console->debug("Adding text glyphs[{0}]", i);
 	    b->add_text("0123456789X", font, 12.0);
 		buffer[i] = b;
@@ -62,7 +64,7 @@ void GobanOverlay::unuse() { }
 
 void GobanOverlay::Update(const Board::Overlay& overlay, const GobanModel& model) {
 	font_size = 0.8 / model.getBoardSize();
-	
+
 	for (std::size_t layer = 0; layer < layers.size(); ++layer) {
 		int cnt = 0;
 		buffer[layer]->clear();
@@ -94,21 +96,21 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
-		
+
 	int viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
 	GLint width = viewport[2];
 	GLint height = viewport[3];
 
 	st->set_depth(which < 1 ? 0.6 : 0.4);
-		
+
 	for (std::size_t layer = which; layer < (which == 0 ? 1 : layers.size()); ++layer) {
-		
+
 		if (layers[layer].empty)
 			continue;
 
 		glm::mat4 m(cam.setView());
-		
+
 		mat = glm::mat4(1.0);
 
 		st->set_color(glm::value_ptr(layers[layer].color));

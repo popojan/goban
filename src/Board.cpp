@@ -11,7 +11,9 @@ const float Board::mDeltaCaptured = 0.5f;
 const float Board::safedist = 1.05f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
-    dist(0.0f, 0.05f), invalidated(false), order(0), moveNumber(0)
+    dist(0.0f, 0.05f), invalidated(false), order(0), showTerritory(false), showTerritoryAuto(false),
+    lastPlayed_i(-1), lastPlayed_j(-1), moveNumber(0)
+
 {
     console = spdlog::get("console");
     clear(size);
@@ -282,7 +284,7 @@ int Board::updateStones(const Board& board, const Board& territory, bool showTer
 		}
 
 	}
-	if (placedSomeStone)  {
+	if (placedSomeStone && lpi > -1 && lpj > -1)  {
 		int oidx = boardSize  * lpi + lpj;
 		overlay[oidx].text = std::string("");
 		overlay[oidx].layer = -1u;
