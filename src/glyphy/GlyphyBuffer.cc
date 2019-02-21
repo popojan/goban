@@ -22,133 +22,133 @@
 #undef max
 
 GlyphyBuffer::GlyphyBuffer() {
-  vertices = new std::vector<glyph_vertex_t>;
-  glGenBuffers(1, &buf_name);
+    vertices = new std::vector<glyph_vertex_t>;
+    glGenBuffers(1, &buf_name);
 
-  clear();
-  console = spdlog::get("console");
+    clear();
+    console = spdlog::get("console");
 }
 
 GlyphyBuffer::~GlyphyBuffer()
 {
-  glDeleteBuffers(1, &buf_name);
-  delete vertices;
+    glDeleteBuffers(1, &buf_name);
+    delete vertices;
 }
 
 
 void GlyphyBuffer::clear()
 {
-  vertices->clear ();
-  glyphy_extents_clear(&ink_extents);
-  glyphy_extents_clear(&logical_extents);
-  dirty = true;
+    vertices->clear ();
+    glyphy_extents_clear(&ink_extents);
+    glyphy_extents_clear(&logical_extents);
+    dirty = true;
 }
 
 void GlyphyBuffer::extents(
-		     glyphy_extents_t *ink_extents,
-		     glyphy_extents_t *logical_extents)
+    glyphy_extents_t *ink_extents,
+    glyphy_extents_t *logical_extents)
 {
-  if (ink_extents)
-    *ink_extents = this->ink_extents;
-  if (logical_extents)
-    *logical_extents = this->logical_extents;
+    if (ink_extents)
+        *ink_extents = this->ink_extents;
+    if (logical_extents)
+        *logical_extents = this->logical_extents;
 }
 
 void GlyphyBuffer::move_to (
-		     const glyphy_point_t *p)
+    const glyphy_point_t *p)
 {
-  cursor = *p;
+    cursor = *p;
 }
 
 void GlyphyBuffer::current_point (
-			   glyphy_point_t *p)
+    glyphy_point_t *p)
 {
-  *p = cursor;
+    *p = cursor;
 }
 
 void GlyphyBuffer::add_text (
-		      const char *utf8,
-		      std::shared_ptr<GlyphyFont> font,
-		      double font_size)
+    const char *utf8,
+    std::shared_ptr<GlyphyFont> font,
+    double font_size)
 {
-  FT_Face face = font->get_face ();
-  glyphy_point_t top_left = cursor;
-  //buffer->cursor.y += font_size /* * font->ascent */;
-  
-  glyphy_point_t origin(cursor);
+    FT_Face face = font->get_face ();
+    glyphy_point_t top_left = cursor;
+    //buffer->cursor.y += font_size /* * font->ascent */;
 
-  unsigned int unicode;
+    glyphy_point_t origin(cursor);
 
-  double max_y = 0.0;
+    unsigned int unicode;
+
+    double max_y = 0.0;
     for (int extents_only = 1; extents_only >= 0; --extents_only) {
         for (const unsigned char *p = (const unsigned char *)utf8; *p; p++) {
-		    if (*p < 128) {
-			  unicode = *p;
-		  }
-		  else {
-			  unsigned int j;
-			  if (*p < 0xE0) {
-				  unicode = *p & ~0xE0;
-				  j = 1;
-			  }
-			  else if (*p < 0xF0) {
-				  unicode = *p & ~0xF0;
-				  j = 2;
-			  }
-			  else {
-				  unicode = *p & ~0xF8;
-				  j = 3;
-				  continue;
-			  }
-			  p++;
-			  for (; j && *p; j--, p++)
-				  unicode = (unicode << 6) | (*p & ~0xC0);
-			  p--;
-		  }
+            if (*p < 128) {
+                unicode = *p;
+            }
+            else {
+                unsigned int j;
+                if (*p < 0xE0) {
+                    unicode = *p & ~0xE0;
+                    j = 1;
+                }
+                else if (*p < 0xF0) {
+                    unicode = *p & ~0xF0;
+                    j = 2;
+                }
+                else {
+                    unicode = *p & ~0xF8;
+                    j = 3;
+                    continue;
+                }
+                p++;
+                for (; j && *p; j--, p++)
+                    unicode = (unicode << 6) | (*p & ~0xC0);
+                p--;
+            }
 
-		  if (unicode == '\n') {
-			  cursor.y += font_size;
-			  cursor.x = top_left.x;
-			  continue;
-		  }
-		  unsigned int glyph_index = FT_Get_Char_Index(face, unicode);
-		  glyph_info_t gi;
-          font->lookup_glyph(glyph_index, &gi);
+            if (unicode == '\n') {
+                cursor.y += font_size;
+                cursor.x = top_left.x;
+                continue;
+            }
+            unsigned int glyph_index = FT_Get_Char_Index(face, unicode);
+            glyph_info_t gi;
+            font->lookup_glyph(glyph_index, &gi);
 
-		  /* Update ink extents */
-		  glyphy_extents_t ink_extents;
+            /* Update ink extents */
+            glyphy_extents_t ink_extents;
 
-		demo_shader_add_glyph_vertices(cursor, font_size, &gi, vertices, &ink_extents, extents_only);
-		max_y = std::max(max_y, font_size*(gi.extents.max_y - gi.extents.min_y));
-		glyphy_extents_extend(&ink_extents, &ink_extents);
-		glyphy_point_t corner;
-		corner.x = -1;// buffer->cursor.x;
-		corner.y = -1;// buffer->cursor.y - 4.0 / 3.0*font_size;
-		glyphy_extents_add(&logical_extents, &corner);
-		corner.x = 1;// buffer->cursor.x + font_size * gi.advance;
-		corner.y = 1;// buffer->cursor.y + 2.0 / 3.0*font_size;
-		glyphy_extents_add(&logical_extents, &corner);
-		cursor.x += font_size * gi.advance;
-	  }
-	  cursor.x = origin.x + (origin.x - cursor.x) / 2;
-	  cursor.y = origin.y + (origin.y - cursor.y + max_y) / 2;
-  }
-  dirty = true;
+            demo_shader_add_glyph_vertices(cursor, font_size, &gi, vertices, &ink_extents, extents_only);
+            max_y = std::max(max_y, font_size*(gi.extents.max_y - gi.extents.min_y));
+            glyphy_extents_extend(&ink_extents, &ink_extents);
+            glyphy_point_t corner;
+            corner.x = -1;// buffer->cursor.x;
+            corner.y = -1;// buffer->cursor.y - 4.0 / 3.0*font_size;
+            glyphy_extents_add(&logical_extents, &corner);
+            corner.x = 1;// buffer->cursor.x + font_size * gi.advance;
+            corner.y = 1;// buffer->cursor.y + 2.0 / 3.0*font_size;
+            glyphy_extents_add(&logical_extents, &corner);
+            cursor.x += font_size * gi.advance;
+        }
+        cursor.x = origin.x + (origin.x - cursor.x) / 2;
+        cursor.y = origin.y + (origin.y - cursor.y + max_y) / 2;
+    }
+    dirty = true;
 }
 
 void GlyphyBuffer::draw ()
 {
-  GLint program;
-  glGetIntegerv (GL_CURRENT_PROGRAM, &program);
-  GLuint a_glyph_vertex_loc = glGetAttribLocation (program, "a_glyph_vertex");
-  glBindBuffer (GL_ARRAY_BUFFER, buf_name);
-  if (dirty) {
-    glBufferData (GL_ARRAY_BUFFER,  sizeof (glyph_vertex_t) * vertices->size (),
-            (const char *) &(*vertices)[0], GL_STATIC_DRAW);
-    dirty = false;
-  }
-  glEnableVertexAttribArray (a_glyph_vertex_loc);
-  glVertexAttribPointer (a_glyph_vertex_loc, 4, GL_FLOAT, GL_FALSE, sizeof (glyph_vertex_t), 0);
-  glDrawArrays (GL_TRIANGLES, 0, vertices->size ());
-  glDisableVertexAttribArray (a_glyph_vertex_loc);
+    GLint program;
+    glGetIntegerv (GL_CURRENT_PROGRAM, &program);
+    GLuint a_glyph_vertex_loc = glGetAttribLocation (program, "a_glyph_vertex");
+    glBindBuffer (GL_ARRAY_BUFFER, buf_name);
+    if (dirty) {
+        glBufferData (GL_ARRAY_BUFFER,  sizeof (glyph_vertex_t) * vertices->size (),
+                      (const char *) &(*vertices)[0], GL_STATIC_DRAW);
+        dirty = false;
+    }
+    glEnableVertexAttribArray (a_glyph_vertex_loc);
+    glVertexAttribPointer (a_glyph_vertex_loc, 4, GL_FLOAT, GL_FALSE, sizeof (glyph_vertex_t), 0);
+    glDrawArrays (GL_TRIANGLES, 0, vertices->size ());
+    glDisableVertexAttribArray (a_glyph_vertex_loc);
 }
