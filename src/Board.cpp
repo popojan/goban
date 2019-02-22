@@ -233,12 +233,11 @@ int Board::areaChanged(const Position& p, const Color& area) {
     int i = p.row();
     int j = p.col();
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
-	float mValue = stones[idx + 0];
+	float mValue = mEmpty;
     if(stone != Color::EMPTY) {
-        if (area != stone) {
-            mValue = stone == Color::BLACK ? mBlack : mWhite;
-            if(area != Color::EMPTY && showTerritory)
-                mValue += mDeltaCaptured;
+        mValue = stone == Color::BLACK ? mBlack : mWhite;
+        if (area != stone && area != Color::EMPTY && showTerritory) {
+            mValue += mDeltaCaptured;
         }
     }
     else if(showTerritory && area != Color::EMPTY) {
