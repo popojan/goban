@@ -56,8 +56,9 @@ public:
     Position(int col, int row): c(col), r(row), x(0), y(0) { }
 
     operator bool() const { return c >= 0 && r >= 0; }
-    //bool operator ==(const Position& b) const { return c == b.c && r == b.r;}
-    //bool operator !=(const Position& b) const { return !(*this == b);}
+    operator int() const = delete;
+    bool operator ==(const Position& b) const { return c == b.c && r == b.r;}
+    bool operator !=(const Position& b) const { return !(*this == b);}
 
     int col() const { return c; }
     int row() const { return r; }
@@ -106,85 +107,82 @@ private:
 };
 
 
-struct CoordText {
+struct Overlay {
     std::string text;
 	unsigned layer;
-    float x;
-    float y;
 };
 
 //stonePlace
+class Point {
+public:
+    Color stone;
+    Color influence;
+    Overlay overlay;
+    float x;
+    float y;
+};
 
 class Board
 {
 public:
     static const int MAXBOARD = 19;
     static const int MINBOARD = 9;
-    static const int BOARDSIZE = (MAXBOARD + 2) * (MAXBOARD + 1) + 1;
+    static const int BOARDSIZE = MAXBOARD * MAXBOARD;
     static const int DEFAULTSIZE = 19;
-    typedef std::array<float, Board::MAXBOARD*Board::MAXBOARD << 2> Stones;
-    typedef std::array<CoordText, Board::MAXBOARD*Board::MAXBOARD> Overlay;
-    enum Change { NO_CHANGE = 0, STONE_PLACED = 1, STONE_REMOVED = 2, TERRITORY_CHANGED = 4, SIZE_CHANGED = 8};
-private:
-    typedef std::array<Color, BOARDSIZE> board_array;
-public:
-    typedef board_array::iterator iterator;
-    typedef board_array::const_iterator const_iterator;
 
+    enum Change { NO_CHANGE = 0, STONE_PLACED = 1, STONE_REMOVED = 2, TERRITORY_CHANGED = 4, SIZE_CHANGED = 8};
+
+public:
     const float* getStones() const;
     float* getStones();
 
     int getSize() const { return boardSize;}
 
-    std::size_t getSizeOf() const { return 4*sizeof(float)*stones.size(); }
+    std::size_t getSizeOf() const { return 4*sizeof(float)*points.size(); }
 
     void copyStateFrom(const Board&);
     void copyTerritoryFrom(const Board&);
 
-    void setStoneRadius(float r) { rStone = r; r1 = 0.5f*(1.0f - r); dist = std::normal_distribution<float>(0.0f, 3.0f*r1); r1 *= 0.98f; }
+    void setStoneRadius(float r) {
+        rStone = r;
+        r1 = 0.5f * (1.0f - r);
+        dist = std::normal_distribution<float>(0.0f, 3.0f * r1);
+        r1 *= 0.98f;
+    }
 
     double fixStone(int i, int j, int i0, int j0);
 
-    const Overlay& getOverlay() const;
-
-    Overlay& getOverlay();
-
-    const Color  operator[](const Position& pos) const { return board[ord(pos)]; }
-
-    Color& operator[](const Position& pos) {
-        return board[ord(pos)];
+    const
+    std::array<Point, BOARDSIZE>& get() const {
+        return points;
     }
-    const Color operator()(const Position& pos) const {
-        return territory[ord(pos)];
-    }
-    Color& operator()(const Position& pos) {
-        return territory[ord(pos)];
+    std::array<Point, BOARDSIZE>& get() {
+        return points;
     }
 
-    inline int row(int pos) const { return (pos) / (MAXBOARD + 1u) - 1u; }
-    inline int col(int pos) const { return (pos) % (MAXBOARD + 1u) - 1u; }
-    inline int ord(const Position& p) const { return ord(p.col(), p.row()); }
-    inline int ord(int i, int j) const { return (MAXBOARD + 2) + (i) * (MAXBOARD + 1) + (j); }
+    const
+    Point operator[](const Position& pos) const {
+        return points[ord(pos)];
+    }
+
+    Point& operator[](const Position& pos) {
+        return points[ord(pos)];
+    }
 
     int capturedCount(const Color& whose) const;
 
     void clear(int boardSize = DEFAULTSIZE);
-    void clearTerritory(int boardSize = DEFAULTSIZE);
+    void clearTerritory(int boardSize = DEFAULTSIZE) {
+        for(auto pit = points.begin(); pit != points.end(); ++pit) {
+            pit->influence = Color::EMPTY;
+        }
+    };
 
     Board(int size = DEFAULTSIZE);
 
     bool parseGtp(const std::vector<std::string>& lines);
 
     bool parseGtpInfluence(const std::vector<std::string>& lines);
-
-    const_iterator begin() const { return board.begin(); }
-    const_iterator end() const { return board.end(); }
-    iterator begin() { return board.begin(); }
-    iterator end() { return board.end(); }
-    const_iterator tbegin() const { return territory.begin(); }
-    const_iterator tend() const { return territory.end(); }
-    iterator tbegin() { return territory.begin(); }
-    iterator tend() { return territory.end(); }
 
     void invalidate();
 
@@ -206,6 +204,11 @@ public:
 
 private:
 
+    inline int ord(const Position& p) const {
+        return p.col() * MAXBOARD + p.row();
+    }
+
+private:
     const static float mBlackArea;
     const static float mWhiteArea;
     const static float mBlack;
@@ -215,10 +218,8 @@ private:
 
     std::shared_ptr<spdlog::logger> console;
 
-    Overlay overlay;
-
-    std::array<Color, BOARDSIZE> board;
-    std::array<Color, BOARDSIZE> territory;
+    std::array<float, 4*BOARDSIZE> glstones;
+    std::array<Point, BOARDSIZE> points;
 
     int capturedBlack;
     int capturedWhite;
@@ -230,15 +231,18 @@ private:
     std::normal_distribution<float> dist;
 
     bool invalidated;
+
+    const static float mEmpty;
+
 public:
-	const static float mEmpty;
-	Stones stones;
-	int order;
+    int order;
 	volatile long positionNumber;
-	bool showTerritory, showTerritoryAuto;
+    bool showTerritory, showTerritoryAuto;
+private:
 	int lastPlayed_i, lastPlayed_j;
 	Position cursor;
     volatile long moveNumber;
+public:
     double collision;
 };
 

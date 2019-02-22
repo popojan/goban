@@ -248,7 +248,7 @@ bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
                     std::istringstream ss(ret[0].substr(2));
                     Position p;
                     while ((ss >> p)){
-                        board(p) = Color::other(board[p]);
+                        board[p].influence = Color::other(board[p].stone);
                     }
                 }
             }
@@ -273,9 +273,9 @@ bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, cons
         Position p;
         while((ss >> p)) {
             if(color == Color::EMPTY)
-                b(p) = Color::other(board[p]);
+                b[p].influence = Color::other(board[p].stone);
             else
-                b(p) = color;
+                b[p].influence = color;
         }
         return true;
     }

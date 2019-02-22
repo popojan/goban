@@ -53,9 +53,10 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
         ret.black_prisoners = ret.white_prisoners = 0;
         ret.black_captured = board.capturedCount(Color::BLACK);
         ret.white_captured = board.capturedCount(Color::WHITE);
-        for (auto pos = board.begin(), iter = board.tbegin(); pos != board.end(); ++pos, ++iter) {
-            const Color& stone = *pos;
-            const Color& area = *iter;
+        auto& points = board.get();
+        for (auto pit = points.begin(); pit != points.end(); ++pit) {
+            const Color& stone = pit->stone;
+            const Color& area = pit->influence;
             if (stone == Color::EMPTY) {
                 if (area == Color::WHITE) {
                     ret.white_territory++;

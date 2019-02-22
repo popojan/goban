@@ -62,17 +62,18 @@ bool GobanOverlay::init() {
 void GobanOverlay::use() { }
 void GobanOverlay::unuse() { }
 
-void GobanOverlay::Update(const Board::Overlay& overlay, const GobanModel& model) {
+void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 	font_size = 0.8 / model.getBoardSize();
 
+    auto& points = board.get();
 	for (std::size_t layer = 0; layer < layers.size(); ++layer) {
 		int cnt = 0;
 		buffer[layer]->clear();
-		for (auto oit = overlay.begin(); oit != overlay.end(); ++oit) {
-			if (!oit->text.empty() && oit->layer == layer) {
+		for (auto oit = points.begin(); oit != points.end(); ++oit) {
+			if (!oit->overlay.text.empty() && oit->overlay.layer == layer) {
 				glyphy_point_t pos = { model.metrics.squareSize * oit->x, -model.metrics.squareSize * oit->y };
 				buffer[layer]->move_to(&pos);
-				buffer[layer]->add_text(oit->text.c_str(), font, font_size);
+				buffer[layer]->add_text(oit->overlay.text.c_str(), font, font_size);
 				cnt += 1;
 			}
 		}

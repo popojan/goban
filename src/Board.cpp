@@ -21,11 +21,11 @@ Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1
 }
 
 bool Board::isEmpty() const {
-    return std::all_of(board.begin(), board.end(), [](Color c){return c == Color::EMPTY;});
+    return std::all_of(points.begin(), points.end(), [](const Point& p){return p.stone == Color::EMPTY;});
 }
 
-const float* Board::getStones() const { return &stones[0]; }
-float* Board::getStones() { return &stones[0]; }
+const float* Board::getStones() const { return &glstones[0]; }
+float* Board::getStones() { return &glstones[0]; }
 
 std::ostream& operator<< (std::ostream& stream, const Color& color) {
     if (color == Color::BLACK)
@@ -40,7 +40,7 @@ std::ostream& operator<< (std::ostream& stream, const Color& color) {
 std::ostream& operator<< (std::ostream& stream, const Board& board) {
     for (int i = board.boardSize; i != 0; --i) {
         for(int j = 0; j < board.boardSize; ++j)
-            stream << board[Position(j, i)] << " ";
+            stream << board[Position(j, i)].stone << " ";
         stream << std::endl;
     }
     return stream;
@@ -119,10 +119,10 @@ std::istream& operator>> (std::istream& stream, Move& move) {
 bool Board::collides(int i, int j, int i0, int j0) {
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
-    float x0 = stones[idx0 - 2];
-    float y0 = stones[idx0 - 1];
-    float x = stones[idx - 2];
-    float y = stones[idx - 1];
+    float x0 = glstones[idx0 - 2];
+    float y0 = glstones[idx0 - 1];
+    float x = glstones[idx - 2];
+    float y = glstones[idx - 1];
     Position p(i0, j0);
     glm::vec2 v(x0-x,y0-y);
     return glm::length(v) <= safedist*rStone;
@@ -132,15 +132,15 @@ double Board::fixStone(int i, int j, int i0, int j0) {
     console->debug("fixStone ({},{})/({},{})", i, j, i0, j0);
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
-    float mValue = stones[idx0];
+    float mValue = glstones[idx0];
     double ret = 0.0;
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
         console->debug("1st IF");
         if(collides(i, j, i0, j0)) {
-            float x0 = stones[idx0 - 2];
-            float y0 = stones[idx0 - 1];
-            float x = stones[idx - 2];
-            float y = stones[idx - 1];
+            float x0 = glstones[idx0 - 2];
+            float y0 = glstones[idx0 - 1];
+            float x = glstones[idx - 2];
+            float y = glstones[idx - 1];
             Position p(i0, j0);
             glm::vec2 v(x0-x,y0-y);
             v = glm::vec2(x, y) + 1.01f*safedist * rStone * glm::normalize(v);
@@ -148,13 +148,13 @@ double Board::fixStone(int i, int j, int i0, int j0) {
             p.y = v.y;
             console->debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
-	    x = stones[idx - 2];
-	    y = stones[idx - 1];
-            stones[idx - 2] = p.x;
-            stones[idx - 1] = p.y;
+	        x = glstones[idx - 2];
+	        y = glstones[idx - 1];
+            glstones[idx - 2] = p.x;
+            glstones[idx - 1] = p.y;
             int oidx = boardSize  * i0 + j0;
-            overlay[oidx].x = p.x;
-            overlay[oidx].y = p.y;
+            points[oidx].x = p.x;
+            points[oidx].y = p.y;
             ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/boardSize);
             if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0))
                 ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0));
@@ -188,9 +188,9 @@ double Board::placeFuzzy(const Position& p, bool nofix){
         y = i - halfN + add.y;
     }
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
-    stones[idx - 2] = x;
-    stones[idx - 1] = y;
-    stones[idx + 1] = 3.14f*dist(generator);
+    glstones[idx - 2] = x;
+    glstones[idx - 1] = y;
+    glstones[idx + 1] = 3.14f*dist(generator);
     if(nofix == false) {
         if (i + 1 < boardSize)
             ret = std::max(ret, fixStone(i, j, i + 1u, j));
@@ -222,14 +222,14 @@ int Board::stoneChanged(const Position& p, const Color& c) {
     int i = p.row();
     int j = p.col();
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
-	stones[idx + 0] = mValue;
-    (*this)[p] = c;
+	glstones[idx + 0] = mValue;
+    (*this)[p].stone = c;
     return ret;
 }
 
 
 int Board::areaChanged(const Position& p, const Color& area) {
-    Color stone = (*this)[p];
+    Color stone = (*this)[p].stone;
     int i = p.row();
     int j = p.col();
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
@@ -247,8 +247,8 @@ int Board::areaChanged(const Position& p, const Color& area) {
     else if(area == Color::EMPTY || !showTerritory) {
         mValue = mEmpty;
     }
-    stones[idx + 0] = mValue;
-    (*this)(p) = area;
+    glstones[idx + 0] = mValue;
+    (*this)[p].influence = area;
     return TERRITORY_CHANGED;
 }
 
@@ -272,17 +272,19 @@ int Board::updateStones(const Board& board, bool showTerritory) {
         for(int row = 0; row < newSize; ++row) {
             Position pos(col, row);
 
-            Color newStone(board[pos]);
-            Color newArea(board(pos));
+            const Point& np = board[pos];
+            Color newStone(np.stone);
+            Color newArea(np.influence);
 
             if(!this->showTerritory) {
                 newArea = Color::EMPTY;
             }
 
-            if(newStone != (*this)[pos])
+            Point& p = (*this)[pos];
+            if(newStone != p.stone)
                 changed |= stoneChanged(pos, newStone);
 
-            if(newArea != (*this)(pos))
+            if(newArea != p.influence)
                 changed |= areaChanged(pos, newArea);
 
         }
@@ -383,25 +385,26 @@ int Board::capturedCount(const Color& whose) const {
 }
 
 void Board::clear(int boardsize) {
-	this->boardSize = boardsize;
-    stones.fill(mEmpty);
-    overlay.fill({ "", -1u, 0, 0});
+
+    this->boardSize = boardsize;
+
+    glstones.fill(mEmpty);
+    points.fill({
+        Color::EMPTY,
+        Color::EMPTY,
+        {"", -1u},
+        0, 0
+    });
+
     order = 0;
-    board.fill(Color::EMPTY);
-    territory.fill(Color::EMPTY);
     capturedBlack = 0;
     capturedWhite = 0;
     positionNumber += 1;
 }
 
-void Board::clearTerritory(int boardsize) {
-    territory.fill(Color::EMPTY);
-}
-
 void Board::copyStateFrom(const Board& b) {
-    stones = b.stones;
-    board = b.board;
-    territory = b.territory;
+    glstones = b.glstones;
+    points = b.points;
     boardSize = b.boardSize;
     capturedBlack = b.capturedBlack;
     capturedWhite = b.capturedWhite;
@@ -433,7 +436,7 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                         else if(c == 'O') {
                             color = Color::WHITE;
                         }
-                        board[ord(p)] = color;
+                        (*this)[p].stone = color;
                     }
                     if(lines[i].back() == 's') {
                         std::string s;
@@ -489,7 +492,7 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
                     c = Color::WHITE;
                 else if (val < -2)
                     c = Color::BLACK;
-                territory[ord(Position(j, boardSize - i - 1))] = c;
+                (*this)[Position(j, boardSize - i - 1)].influence = c;
             }
         }
         success = true;
@@ -499,14 +502,6 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
     }
     return success;
 
-}
-
-const Board::Overlay& Board::getOverlay() const {
-	return overlay;
-}
-
-Board::Overlay& Board::getOverlay() {
-    return overlay;
 }
 
 void Board::invalidate() {
