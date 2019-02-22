@@ -33,7 +33,7 @@ public:
     void draw(const GobanModel&, const DDG::Camera&, int updateFlag, float time, unsigned);
     ~GobanOverlay();
     void setReady() { overlayReady = true; }
-	void Update(const Board::Overlay& overlay, const GobanModel& model);
+	void Update(const Board& board, const GobanModel& model);
 private:
     FT_Library ft_library;
     FT_Face ft_face;

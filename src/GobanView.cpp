@@ -204,7 +204,7 @@ void GobanView::Render(int w, int h)
     }
 
 	if (updateFlag & UPDATE_STONES) {
-	    int change = board.updateStones(model.board, model.board.showTerritory);
+	    board.updateStones(model.board, model.board.showTerritory);
         updateCursor(model.cursor);
         lastCursor = model.cursor;
         double vol = board.collision;
@@ -222,7 +222,7 @@ void GobanView::Render(int w, int h)
 
 	glEnable(GL_DEPTH_TEST);
 	if (updateFlag & UPDATE_OVERLAY){
-		gobanOverlay.Update(board.getOverlay(), model);
+		gobanOverlay.Update(board, model);
 	}
 
 	if (time - startTime >= gobanShader.animT) {
@@ -345,15 +345,17 @@ void GobanView::moveCursor(float x, float y) {
 int GobanView::updateCursor(const Position& lastCursor){
     Position cursor = model.cursor;
     int ret = 0;
-    if(model.isPointOnBoard(lastCursor) && model.board[lastCursor] == Color::EMPTY) {
-        board.stoneChanged(lastCursor, model.board[lastCursor]);
-        board.areaChanged(lastCursor, model.board(lastCursor));
+    auto& lp = model.board[lastCursor];
+    auto& np = model.board[cursor];
+
+    if(model.isPointOnBoard(lastCursor) && lp.stone == Color::EMPTY) {
+        board.stoneChanged(lastCursor, lp.stone);
+        board.areaChanged(lastCursor, lp.influence);
     }
-    if(model.state.holdsStone && model.isPointOnBoard(cursor) && model.board[cursor] == Color::EMPTY){
-        board.stoneChanged(cursor, model.board[cursor]);
-        board.areaChanged(cursor, model.board(cursor));
+    if(model.state.holdsStone && model.isPointOnBoard(cursor) && np.stone == Color::EMPTY){
+        board.stoneChanged(cursor, np.stone);
+        board.areaChanged(cursor, np.influence);
         board.placeCursor(cursor, state.colorToMove);
-        //ret = state.holdsStone != model.state.holdsStone;
     }
     state.holdsStone = model.state.holdsStone;
     return ret;
