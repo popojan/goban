@@ -182,6 +182,9 @@ set(GOBAN_HDR_FILES
     ${PROJECT_SOURCE_DIR}/src/EventInstancer.h
     ${PROJECT_SOURCE_DIR}/src/EventManager.h
     ${PROJECT_SOURCE_DIR}/src/GameThread.h
+    ${PROJECT_SOURCE_DIR}/src/GameObserver.h
+    ${PROJECT_SOURCE_DIR}/src/BoardObserver.h
+    ${PROJECT_SOURCE_DIR}/src/GameThread.h
     ${PROJECT_SOURCE_DIR}/src/gtpclient.h
     ${PROJECT_SOURCE_DIR}/src/opengl.h
     ${PROJECT_SOURCE_DIR}/src/player.h

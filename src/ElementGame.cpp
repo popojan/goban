@@ -10,7 +10,9 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
           control(*this, model, view, engine), hasResults(false), calculatingScore(false)
 {
 
-	console = spdlog::get("console");
+    engine.addGameObserver(&model);
+    engine.addGameObserver(&view);
+    console = spdlog::get("console");
 	engine.clearGame(19);
     control.switchPlayer(0);
     control.switchPlayer(1);

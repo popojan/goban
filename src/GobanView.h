@@ -8,6 +8,7 @@
 #include <Rocket/Core/Texture.h>
 #include "GobanShader.h"
 #include "GobanModel.h"
+#include "GameObserver.h"
 #include "Metrics.h"
 #include "Camera.h"
 #include "GobanOverlay.h"
@@ -17,9 +18,10 @@
 #ifndef GOBAN_GOBANVIEW_H
 #define GOBAN_GOBANVIEW_H
 
-class GobanView {
+class GobanView: public GameObserver {
 public:
-    enum {UPDATE_NONE = 0, UPDATE_BOARD = 1, UPDATE_STONES = 2, UPDATE_GUI = 4, UPDATE_OVERLAY = 8, UPDATE_SOME = 16, UPDATE_SHADER = 32, UPDATE_ALL = -1};
+    enum {UPDATE_NONE = 0, UPDATE_BOARD = 1, UPDATE_STONES = 2, UPDATE_GUI = 4, UPDATE_OVERLAY = 8,
+        UPDATE_SOME = 16, UPDATE_SHADER = 32, UPDATE_SOUND_STONE = 64, UPDATE_ALL = -1};
 
 	GobanView(GobanModel& m)
 		: gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),
@@ -43,6 +45,7 @@ public:
         gobanShader.setReady();
         gobanOverlay.setReady();
     }
+    virtual void onGameMove(const Move& move);
 
     ~GobanView() {
         gobanShader.destroy();

@@ -259,6 +259,10 @@ void GameThread::gameLoop() {
                 const Board& result(
                     coach->showboard()
                 );
+                std::for_each(
+                    observers.begin(), observers.end(),
+                    [move](GameObserver* observer){observer->onGameMove(move);}
+                );
                 model.update(move, result);
             }
             //update territory if shown
