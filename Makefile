@@ -7,4 +7,4 @@ dependencies:
 build: dependencies
 	mkdir -p build && cd build && \
 	cmake .. && make -j4 && cd ..
-	cp build/goban .
+	ln -fs build/goban .

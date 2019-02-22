@@ -7,6 +7,7 @@
 
 #include "player.h"
 #include "GobanModel.h"
+#include "GameObserver.h"
 #include "Board.h"
 
 class GameThread
@@ -64,9 +65,12 @@ public:
 
 	void init();
 	void reset();
-
+    void addGameObserver(GameObserver* pobserver) {
+        observers.push_back(pobserver);
+    }
 private:
 	std::shared_ptr<spdlog::logger> console;
+    std::vector<GameObserver*> observers;
     GobanModel& model;
     std::vector<Engine*> engines; //engines know the rules
     std::vector<Player*> players; //all players including engines, humans, spectators

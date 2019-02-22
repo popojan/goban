@@ -199,12 +199,13 @@ void GobanView::Render(int w, int h)
 		animationRunning = true;
 		updateFlag = UPDATE_ALL;
 	}
+    if(updateFlag & UPDATE_SOUND_STONE) {
+        player.play("data/sound/stone.wav", 1.0);
+    }
 
 	if (updateFlag & UPDATE_STONES) {
 	    int change = board.updateStones(model.board, model.board.showTerritory);
         updateCursor(model.cursor);
-        if(change & Board::STONE_PLACED)
-            player.play("data/sound/stone.wav", 1.0);
         lastCursor = model.cursor;
         double vol = board.collision;
         if(vol > 0.0 && player.playbackCount() < 5){
@@ -356,4 +357,11 @@ int GobanView::updateCursor(const Position& lastCursor){
     }
     state.holdsStone = model.state.holdsStone;
     return ret;
+}
+
+
+void GobanView::onGameMove(const Move& move) {
+    if(move != Move::PASS) {
+        updateFlag |= UPDATE_SOUND_STONE;
+    }
 }

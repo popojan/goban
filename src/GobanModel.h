@@ -10,16 +10,19 @@
 #include "GameState.h"
 #include <spdlog/spdlog.h>
 #include "AudioPlayer.hpp"
+#include <GameObserver.h>
 
 class ElementGame;
 
-class GobanModel {
+class GobanModel: public GameObserver {
 public:
     GobanModel(ElementGame& p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
             : parent(p), prevPass(false), over(false), invalidated(false), cursor({0,0}) {
         console = spdlog::get("console");
         console->info("Preloading sounds...");
         newGame(boardSize, handicap, komi);
+    }
+    virtual void onGameMove(const Move& move) {
     }
 
 	void newGame(int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f);
@@ -63,6 +66,9 @@ public:
     //int boardChanged(Board&);
 public:
     ElementGame& parent;
+
+    //TODO multiple views in the future
+
     Board board;
 
     float komi;
