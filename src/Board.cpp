@@ -170,7 +170,7 @@ double Board::fixStone(int i, int j, int i0, int j0) {
     return ret;
 }
 
-double Board::placeFuzzy(const Position& p){
+double Board::placeFuzzy(const Position& p, bool nofix){
     int j = p.col();
     int i = p.row();
     const float halfN = 0.5f * boardSize - 0.5f;
@@ -191,26 +191,32 @@ double Board::placeFuzzy(const Position& p){
     stones[idx - 2] = x;
     stones[idx - 1] = y;
     stones[idx + 1] = 3.14f*dist(generator);
-    if (i + 1 < boardSize)
-        ret = std::max(ret, fixStone(i, j, i + 1u, j));
-    if(i -  1 >= 0)
-        ret = std::max(ret, fixStone(i, j, i -  1u, j));
-    if (j + 1 < boardSize)
-        ret = std::max(ret, fixStone(i, j, i, j + 1));
-    if(j -  1 >= 0)
-        ret = std::max(ret, fixStone(i, j, i, j -  1));
+    if(nofix == false) {
+        if (i + 1 < boardSize)
+            ret = std::max(ret, fixStone(i, j, i + 1u, j));
+        if(i -  1 >= 0)
+            ret = std::max(ret, fixStone(i, j, i -  1u, j));
+        if (j + 1 < boardSize)
+            ret = std::max(ret, fixStone(i, j, i, j + 1));
+        if(j -  1 >= 0)
+            ret = std::max(ret, fixStone(i, j, i, j -  1));
+    }
     return ret;
 }
 
-float Board::stoneChanged(const Position& p, const Color& c) {
+int Board::stoneChanged(const Position& p, const Color& c) {
     float mValue = mEmpty;
-    float ret = 0.0;
+    int ret = NO_CHANGE;
     if(c == Color::WHITE)
         mValue = mWhite;
     else if(c == Color::BLACK)
         mValue = mBlack;
     if(c == Color::WHITE || c == Color::BLACK) {
-        ret = placeFuzzy(p);
+        double collides = placeFuzzy(p);
+        collision = std::max(collision, collides);
+        ret = STONE_PLACED;
+    } else {
+        ret = STONE_REMOVED;
     }
     //TODO refactor arrays and indexing to simplify
     int i = p.row();
@@ -222,18 +228,43 @@ float Board::stoneChanged(const Position& p, const Color& c) {
 }
 
 
-int Board::areaChanged(const Position& p, const Color& col) {
-    return 1;
+int Board::areaChanged(const Position& p, const Color& area) {
+    Color stone = (*this)[p];
+    int i = p.row();
+    int j = p.col();
+    unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
+	float mValue = stones[idx + 0];
+    if(stone != Color::EMPTY) {
+        if (area != stone) {
+            mValue = stone == Color::BLACK ? mBlack : mWhite;
+            if(area != Color::EMPTY && showTerritory)
+                mValue += mDeltaCaptured;
+        }
+    }
+    else if(showTerritory && area != Color::EMPTY) {
+        mValue = area == Color::BLACK ? mBlackArea : mWhiteArea;
+        placeFuzzy(p, true);
+    }
+    else if(area == Color::EMPTY || !showTerritory) {
+        mValue = mEmpty;
+    }
+    stones[idx + 0] = mValue;
+    (*this)(p) = area;
+    return TERRITORY_CHANGED;
 }
 
 int Board::sizeChanged(int newSize) {
     boardSize = newSize;
-    return 1;
+    return SIZE_CHANGED;
 }
 
 int Board::updateStones(const Board& board, bool showTerritory) {
     int newSize = board.getSize();
     int changed = 0;
+
+    this->showTerritory = board.showTerritory;
+	this->showTerritoryAuto = board.showTerritoryAuto;
+
     if(newSize != boardSize) {
         sizeChanged(newSize);
         changed = 1;
@@ -241,16 +272,20 @@ int Board::updateStones(const Board& board, bool showTerritory) {
     for(int col = 0; col < newSize; ++col) {
         for(int row = 0; row < newSize; ++row) {
             Position pos(col, row);
+
             Color newStone(board[pos]);
             Color newArea(board(pos));
-            if(newStone != (*this)[pos]){
-                stoneChanged(pos, newStone);
-                changed = 1;
+
+            if(!this->showTerritory) {
+                newArea = Color::EMPTY;
             }
-            if(newArea != (*this)(pos)) {
-               areaChanged(pos, newArea);
-               changed = 1;
-            }
+
+            if(newStone != (*this)[pos])
+                changed |= stoneChanged(pos, newStone);
+
+            if(newArea != (*this)(pos))
+                changed |= areaChanged(pos, newArea);
+
         }
     }
     return changed;

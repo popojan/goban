@@ -16,10 +16,9 @@ class ElementGame;
 class GobanModel {
 public:
     GobanModel(ElementGame& p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
-            : parent(p), prevPass(false), over(false), invalidated(false), holdsStone(false), cursor({0,0}) {
+            : parent(p), prevPass(false), over(false), invalidated(false), cursor({0,0}) {
         console = spdlog::get("console");
         console->info("Preloading sounds...");
-        player.preload({"data/sound/collision.wav", "data/sound/stone.wav"});
         newGame(boardSize, handicap, komi);
     }
 
@@ -60,7 +59,6 @@ public:
 
     void setCursor(const Position& p) { cursor = p;}
 
-    bool placeCursor(Board& target, const Position& last);
 
     //int boardChanged(Board&);
 public:
@@ -85,9 +83,7 @@ public:
 	std::mutex mutex;
     std::shared_ptr<spdlog::logger> console;
 
-    bool holdsStone;
     Position cursor;
-    AudioPlayer player;
 };
 
 
