@@ -56,8 +56,8 @@ public:
     Position(int col, int row): c(col), r(row), x(0), y(0) { }
 
     operator bool() const { return c >= 0 && r >= 0; }
-    bool operator ==(const Position& b) const { return c == b.c && r == b.r;}
-    bool operator !=(const Position& b) const { return !(*this == b);}
+    //bool operator ==(const Position& b) const { return c == b.c && r == b.r;}
+    //bool operator !=(const Position& b) const { return !(*this == b);}
 
     int col() const { return c; }
     int row() const { return r; }
@@ -124,6 +124,7 @@ public:
     static const int DEFAULTSIZE = 19;
     typedef std::array<float, Board::MAXBOARD*Board::MAXBOARD << 2> Stones;
     typedef std::array<CoordText, Board::MAXBOARD*Board::MAXBOARD> Overlay;
+    enum Change { NO_CHANGE = 0, STONE_PLACED = 1, STONE_REMOVED = 2, TERRITORY_CHANGED = 4, SIZE_CHANGED = 8};
 private:
     typedef std::array<Color, BOARDSIZE> board_array;
 public:
@@ -189,7 +190,7 @@ public:
 
     friend std::ostream& operator<< (std::ostream&, const Board&);
 
-    float stoneChanged(const Position& p, const Color& col);
+    int stoneChanged(const Position& p, const Color& col);
     int areaChanged(const Position& p, const Color& col);
     int sizeChanged(int newSize);
     int updateStones(const Board& previous, bool showTerritory);
@@ -199,7 +200,7 @@ public:
 	bool toggleTerritoryAuto(bool);
 
 	double placeCursor(const Position& p, const Color& col);
-    double placeFuzzy(const Position& p);
+    double placeFuzzy(const Position& p, bool nofix = false);
 
     bool collides(int i, int j, int i0, int j0);
 
@@ -238,6 +239,7 @@ public:
 	int lastPlayed_i, lastPlayed_j;
 	Position cursor;
     volatile long moveNumber;
+    double collision;
 };
 
 #endif // BOARD_H

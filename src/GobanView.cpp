@@ -201,9 +201,17 @@ void GobanView::Render(int w, int h)
 	}
 
 	if (updateFlag & UPDATE_STONES) {
-	    board.updateStones(model.board, model.board.showTerritory);
-        model.placeCursor(board, lastCursor);
+	    int change = board.updateStones(model.board, model.board.showTerritory);
+        updateCursor(model.cursor);
+        if(change & Board::STONE_PLACED)
+            player.play("data/sound/stone.wav", 1.0);
         lastCursor = model.cursor;
+        double vol = board.collision;
+        if(vol > 0.0 && player.playbackCount() < 5){
+	        console->info("collision volume = {}", vol);
+            player.play("data/sound/collision.wav", vol);
+            board.collision = false;
+	    }
 	}
 
 	shadeit(time, gobanShader);
@@ -331,4 +339,21 @@ void GobanView::moveCursor(float x, float y) {
     Position coord = getBoardCoordinate(x, y);
     model.setCursor(coord);
 	updateFlag |= UPDATE_STONES | UPDATE_OVERLAY;
+}
+
+int GobanView::updateCursor(const Position& lastCursor){
+    Position cursor = model.cursor;
+    int ret = 0;
+    if(model.isPointOnBoard(lastCursor) && model.board[lastCursor] == Color::EMPTY) {
+        board.stoneChanged(lastCursor, model.board[lastCursor]);
+        board.areaChanged(lastCursor, model.board(lastCursor));
+    }
+    if(model.state.holdsStone && model.isPointOnBoard(cursor) && model.board[cursor] == Color::EMPTY){
+        board.stoneChanged(cursor, model.board[cursor]);
+        board.areaChanged(cursor, model.board(cursor));
+        board.placeCursor(cursor, state.colorToMove);
+        //ret = state.holdsStone != model.state.holdsStone;
+    }
+    state.holdsStone = model.state.holdsStone;
+    return ret;
 }

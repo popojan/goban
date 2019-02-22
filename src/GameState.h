@@ -30,7 +30,7 @@ public:
 
     GameState(): colorToMove(Color::BLACK), black(""), white(""), capturedBlack(-1), capturedWhite(-1),
             komi(-1.0f), handicap(-1), result(0.0f), cmd("xxx"), msg(PAUSED), reason(NOREASON), adata(),
-            metricsReady(false), showTerritory(false), showOverlay(false), dirty(true)
+            metricsReady(false), showTerritory(false), showOverlay(false), holdsStone(false), dirty(true)
     {
         activePlayerId[0] = activePlayerId[1] = -1;
     }
@@ -61,7 +61,7 @@ public:
         { }
     } adata;
     bool metricsReady;
-	bool showTerritory, showOverlay;
+	bool showTerritory, showOverlay, holdsStone;
 	volatile bool dirty;
 
 };

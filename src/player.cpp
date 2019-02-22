@@ -216,11 +216,11 @@ bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
         board.clearTerritory(board.getSize());
         bool success = true;
         Player::console->debug("dead");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), territory, Color::EMPTY);
+        success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), board, Color::EMPTY);
         Player::console->debug("white");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), territory, Color::WHITE);
+        success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), board, Color::WHITE);
         Player::console->debug("black");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), territory, Color::BLACK);
+        success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), board, Color::BLACK);
         return success;
     }
     else {
@@ -248,7 +248,7 @@ bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
                     std::istringstream ss(ret[0].substr(2));
                     Position p;
                     while ((ss >> p)){
-                        board(p) = board[p]; //Color::other(board[p]);
+                        board(p) = Color::other(board[p]);
                     }
                 }
             }
@@ -273,9 +273,9 @@ bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, cons
         Position p;
         while((ss >> p)) {
             if(color == Color::EMPTY)
-                b[p] = Color::other(board[p]);
+                b(p) = Color::other(board[p]);
             else
-                b[p] = color;
+                b(p) = color;
         }
         return true;
     }
