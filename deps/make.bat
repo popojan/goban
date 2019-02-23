@@ -11,8 +11,9 @@ MSBuild.exe freetype.vcxproj /t:Build /p:Configuration=Release  /p:PlatformTools
 cd ..\..
 
 REM libRocket
-if not exist libRocket git clone https://github.com/libRocket/libRocket.git
+if not exist libRocket git clone https://github.com/popojan/libRocket.git
 cd libRocket
+git checkout rem-fix
 if defined CLEAN rmdir /s /q BuildDir
 if not exist BuildDir mkdir BuildDir
 cd BuildDir

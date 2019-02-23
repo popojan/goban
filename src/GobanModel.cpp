@@ -27,20 +27,6 @@ void GobanModel::newGame(int boardSize, int handicap, float komi) {
 	//state.adata = GameState::Result();
 	calcCapturedBlack = calcCapturedWhite = 0;
 
-	/*auto problems(sgf::parse("./problems/alphago/master04_Xie_Erhao.sgf"));
-	auto variations = problems.at(0).variations();
-	if (variations[0].nodehas("C")) {
-		std::cerr << "SGF " << node.get("C")[0] << std::endl;
-	}
-
-	for (int i = 0; i < search()nodes.size(); ++i) {
-		if (nodes[i].has("B")) {
-			std::cerr << "SGF " << nodes[i].get("B")[0] << std::endl;
-		}
-		if (nodes[i].has("W")) {
-			std::cerr << "SGF " << nodes[i].get("W")[0] << std::endl;
-		}
-	}*/
     if(!state.metricsReady) {
         metrics.calc(board.getSize());
         state.metricsReady = true;
