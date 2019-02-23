@@ -8,10 +8,10 @@ const float Board::mEmpty = 0.0f;
 const float Board::mBlack = 5.0f;
 const float Board::mWhite = 6.0f;
 const float Board::mDeltaCaptured = 0.5f;
-const float Board::safedist = 1.05f;
+const float Board::safedist = 1.01f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
-    dist(0.0f, 0.05f), invalidated(false), order(0), showTerritory(false), showTerritoryAuto(false),
+    dist(0.0f, 0.05f), invalidated(false), order(1), showTerritory(false), showTerritoryAuto(false),
     territoryReady(false), lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0)
 
 {
@@ -150,11 +150,12 @@ double Board::fixStone(int i, int j, int i0, int j0) {
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
 	        x = glstones[idx - 2];
 	        y = glstones[idx - 1];
-            glstones[idx - 2] = p.x;
-            glstones[idx - 1] = p.y;
-            int oidx = boardSize  * i0 + j0;
-            points[oidx].x = p.x;
-            points[oidx].y = p.y;
+            glstones[idx0 - 2] = p.x;
+            glstones[idx0 - 1] = p.y;
+            Point& pt = (*this)[Position(j0, i0)];
+            pt.x = p.x;
+            pt.y = p.y;
+            (*this)[Position(j0, i0)].y = p.y;
             ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/boardSize);
             if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0))
                 ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0));
@@ -177,19 +178,23 @@ double Board::placeFuzzy(const Position& p, bool nofix){
     float x = p.x;
     float y = p.y;
     double ret = 0.0;
-    if(x == 0 && y == 0) {
+    if(p.x == 0 && p.y == 0) {
         x = j - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
         y = i - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
     }
     else {
-        glm::vec2 v(x - j - 0.5f, y - i - 0.5f);
-        glm::vec2 add(6.0f * r1 * v);
-        x = j - halfN + add.x;
-        y = i - halfN + add.y;
+        x = x - halfN;
+        y = y - halfN;
     }
+
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
+
     glstones[idx - 2] = x;
     glstones[idx - 1] = y;
+
+    (*this)[p].x = x;
+    (*this)[p].y = y;
+
     glstones[idx + 1] = 3.14f*dist(generator);
     if(nofix == false) {
         if (i + 1 < boardSize)
@@ -204,9 +209,24 @@ double Board::placeFuzzy(const Position& p, bool nofix){
     return ret;
 }
 
+void Board::removeOverlay(const Position& p) {
+    auto& overlay = (*this)[p].overlay;
+    overlay.text = std::string("");
+    overlay.layer = -1u;
+}
+
+void Board::setOverlay(const Position& p, const std::string& text, const Color& c) {
+    auto& overlay = (*this)[p].overlay;
+    overlay.text = text;
+    overlay.layer = c == Color::BLACK ? 1 : 2;
+}
+
 int Board::stoneChanged(const Position& p, const Color& c) {
     float mValue = mEmpty;
     int ret = NO_CHANGE;
+    int i = p.row();
+    int j = p.col();
+    unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
     if(c == Color::WHITE)
         mValue = mWhite;
     else if(c == Color::BLACK)
@@ -217,11 +237,9 @@ int Board::stoneChanged(const Position& p, const Color& c) {
         ret = STONE_PLACED;
     } else {
         ret = STONE_REMOVED;
+        removeOverlay(p);
     }
     //TODO refactor arrays and indexing to simplify
-    int i = p.row();
-    int j = p.col();
-    unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
 	glstones[idx + 0] = mValue;
     (*this)[p].stone = c;
     return ret;
@@ -263,6 +281,7 @@ int Board::updateStones(const Board& board, bool showTerritory) {
 
     this->showTerritory = board.showTerritory;
 	this->showTerritoryAuto = board.showTerritoryAuto;
+    this->order = board.order;
 
     if(newSize != boardSize) {
         sizeChanged(newSize);
@@ -396,7 +415,7 @@ void Board::clear(int boardsize) {
         0, 0
     });
 
-    order = 0;
+    order = 1;
     capturedBlack = 0;
     capturedWhite = 0;
     positionNumber += 1;
@@ -533,7 +552,19 @@ bool Board::toggleTerritory() {
 }
 
 double Board::placeCursor(const Position& coord, const Color& col) {
-    return stoneChanged(coord, col);
+
+    glm::vec2 v(
+        coord.x - coord.col() - 0.5f,
+        coord.y - coord.row() - 0.5f
+    );
+
+    glm::vec2 add(6.0f * r1 * v);
+
+    Position pos(coord);
+    pos.x = coord.col() + add.x;
+    pos.y = coord.row() + add.y;
+
+    return stoneChanged(pos, col);
     /*int oidx = ((boardSize  * coord.row() + coord.col()) << 2u) + 2u;
     console->debug("oidx = [{},{}] = {} ... {} {}", coord.col(), coord.row(), oidx, board[coord].toString(), col.toString());
     double altered = placeFuzzy(coord);

@@ -51,6 +51,7 @@ class Position {
 public:
     float x;
     float y;
+
     Position(): c(0), r(0), x(0.0), y(0.0) { }
 
     Position(int col, int row): c(col), r(row), x(0), y(0) { }
@@ -82,7 +83,9 @@ public:
         : spec(NORMAL), pos(pos), col(col)
     { }
 
-    operator bool() const { return spec != INVALID; }
+    operator bool() const { return spec != INVALID && spec != INTERRUPT; }
+    operator Position() const { return pos; }
+    operator Color() const { return col; }
 
     bool operator== (Special b) const { return spec == b; }
 
@@ -99,8 +102,10 @@ public:
     friend std::ostream& operator<< (std::ostream& stream, const Move& );
 
     std::string toString() const;
+
 private:
     Special spec;
+public:
     Position pos;
     Color col;
 
@@ -201,6 +206,8 @@ public:
     double placeFuzzy(const Position& p, bool nofix = false);
 
     bool collides(int i, int j, int i0, int j0);
+    void removeOverlay(const Position& p);
+    void setOverlay(const Position& p, const std::string& text, const Color& c);
 
 private:
 

@@ -53,9 +53,15 @@ public:
         pis << command << std::endl;
         std::string line;
         console->info("getting response...");
+        bool error = true;
         while (std::getline(pos, line)) {
             line.erase(line.find_last_not_of(" \n\r\t") + 1);
-            console->info("{1} >> {0}", line, exe);
+            if(ret.empty())
+                error = *line.c_str() != '=';
+            if(!error)
+                console->info("{1} >> {0}", line, exe);
+            else
+                console->error("{1} >> {0}", line, exe);
             if (line.empty()) break;
             ret.push_back(line);
         }
