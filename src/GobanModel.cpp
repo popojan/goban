@@ -13,6 +13,7 @@ void GobanModel::newGame(int boardSize, int handicap, float komi) {
 	}
 	lastHandicap = this->handicap = handicap;
 	board.clear(boardSize);
+    history.clear();
 
 	over = false;
 	started = false;
@@ -257,7 +258,7 @@ void GobanModel::onBoardChange(const Board& result) {
     state.capturedWhite = board.capturedCount(Color::WHITE);
     calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
 
-    console->warn("over {} ready {}", over, result.territoryReady);
+    console->debug("over {} ready {}", over, result.territoryReady);
 
     if(over && result.territoryReady) {
         this->result(history.back(), state.adata);

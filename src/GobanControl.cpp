@@ -36,9 +36,8 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 newGame(model.getBoardSize());
                 playNow = false;
             }
-            else if(view.board.isEmpty()) {
-                if(!engine.isRunning())
-                    engine.run();
+            else if(!engine.isRunning() && !model.over) {
+               engine.run();
             }
             if(playNow) {
                 bool humanMove = engine.humanToMove();

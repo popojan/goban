@@ -41,6 +41,7 @@ void GlyphyBuffer::clear()
     vertices->clear ();
     glyphy_extents_clear(&ink_extents);
     glyphy_extents_clear(&logical_extents);
+    cursor.x = cursor.y = 0.0f; 
     dirty = true;
 }
 

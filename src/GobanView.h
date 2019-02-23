@@ -144,6 +144,7 @@ public:
     int currentProgram;
 	bool showOverlay;
     Position lastCursor;
+    Position lastMove;
     AudioPlayer player;
 };
 
