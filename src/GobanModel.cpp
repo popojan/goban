@@ -219,28 +219,18 @@ Move GobanModel::getUndoMove() {
     return Move(Move::UNDO, state.colorToMove);
 }
 
-void GobanModel::update(const Move& move, const Board& result) {
-
-    console->debug("LOCK board");
+void GobanModel::onGameMove(const Move& move) {
+    console->debug("LOCK model");
     std::lock_guard<std::mutex> lock(mutex);
-
-    board.copyStateFrom(result);
-    board.positionNumber += 1;
-    board.order += 1;
-
-    state.capturedBlack = board.capturedCount(Color::BLACK);
-    state.capturedWhite = board.capturedCount(Color::WHITE);
-    calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
 
     history.push_back(move);
 
     if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
-        over = true;
-        console->debug("Main Over! Reason {}", state.reason);
-        this->result(move, state.adata);
         if (state.reason == GameState::DOUBLE_PASS)
             board.toggleTerritoryAuto(true);
+        over = true;
+        console->debug("Main Over! Reason {}", state.reason);
     }
     else if (move == Move::PASS) {
         prevPass = true;
@@ -255,10 +245,21 @@ void GobanModel::update(const Move& move, const Board& result) {
     changeTurn();
 }
 
-void GobanModel::update(const Board& board) {
-    console->debug("LOCK territory");
+void GobanModel::onBoardChange(const Board& result) {
+    console->debug("LOCK board");
     std::lock_guard<std::mutex> lock(mutex);
-    this->board.copyStateFrom(board);
-    this->board.positionNumber += 1;
-}
 
+    board.copyStateFrom(result);
+    board.positionNumber += 1;
+    board.order += 1;
+
+    state.capturedBlack = board.capturedCount(Color::BLACK);
+    state.capturedWhite = board.capturedCount(Color::WHITE);
+    calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
+
+    console->warn("over {} ready {}", over, result.territoryReady);
+
+    if(over && result.territoryReady) {
+        this->result(history.back(), state.adata);
+    }
+}

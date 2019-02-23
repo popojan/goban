@@ -164,6 +164,7 @@ Move GtpEngine::genmove(const Color& colorToMove) {
 }
 
 const Board& GtpEngine::showboard() {
+    board.territoryReady = false;
     board.parseGtp(GtpClient::showboard());
     return board;
 }
@@ -210,18 +211,17 @@ bool GtpEngine::undo() {
     return GtpClient::success(GtpClient::issueCommand("undo"));
 }
 
-bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
-    if (final) {
+bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
+    bool success = true;
+    if (finalize) {
         Player::console->debug("initial territory");
         board.clearTerritory(board.getSize());
-        bool success = true;
         Player::console->debug("dead");
         success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), board, Color::EMPTY);
         Player::console->debug("white");
         success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), board, Color::WHITE);
         Player::console->debug("black");
         success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), board, Color::BLACK);
-        return success;
     }
     else {
         std::stringstream ss;
@@ -253,8 +253,9 @@ bool GtpEngine::estimateTerritory(bool final, const Color& colorToMove) {
                 }
             }
         }
-        return true;
     }
+    board.territoryReady = success;
+    return success;
 }
 
 const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
@@ -273,7 +274,7 @@ bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, cons
         Position p;
         while((ss >> p)) {
             if(color == Color::EMPTY)
-                b[p].influence = Color::other(board[p].stone);
+                b[p].influence = Color::other(b[p].stone);
             else
                 b[p].influence = color;
         }

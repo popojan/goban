@@ -20,8 +20,12 @@
 
 class GobanView: public GameObserver {
 public:
-    enum {UPDATE_NONE = 0, UPDATE_BOARD = 1, UPDATE_STONES = 2, UPDATE_GUI = 4, UPDATE_OVERLAY = 8,
-        UPDATE_SOME = 16, UPDATE_SHADER = 32, UPDATE_SOUND_STONE = 64, UPDATE_ALL = -1};
+    enum {
+        UPDATE_NONE   =  0,  UPDATE_BOARD       =  1, UPDATE_STONES =  2,
+        UPDATE_GUI    =  4,  UPDATE_OVERLAY     =  8, UPDATE_SOME   = 16,
+        UPDATE_SHADER = 32,  UPDATE_SOUND_STONE = 64,
+        UPDATE_ALL = (1|2|3|4|8|16|32)
+    };
 
 	GobanView(GobanModel& m)
 		: gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),

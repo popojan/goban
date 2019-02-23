@@ -84,7 +84,7 @@ void GameThread::clearGame(int boardSize) {
         Player* player = *pit;
         player->boardsize(boardSize);
     }
-    players[sgf]->clear();
+    //players[sgf]->clear();
     setKomi(model.komi);
     setFixedHandicap(model.handicap);
 }
@@ -105,10 +105,10 @@ int GameThread::getActivePlayer(int which) {
     return activePlayer[which];
 }
 
-int GameThread::activatePlayer(int which) {
+int GameThread::activatePlayer(int which, int delta) {
     std::lock_guard<std::mutex> lock(playerMutex);
     std::size_t oldp = activePlayer[which];
-    std::size_t newp = (oldp + 1) %  numPlayers;
+    std::size_t newp = (oldp + delta) %  numPlayers;
     activePlayer[which] = newp;
     int role = which == 0 ? Player::BLACK : Player::WHITE;
     if(newp == sgf) {
@@ -260,21 +260,35 @@ void GameThread::gameLoop() {
                     coach->showboard()
                 );
                 std::for_each(
-                    observers.begin(), observers.end(),
+                    gobservers.begin(), gobservers.end(),
                     [move](GameObserver* observer){observer->onGameMove(move);}
                 );
-                model.update(move, result);
+                std::for_each(
+                    bobservers.begin(), bobservers.end(),
+                    [result](BoardObserver* observer){observer->onBoardChange(result);}
+                );
             }
+
             //update territory if shown
-            if(model.board.showTerritory && (success || move == Move::INTERRUPT)) {
+
+            bool influence = model.board.showTerritory
+                && (success || move == Move::INTERRUPT);
+
+            if(influence) {
                 bool finalized = model.state.reason == GameState::DOUBLE_PASS;
-                const Board& territory(
+                const Board& result(
                     coach->showterritory(finalized, model.state.colorToMove)
                 );
-                model.update(territory);
+                std::for_each(
+                    bobservers.begin(), bobservers.end(),
+                    [result](BoardObserver* observer){observer->onBoardChange(result);}
+                );
             }
+
             if(model.over)
                 break;
+
+
             if(success && move != Move::INTERRUPT)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -297,7 +311,7 @@ void GameThread::loadEngines(const std::string& dir) {
 
     if(boost::filesystem::is_directory(p)) {
 
-        bool hasCouch(false);
+        bool hasCoach(false);
 
         for (auto it = boost::filesystem::directory_iterator(p); it != boost::filesystem::directory_iterator(); ++it) {
             std::string fengine(it->path().string());
@@ -307,25 +321,28 @@ void GameThread::loadEngines(const std::string& dir) {
             std::getline(fin, exe);
             std::getline(fin, cmd);
             std::getline(fin, name);
-            int isCouch = 0;
-            fin >> isCouch;
+            int isCoach = 0;
+            fin >> isCoach;
             fin.close();
             int role = Player::SPECTATOR;
-            if(isCouch && !hasCouch) {
-                role |= Player::COACH;
-                hasCouch = true;
-            };
+
             std::size_t id = addEngine(new GtpEngine(exe, cmd, path, name));
+
+            if(isCoach && !hasCoach) {
+                role |= Player::COACH;
+                hasCoach = true;
+                coach = id;
+            };
             setRole(id, role, true);
         }
     }
-    sgf = addPlayer(new SgfPlayer("SGF Record", "./problems/alphago-2016/3/13/Tictactoe.sgf"));
+    sgf = -1; //addPlayer(new SgfPlayer("SGF Record", "./problems/alphago-2016/3/13/Tictactoe.sgf"));
 
     human = addPlayer(new LocalHumanPlayer("Human"));
 
     numPlayers = human + 1;
-    activePlayer[0] = sgf;
-    activePlayer[1] = human;
+    activePlayer[0] = human;
+    activePlayer[1] = coach;
 }
 
 Move GameThread::getLocalMove(const Position& coord) {

@@ -57,7 +57,7 @@ public:
 
 	void loadEngines(const std::string& path);
 
-	int activatePlayer(int which);
+	int activatePlayer(int which, int delta = 1);
 
 	int getActivePlayer(int which);
 
@@ -65,12 +65,19 @@ public:
 
 	void init();
 	void reset();
+
     void addGameObserver(GameObserver* pobserver) {
-        observers.push_back(pobserver);
+        gobservers.push_back(pobserver);
     }
+
+    void addBoardObserver(BoardObserver* pobserver) {
+        bobservers.push_back(pobserver);
+    }
+
 private:
 	std::shared_ptr<spdlog::logger> console;
-    std::vector<GameObserver*> observers;
+    std::vector<GameObserver*> gobservers;
+    std::vector<BoardObserver*> bobservers;
     GobanModel& model;
     std::vector<Engine*> engines; //engines know the rules
     std::vector<Player*> players; //all players including engines, humans, spectators
@@ -79,8 +86,7 @@ private:
     std::condition_variable cvPlayer;
     volatile bool interruptRequested, hasThreadRunning;
     Player* playerToMove;
-	std::size_t human;
-	std::size_t sgf;
+	std::size_t human, sgf, coach;
 	std::size_t numPlayers;
 	std::array<std::size_t, 2> activePlayer;
     std::mutex playerMutex;

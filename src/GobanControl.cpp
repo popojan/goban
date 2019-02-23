@@ -232,8 +232,8 @@ void GobanControl::increaseHandicap(){
 }
 
 
-void GobanControl::switchPlayer(int which) {
-    model.state.activePlayerId[which] = engine.activatePlayer(which);
+void GobanControl::switchPlayer(int which, int delta) {
+    model.state.activePlayerId[which] = engine.activatePlayer(which, delta);
     model.state.activePlayerId[1-which] = engine.getActivePlayer(1-which);
 }
 
