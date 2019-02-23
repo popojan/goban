@@ -342,13 +342,14 @@ void GobanView::Update() {
 void GobanView::moveCursor(float x, float y) {
     Position coord = getBoardCoordinate(x, y);
     model.setCursor(coord);
-	updateFlag |= UPDATE_STONES | UPDATE_OVERLAY;
+    if(model.state.holdsStone) {
+        updateFlag |= UPDATE_STONES | UPDATE_OVERLAY;
+    }
 }
 
 int GobanView::updateCursor(const Position& lastCursor){
     Position cursor = model.cursor;
     int ret = 0;
-    auto& lp = model.board[lastCursor];
     auto& np = model.board[cursor];
 
     if(model.state.holdsStone && model.isPointOnBoard(cursor) && np.stone == Color::EMPTY){
@@ -360,7 +361,7 @@ int GobanView::updateCursor(const Position& lastCursor){
 
 
 void GobanView::onGameMove(const Move& move) {
-    if(move != Move::PASS) {
+    if(move == Move::NORMAL) {
         updateFlag |= UPDATE_SOUND_STONE;
         std::ostringstream ss;
         ss << board.order;
