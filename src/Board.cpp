@@ -12,7 +12,7 @@ const float Board::safedist = 1.05f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
     dist(0.0f, 0.05f), invalidated(false), order(0), showTerritory(false), showTerritoryAuto(false),
-    lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0)
+    territoryReady(false), lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0)
 
 {
     console = spdlog::get("console");
@@ -276,7 +276,7 @@ int Board::updateStones(const Board& board, bool showTerritory) {
             Color newStone(np.stone);
             Color newArea(np.influence);
 
-            if(!this->showTerritory) {
+            if(!this->showTerritory) { // || !board.territoryReady) ugly flashing
                 newArea = Color::EMPTY;
             }
 
@@ -408,6 +408,7 @@ void Board::copyStateFrom(const Board& b) {
     boardSize = b.boardSize;
     capturedBlack = b.capturedBlack;
     capturedWhite = b.capturedWhite;
+    territoryReady = b.territoryReady;
     moveNumber = b.moveNumber;
 }
 

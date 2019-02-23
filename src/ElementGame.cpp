@@ -11,11 +11,12 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
 {
 
     engine.addGameObserver(&model);
+    engine.addBoardObserver(&model);
     engine.addGameObserver(&view);
     console = spdlog::get("console");
 	engine.clearGame(19);
-    control.switchPlayer(0);
-    control.switchPlayer(1);
+    control.switchPlayer(0, 0);
+    control.switchPlayer(1, 0);
 }
 
 void ElementGame::gameLoop() {

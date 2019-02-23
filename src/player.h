@@ -85,11 +85,14 @@ protected:
 class Engine: public Player
 {
 public:
-    Engine(const std::string& name) : Player(name, NONE, LOCAL | ENGINE)  {}
+    Engine(const std::string& name) : Player(name, NONE, LOCAL | ENGINE), board(19)  {}
     virtual Move genmove(const Color& colorToMove) = 0;
     virtual const Board& showboard() = 0;
     virtual const Board& showterritory(bool final = true, Color colorToMove = Color::EMPTY) = 0;
     virtual ~Engine() {}
+    virtual const Board& peek() const { return board; }
+protected:
+    Board board;
     //TODO GTP API
 };
 
@@ -98,7 +101,7 @@ public:
 
     GtpEngine(const std::string& exe, const std::string& cmdline, const std::string& path = "",
         const std::string& nameExtra = "")
-    : Engine(nameExtra), GtpClient(exe, cmdline, path), board(19)
+    : Engine(nameExtra), GtpClient(exe, cmdline, path)
     {
         //setEngineName(nameExtra);
     }
@@ -119,8 +122,6 @@ public:
     virtual const Board& showterritory(bool final = true, Color colorToMove = Color::EMPTY);
 
 protected:
-    Board board;
-    Board territory;
 
     bool setTerritory(const GtpClient::CommandOutput& ret, Board& b, const Color& color);
     void setEngineName(const std::string& nameExtra);

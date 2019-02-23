@@ -238,6 +238,7 @@ public:
     int order;
 	volatile long positionNumber;
     bool showTerritory, showTerritoryAuto;
+    bool territoryReady;
 private:
 	int lastPlayed_i, lastPlayed_j;
 	Position cursor;
