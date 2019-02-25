@@ -12,10 +12,11 @@ For windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/gob
 
 ## Tasks
 *   refactor and clean-up code
+*   redesign GUI allowing for new features
 *   add SGF support to replay and save games
-*   add stone placement sound
-*   add shader configuration via GUI or xml
-*   publish anaglyphic version of the shader
+*   enable shader templating to share common code between shaders
+*   enable shader configuration via GUI or configuration files
+*   allow external goban control via GTP protocol
 
 ## Dependencies
 *   `glew`
@@ -24,3 +25,5 @@ For windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/gob
 *   `boost >= 1.64`
 *   `GLM`
 *   `glyphy`
+*   `libsndfile`
+*   `portaudio`
