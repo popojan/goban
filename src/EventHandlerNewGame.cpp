@@ -1,5 +1,7 @@
 #include "EventHandlerNewGame.h"
 #include <Rocket/Core/Context.h>
+#include <Rocket/Controls/ElementFormControlSelect.h>
+#include <Rocket/Controls/SelectOption.h>
 #include <Rocket/Core/ElementDocument.h>
 #include <Rocket/Core/ElementUtilities.h>
 #include <Rocket/Core/Event.h>
@@ -18,8 +20,8 @@ EventHandlerNewGame::~EventHandlerNewGame()
 void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value)
 {
 
-    GobanControl& controller = dynamic_cast<ElementGame*>(event.GetCurrentElement()
-    ->GetContext()->GetDocument("game_window")->GetElementById("game"))->getController();
+  auto doc = event.GetCurrentElement()->GetContext()->GetDocument("game_window");
+  GobanControl& controller = dynamic_cast<ElementGame*>(doc->GetElementById("game"))->getController();
 
     if(value == "new 9") {
         controller.newGame(9);
@@ -60,6 +62,9 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
     }
     else if (value == "hand") {
         controller.increaseHandicap();
+    }
+    else if (value == "form") {
+        std::cerr << "change komi " << event.GetParameter<Rocket::Core::String>("value", "0").CString() << std::endl;
     }
     event.StopPropagation();
 }

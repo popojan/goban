@@ -33,7 +33,16 @@
             <div id="grpWhite">
                 <div class="cmd" id="lblWhite" onmousedown="white">White</div><br/>
                 <div class="cmd" id="cntWhite" onmousedown="white">White: 0</div><br/>
-                <div class="cmd" id="lblKomi" onmousedown="komi">Komi: 6.5</div>
+                <div class="frm">
+                <div class="cmd">
+                  <select onchange="form" id="selectKomi">
+                    <option value="0.5">Komi: 0.5</option>
+                    <option value="6.5" selected>Komi: 6.5</option>
+                    <option value="7.5">Komi: 7.5</option>
+                    <option value="-15.5">Komi: -15.5</option>
+                  </select>
+                </div><br/>
+                </div>
             </div>
         </div>
         <div id="grpMessage">
