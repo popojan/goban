@@ -39,7 +39,6 @@
                     <option value="0.5">Komi: 0.5</option>
                     <option value="6.5" selected>Komi: 6.5</option>
                     <option value="7.5">Komi: 7.5</option>
-                    <option value="-15.5">Komi: -15.5</option>
                   </select>
                 </div><br/>
                 </div>
