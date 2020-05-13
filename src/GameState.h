@@ -26,14 +26,11 @@ public:
 
     Message msg;
 
-    std::array<int, 2> activePlayerId;
-
     GameState(): colorToMove(Color::BLACK), black(""), white(""), capturedBlack(0), capturedWhite(0),
-            komi(0.5f), handicap(0), result(0.0f), cmd("xxx"), msg(PAUSED), reason(NOREASON), adata(),
-            metricsReady(false), showTerritory(false), showOverlay(false), holdsStone(false), dirty(true)
-    {
-        activePlayerId[0] = activePlayerId[1] = -1;
-    }
+            komi(0.5f), handicap(0), result(0.0f), cmd("xxx"), msg(PAUSED),
+            reason(NOREASON), adata(), metricsReady(false), showTerritory(false), showOverlay(false),
+            holdsStone(false), dirty(true)
+    { }
 
     enum Reason { NOREASON, DOUBLE_PASS, RESIGNATION, INVALID_MOVE } reason;
     struct Result {

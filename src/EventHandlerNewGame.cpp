@@ -11,6 +11,7 @@
 
 EventHandlerNewGame::EventHandlerNewGame()
 {
+    console = spdlog::get("console");
 }
 
 EventHandlerNewGame::~EventHandlerNewGame()
@@ -64,7 +65,17 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
         controller.increaseHandicap();
     }
     else if (value == "form") {
-        std::cerr << "change komi " << event.GetParameter<Rocket::Core::String>("value", "0").CString() << std::endl;
+      std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0.5").CString());
+      float komi = 0.5;
+      ss >> komi;
+
+      auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
+      if(!controller.setKomi(komi)) {
+          console->error("setting komi failed");
+          select->SetSelection(lastKomiSelection);
+      } else {
+          lastKomiSelection = select->GetSelection();
+      }
     }
     event.StopPropagation();
 }

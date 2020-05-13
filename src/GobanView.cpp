@@ -312,16 +312,11 @@ glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     return vec2(ip.x, ip.z);
 }
 
-void GobanView::toggleAnimation(time_t currentTime){
-    if (!animationRunning) {
-        startTime = currentTime;
-    }
-    else {
-        lastTime += currentTime - startTime;
-        gobanShader.setTime(lastTime);
-		gobanShader.setTime(lastTime);
-    }
-    animationRunning = !animationRunning;
+void GobanView::animateIntro() {
+    lastTime = 0.0;
+    startTime = Shell::GetElapsedTime();
+    animationRunning = true;
+    requestRepaint(UPDATE_BOARD|UPDATE_STONES|UPDATE_OVERLAY);
 }
 
 void GobanView::Update() {
@@ -364,7 +359,7 @@ void GobanView::onGameMove(const Move& move) {
     if(move == Move::NORMAL) {
         updateFlag |= UPDATE_SOUND_STONE;
         std::ostringstream ss;
-        ss << board.order;
+        ss << model.history.size();
         if(lastMove) {
             board.removeOverlay(lastMove);
         }

@@ -148,7 +148,7 @@
         return true;
     }
 
-    std::string& SgfPlayer::getName(Color whose) {
+    std::string& SgfPlayer::getName(const Color& whose) {
         return whose == Color::BLACK ? names[0] : names[1];
     }
 

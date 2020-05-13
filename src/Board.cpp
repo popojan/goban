@@ -11,7 +11,7 @@ const float Board::mDeltaCaptured = 0.5f;
 const float Board::safedist = 1.01f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
-    dist(0.0f, 0.05f), invalidated(false), order(1), showTerritory(false), showTerritoryAuto(false),
+    dist(0.0f, 0.05f), invalidated(false), showTerritory(false), showTerritoryAuto(false),
     territoryReady(false), lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0)
 
 {
@@ -247,6 +247,7 @@ int Board::stoneChanged(const Position& p, const Color& c) {
 
 
 int Board::areaChanged(const Position& p, const Color& area) {
+    console->warn("area changed [{}, {}]", p.row(), p.col());
     Color stone = (*this)[p].stone;
     int i = p.row();
     int j = p.col();
@@ -281,7 +282,6 @@ int Board::updateStones(const Board& board, bool showTerritory) {
 
     this->showTerritory = board.showTerritory;
 	this->showTerritoryAuto = board.showTerritoryAuto;
-    this->order = board.order;
 
     if(newSize != boardSize) {
         sizeChanged(newSize);
@@ -415,7 +415,6 @@ void Board::clear(int boardsize) {
         0, 0
     });
 
-    order = 1;
     capturedBlack = 0;
     capturedWhite = 0;
     positionNumber += 1;

@@ -9,16 +9,8 @@
 void GobanControl::newGame(int boardSize) {
 	engine.interrupt();
     engine.reset();
-	engine.clearGame(boardSize);
-	model.board.toggleTerritoryAuto(false);
-	model.newGame(boardSize);
-    view.board.clear(boardSize);
-    //view.resetView();
-	view.board.order = 0;
-    view.lastTime = 0.0;
-    view.startTime = Shell::GetElapsedTime();
-	view.animationRunning = true;
-	view.requestRepaint(GobanView::UPDATE_BOARD|GobanView::UPDATE_STONES|GobanView::UPDATE_OVERLAY);
+	engine.clearGame(boardSize, model.state.komi, model.state.handicap);
+    view.animateIntro();
 }
 
 void GobanControl::mouseClick(int button, int state, int x, int y) {
@@ -212,28 +204,32 @@ void GobanControl::mouseMove(int x, int y){
     view.moveCursor(mouseX, mouseY);
 }
 
+bool GobanControl::setKomi(float komi) {
+    bool isRunning = engine.isRunning();
+    if(!isRunning) {
+        engine.setKomi(komi);
+        model.state.komi = komi;
+        return true;
+    }
+    return false;
+}
+
 void GobanControl::increaseHandicap(){
     bool isOver = model.state.adata.reason != GameState::NOREASON;
     bool isRunning = engine.isRunning();
     if(!isRunning && !isOver) {
-        int nextHandicap = model.lastHandicap + 1;
+        int nextHandicap = model.state.handicap + 1;
 		if (engine.setFixedHandicap(nextHandicap)) {
-			float komi = model.handicap > 0 ? 0.5f : 6.5f;
-			engine.setKomi(komi);
-			model.state.komi = komi;
-            model.state.handicap = model.lastHandicap = model.handicap;
-			if (model.handicap < 2) {
-				view.board.order = 0;
-			}
-        }
+      //komi configurable independent of handicap
     }
-	view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
+	    view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
+    }
 }
 
 
 void GobanControl::switchPlayer(int which, int delta) {
-    model.state.activePlayerId[which] = engine.activatePlayer(which, delta);
-    model.state.activePlayerId[1-which] = engine.getActivePlayer(1-which);
+    engine.activatePlayer(which, delta);
+    engine.getActivePlayer(1-which);
     model.state.holdsStone = false;
 }
 

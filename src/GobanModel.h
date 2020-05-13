@@ -15,18 +15,24 @@
 
 class ElementGame;
 
-class GobanModel: public GameObserver, public BoardObserver {
+class GobanModel: public GameObserver {
 public:
     GobanModel(ElementGame& p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
             : parent(p), prevPass(false), over(false), invalidated(false), cursor({0,0}) {
         console = spdlog::get("console");
         console->info("Preloading sounds...");
-        newGame(boardSize, handicap, komi);
+        //newGame(boardSize, handicap, komi);
     }
     virtual void onGameMove(const Move&);
+    virtual void onKomiChange(float);
+    virtual void onHandicapChange(int);
+    virtual void onPlayerChange(int, const std::string&);
+
+    virtual void onBoardSized(int);
+
     virtual void onBoardChange(const Board&);
 
-	void newGame(int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f);
+	//void newGame(int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f);
 
     bool isPointOnBoard(const Position& coord);
 
@@ -41,9 +47,6 @@ public:
         return state.colorToMove;
     }
 
-    void toggleAnimation();
-
-
     bool isGameOver() { return state.adata.reason != GameState::NOREASON;}
 
     unsigned getBoardSize() const;
@@ -51,10 +54,6 @@ public:
     Move getPassMove();
     Move getUndoMove();
 
-    //bool playMove(const Move& move);
-
-    void update(const Move& move, const Board& result);
-    void update(const Board& territory);
     float result(const Move& lastMove, GameState::Result& ret);
 
     void calcCaptured(Metrics& m, int capturedBlack, int capturedWhite);
@@ -63,8 +62,6 @@ public:
 
     void setCursor(const Position& p) { cursor = p;}
 
-
-    //int boardChanged(Board&);
 public:
     ElementGame& parent;
 
@@ -72,8 +69,6 @@ public:
 
     Board board;
 
-    float komi;
-    int handicap;
     bool prevPass;
     volatile bool over;
     volatile bool started;
@@ -86,7 +81,7 @@ public:
     float ddc[6 * maxCaptured];
 
     Metrics metrics;
-    int lastHandicap;
+
 	std::mutex mutex;
     std::shared_ptr<spdlog::logger> console;
 

@@ -31,7 +31,7 @@ public:
     virtual bool clear() { return true; }
     virtual bool undo() { return true; }
     void setName(const std::string& name) { this->name = name; }
-    virtual std::string& getName(Color whose) { return name; }
+    virtual std::string& getName(const Color& whose = Color::EMPTY) { return name; }
     bool hasRole(int r) { return (role & r) != 0;  }
     void setRole(int r, bool add = true) {
         if(add) role |=  r;
@@ -142,7 +142,7 @@ public:
     virtual Move genmove(const Color& );
     virtual void suggestMove(const Move& move);
     virtual bool undo();
-    virtual std::string& getName(Color whose);
+    virtual std::string& getName(const Color& whose = Color::EMPTY);
     virtual bool clear();
 private:
     void parseSgf(const std::string& fname);

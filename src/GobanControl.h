@@ -31,6 +31,8 @@ public:
     void newGame(int boardSize);
     void switchPlayer(int which, int delta = 1);
     void increaseHandicap();
+    bool setKomi(float);
+
 private:
     ElementGame& parent;
     GobanModel& model;

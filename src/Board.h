@@ -19,7 +19,11 @@ public:
     Color(Value col = EMPTY): col(col) {}
 
     static Color other(const Color& b) {
-        return b == EMPTY ?  b : b == BLACK ? WHITE : BLACK;
+        return b.col == EMPTY ?  b.col : b.col == BLACK ? WHITE : BLACK;
+    }
+
+    explicit operator int() const {
+        return col == EMPTY ? -1 : (col == BLACK ? 0 : 1);
     }
 
     bool operator== (const Color& b) const {
@@ -242,9 +246,9 @@ private:
     const static float mEmpty;
 
 public:
-    int order;
 	volatile long positionNumber;
-    bool showTerritory, showTerritoryAuto;
+    bool showTerritory;
+    bool showTerritoryAuto;
     bool territoryReady;
 private:
 	int lastPlayed_i, lastPlayed_j;

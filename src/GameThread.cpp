@@ -2,8 +2,8 @@
 #include <fstream>
 
 GameThread::GameThread(GobanModel &m) :
-        model(m), thread(0), interruptRequested(false), hasThreadRunning(false),
-        playerToMove(0), human(0), numPlayers(0), activePlayer({0, 0})
+        model(m), thread(nullptr), interruptRequested(false), hasThreadRunning(false),
+        playerToMove(0), human(0), sgf(0), coach(0), numPlayers(0), activePlayer({0, 0})
 {
     console = spdlog::get("console");
     std::string list("./config/engines.enabled");
@@ -56,15 +56,22 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
         Player* player = players[playerIndex];
         player->setRole(role, add);
         console->debug("Player[{}] newType = [human = {}, computer = {}] newRole = [black = {}, whsite = {}]",
-                playerIndex,
-                player->isTypeOf(Player::HUMAN),
-                player->isTypeOf(Player::ENGINE),
-                player->hasRole(Player::BLACK),
-                player->hasRole(Player::WHITE)
+            playerIndex,
+            player->isTypeOf(Player::HUMAN),
+            player->isTypeOf(Player::ENGINE),
+            player->hasRole(Player::BLACK),
+            player->hasRole(Player::WHITE)
         );
         if(!add && playerToMove != 0 && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
             playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
         }
+        std::for_each(
+            gameObservers.begin(), gameObservers.end(),
+            [player, role](GameObserver* observer){
+                observer->onPlayerChange(role, player->getName());
+            }
+        );
+
     }
 }
 
@@ -78,27 +85,36 @@ void GameThread::interrupt() {
     }
 }
 
-void GameThread::clearGame(int boardSize) {
-    model.newGame(boardSize);
+/** \brief Clears the board and resets both komi and handicap.
+ *
+ * @param boardSize
+ */
+void GameThread::clearGame(int boardSize, float komi, int handicap) {
     for (auto pit = players.begin(); pit != players.end(); ++pit) {
         Player* player = *pit;
         player->boardsize(boardSize);
     }
-    //players[sgf]->clear();
-    setKomi(model.komi);
-    setFixedHandicap(model.handicap);
+
+    std::for_each(
+        gameObservers.begin(), gameObservers.end(),
+        [boardSize](GameObserver* observer){
+            observer->onBoardSized(boardSize);
+        }
+    );
+    setKomi(komi);
+    setFixedHandicap(handicap);
+
 }
 
 void GameThread::setKomi(float komi) {
-    if (!model.started) {
-        console->debug("setting komi {}", komi);
-        model.komi = komi;
-        for (auto pit = players.begin(); pit != players.end(); ++pit) {
-            Player* player = *pit;
-            player->komi(komi);
-        }
+    std::for_each(
+        gameObservers.begin(), gameObservers.end(),
+        [komi](GameObserver* observer){observer->onKomiChange(komi);}
+    );
+    for (auto pit = players.begin(); pit != players.end(); ++pit) {
+        Player* player = *pit;
+        player->komi(komi);
     }
-
 }
 
 int GameThread::getActivePlayer(int which) {
@@ -112,7 +128,7 @@ int GameThread::activatePlayer(int which, int delta) {
     activePlayer[which] = newp;
     int role = which == 0 ? Player::BLACK : Player::WHITE;
     if(newp == sgf) {
-        clearGame(model.getBoardSize());
+        clearGame(model.getBoardSize(), model.state.komi, model.state.handicap);
     } else if (oldp == sgf) {
         players[oldp]->clear();
     }
@@ -176,7 +192,7 @@ bool GameThread::setFixedHandicap(int handicap) {
         else {
             success = true;
         }
-        model.handicap = handicap;
+        model.state.handicap = handicap;
 		model.board.copyStateFrom(coach->showboard());
 	}
 	return success;
@@ -260,12 +276,11 @@ void GameThread::gameLoop() {
                     coach->showboard()
                 );
                 std::for_each(
-                    gobservers.begin(), gobservers.end(),
-                    [move](GameObserver* observer){observer->onGameMove(move);}
-                );
-                std::for_each(
-                    bobservers.begin(), bobservers.end(),
-                    [result](BoardObserver* observer){observer->onBoardChange(result);}
+                    gameObservers.begin(), gameObservers.end(),
+                    [result, move](GameObserver* observer) {
+                        observer->onGameMove(move);
+                        observer->onBoardChange(result);
+                    }
                 );
             }
 
@@ -280,8 +295,8 @@ void GameThread::gameLoop() {
                     coach->showterritory(finalized, model.state.colorToMove)
                 );
                 std::for_each(
-                    bobservers.begin(), bobservers.end(),
-                    [result](BoardObserver* observer){observer->onBoardChange(result);}
+                    gameObservers.begin(), gameObservers.end(),
+                    [result](GameObserver* observer){observer->onBoardChange(result);}
                 );
             }
 
@@ -298,9 +313,6 @@ void GameThread::gameLoop() {
     hasThreadRunning = false;
 }
 
-Color GameThread::getCurrentColor() {
-    return model.state.colorToMove;
-}
 void GameThread::playLocalMove(const Move& move) {
     std::unique_lock<std::mutex> lock(playerMutex);
     if(playerToMove) playerToMove->suggestMove(move);
@@ -332,7 +344,7 @@ void GameThread::loadEngines(const std::string& dir) {
                 role |= Player::COACH;
                 hasCoach = true;
                 coach = id;
-            };
+            }
             setRole(id, role, true);
         }
     }

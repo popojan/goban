@@ -10,6 +10,9 @@
 #include "GameObserver.h"
 #include "Board.h"
 
+/** \brief Background thread responsible for rules enforcing
+ *
+ */
 class GameThread
 {
 public:
@@ -31,7 +34,7 @@ public:
 
     void interrupt();
 
-    void clearGame(int boardSize);
+    void clearGame(int boardSize, float komi, int handicap);
 
     void setKomi(float komi);
 
@@ -40,22 +43,14 @@ public:
     void run();
 
     bool isRunning();
-    bool isOver();
 
     void gameLoop();
 
     bool humanToMove();
 
     void playLocalMove(const Move& move);
-    Color getCurrentColor();
 
-    int boardChanged(Board&);
-
-    void toggleTerritory(int jak = -1);
-
-	void invalidateBoard();
-
-	void loadEngines(const std::string& path);
+    void loadEngines(const std::string& path);
 
 	int activatePlayer(int which, int delta = 1);
 
@@ -67,23 +62,17 @@ public:
 	void reset();
 
     void addGameObserver(GameObserver* pobserver) {
-        gobservers.push_back(pobserver);
-    }
-
-    void addBoardObserver(BoardObserver* pobserver) {
-        bobservers.push_back(pobserver);
+        gameObservers.push_back(pobserver);
     }
 
 private:
 	std::shared_ptr<spdlog::logger> console;
-    std::vector<GameObserver*> gobservers;
-    std::vector<BoardObserver*> bobservers;
+    std::vector<GameObserver*> gameObservers;
     GobanModel& model;
     std::vector<Engine*> engines; //engines know the rules
     std::vector<Player*> players; //all players including engines, humans, spectators
     std::thread* thread;
     std::mutex mutex2;
-    std::condition_variable cvPlayer;
     volatile bool interruptRequested, hasThreadRunning;
     Player* playerToMove;
 	std::size_t human, sgf, coach;
