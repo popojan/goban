@@ -2,6 +2,7 @@
 #define ROCKETINVADERSEVENTHANDLERSTARTGAME_H
 
 #include "EventHandler.h"
+#include "spdlog/spdlog.h"
 
 /**
 	@author Peter Curry
@@ -14,6 +15,9 @@ public:
 	virtual ~EventHandlerNewGame();
 
 	virtual void ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value);
+private:
+    std::shared_ptr<spdlog::logger> console;
+    int lastKomiSelection = -1;
 };
 
 #endif

@@ -102,13 +102,13 @@ public:
         state.metricsReady = false;
     }
 
-    void toggleAnimation(time_t);
-
     Position getBoardCoordinate(float x, float y)const ;
     glm::vec2 boardCoordinate(float x, float y) const;
 
     void resetView();
 	void shadeit(float, GobanShader&);
+
+	void animateIntro();
 
     bool needsRepaint();
     void requestRepaint(int what = UPDATE_SOME);

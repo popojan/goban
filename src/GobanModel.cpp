@@ -6,29 +6,25 @@
 #include "GobanModel.h"
 #include <glm/glm.hpp>
 
-void GobanModel::newGame(int boardSize, int handicap, float komi) {
-	this->komi = komi;
-	if (komi == 0.0f) {
-		this->komi = handicap > 0 ? 0.5f : 6.5f;
-	}
-	lastHandicap = this->handicap = handicap;
-	board.clear(boardSize);
+void GobanModel::onBoardSized(int boardSize) {
+
     history.clear();
 
-	over = false;
-	started = false;
-	auto activePlayerId = state.activePlayerId;
-	state = GameState();
-	state.komi = this->komi; //TODO jedno komi
-	state.handicap = this->handicap; //TODO jeden handicap
-	state.activePlayerId = activePlayerId;
+	board.clear(boardSize);
+    board.clearTerritory(boardSize);
+	board.toggleTerritoryAuto(false);
+    board.positionNumber += 1;
 
-	//state.reason = GameState::NOREASON;
-	//state.adata = GameState::Result();
-	calcCapturedBlack = calcCapturedWhite = 0;
+	over    = false;
+	started = false;
+
+	state = GameState();
+
+	calcCapturedBlack = 0;
+	calcCapturedWhite = 0;
 
     if(!state.metricsReady) {
-        metrics.calc(board.getSize());
+        metrics.calc(boardSize);
         state.metricsReady = true;
     }
 
@@ -71,13 +67,6 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
                     ret.black_area++;
             }
         }
-        /*if (false)//chinese
-            ret.delta =
-            -ret.white_area
-            - ret.black_area
-            + komi
-            + handicap;
-        else*/
         ret.delta =
                 +ret.white_territory
                 + ret.black_captured
@@ -85,7 +74,7 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
                 - ret.black_territory
                 - ret.white_captured
                 - ret.white_prisoners
-                + komi;
+                + state.komi;
     }
     else {
         ret.delta = lastMove == Color::BLACK ? 1.0f : -1.0f;
@@ -197,8 +186,6 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
     }
 }
 
-//bool GobanModel::playMove(const Move& move) {}
-
 Move GobanModel::getPassMove() {
     return Move(Move::PASS, state.colorToMove);
 }
@@ -238,7 +225,6 @@ void GobanModel::onBoardChange(const Board& result) {
 
     board.copyStateFrom(result);
     board.positionNumber += 1;
-    board.order += 1;
 
     state.capturedBlack = board.capturedCount(Color::BLACK);
     state.capturedWhite = board.capturedCount(Color::WHITE);
@@ -248,5 +234,26 @@ void GobanModel::onBoardChange(const Board& result) {
 
     if(over && result.territoryReady) {
         this->result(history.back(), state.adata);
+    }
+}
+
+void GobanModel::onKomiChange(float newKomi) {
+    if (!started) {
+        console->debug("setting komi {}", newKomi);
+        state.komi = newKomi;
+    }
+}
+
+void GobanModel::onHandicapChange(int newHandicap) {
+
+
+}
+
+void GobanModel::onPlayerChange(int role, const std::string& name) {
+    if(role & Player::BLACK) {
+        state.black = name;
+    }
+    if(role & Player::WHITE) {
+        state.white = name;
     }
 }

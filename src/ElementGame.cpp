@@ -11,10 +11,9 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
 {
 
     engine.addGameObserver(&model);
-    engine.addBoardObserver(&model);
-    engine.addGameObserver(&view);
+    //engine.addGameObserver(&view);
     console = spdlog::get("console");
-	engine.clearGame(19);
+    engine.clearGame(19, 0.5, 0);
     control.switchPlayer(0, 0);
     control.switchPlayer(1, 0);
 }
@@ -100,8 +99,10 @@ void ElementGame::ProcessEvent(Rocket::Core::Event& event)
 
 void ElementGame::OnUpdate()
 {
+
     if(!view.gobanShader.isReady())
         return;
+
     //model.update();
     view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSize);
     //view.board.updateStones(model.board, model.territory, view.showTerritory);
@@ -111,13 +112,15 @@ void ElementGame::OnUpdate()
 
     Rocket::Core::Context* context = GetContext();
 
-	for (int which = 0; which < 2; ++which) {
-		if (view.state.activePlayerId[which] != model.state.activePlayerId[which]) {
-            context->GetDocument("game_window")->GetElementById(which == 0 ? "lblBlack" : "lblWhite")
-				->SetInnerRML(engine.getName(model.state.activePlayerId[which], which ? Color::WHITE : Color::BLACK).c_str());
-			view.state.activePlayerId[which] = model.state.activePlayerId[which];
-		}
-	}
+	if (view.state.black != model.state.black) {
+        context->GetDocument("game_window")->GetElementById("lblBlack")
+            ->SetInnerRML(model.state.black.c_str());
+    }
+    if (view.state.white != model.state.white) {
+        context->GetDocument("game_window")->GetElementById("lblWhite")
+            ->SetInnerRML(model.state.white.c_str());
+    }
+
 
 	std::string cmd(isOver ? "New" : !isRunning ? "Play" : "Pass");
 	model.state.cmd = cmd;
@@ -146,8 +149,11 @@ void ElementGame::OnUpdate()
 			requestRepaint();
 		}
 	}
-	if ((view.state.capturedBlack != model.state.capturedBlack) || (view.state.capturedWhite != model.state.capturedWhite)
-		|| (view.state.reason != GameState::NOREASON && model.state.reason == GameState::NOREASON)) {
+	//console->warn("view.state.reason = {} vs model.state.reason = {}", view.state.reason,model.state.reason);
+	if ((view.state.capturedBlack != model.state.capturedBlack)
+	    || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */
+		|| (view.state.reason != GameState::NOREASON && model.state.reason == GameState::NOREASON) /* new game */)
+	{
 		Rocket::Core::Element* elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
 		Rocket::Core::Element* elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
 		if (elWhiteCnt != NULL) {
@@ -160,6 +166,7 @@ void ElementGame::OnUpdate()
 		}
 		view.state.capturedBlack = model.state.capturedBlack;
 		view.state.capturedWhite = model.state.capturedWhite;
+        view.state.reason = model.state.reason;
 	}
 	if (view.state.handicap != model.state.handicap) {
 		Rocket::Core::Element* hand = context->GetDocument("game_window")->GetElementById("lblHandicap");
@@ -205,26 +212,26 @@ void ElementGame::OnUpdate()
 			msg->SetInnerRML("White passes");
 			break;
 		case GameState::BLACK_WON:
-		case GameState::WHITE_WON:
-		{
+		case GameState::WHITE_WON: {
             Rocket::Core::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
             Rocket::Core::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
             elWhiteCnt->SetInnerRML(
-            Rocket::Core::String(128, "White: %d + %d + %d", model.state.adata.black_captured,
-            model.state.adata.black_prisoners,
-            model.state.adata.white_territory).CString());
+                    Rocket::Core::String(128, "White: %d + %d + %d", model.state.adata.black_captured,
+                                         model.state.adata.black_prisoners,
+                                         model.state.adata.white_territory).CString());
             elBlackCnt->SetInnerRML(
-            Rocket::Core::String(128, "Black: %d + %d + %d", model.state.adata.white_captured,
-            model.state.adata.white_prisoners,
-            model.state.adata.black_territory).CString());
+                    Rocket::Core::String(128, "Black: %d + %d + %d", model.state.adata.white_captured,
+                                         model.state.adata.white_prisoners,
+                                         model.state.adata.black_territory).CString());
             if (view.state.msg == GameState::WHITE_WON)
                 msg->SetInnerRML(
-                    Rocket::Core::String(128, "White wins by %.1f", model.state.adata.delta).CString());
+                        Rocket::Core::String(128, "White wins by %.1f", model.state.adata.delta).CString());
             else
                 msg->SetInnerRML(
-                    Rocket::Core::String(128, "Black wins by %.1f", -model.state.adata.delta).CString());
-		}
-			//engine.showTerritory = model.board.toggleTerritoryAuto(true);
+                        Rocket::Core::String(128, "Black wins by %.1f", -model.state.adata.delta).CString());
+            //engine.showTerritory = model.board.toggleTerritoryAuto(true);
+            view.state.reason = model.state.reason;
+        }
 			break;
 		default:
 			msg->SetInnerRML("");
