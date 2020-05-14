@@ -109,9 +109,28 @@ select {
 div.cmd:hover {
     color: #fff;
 }
+
 div.cmd:hover option {
-    color: #eb0000;
+    color: #ffffff80;
 }
+div.cmd:hover option:hover {
+    color: #ffffffa0;
+}
+select selectbox {
+  text-decoration:underline;
+}
+
+select#selectBlack selectbox {
+  position:absolute;
+  bottom:105pt;
+}
+
+
+select#selectWhite selectbox {
+  position:absolute;
+  top:105pt;
+}
+
 .active {
 	text-decoration: underline;
 }

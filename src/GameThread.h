@@ -64,6 +64,8 @@ public:
     void addGameObserver(GameObserver* pobserver) {
         gameObservers.push_back(pobserver);
     }
+    const std::vector<Engine*> getEngines() { return engines;}
+    const std::vector<Player*> getPlayers() { return players;}
 
 private:
 	std::shared_ptr<spdlog::logger> console;

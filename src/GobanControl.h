@@ -29,7 +29,8 @@ public:
     void keyPress(int key, int x, int y, bool downNotUp = false);
     bool isExiting() { return exit; }
     void newGame(int boardSize);
-    void switchPlayer(int which, int delta = 1);
+    void togglePlayer(int which, int delta = 1);
+    void switchPlayer(int which, int idx);
     void increaseHandicap();
     bool setKomi(float);
 
