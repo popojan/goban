@@ -39,7 +39,6 @@
                   </select>
                 </div><br/>
                 <div class="cmd" id="cntWhite" onmousedown="white">White: 0</div><br/>
-                <div class="frm">
                 <div class="cmd">
                   <select onchange="komi" id="selectKomi">
                     <option value="0.5">Komi: 0.5</option>
@@ -47,7 +46,6 @@
                     <option value="7.5">Komi: 7.5</option>
                   </select>
                 </div><br/>
-                </div>
             </div>
         </div>
         <div id="grpMessage">

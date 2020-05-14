@@ -25,7 +25,7 @@ div.grp {
     display:inline;
     padding-right:0.5rem;
 }
-div.cmd, div.frm {
+div.cmd {
     display:inline;
     padding-right: 0.5rem;
     border-color: #fff;
@@ -35,7 +35,7 @@ div.fps, div#lblBlack, div#lblWhite, div#cntWhite, div#cntBlack {
 }
 
 div#grpGame {
-	width: 75%;
+	width: 50%;
 	position:absolute;
 	top:0px;
 	left:0px;
@@ -84,7 +84,7 @@ div#grpDebug {
 }
 
 div#grpWhite {
-	width: 25%;
+	width: 50%;
 	position:absolute;
 	top:0px;
 	right:0px;
@@ -100,12 +100,7 @@ div.fps {
     right:0;
     text-align:right;
 }
-select {
-  position:relative;
-  padding-right: 1.0%;
-  font-size:25pt;
-  height:30pt;
-}
+
 div.cmd:hover {
     color: #fff;
 }
@@ -116,19 +111,36 @@ div.cmd:hover option {
 div.cmd:hover option:hover {
     color: #ffffffa0;
 }
+
+select {
+  height:28pt;
+  position:relative;
+}
 select selectbox {
-  text-decoration:underline;
+  //text-decoration:underline;
+  border-color:#ffffff80;
+}
+div#grpBlack select selectbox {
+  position:absolute;
+  border-left:0.2rem;
+  padding-left:0.5rem;
 }
 
-select#selectBlack selectbox {
+
+div#grpWhite select selectbox {
   position:absolute;
-  bottom:105pt;
+  border-right:0.2rem;
+  padding-right:0.5rem;
 }
 
-
-select#selectWhite selectbox {
-  position:absolute;
-  top:105pt;
+div#grpWhite select#selectWhite selectbox {
+  top:85pt;
+}
+div#grpBlack select#selectBlack selectbox {
+  bottom:85pt;
+}
+div#grpWhite select#selectKomi selectbox {
+  top:30pt;
 }
 
 .active {
