@@ -24,7 +24,6 @@ ExternalProject_Add(project_libsndfile
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
     BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile/build
     STEP_TARGETS build
-    UPDATE_COMMAND ""
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 

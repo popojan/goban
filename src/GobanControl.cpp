@@ -106,10 +106,10 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
 			view.requestRepaint();
 		}
 		else if (key == Rocket::Core::Input::KI_K) {
-			switchPlayer(0);
+			//switchPlayer(0);
 		}
 		else if (key == Rocket::Core::Input::KI_L) {
-			switchPlayer(1);
+			//switchPlayer(1);
 		}
 
 		else if (key == Rocket::Core::Input::KI_P) {
@@ -227,12 +227,17 @@ void GobanControl::increaseHandicap(){
 }
 
 
-void GobanControl::switchPlayer(int which, int delta) {
+void GobanControl::togglePlayer(int which, int delta) {
     engine.activatePlayer(which, delta);
-    engine.getActivePlayer(1-which);
     model.state.holdsStone = false;
 }
 
+void GobanControl::switchPlayer(int which, int newPlayerIndex) {
+    console->warn("switching player {}", newPlayerIndex);
+    int idx = engine.getActivePlayer(which);
+    engine.activatePlayer(which, newPlayerIndex - idx);
+    model.state.holdsStone = false;
+}
 void GobanControl::destroy() {
     console->debug("GAME DESTRUCT");
     engine.interrupt();

@@ -28,14 +28,20 @@
             <div id="grpBlack">
                 <div class="cmd" id="lblHandicap" onmousedown="hand">Handicap: 0</div><br/>
                 <div class="cmd" id="cntBlack" onmousedown="black">Black: 0</div><br/>
-                <div class="cmd" id="lblBlack" onmousedown="black">Black</div>
+                <div class="cmd">
+                  <select onchange="engine" id="selectBlack">
+                  </select>
+                </div><br/>
             </div>
             <div id="grpWhite">
-                <div class="cmd" id="lblWhite" onmousedown="white">White</div><br/>
+                <div class="cmd">
+                  <select onchange="engine" id="selectWhite">
+                  </select>
+                </div><br/>
                 <div class="cmd" id="cntWhite" onmousedown="white">White: 0</div><br/>
                 <div class="frm">
                 <div class="cmd">
-                  <select onchange="form" id="selectKomi">
+                  <select onchange="komi" id="selectKomi">
                     <option value="0.5">Komi: 0.5</option>
                     <option value="6.5" selected>Komi: 6.5</option>
                     <option value="7.5">Komi: 7.5</option>

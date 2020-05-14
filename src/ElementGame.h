@@ -28,6 +28,7 @@ public:
     bool isExiting() { return control.isExiting(); }
     void Reshape();
     void gameLoop();
+    void populateEngines();
 
     GobanControl& getController() { return control; }
 protected:

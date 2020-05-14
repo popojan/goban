@@ -56,15 +56,27 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
         controller.keyPress(Rocket::Core::Input::KI_T, -1, -1);
     }
     else if (value == "black") {
-        controller.switchPlayer(0);
+        //controller.switchPlayer(0);
     }
     else if (value == "white") {
-        controller.switchPlayer(1);
+        //controller.switchPlayer(1);
     }
     else if (value == "hand") {
         controller.increaseHandicap();
     }
-    else if (value == "form") {
+    else if(value == "engine") {
+        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0.5").CString());
+        int index = 0;
+        ss >> index;
+        console->warn("engine {}", index);
+        if(event.GetCurrentElement()->GetId() == "selectBlack") {
+            controller.switchPlayer(0, index);
+        }
+        else if(event.GetCurrentElement()->GetId() == "selectWhite") {
+            controller.switchPlayer(1, index);
+        }
+    }
+    else if (value == "komi") {
       std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0.5").CString());
       float komi = 0.5;
       ss >> komi;

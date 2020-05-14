@@ -4,18 +4,45 @@
 #include <Rocket/Core/Input.h>
 #include <Rocket/Core.h>
 #include <Shell.h>
+#include <Rocket/Controls/ElementFormControlSelect.h>
 
 ElementGame::ElementGame(const Rocket::Core::String& tag)
         : Rocket::Core::Element(tag), model(*this), view(model), engine(model),
           control(*this, model, view, engine), hasResults(false), calculatingScore(false)
 {
-
+    console = spdlog::get("console");
     engine.addGameObserver(&model);
     //engine.addGameObserver(&view);
-    console = spdlog::get("console");
+
     engine.clearGame(19, 0.5, 0);
-    control.switchPlayer(0, 0);
-    control.switchPlayer(1, 0);
+    control.togglePlayer(0, 0);
+    control.togglePlayer(1, 0);
+}
+
+void ElementGame::populateEngines() {
+    auto selectBlack = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
+    console->info("preBlack");
+    auto selectWhite = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
+    console->info("preBlack");
+    const auto players(engine.getPlayers());
+
+    if(!selectBlack || !selectWhite) {
+        console->error("missing GUI element");
+        return;
+    }
+
+    for(unsigned i = 0; i < players.size(); ++i) {
+        std::ostringstream ss;
+        ss << i;
+        std::string playerName(players[i]->getName());
+        std::string playerIndex(ss.str());
+        selectBlack->Add(playerName.c_str(), playerIndex.c_str());
+        selectWhite->Add(playerName.c_str(), playerIndex.c_str());
+    }
+    selectBlack->SetSelection(players.size()-1);
+    selectWhite->SetSelection(0);
 }
 
 void ElementGame::gameLoop() {
@@ -94,6 +121,7 @@ void ElementGame::ProcessEvent(Rocket::Core::Event& event)
     {
         //control.Initialise();
         console->debug("Load");
+        populateEngines();
     }
 }
 
@@ -113,12 +141,12 @@ void ElementGame::OnUpdate()
     Rocket::Core::Context* context = GetContext();
 
 	if (view.state.black != model.state.black) {
-        context->GetDocument("game_window")->GetElementById("lblBlack")
-            ->SetInnerRML(model.state.black.c_str());
+        //context->GetDocument("game_window")->GetElementById("lblBlack")
+        //    ->SetInnerRML(model.state.black.c_str());
     }
     if (view.state.white != model.state.white) {
-        context->GetDocument("game_window")->GetElementById("lblWhite")
-            ->SetInnerRML(model.state.white.c_str());
+        //context->GetDocument("game_window")->GetElementById("lblWhite")
+        //    ->SetInnerRML(model.state.white.c_str());
     }
 
 
@@ -136,8 +164,8 @@ void ElementGame::OnUpdate()
 	//model.state.colorToMove = colorToMove;
 	if (view.state.colorToMove != model.state.colorToMove) {
 		bool blackMove = model.state.colorToMove == Color::BLACK;
-		Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("lblBlack");
-		Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("lblWhite");
+		Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("selectBlack");
+		Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("selectWhite");
 		if (elBlack != NULL) {
 			elBlack->SetClass("active", blackMove);
 			view.state.colorToMove = model.state.colorToMove;
