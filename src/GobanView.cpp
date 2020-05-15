@@ -212,8 +212,7 @@ void GobanView::Render(int w, int h)
         if(vol > 0) {
             updateFlag |= UPDATE_OVERLAY;
             if(player.playbackCount() < 5){
-	            console->info("collision volume = {}", vol);
-                player.play("data/sound/collision.wav", vol);
+	            player.play("data/sound/collision.wav", vol);
             }
             board.collision = false;
 	    }

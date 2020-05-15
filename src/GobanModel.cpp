@@ -197,7 +197,8 @@ void GobanModel::onGameMove(const Move& move) {
     console->debug("LOCK model");
     std::lock_guard<std::mutex> lock(mutex);
 
-    history.push_back(move);
+    if(!(move == Move::UNDO))
+        history.push_back(move);
 
     if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
