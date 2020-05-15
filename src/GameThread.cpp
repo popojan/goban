@@ -260,26 +260,27 @@ void GameThread::gameLoop() {
                           || move == Move::RESIGN
                           || coach->play(move);
             }
-            //other engines play
-            for (auto pit = players.begin(); pit != players.end(); ++pit) {
-                Player* p = *pit;
-                if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
-                        && p != reinterpret_cast<Player*>(coach) && p != player) {
-                    console->debug("DEBUG play iter");
-                    if(move == Move::UNDO) {
-                        p->undo();
-                        if(doubleUndo)
-                           p->undo();
-                    }
-                    else
-                        p->play(move);
-                }
-            }
-            //update model
             if(success) {
+                //other engines play
+                for (auto pit = players.begin(); pit != players.end(); ++pit) {
+                    Player *p = *pit;
+                    if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
+                        && p != reinterpret_cast<Player *>(coach) && p != player) {
+                        console->debug("DEBUG play iter");
+                        if (move == Move::UNDO) {
+                            p->undo();
+                            if (doubleUndo)
+                                p->undo();
+                        } else
+                            p->play(move);
+                    }
+                }
+                //update model
+
                 const Board& result(
-                    coach->showboard()
+                        coach->showboard()
                 );
+
                 std::for_each(
                     gameObservers.begin(), gameObservers.end(),
                     [result, move](GameObserver* observer) {

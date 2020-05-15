@@ -217,6 +217,7 @@ void GobanModel::onGameMove(const Move& move) {
         prevPass = false;
         state.msg = GameState::NONE;
     }
+    state.holdsStone = false;
     changeTurn();
 }
 
