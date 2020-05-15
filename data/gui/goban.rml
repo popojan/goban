@@ -7,18 +7,18 @@
     <game id="game" onmousedown="mdown" onmouseup="mup">
         <div id="grpGame">
 	        <div class="grp" id="grpNew">
-	            <div class="cmd" id="cmdNew19" onmousedown="new 19">19x19</div>
-	            <div class="cmd" id="cmdNew13" onmousedown="new 13">13x13</div>
-	            <div class="cmd" id="cmdNew9" onmousedown="new 9">9x9</div>
+	            <div class="cmd space" id="cmdNew19" onmousedown="new 19">19x19</div>
+	            <div class="cmd space" id="cmdNew13" onmousedown="new 13">13x13</div>
+	            <div class="cmd space" id="cmdNew9" onmousedown="new 9">9x9</div>
 	        </div>
 	        <div class="grp" id="grpMove">
-	            <div class="cmd" id="cmdPass" onmousedown="pass">Pass</div>
-	            <div class="cmd" id="cmdTerritory" onmousedown="territory">Territory</div>
+	            <div class="cmd space" id="cmdPass" onmousedown="pass">Pass</div>
+	            <div class="cmd space" id="cmdTerritory" onmousedown="territory">Territory</div>
 	        </div>
 	        <div class="grp" id="grpSystem">
-	            <div class="cmd" id="cmdFullscreen" onmousedown="fullscreen">Fullscreen</div>
+	            <div class="cmd space" id="cmdFullscreen" onmousedown="fullscreen">Fullscreen</div>
 	            <!--<div class="cmd" id="cmdAA" onmousedown="aa">AA</div>-->
-	            <div class="cmd" id="cmdExit" onmousedown="exit">Exit</div>
+	            <div class="cmd space" id="cmdExit" onmousedown="exit">Exit</div>
 	        </div>
         </div>
         <div class="grp" id="grpDebug">
@@ -26,26 +26,30 @@
         </div>
         <div id="grpPlayers">
             <div id="grpBlack">
-                <div class="cmd" id="lblHandicap" onmousedown="hand">Handicap: 0</div><br/>
-                <div class="cmd" id="cntBlack" onmousedown="black">Black: 0</div><br/>
-                <div class="cmd">
-                  <select onchange="engine" id="selectBlack">
-                  </select>
-                </div><br/>
+                <div class="bottom">
+                  <div class="cmd" id="lblHandicap" onmousedown="hand">Handicap: 0</div><br/>
+                  <div class="cmd" id="cntBlack" onmousedown="black">Black: 0</div><br/>
+                  <div class="cmd">
+                    <select onchange="engine" id="selectBlack">
+                    </select>
+                  </div><br/>
+                </div>
             </div>
             <div id="grpWhite">
-                <div class="cmd">
-                  <select onchange="engine" id="selectWhite">
-                  </select>
-                </div><br/>
-                <div class="cmd" id="cntWhite" onmousedown="white">White: 0</div><br/>
-                <div class="cmd">
-                  <select onchange="komi" id="selectKomi">
-                    <option value="0.5">Komi: 0.5</option>
-                    <option value="6.5" selected>Komi: 6.5</option>
-                    <option value="7.5">Komi: 7.5</option>
-                  </select>
-                </div><br/>
+                <div class="top">
+                  <div class="cmd">
+                    <select onchange="engine" id="selectWhite">
+                    </select>
+                  </div><br/>
+                  <div class="cmd" id="cntWhite" onmousedown="white">White: 0</div><br/>
+                  <div class="cmd">
+                    <select onchange="komi" id="selectKomi">
+                      <option value="0.5">Komi: 0.5</option>
+                      <option value="6.5" selected>Komi: 6.5</option>
+                      <option value="7.5">Komi: 7.5</option>
+                    </select>
+                  </div><br/>
+                </div>
             </div>
         </div>
         <div id="grpMessage">

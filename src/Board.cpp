@@ -247,8 +247,10 @@ int Board::stoneChanged(const Position& p, const Color& c) {
 
 
 int Board::areaChanged(const Position& p, const Color& area) {
-    console->warn("area changed [{}, {}]", p.row(), p.col());
     Color stone = (*this)[p].stone;
+    console->warn("area changed [{}, {}] = [{}, {}] @ {}", p.row(), p.col(),
+                  (stone == Color::EMPTY ? 0 : 1), (area == Color::EMPTY ? 0:1),
+                  (int)showTerritory);
     int i = p.row();
     int j = p.col();
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
@@ -285,17 +287,21 @@ int Board::updateStones(const Board& board, bool showTerritory) {
 
     if(newSize != boardSize) {
         sizeChanged(newSize);
+        this->clearTerritory(newSize);
+        this->clear(newSize);
         changed = 1;
+        return changed;
     }
-    for(int col = 0; col < newSize; ++col) {
-        for(int row = 0; row < newSize; ++row) {
-            Position pos(col, row);
+    for(int col = 0; col < MAXBOARD; ++col) {
+        for(int row = 0; row < MAXBOARD; ++row) {
+            Position pos(row, col);
 
             const Point& np = board[pos];
             Color newStone(np.stone);
             Color newArea(np.influence);
 
-            if(!this->showTerritory) { // || !board.territoryReady) ugly flashing
+            if(!this->showTerritory) {
+                // || !board.territoryReady) ugly flashing
                 newArea = Color::EMPTY;
             }
 

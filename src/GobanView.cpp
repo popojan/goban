@@ -200,6 +200,7 @@ void GobanView::Render(int w, int h)
 		updateFlag = UPDATE_ALL;
 	}
     if(updateFlag & UPDATE_SOUND_STONE) {
+        updateFlag &= ~UPDATE_SOUND_STONE;
         player.play("data/sound/stone.wav", 1.0);
     }
 
@@ -251,7 +252,8 @@ void GobanView::Render(int w, int h)
 
 	glEnable(GL_BLEND);
 	//glDisable(GL_DEPTH_TEST);
-	updateFlag = UPDATE_NONE;
+
+	updateFlag = UPDATE_NONE | (UPDATE_SOUND_STONE & updateFlag);
 }
 
 void GobanView::toggleOverlay() {
