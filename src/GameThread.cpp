@@ -240,34 +240,39 @@ void GameThread::gameLoop() {
                 locked = true;
             }
             if (move == Move::UNDO) {
-                success = coach->undo();
-                model.changeTurn();
-                if (currentPlayer()->isTypeOf(Player::ENGINE)) {
-                    success = coach->undo();
-                    model.changeTurn();
-                    doubleUndo = true;
+                bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
+                        && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
+                if(bothHumans && model.history.size() > 0) {
+                    success  = coach->undo();
+                    model.history.pop_back();
+                } else if(currentPlayer()->isTypeOf(Player::HUMAN) && model.history.size() > 1) {
+                        success  = coach->undo();
+                        success &= coach->undo();
+                        model.history.pop_back();
+                        model.history.pop_back();
+                        model.changeTurn();
+                        doubleUndo = true;
                 }
-            } else if (move) {
-
+            }
+            else if (move) {
                 // coach plays
                 success = player == coach
-                    || move == Move::RESIGN
-                    || coach->play(move);
-
-                //other engines play
-                for (auto pit = players.begin(); pit != players.end(); ++pit) {
-                    Player* p = *pit;
-                    if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
-                            && p != reinterpret_cast<Player*>(coach) && p != player) {
-                        console->debug("DEBUG play iter");
-                        if(move == Move::UNDO) {
-                            p->undo();
-                            if(doubleUndo)
-                               p->undo();
-                        }
-                        else
-                            p->play(move);
+                          || move == Move::RESIGN
+                          || coach->play(move);
+            }
+            //other engines play
+            for (auto pit = players.begin(); pit != players.end(); ++pit) {
+                Player* p = *pit;
+                if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
+                        && p != reinterpret_cast<Player*>(coach) && p != player) {
+                    console->debug("DEBUG play iter");
+                    if(move == Move::UNDO) {
+                        p->undo();
+                        if(doubleUndo)
+                           p->undo();
                     }
+                    else
+                        p->play(move);
                 }
             }
             //update model

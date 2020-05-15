@@ -248,9 +248,6 @@ int Board::stoneChanged(const Position& p, const Color& c) {
 
 int Board::areaChanged(const Position& p, const Color& area) {
     Color stone = (*this)[p].stone;
-    console->warn("area changed [{}, {}] = [{}, {}] @ {}", p.row(), p.col(),
-                  (stone == Color::EMPTY ? 0 : 1), (area == Color::EMPTY ? 0:1),
-                  (int)showTerritory);
     int i = p.row();
     int j = p.col();
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
