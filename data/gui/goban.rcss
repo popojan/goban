@@ -28,7 +28,7 @@ div.grp {
 
 div.space {
     display:inline;
-    padding-right: 0.5em;
+    padding-right: 0.5rem;
 }
 
 div.cmd {
@@ -89,7 +89,7 @@ div#grpDebug {
 }
 
 div#grpWhite {
-	width: 30%;
+	width: 45%;
 	position:absolute;
 	top:0px;
 	right:0px;
