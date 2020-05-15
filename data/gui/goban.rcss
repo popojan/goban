@@ -9,6 +9,7 @@ body
 	color: white;
 	background-color: #000;
 	color: #ffffff00;
+  border-width:0px;
   padding: 0px;
   margin: 0px;
 	z-index: -1;
@@ -23,13 +24,18 @@ game {
 
 div.grp {
     display:inline;
-    padding-right:0.5rem;
 }
+
+div.space {
+    display:inline;
+    padding-right: 0.5em;
+}
+
 div.cmd {
     display:inline;
-    padding-right: 0.5rem;
     border-color: #fff;
 }
+
 div.fps, div#lblBlack, div#lblWhite, div#cntWhite, div#cntBlack {
     display:inline;
 }
@@ -44,19 +50,19 @@ div#grpGame {
   padding-bottom: 1.5%;
   padding-top: 1%;
 }
-div#grpGame:hover, div#grpPlayers:hover, div#grpBlack:hover, div#grpWhite:hover)  {
+
+div#grpGame:hover, div#grpPlayers:hover, div#grpBlack:hover, div#grpWhite:hover {
   color: #ffffff80;
 }
+
 div#grpBlack {
-	width: 25%;
+	width: 30%;
+  height:30%;
 	position:absolute;
 	bottom:0px;
 	left:0px;
-  padding-right: 1.0%;
-  padding-left: 1.5%;
-  padding-bottom: 1.5%;
-  padding-top: 1%;
 }
+
 div#grpMessage {
   color: #ffffff80;
 	width: 50%;
@@ -69,7 +75,6 @@ div#grpMessage {
   padding-bottom: 1.5%;
   padding-top: 1%;
 }
-
 
 div#grpDebug {
 	width: 25%;
@@ -84,21 +89,31 @@ div#grpDebug {
 }
 
 div#grpWhite {
-	width: 50%;
+	width: 30%;
 	position:absolute;
 	top:0px;
 	right:0px;
 	text-align:right;
-  padding-right: 1.0%;
-  padding-left: 1%;
-  padding-bottom: 1.0%;
-  padding-top: 1%;
 }
 
 div.fps {
     bottom:0;
     right:0;
     text-align:right;
+}
+
+div.bottom {
+  position:absolute;
+  bottom: 0%;
+  left:0%;
+  padding:0.75rem;
+}
+
+div.top {
+  position:absolute;
+  top: 0%;
+  right:0%;
+  padding:0.75rem;
 }
 
 div.cmd:hover {
@@ -114,33 +129,35 @@ div.cmd:hover option:hover {
 
 select {
   height:28pt;
-  position:relative;
 }
+
 select selectbox {
-  //text-decoration:underline;
+  text-decoration:none;
   border-color:#ffffff80;
 }
-div#grpBlack select selectbox {
+
+div#grpBlack:hover select selectbox {
   position:absolute;
   border-left:0.2rem;
   padding-left:0.5rem;
 }
 
-
-div#grpWhite select selectbox {
+div#grpWhite:hover select selectbox {
   position:absolute;
   border-right:0.2rem;
   padding-right:0.5rem;
 }
 
 div#grpWhite select#selectWhite selectbox {
-  top:85pt;
+  top:105pt;
 }
+
 div#grpBlack select#selectBlack selectbox {
-  bottom:85pt;
+  bottom:105pt;
 }
+
 div#grpWhite select#selectKomi selectbox {
-  top:30pt;
+  top:45pt;
 }
 
 .active {

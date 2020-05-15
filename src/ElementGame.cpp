@@ -12,7 +12,7 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
 {
     console = spdlog::get("console");
     engine.addGameObserver(&model);
-    //engine.addGameObserver(&view);
+    engine.addGameObserver(&view);
 
     engine.clearGame(19, 0.5, 0);
     control.togglePlayer(0, 0);
