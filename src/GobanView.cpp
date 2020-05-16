@@ -138,18 +138,6 @@ void GobanView::reshape(int width, int height) {
 	gobanShader.setResolution(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 }
 
-/*bool GobanView::invalidate(int inc) {
-    bool cleared = false;
-    if (inc != 0) {
-        needsUpdate++;
-    }
-    else {
-        cleared = needsUpdate > 0 || MAX_FPS || animationRunning;
-        needsUpdate = 0;
-    }
-    return cleared;
-}*/
-
 bool GobanView::needsRepaint() {
     return updateFlag != UPDATE_NONE || MAX_FPS;
 }
@@ -166,14 +154,9 @@ void GobanView::shadeit(float time, GobanShader& gobanShader) {
 	gobanShader.setPan(newTranslate);
 
 	if (updateFlag & UPDATE_SHADER) {
-		//gobanShader.setGamma(1.0f);
-		//gobanShader.setContrast(0.0f);
 		console->debug("setMetrics");
 		gobanShader.setMetrics(model.metrics);
 	}
-
-	//glDisable(GL_BLEND);
-
 
 	gobanShader.draw(model, cam, updateFlag, time);
 	gobanShader.unuse();
@@ -186,7 +169,6 @@ void GobanView::Render(int w, int h)
         return;
     glDisable(GL_BLEND);
 	glClear(GL_DEPTH_BUFFER_BIT);
-	//glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
 
 
@@ -221,7 +203,6 @@ void GobanView::Render(int w, int h)
 	shadeit(time, gobanShader);
 
    	glEnable(GL_BLEND);
-	//shadeit(time, gobanShaderStones);
 
 	glEnable(GL_DEPTH_TEST);
 	if (updateFlag & UPDATE_OVERLAY){
@@ -238,7 +219,6 @@ void GobanView::Render(int w, int h)
     }
 
     glUseProgram(0);
-	//glDisable(GL_DEPTH_TEST);
 
 	if (time - startTime >= gobanShader.animT) {
 		if (showOverlay) {
@@ -250,7 +230,6 @@ void GobanView::Render(int w, int h)
 	}
 
 	glEnable(GL_BLEND);
-	//glDisable(GL_DEPTH_TEST);
 
 	updateFlag = UPDATE_NONE | (UPDATE_SOUND_STONE & updateFlag);
 }
