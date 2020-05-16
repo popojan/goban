@@ -202,8 +202,7 @@ void GobanModel::onGameMove(const Move& move) {
 
     if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
-        if (state.reason == GameState::DOUBLE_PASS)
-            board.toggleTerritoryAuto(true);
+        board.toggleTerritoryAuto(true);
         over = true;
         console->debug("Main Over! Reason {}", state.reason);
     }
