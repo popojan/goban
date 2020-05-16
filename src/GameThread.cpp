@@ -93,6 +93,7 @@ void GameThread::clearGame(int boardSize, float komi, int handicap) {
     for (auto pit = players.begin(); pit != players.end(); ++pit) {
         Player* player = *pit;
         player->boardsize(boardSize);
+        player->clear();
     }
 
     std::for_each(
@@ -123,41 +124,17 @@ int GameThread::getActivePlayer(int which) {
 
 int GameThread::activatePlayer(int which, int delta) {
     std::lock_guard<std::mutex> lock(playerMutex);
+
     std::size_t oldp = activePlayer[which];
     std::size_t newp = (oldp + delta) %  numPlayers;
+
     activePlayer[which] = newp;
+
     int role = which == 0 ? Player::BLACK : Player::WHITE;
-    if(newp == sgf) {
-        clearGame(model.getBoardSize(), model.state.komi, model.state.handicap);
-    } else if (oldp == sgf) {
-        players[oldp]->clear();
-    }
+
     setRole(oldp, role, false);
     setRole(newp, role, true);
-    if(players[oldp]->getRole() == Player::SPECTATOR && !players[oldp]->isTypeOf(Player::HUMAN)) {
-        players[oldp]->clear();
-        console->debug("Clearing board");
-    }
-    if(newp == sgf || oldp == sgf) {
-        console->debug("newp == sgf");
-        int role = which == 0 ? Player::WHITE : Player::BLACK;
-        std::size_t oldp = activePlayer[1-which];
-        activePlayer[1-which] = newp;
-        setRole(oldp, role, false);
-        setRole(newp, role, true);
-        if(players[oldp]->getRole() == Player::SPECTATOR && !players[oldp]->isTypeOf(Player::HUMAN)) {
-            players[oldp]->clear();
-            console->debug("Clearing board");
-        }
-    }
-    if(!((players[newp]->getRole() & (Player::COACH)) || players[newp]->isTypeOf(Player::HUMAN))) {
-        console->debug("Replaying history");
-        for(auto it = model.history.begin(); it != model.history.end(); ++it) {
-           players[newp]->play(*it);
-        }
-        console->debug("Needs replaying history size={} for player with role={}",
-                       model.history.size(), players[newp]->getRole());
-    }
+
     return newp;
 }
 
@@ -212,6 +189,20 @@ bool GameThread::humanToMove() {
     }
     return false;
 }
+bool GameThread::undo(Player * engine, bool doubleUndo) {
+    bool success = engine->undo();
+    if(success && doubleUndo) {
+        success &= engine->undo();
+    }
+    if (!success) {
+        console->debug("Undo not supported. Replaying game from the beginning.");
+        success = engine->clear() || engine->boardsize(model.getBoardSize());
+        for (auto it = model.history.begin(); it != model.history.end(); ++it) {
+            success &= engine->play(*it);
+        }
+    }
+    return success;
+}
 
 void GameThread::gameLoop() {
     hasThreadRunning = true;
@@ -262,17 +253,16 @@ void GameThread::gameLoop() {
             }
             if(success) {
                 //other engines play
-                for (auto pit = players.begin(); pit != players.end(); ++pit) {
-                    Player *p = *pit;
-                    if (p->getRole() != Player::NONE && p->getRole() != Player::SPECTATOR
-                        && p != reinterpret_cast<Player *>(coach) && p != player) {
-                        console->debug("DEBUG play iter");
-                        if (move == Move::UNDO) {
-                            p->undo();
-                            if (doubleUndo)
-                                p->undo();
-                        } else
-                            p->play(move);
+                if (!(move == Move::RESIGN)) {
+                    for (auto pit = players.begin(); pit != players.end(); ++pit) {
+                        Player *p = *pit;
+                        if (p != reinterpret_cast<Player *>(coach) && p != player) {
+                            console->debug("DEBUG play iter");
+                            if (move == Move::UNDO) {
+                                undo(p, doubleUndo);
+                            } else
+                                p->play(move);
+                        }
                     }
                 }
                 //update model

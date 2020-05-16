@@ -64,6 +64,9 @@ public:
     void addGameObserver(GameObserver* pobserver) {
         gameObservers.push_back(pobserver);
     }
+
+    bool undo(Player * engine, bool doubleUndo);
+
     const std::vector<Engine*> getEngines() { return engines;}
     const std::vector<Player*> getPlayers() { return players;}
 
