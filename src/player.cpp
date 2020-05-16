@@ -204,7 +204,7 @@ bool GtpEngine::boardsize(int boardSize) {
 }
 
 bool GtpEngine::clear() {
-    return GtpClient::success(GtpClient::issueCommand("clear"));
+    return GtpClient::success(GtpClient::issueCommand("clear_board"));
 }
 
 bool GtpEngine::undo() {
