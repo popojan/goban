@@ -158,6 +158,7 @@ bool GameThread::setFixedHandicap(int handicap) {
                     Player* player = *pit;
                     if (player != coach && player->getRole() != Player::NONE) {
                         player->boardsize(lastSize);
+                        player->clear();
                         for (auto pit = stones.begin(); pit != stones.end(); ++pit)
                             success &= player->play(Move(*pit, Color::BLACK));
                     }
