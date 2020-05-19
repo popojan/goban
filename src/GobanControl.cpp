@@ -6,11 +6,14 @@
 #include "ElementGame.h"
 #include "GobanControl.h"
 
-void GobanControl::newGame(int boardSize) {
+bool GobanControl::newGame(int boardSize) {
 	engine.interrupt();
     engine.reset();
-	engine.clearGame(boardSize, model.state.komi, model.state.handicap);
-    view.animateIntro();
+	if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
+        view.animateIntro();
+        return true;
+	}
+    return false;
 }
 
 void GobanControl::mouseClick(int button, int state, int x, int y) {
@@ -225,6 +228,17 @@ void GobanControl::increaseHandicap(){
     }
 }
 
+bool GobanControl::setHandicap(int handicap){
+    bool isOver = model.state.adata.reason != GameState::NOREASON;
+    bool isRunning = engine.isRunning();
+    bool success = false;
+    if(!isRunning && !isOver) {
+        model.state.handicap = handicap;
+        success = newGame(model.getBoardSize());
+    }
+    view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
+    return success;
+}
 
 void GobanControl::togglePlayer(int which, int delta) {
     engine.activatePlayer(which, delta);
