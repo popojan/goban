@@ -22,6 +22,7 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
 {
 
   auto doc = event.GetCurrentElement()->GetContext()->GetDocument("game_window");
+  if(!doc) return;
   GobanControl& controller = dynamic_cast<ElementGame*>(doc->GetElementById("game"))->getController();
 
     if (value == "boardsize") {
@@ -44,28 +45,7 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
         int y = event.GetParameter<int>("mouse_y", -1);
         controller.mouseClick(button, state, x, y);
     }
-    else if (value == "fullscreen") {
-        controller.keyPress(Rocket::Core::Input::KI_F, -1, -1);
-    }
-    else if (value == "aa") {
-        controller.keyPress(Rocket::Core::Input::KI_A, -1, -1);
-    }
-    else if (value == "fps") {
-        controller.keyPress(Rocket::Core::Input::KI_X, -1, -1);
-    }
-    else if (value == "pass") {
-        controller.keyPress(Rocket::Core::Input::KI_P, -1, -1);
-    }
-    else if (value == "territory") {
-        controller.keyPress(Rocket::Core::Input::KI_T, -1, -1);
-    }
-    else if (value == "black") {
-        //controller.switchPlayer(0);
-    }
-    else if (value == "white") {
-        //controller.switchPlayer(1);
-    }
-    else if (value == "handicap") {
+      else if (value == "handicap") {
         std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0").CString());
         float handicap = 0;
         ss >> handicap;
@@ -82,7 +62,6 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
         std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0.5").CString());
         int index = 0;
         ss >> index;
-        console->warn("engine {}", index);
         if(event.GetCurrentElement()->GetId() == "selectBlack") {
             controller.switchPlayer(0, index);
         }
@@ -102,6 +81,9 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
       } else {
           lastKomiSelection = select->GetSelection();
       }
+    }
+    else {
+        controller.command(value.CString());
     }
     event.StopPropagation();
 }

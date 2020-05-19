@@ -17,12 +17,13 @@ class ElementGame;
 
 class GobanModel: public GameObserver {
 public:
-    GobanModel(ElementGame& p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
+    GobanModel(ElementGame* p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
             : parent(p), prevPass(false), over(false), invalidated(false), cursor({0,0}) {
         console = spdlog::get("console");
         console->info("Preloading sounds...");
         //newGame(boardSize, handicap, komi);
     }
+    ~GobanModel();
     virtual void onGameMove(const Move&);
     virtual void onKomiChange(float);
     virtual void onHandicapChange(int);
@@ -63,7 +64,7 @@ public:
     void setCursor(const Position& p) { cursor = p;}
 
 public:
-    ElementGame& parent;
+    ElementGame* parent;
 
     //TODO multiple views in the future
 

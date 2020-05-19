@@ -26,7 +26,7 @@ div {
 */
 
 .padding {
-  padding: 14pt;
+  padding: 7pt;
 }
 
 div {
@@ -47,7 +47,7 @@ select selectbox {
   left:160pt;
   top:-100%;
   border-color: #ffffff80;
-  padding: 10pt;
+  padding: 7pt;
   background-color: #00000040;
 
 }
@@ -73,7 +73,7 @@ game {
 }
 
 
-.menu.hoverable:hover{
+.menu.hoverable:hover {
   background-color: #00000040;
 }
 
@@ -113,15 +113,17 @@ game {
 div.hide,
 .show:hover,
 .menu.hoverable:hover .menu:first-child.show,
-.menuitem.hoverable:hover .menuitem:first-child.show,
-.hoverable:hover .hide:hover
+.menuitem.hoverable:hover .menuitem.show,
+.hoverable:hover .hide:hover,
+.hoverable:hover span
 {
-  display: inline;
+  display: block;
   z-index:1;
 }
 
 div.show,
-.hoverable:hover .hide
+.hoverable:hover .hide,
+.hoverable span
 {
   display: none;
   z-index: 1;
@@ -132,18 +134,6 @@ div.show,
 .center {  text-align:center; }
 .right  { position:absolute; right: 0pt;}
 .top    {  position: absolute; top: 0pt; }
-.top.left  {  display:inline; }
-
-div#grpMessage {
-  width: 50%;
-  left: 25%;
-}
-
-div#grpDebug {
-  width: 25%;
-  height: 50pt;
-  overflow: visible;
-}
 
 div.hr
 {
@@ -160,6 +150,9 @@ div.hr
   border-right: 2pt;
 }
 
+#lblMessage {
+  padding-bottom: 10pt;
+}
 .active {
   text-decoration: underline;
 }

@@ -108,7 +108,6 @@ void EventManager::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::
 		else if (values[0] == "exit")
 		{
 			Shell::RequestExit();
-            event.StopPropagation();
 		}
 		else
 		{

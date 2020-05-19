@@ -29,6 +29,9 @@ void GobanModel::onBoardSized(int boardSize) {
     }
 
 }
+GobanModel::~GobanModel() {
+    //parent->RemoveReference();
+}
 
 float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
     if (state.reason == GameState::DOUBLE_PASS) {

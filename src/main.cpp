@@ -19,6 +19,12 @@
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
 
+Rocket::Core::Context* context = NULL;
+
+void GameLoop() {
+    dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"))->gameLoop();
+}
+
 #if defined ROCKET_PLATFORM_WIN32
   #undef __GNUC__
 #endif
@@ -26,14 +32,6 @@
 #include <clipp.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-
-Rocket::Core::Context* context = NULL;
-static ElementGame* gameElement = NULL;
-
-void GameLoop() {
-    gameElement->gameLoop();
-}
-
 
 #if defined ROCKET_PLATFORM_WIN32
 #include <windows.h>
@@ -147,7 +145,8 @@ const char * WINDOW_NAME = "Goban";
     }
 
     // Create the main Rocket context and set it on the shell's input layer.
-    context = Rocket::Core::CreateContext("main", Rocket::Core::Vector2i(window_width, window_height));
+    context = Rocket::Core::CreateContext("main",
+            Rocket::Core::Vector2i(window_width, window_height));
     if (context == NULL)
     {
         Rocket::Core::Shutdown();
@@ -172,11 +171,13 @@ const char * WINDOW_NAME = "Goban";
     EventManager::RegisterEventHandler("goban", new EventHandlerNewGame());
 
     //Shell::ToggleFullscreen();
-
-    if(EventManager::LoadWindow("goban")) {
-        gameElement = dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"));
+    auto window = EventManager::LoadWindow("goban");
+    if(window) {
 		Shell::EventLoop(GameLoop);
     }
+    EventManager::
+
+    EventManager::Shutdown();
 
     console->debug("Before context destroy");;
 
