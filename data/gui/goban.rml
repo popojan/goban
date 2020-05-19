@@ -6,60 +6,65 @@
 <body id="game_window">
     <game id="game" onmousedown="mdown" onmouseup="mup">
         <div class="menu hoverable top right">
-            <div class="menu top right show">
-                <div class="menuitem hoverable top left"> File
+            <divs class="menu show">
+                <div class="menuitem hoverable left">
+                    <span>File</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">SGF</div>
-                            <div class="cmd" id="cmdExit" onmousedown="exit">Load game...</div>
-                            <div class="cmd" id="cmdExit" onmousedown="exit">Save game</div>
+                            <div class="cmd" onmouseup="load">Load game...</div>
+                            <div class="cmd" onmouseup="save">Save game</div>
                         </div>
                         <div class="grp">
                             <div class="hr">System</div>
-                            <div class="cmd" id="cmdExit" onmousedown="exit">Exit</div>
+                            <div class="cmd" onmouseup="quit">Exit</div>
                         </div>
                     </div>
                 </div>
-                <div class="menuitem hoverable top left"> View
+                <div class="menuitem hoverable left">
+                    <span>View</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Window</div>
-                            <div class="cmd" id="cmdFullscreen" onmousedown="fullscreen">Fullscreen</div>
+                            <div class="cmd" id="cmdFullscreen" onmouseup="fullscreen">Fullscreen</div>
                         </div>
                         <div class="grp">
                             <div class="hr">Overlay</div>
-                            <div class="cmd" onmousedown="overlay">Last move</div>
+                            <div class="cmd" onmouseup="overlay">Last move</div>
                         </div>
                         <div class="grp">
                             <div class="hr">Gamma correction</div>
-                            <div class="cmd" onmousedown="resetgamma">Reset gamma</div>
+                            <div class="cmd" onmouseup="reset gamma and contrast">Reset gamma</div>
                         </div>
                         <div class="grp">
                             <div class="hr">Contrast</div>
-                            <div class="cmd" onmousedown="resetgamma">Reset contrast</div>
+                            <div class="cmd" onmouseup="reset gamma and contrast">Reset contrast</div>
                         </div>
 
                         <div class="grp">
                             <div class="hr">Camera</div>
-                            <div class="cmd" onmousedown="resetcamera">Reset camera</div>
-                            <div class="cmd" onmousedown="resetcamera">Animate</div>
+                            <div class="cmd" onmouseup="reset camera">Reset camera</div>
+                            <div class="cmd" onmouseup="animate">Animate</div>
                         </div>
                     </div>
                 </div>
-                <div class="menuitem hoverable top left"> Game
+                <div class="menuitem hoverable left">
+                    <span>Game</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr" id="blackMoves">Black player</div>
                             <div class="cmd">
-                                <select onchange="engine" id="selectBlack"/>
+                                <select id="selectBlack"
+                                        onchange="engine" onmouseup="nop"/>
                             </div>
                             <div class="hr"  id="whiteMoves">White player</div>
                             <div class="cmd">
-                                <select onchange="engine" id="selectWhite"/>
+                                <select id="selectWhite" onchange="engine" onmouseup="nop"/>
                             </div>
                             <div class="hr">Board size</div>
                             <div class="cmd">
-                                <select id="selBoard" onchange="boardsize">
+                                <select id="selBoard"
+                                        onmouseup="nop" onchange="boardsize">
                                     <option value="19" selected>19x19</option>
                                     <option value="17">17x17</option>
                                     <option value="15">15x15</option>
@@ -70,7 +75,8 @@
                             </div>
                             <div class="hr">Komi</div>
                             <div class="cmd">
-                                <select onchange="komi" id="selectKomi">
+                                <select id="selectKomi"
+                                        onmouseup="nop" onchange="komi">
                                     <option value="0.5">0.5</option>
                                     <option value="6.5">6.5</option>
                                     <option value="7.5" selected>7.5</option>
@@ -78,7 +84,8 @@
                             </div>
                             <div class="hr">Handicap</div>
                             <div class="cmd">
-                                <select onchange="handicap" id="selectHandicap">
+                                <select id="selectHandicap"
+                                        onchange="handicap" onmouseup="nop">
                                     <option value="0" selected>even</option>
                                     <option value="2">2 stones</option>
                                     <option value="3">3 stones</option>
@@ -93,62 +100,62 @@
                         </div>
                     </div>
                 </div>
-                <div class="menuitem hoverable top left"> Move
+                <div class="menuitem hoverable left">
+                    <span>Move</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Game</div>
-                            <div class="cmd" id="cmdPass" onmousedown="pass">Pass</div>
-                            <div class="cmd" onmousedown="once">Play once</div>
+                            <div class="cmd" id="cmdPass" onmouseup="play/pass">Pass</div>
+                            <div class="cmd" onmouseup="play once">Play once</div>
                             <div class="hr">Move</div>
-                            <div class="cmd" onmousedown="undo">Undo</div>
+                            <div class="cmd" onmouseup="undo move">Undo</div>
                         </div>
                     </div>
                 </div>
-                <div class="menuitem hoverable top left"> Analyze
+                <div class="menuitem hoverable left">
+                    <span>Analyze</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">GnuGo</div>
-                            <div class="cmd" id="cmdTerritory" onmousedown="territory">Territory</div>
+                            <div class="cmd" onmouseup="territory">Territory</div>
                         </div>
                     </div>
                 </div>
-                <div class="menuitem hoverable top right"> About
+                <div class="menuitem hoverable right">
+                    <span>About</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Version</div>
-                            <div class="cmd">
-                                <div class="cmd" onmousedown="about">Goban 0.0.1</div>
-                            </div>
+                            <div class="cmd" onmouseup="about">Goban 0.0.1</div>
                         </div>
                     </div>
                 </div>
-                <div class="menuitem hoverable top right"> Debug
+                <div class="menuitem hoverable right">
+                    <span>Debug</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Framerate</div>
-                            <div class="cmd">
-                                <div class="cmd" id="lblFPS" onmousedown="fps">fps</div>
-                            </div>
+                            <div class="cmd" id="lblFPS" onmouseup="fps">fps</div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </divs>
         </div>
 
         <div id="grpPlayers">
             <div id="grpBlack" class="hoverable bottom left">
-                <div class="show padding bottom left">
-                  <div class="cmd" id="cntBlack" onmousedown="black">Black: 0</div>
+                <div class="show bottom left">
+                  <div class="cmd" id="cntBlack" onmouseup="black">Black: 0</div>
                 </div>
             </div>
             <div id="grpWhite" class="hoverable top right">
-                <div class="show padding top right">
-                  <div class="cmd" id="cntWhite" onmousedown="white">White: 0</div>
+                <div class="show top right">
+                  <div class="cmd" id="cntWhite" onmouseup="white">White: 0</div>
                 </div>
             </div>
         </div>
-        <div id="grpMessage" class="bottom">
-            <div class="cmd padding bottom center" id="lblMessage" onmousedown="msg"></div>
+        <div class="bottom">
+            <div class="cmd bottom center" id="lblMessage" onmouseup="msg"></div>
         </div>
     </game>
 </body>

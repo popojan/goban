@@ -1,7 +1,3 @@
-//
-// Created by jan on 7.5.17.
-//
-
 #ifndef GOBAN_GOBANCONTROL_H
 #define GOBAN_GOBANCONTROL_H
 
@@ -9,38 +5,51 @@
 #include "GobanModel.h"
 #include "GobanView.h"
 #include "spdlog/spdlog.h"
+#include "Controls.h"
 
 class ElementGame;
 
 class GobanControl {
 public:
-    GobanControl(ElementGame& p, GobanModel& m, GobanView& v, GameThread& e)
+    GobanControl(ElementGame* p, GobanModel& m, GobanView& v, GameThread& e)
             : parent(p), model(m), view(v), engine(e), rButtonDown(false), mButtonDown(false), startX(-1),
               startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true)
     {
         console = spdlog::get("console");
+        initControls();
     };
     ~GobanControl() { destroy(); }
 
     void destroy();
+    void initControls();
 
     void mouseClick(int button, int state, int x, int y);
     void mouseMove(int x, int y);
     void keyPress(int key, int x, int y, bool downNotUp = false);
-    bool isExiting() { return exit; }
+    bool isExiting() {
+        return exit;
+    }
+    bool requestExit() {
+        exit = true;
+        Shell::RequestExit();
+        return true;
+    }
     bool newGame(int boardSize);
     void togglePlayer(int which, int delta = 1);
     void switchPlayer(int which, int idx);
     void increaseHandicap();
     bool setHandicap(int);
     bool setKomi(float);
+    bool command(const std::string& cmd);
 
 private:
-    ElementGame& parent;
+    ElementGame* parent;
     GobanModel& model;
     GobanView& view;
     GameThread& engine;
+    Controls controls;
 private:
+
     bool rButtonDown, mButtonDown;
     //float mouse[2];
     int startX, startY;

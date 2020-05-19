@@ -76,118 +76,140 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     }
 }
 
+void GobanControl::initControls() {
+    controls
+    .add("quit", Rocket::Core::Input::KI_ESCAPE)
+    .add("fullscreen", Rocket::Core::Input::KI_F)
+    .add("fps", Rocket::Core::Input::KI_X)
+    .add("animate", Rocket::Core::Input::KI_O)
+    .add("territory", Rocket::Core::Input::KI_T)
+    .add("overlay", Rocket::Core::Input::KI_N)
+    .add("play/pass", Rocket::Core::Input::KI_P)
+    .add("reset camera", Rocket::Core::Input::KI_C)
+    .add("undo", Rocket::Core::Input::KI_U)
+    //.add("prev move", Rocket::Core::Input::KI_LEFT)
+    //.add("next move", Rocket::Core::Input::KI_RIGHT)
+    .add("pan camera", Rocket::Core::Input::KI_D)
+    .add("rotate camera", Rocket::Core::Input::KI_A)
+    .add("zoom camera", Rocket::Core::Input::KI_S)
+    .add("cycle shaders", Rocket::Core::Input::KI_V)
+    .add("increase gamma", Rocket::Core::Input::KI_RIGHT)
+    .add("decrease gamma", Rocket::Core::Input::KI_LEFT)
+    .add("increase contrast", Rocket::Core::Input::KI_UP)
+    .add("decrease contrast", Rocket::Core::Input::KI_DOWN)
+    .add("reset contrast and gamma", Rocket::Core::Input::KI_HOME);
+}
+
+bool GobanControl::command(const std::string& cmd) {
+
+    if(cmd == "quit") {
+        exit = true;
+        Shell::RequestExit();
+    }
+    else if (cmd == "fullscreen") {
+        Shell::ToggleFullscreen();
+    }
+    else if (cmd == "fps") {
+        view.toggleFpsLimit();
+    }
+    else if (cmd == "animate") {
+        view.lastTime = 0.0;
+        view.startTime = Shell::GetElapsedTime();
+        view.animationRunning = true;
+        view.requestRepaint();
+    }
+    else if (cmd == "territory") {
+        model.board.toggleTerritory();
+        view.requestRepaint();
+    }
+    else if (cmd == "overlay") {
+        view.toggleOverlay();
+        view.requestRepaint();
+    }
+    else if (cmd == "play/pass") {
+        bool playNow = !firstGame;
+        if (model.isGameOver()) {
+            newGame(model.getBoardSize());
+            playNow = false;
+        }
+        else if(view.board.isEmpty()) {
+            if(!engine.isRunning())
+                engine.run();
+        }
+        if(playNow) {
+            auto move = model.getPassMove();
+            engine.playLocalMove(move);
+            view.requestRepaint();
+            firstGame = false;
+        }
+    }
+    else if (cmd == "reset camera") {
+        view.resetView();
+        view.requestRepaint();
+    }
+    else if (cmd == "undo move") {
+        engine.playLocalMove(model.getUndoMove());
+    }
+    else if (cmd == "pan camera") {
+        view.endPan();
+    }
+    else if (cmd == "rotate camera") {
+        view.endRotation();
+    }
+    else if (cmd == "zoom camera") {
+        view.endZoom();
+    }
+    else if (cmd == "cycle shaders") {
+        view.cycleShaders();
+        view.gobanShader.setReady();
+        view.gobanShader.setReady();
+    }
+    else if (cmd == "increase gamma") {
+        console->debug("new gamma = {0}", view.getGamma() + 0.025f);
+        view.setGamma(view.getGamma() + 0.025f);
+    }
+    else if (cmd == "decrease gamma") {
+        console->debug("new gamma = {0}", view.getGamma() + 0.025f);
+        view.setGamma(view.getGamma() - 0.025f);
+    }
+    else if (cmd == "increase contrast") {
+        console->debug("new contrast = {0}", view.getContrast() + 0.025f);
+        view.setContrast(view.getContrast() + 0.025f);
+    }
+    else if (cmd == "decrease contrast") {
+        console->debug("new contrast = {0}", view.getContrast() - 0.025f);
+        view.setContrast(view.getContrast() - 0.025f);
+    }
+    else if (cmd == "reset contrast and gamma") {
+        view.resetAdjustments();
+    }
+    return true;
+}
+
 void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     (void) x;
     (void) y;
 
     if (!downNotUp) {
-        if (key == Rocket::Core::Input::KI_ESCAPE) {
-            exit = true;
-            Shell::RequestExit();
+        std::string cmd;
+        auto it = controls.keyToCommand.find(static_cast<Rocket::Core::Input::KeyIdentifier>(key));
+        if (it != controls.keyToCommand.end()) {
+            cmd = it->second;
         }
-        else if (key == Rocket::Core::Input::KI_F) {
-            Shell::ToggleFullscreen();
+        if (!cmd.empty()) {
+            command(cmd);
+            return;
         }
-        else if (key == Rocket::Core::Input::KI_X) {
-            view.toggleFpsLimit();
-        }
-        else if (key == Rocket::Core::Input::KI_O) {
-            //view.toggleAnimation(Shell::GetElapsedTime());
-            view.lastTime = 0.0;
-            view.startTime = Shell::GetElapsedTime();
-			view.animationRunning = true;
-			view.requestRepaint();
-        }
-        else if (key == Rocket::Core::Input::KI_T) {
-            model.board.toggleTerritory();
-			//engine.toggleTerritory();
-			view.requestRepaint();
-        }
-		else if (key == Rocket::Core::Input::KI_N) {
-			view.toggleOverlay();
-			view.requestRepaint();
-		}
-		else if (key == Rocket::Core::Input::KI_K) {
-			//switchPlayer(0);
-		}
-		else if (key == Rocket::Core::Input::KI_L) {
-			//switchPlayer(1);
-		}
-
-		else if (key == Rocket::Core::Input::KI_P) {
-            bool playNow = !firstGame;
-            if (model.isGameOver()) {
-                newGame(model.getBoardSize());
-                playNow = false;
-            }
-            else if(view.board.isEmpty()) {
-                if(!engine.isRunning())
-                    engine.run();
-            }
-            if(playNow) {
-                auto move = model.getPassMove();
-                //model.playMove(move);
-                engine.playLocalMove(move);
-                view.requestRepaint();
-				firstGame = false;
-            }
-        }
-        else if (key == Rocket::Core::Input::KI_C) {
-            view.resetView();
-			view.requestRepaint();
-        }
-        else if (key == Rocket::Core::Input::KI_U || key == Rocket::Core::Input::KI_LEFT) {
-            engine.playLocalMove(model.getUndoMove());
-        }
-        else if (key == Rocket::Core::Input::KI_RIGHT) {
-            engine.playLocalMove(model.getPassMove());
-        }
-        else if (key == Rocket::Core::Input::KI_D) {
+        if (key == Rocket::Core::Input::KI_D) {
             view.endPan();
-        }
-        else if (key == Rocket::Core::Input::KI_A) {
+        } else if (key == Rocket::Core::Input::KI_A) {
             view.endRotation();
-        }
-        else if (key == Rocket::Core::Input::KI_S) {
+        } else if (key == Rocket::Core::Input::KI_S) {
             view.endZoom();
         }
-        else if (key == Rocket::Core::Input::KI_Q){
-            newGame(9);
-        }
-        else if (key == Rocket::Core::Input::KI_W) {
-            newGame(13);
-        }
-        else if (key == Rocket::Core::Input::KI_E) {
-            newGame(19);
-        }
-        else if (key == Rocket::Core::Input::KI_V) {
-            view.cycleShaders();
-            view.gobanShader.setReady();
-			view.gobanShader.setReady();
-        }
-        //view.requestRepaint();
     }
     else {
-        if (key == Rocket::Core::Input::KI_RIGHT) {
-            console->debug("new gamma = {0}", view.getGamma() + 0.025f);
-            view.setGamma(view.getGamma() + 0.025f);
-        }
-        else if (key == Rocket::Core::Input::KI_LEFT) {
-            console->debug("new gamma = {0}", view.getGamma() + 0.025f);
-            view.setGamma(view.getGamma() - 0.025f);
-        }
-        else if (key == Rocket::Core::Input::KI_UP) {
-            console->debug("new contrast = {0}", view.getContrast() + 0.025f);
-            view.setContrast(view.getContrast() + 0.025f);
-        }
-        else if (key == Rocket::Core::Input::KI_DOWN) {
-            console->debug("new contrast = {0}", view.getContrast() - 0.025f);
-            view.setContrast(view.getContrast() - 0.025f);
-        }
-        else if (key == Rocket::Core::Input::KI_HOME) {
-            view.resetAdjustments();
-        }
-        else if (key == Rocket::Core::Input::KI_D) {
+        if (key == Rocket::Core::Input::KI_D) {
             view.initPan(mouseX, mouseY);
         }
         else if (key == Rocket::Core::Input::KI_A) {
@@ -246,7 +268,6 @@ void GobanControl::togglePlayer(int which, int delta) {
 }
 
 void GobanControl::switchPlayer(int which, int newPlayerIndex) {
-    console->warn("switching player {}", newPlayerIndex);
     int idx = engine.getActivePlayer(which);
     engine.activatePlayer(which, newPlayerIndex - idx);
     model.state.holdsStone = false;

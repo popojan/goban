@@ -7,8 +7,8 @@
 #include <Rocket/Controls/ElementFormControlSelect.h>
 
 ElementGame::ElementGame(const Rocket::Core::String& tag)
-        : Rocket::Core::Element(tag), model(*this), view(model), engine(model),
-          control(*this, model, view, engine), hasResults(false), calculatingScore(false)
+        : Rocket::Core::Element(tag), model(this), view(model), engine(model),
+          control(this, model, view, engine), hasResults(false), calculatingScore(false)
 {
     console = spdlog::get("console");
     engine.addGameObserver(&model);
@@ -22,10 +22,8 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
 void ElementGame::populateEngines() {
     auto selectBlack = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(
             GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
-    console->info("preBlack");
     auto selectWhite = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(
             GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
-    console->info("preBlack");
     const auto players(engine.getPlayers());
 
     if(!selectBlack || !selectWhite) {
@@ -38,8 +36,8 @@ void ElementGame::populateEngines() {
         ss << i;
         std::string playerName(players[i]->getName());
         std::string playerIndex(ss.str());
-        selectBlack->Add(playerName.c_str(), playerIndex.c_str());
-        selectWhite->Add(playerName.c_str(), playerIndex.c_str());
+        selectBlack->Add(playerName.c_str(),playerIndex.c_str());
+        selectWhite->Add(playerName.c_str(),playerIndex.c_str());
     }
     selectBlack->SetSelection(players.size()-1);
     selectWhite->SetSelection(0);
@@ -66,9 +64,9 @@ void ElementGame::gameLoop() {
 		cnt = 0;
 	}
 	ElementGame* game = dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"));
-	if (game != 0 && game->isExiting())
-		return;
-
+	if (game != 0 && game->isExiting()) {
+        return;
+    }
 	context->Update();
 	if (view.animationRunning || view.MAX_FPS) {
 		view.requestRepaint();
@@ -89,6 +87,7 @@ void ElementGame::gameLoop() {
 	}
 }
 ElementGame::~ElementGame() {
+
 }
 
 void ElementGame::ProcessEvent(Rocket::Core::Event& event)
@@ -127,7 +126,6 @@ void ElementGame::ProcessEvent(Rocket::Core::Event& event)
 
 void ElementGame::OnUpdate()
 {
-
     if(!view.gobanShader.isReady())
         return;
 
@@ -177,7 +175,6 @@ void ElementGame::OnUpdate()
 			requestRepaint();
 		}
 	}
-	//console->warn("view.state.reason = {} vs model.state.reason = {}", view.state.reason,model.state.reason);
 	if ((view.state.capturedBlack != model.state.capturedBlack)
 	    || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */
 		|| (view.state.reason != GameState::NOREASON && model.state.reason == GameState::NOREASON) /* new game */)

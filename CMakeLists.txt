@@ -24,6 +24,7 @@ ExternalProject_Add(project_libsndfile
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
     BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile/build
     STEP_TARGETS build
+    UPDATE_COMMAND ""
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 
@@ -195,7 +196,7 @@ set(GOBAN_HDR_FILES
     ${PROJECT_SOURCE_DIR}/src/GobanShader.h
     ${PROJECT_SOURCE_DIR}/src/Metrics.h
     ${PROJECT_SOURCE_DIR}/src/GobanOverlay.h
-    ${PROJECT_SOURCE_DIR}/src/GameState.h)
+    ${PROJECT_SOURCE_DIR}/src/GameState.h src/Controls.h)
 
 set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/Board.cpp
@@ -224,7 +225,7 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/sound/AudioPlayer.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/FileHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
-    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp)
+    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Controls.cpp)
 
 
 
