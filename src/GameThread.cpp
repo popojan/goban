@@ -89,12 +89,17 @@ void GameThread::interrupt() {
  *
  * @param boardSize
  */
-void GameThread::clearGame(int boardSize, float komi, int handicap) {
+bool GameThread::clearGame(int boardSize, float komi, int handicap) {
+
+    bool success = true;
+
     for (auto pit = players.begin(); pit != players.end(); ++pit) {
         Player* player = *pit;
-        player->boardsize(boardSize);
-        player->clear();
+        success &= player->boardsize(boardSize);
+        success &= player->clear();
     }
+    if(! success)
+        return false;
 
     std::for_each(
         gameObservers.begin(), gameObservers.end(),
@@ -104,6 +109,7 @@ void GameThread::clearGame(int boardSize, float komi, int handicap) {
     );
     setKomi(komi);
     setFixedHandicap(handicap);
+    return success;
 
 }
 
@@ -146,6 +152,7 @@ bool GameThread::setFixedHandicap(int handicap) {
 		Engine* coach = currentCoach();
 		if (handicap >= 2) {
             coach->boardsize(lastSize);
+            coach->clear();
             std::vector<Position> stones;
             if (coach != 0) {
                 success = coach->fixed_handicap(handicap, stones);

@@ -164,8 +164,8 @@ void ElementGame::OnUpdate()
 	//model.state.colorToMove = colorToMove;
 	if (view.state.colorToMove != model.state.colorToMove) {
 		bool blackMove = model.state.colorToMove == Color::BLACK;
-		Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("selectBlack");
-		Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("selectWhite");
+		Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("blackMoves");
+		Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("whiteMoves");
 		if (elBlack != NULL) {
 			elBlack->SetClass("active", blackMove);
 			view.state.colorToMove = model.state.colorToMove;

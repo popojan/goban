@@ -18,6 +18,8 @@ public:
 private:
     std::shared_ptr<spdlog::logger> console;
     int lastKomiSelection = -1;
+    int lastBoardSelection = -1;
+    int lastHandicapSelection = -1;
 };
 
 #endif

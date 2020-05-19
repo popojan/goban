@@ -34,7 +34,7 @@ public:
 
     void interrupt();
 
-    void clearGame(int boardSize, float komi, int handicap);
+    bool clearGame(int boardSize, float komi, int handicap);
 
     void setKomi(float komi);
 

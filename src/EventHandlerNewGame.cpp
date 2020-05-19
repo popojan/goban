@@ -24,14 +24,18 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
   auto doc = event.GetCurrentElement()->GetContext()->GetDocument("game_window");
   GobanControl& controller = dynamic_cast<ElementGame*>(doc->GetElementById("game"))->getController();
 
-    if(value == "new 9") {
-        controller.newGame(9);
-    }
-    else if(value == "new 13") {
-        controller.newGame(13);
-    }
-    else if(value == "new 19") {
-        controller.newGame(19);
+    if (value == "boardsize") {
+        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "19").CString());
+        float boardSize = 19;
+        ss >> boardSize;
+
+        auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selBoard"));
+        if(!controller.newGame(boardSize)) {
+            console->error("setting boardsize failed");
+            select->SetSelection(lastBoardSelection);
+        } else {
+            lastBoardSelection = select->GetSelection();
+        }
     }
     else if(value == "mdown" || value == "mup") {
         int state = value == "mdown" ? 1 : 0;
@@ -61,8 +65,18 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
     else if (value == "white") {
         //controller.switchPlayer(1);
     }
-    else if (value == "hand") {
-        controller.increaseHandicap();
+    else if (value == "handicap") {
+        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0").CString());
+        float handicap = 0;
+        ss >> handicap;
+
+        auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selectHandicap"));
+        if(!controller.setHandicap(handicap)) {
+            console->error("setting handicap failed");
+            select->SetSelection(lastHandicapSelection);
+        } else {
+            lastHandicapSelection = select->GetSelection();
+        }
     }
     else if(value == "engine") {
         std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0.5").CString());
