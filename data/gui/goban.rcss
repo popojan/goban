@@ -26,7 +26,7 @@ div {
 */
 
 .padding {
-  padding: 7pt;
+  padding: 0.25rem;
 }
 
 div {
@@ -42,17 +42,17 @@ select option:hover, .cmd:hover {
 }
 
 select selectbox {
-  width: 150pt;
+  width: 10rem;
   position:relative;
-  left:160pt;
+  left:10.2rem;
   top:-100%;
   border-color: #ffffff80;
-  padding: 7pt;
+  padding: 0.25rem;
   background-color: #00000040;
 
 }
 div.cmd   {
-  height: 28pt;
+  height: 1.25rem;
   display: block;
 }
 
@@ -67,8 +67,8 @@ game {
 
 .menu {
   width:100%;
-  height:48pt;
-  border-bottom: 24pt;
+  height:2rem;
+  border-bottom: 1rem;
   border-color: #00000000;
 }
 
@@ -79,7 +79,7 @@ game {
 
 .menuitem {
   position:relative;
-  padding: 10pt;
+  padding: 0.25rem;
   width: 0px;
 }
 
@@ -95,18 +95,22 @@ game {
 
 .left .menuitem.show {
   position: absolute;
-  width: 150pt;
-  top: 48pt;
+  width: 10rem;
+  top: 1rem;
   left: 0px;
   background-color: #00000040;
+  border-color:#00000000;
+  border-top:1rem;
 }
 
 .right .menuitem.show {
   position: absolute;
-  width: 150pt;
-  top: 48pt;
+  width: 10rem;
+  top: 1rem;
   right: 0px;
   background-color: #00000040;
+  border-color:#00000000;
+  border-top:1rem;
 }
 
 
@@ -114,6 +118,7 @@ div.hide,
 .show:hover,
 .menu.hoverable:hover .menu:first-child.show,
 .menuitem.hoverable:hover .menuitem.show,
+.menuitem:hover, .menu:hover,
 .hoverable:hover .hide:hover,
 .hoverable:hover span
 {
@@ -129,29 +134,30 @@ div.show,
   z-index: 1;
 }
 
-.bottom {  position: absolute; bottom: 0pt; }
-.left   {  position: absolute; left: 0pt; text-align: left;  }
+.bottom {  position: absolute; bottom: 0px; }
+.left   {  position: absolute; left: 0px; text-align: left;  }
 .center {  text-align:center; }
-.right  { position:absolute; right: 0pt;}
-.top    {  position: absolute; top: 0pt; }
+.right  { position:absolute; right: 0px;}
+.top    {  position: absolute; top: 0px; }
 
 div.hr
 {
   display:block;
-  margin-top: 12pt;
-  margin-bottom: -4pt;
-  border-bottom: 0pt;
+  margin-top: 0.5rem;
+  margin-bottom: -0.15rem;
+  border-color:#00000000;
+  border-bottom: 0px;
   border-color: #ffffff40;
-  font-size: 14pt;
+  font-size: 0.6rem;
 }
 
 #blackMoves {
   border-color: #ffffff00;
-  border-right: 2pt;
+  border-right: 0.05rem;
 }
 
 #lblMessage {
-  padding-bottom: 10pt;
+  padding-bottom: 0.25rem;
 }
 .active {
   text-decoration: underline;
