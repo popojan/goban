@@ -55,16 +55,16 @@
                             <div class="hr" id="blackMoves">Black player</div>
                             <div class="cmd">
                                 <select id="selectBlack"
-                                        onchange="engine" onmouseup="nop"/>
+                                        onchange="engine" onmousedown="nop"/>
                             </div>
                             <div class="hr"  id="whiteMoves">White player</div>
                             <div class="cmd">
-                                <select id="selectWhite" onchange="engine" onmouseup="nop"/>
+                                <select id="selectWhite" onchange="engine" onmousedown="nop"/>
                             </div>
                             <div class="hr">Board size</div>
                             <div class="cmd">
                                 <select id="selBoard"
-                                        onmouseup="nop" onchange="boardsize">
+                                        onmousedown="nop" onchange="boardsize">
                                     <option value="19" selected>19x19</option>
                                     <option value="17">17x17</option>
                                     <option value="15">15x15</option>
@@ -76,7 +76,7 @@
                             <div class="hr">Komi</div>
                             <div class="cmd">
                                 <select id="selectKomi"
-                                        onmouseup="nop" onchange="komi">
+                                        onmousedown="nop" onchange="komi">
                                     <option value="0.5">0.5</option>
                                     <option value="6.5">6.5</option>
                                     <option value="7.5" selected>7.5</option>
@@ -85,7 +85,7 @@
                             <div class="hr">Handicap</div>
                             <div class="cmd">
                                 <select id="selectHandicap"
-                                        onchange="handicap" onmouseup="nop">
+                                        onchange="handicap" onmousedown="nop">
                                     <option value="0" selected>even</option>
                                     <option value="2">2 stones</option>
                                     <option value="3">3 stones</option>
