@@ -77,27 +77,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
 }
 
 void GobanControl::initControls() {
-    controls
-    .add("quit", Rocket::Core::Input::KI_ESCAPE)
-    .add("fullscreen", Rocket::Core::Input::KI_F)
-    .add("fps", Rocket::Core::Input::KI_X)
-    .add("animate", Rocket::Core::Input::KI_O)
-    .add("territory", Rocket::Core::Input::KI_T)
-    .add("overlay", Rocket::Core::Input::KI_N)
-    .add("play/pass", Rocket::Core::Input::KI_P)
-    .add("reset camera", Rocket::Core::Input::KI_C)
-    .add("undo", Rocket::Core::Input::KI_U)
-    //.add("prev move", Rocket::Core::Input::KI_LEFT)
-    //.add("next move", Rocket::Core::Input::KI_RIGHT)
-    .add("pan camera", Rocket::Core::Input::KI_D)
-    .add("rotate camera", Rocket::Core::Input::KI_A)
-    .add("zoom camera", Rocket::Core::Input::KI_S)
-    .add("cycle shaders", Rocket::Core::Input::KI_V)
-    .add("increase gamma", Rocket::Core::Input::KI_RIGHT)
-    .add("decrease gamma", Rocket::Core::Input::KI_LEFT)
-    .add("increase contrast", Rocket::Core::Input::KI_UP)
-    .add("decrease contrast", Rocket::Core::Input::KI_DOWN)
-    .add("reset contrast and gamma", Rocket::Core::Input::KI_HOME);
+    controls.addFromJson("./config/config.json");
 }
 
 bool GobanControl::command(const std::string& cmd) {
