@@ -1,5 +1,5 @@
 #version 300 es
-precision lowp float;
+precision highp float;
 
 layout(location = 0) in vec4 vertex;
 out vec3 rdbl;

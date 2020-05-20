@@ -1,5 +1,5 @@
 #version 300 es
-precision lowp float;
+precision highp float;
 
 /* === DO NOT CHANGE BELOW === */
 const int MAXSTONES = 19*19;
