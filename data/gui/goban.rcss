@@ -33,6 +33,10 @@ div {
   position: static;
 }
 
+.menu span {
+  padding-right: 0.75rem;
+}
+
 select option {
   color:#ffffff80;
 }
