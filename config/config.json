@@ -1,0 +1,40 @@
+{
+  "bots": [
+    {
+      "name": "GNU go 3.8",
+      "path": "./engine/gnugo",
+      "command": "gnugo",
+      "parameters": "--mode gtp",
+      "main": 1,
+      "enabled": 1
+    },
+    {
+      "name": "Pachi 10.00",
+      "path": "./engine/pachi",
+      "command": "pachi",
+      "parameters": "-t _120 threads=2,maximize_score",
+      "main": 0,
+      "enabled": 1
+    }
+  ],
+  "controls" : [
+    {"command": "quit", "key": 81},
+    {"command": "fullscreen", "key": 17},
+    {"command": "fps", "key": 35},
+    {"command": "animate", "key": 26},
+    {"command": "territory", "key": 31},
+    {"command": "overlay", "key": 25},
+    {"command": "play/pass", "key": 27},
+    {"command": "reset camera", "key": 14},
+    {"command": "undo", "key": 32},
+    {"command": "pan camera", "key": 15},
+    {"command": "rotate camera", "key": 12},
+    {"command": "zoom camera", "key": 30},
+    {"command": "cycle shaders", "key": 33},
+    {"command": "increase gamma", "key": 92},
+    {"command": "decrease gamma", "key": 90},
+    {"command": "increase contrast", "key": 91},
+    {"command": "decrease contrast", "key": 93},
+    {"command": "reset contrast and gamma", "key": 89}
+  ]
+}
