@@ -104,6 +104,19 @@ endif (NOT WIN32)
 find_package(LibGlyphy REQUIRED)
 find_package(Freetype REQUIRED)
 
+
+include(FetchContent)
+
+FetchContent_Declare(json
+  GIT_REPOSITORY git://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent.git
+  GIT_TAG v3.7.3)
+
+FetchContent_GetProperties(json)
+if(NOT json_POPULATED)
+  FetchContent_Populate(json)
+  add_subdirectory(${json_SOURCE_DIR} ${json_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
 #===================================
 # Setup paths ======================
 #===================================
@@ -259,6 +272,7 @@ target_link_libraries(goban
     ${LIBROCKET_LIBRARIES}
     ${EXTRA_LIBS}
     libsndfile portaudio
+    nlohmann_json::nlohmann_json
 )
 
 

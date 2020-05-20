@@ -1,7 +1,3 @@
-//
-// Created by jan on 30.6.17.
-//
-
 #ifndef GOBAN_VIEWSTATE_H
 #define GOBAN_VIEWSTATE_H
 
@@ -64,4 +60,4 @@ public:
 };
 
 
-#endif //GOBAN_VIEWSTATE_H
+#endif

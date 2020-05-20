@@ -13,6 +13,7 @@ struct Controls {
     std::unordered_map<std::string, Rocket::Core::Input::KeyIdentifier> commandToKey;
     std::unordered_map<Rocket::Core::Input::KeyIdentifier, std::string> keyToCommand;
     Controls& add(const std::string& cmd, Rocket::Core::Input::KeyIdentifier key);
+    void addFromJson(const std::string& fileName);
 };
 
 #endif //GOBAN_CONTROLS_H
