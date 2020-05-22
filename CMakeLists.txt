@@ -39,7 +39,7 @@ ADD_LIBRARY(libsndfile STATIC IMPORTED)
 
 #SET(LIBSNDFILE_INCLUDE_PATH "${install_dir}/src/project_libsndfile-build/src/")
 
-ExternalProject_Add(project_portaudio 
+ExternalProject_Add(project_portaudio
     GIT_REPOSITORY      https://git.assembla.com/portaudio.git
     SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
     BINARY_DIR  ${PROJECT_SOURCE_DIR}/deps/portaudio/build
@@ -209,7 +209,7 @@ set(GOBAN_HDR_FILES
     ${PROJECT_SOURCE_DIR}/src/GobanShader.h
     ${PROJECT_SOURCE_DIR}/src/Metrics.h
     ${PROJECT_SOURCE_DIR}/src/GobanOverlay.h
-    ${PROJECT_SOURCE_DIR}/src/GameState.h src/Controls.h)
+    ${PROJECT_SOURCE_DIR}/src/GameState.h src/Configuration.h)
 
 set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/Board.cpp
@@ -238,7 +238,7 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/sound/AudioPlayer.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/FileHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
-    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Controls.cpp)
+    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp)
 
 
 

@@ -5,7 +5,7 @@
 #include "GobanModel.h"
 #include "GobanView.h"
 #include "spdlog/spdlog.h"
-#include "Controls.h"
+#include "Configuration.h"
 
 class ElementGame;
 
@@ -16,8 +16,9 @@ public:
               startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true)
     {
         console = spdlog::get("console");
-        initControls();
-    };
+        config.load("./config/config.json");
+    }
+
     ~GobanControl() { destroy(); }
 
     void destroy();
@@ -47,7 +48,7 @@ private:
     GobanModel& model;
     GobanView& view;
     GameThread& engine;
-    Controls controls;
+    Configuration config;
 private:
 
     bool rButtonDown, mButtonDown;

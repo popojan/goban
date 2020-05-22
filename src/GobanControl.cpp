@@ -76,10 +76,6 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     }
 }
 
-void GobanControl::initControls() {
-    controls.addFromJson("./config/config.json");
-}
-
 bool GobanControl::command(const std::string& cmd) {
 
     if(cmd == "quit") {
@@ -171,11 +167,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     (void) y;
 
     if (!downNotUp) {
-        std::string cmd;
-        auto it = controls.keyToCommand.find(static_cast<Rocket::Core::Input::KeyIdentifier>(key));
-        if (it != controls.keyToCommand.end()) {
-            cmd = it->second;
-        }
+        std::string cmd(config.getCommand(static_cast<Rocket::Core::Input::KeyIdentifier>(key)));
         if (!cmd.empty()) {
             command(cmd);
             return;
