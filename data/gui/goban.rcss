@@ -48,11 +48,15 @@ select option:hover, .cmd:hover {
 select selectbox {
   width: 10rem;
   position:relative;
-  left:10.2rem;
-  top:-100%;
-  border-color: #ffffff80;
+  left:9.2rem;
+  top:-1.75rem;
+  border-color: #ffffff00;
   padding: 0.25rem;
   background-color: #00000040;
+  border-left: 1rem;
+  border-right: 1rem;
+  border-bottom: 1rem;
+  border-top: 1rem;
 
 }
 div.cmd   {
@@ -101,20 +105,26 @@ game {
   position: absolute;
   width: 10rem;
   top: 1rem;
-  left: 0px;
+  left: -1rem;
   background-color: #00000040;
-  border-color:#00000000;
   border-top:1rem;
+  border-left:1rem;
+  border-right:1rem;
+  border-bottom:1rem;
+  border-color:#ffff0000;
 }
 
 .right .menuitem.show {
   position: absolute;
   width: 10rem;
   top: 1rem;
-  right: 0px;
+  right: -1rem;
   background-color: #00000040;
-  border-color:#00000000;
   border-top:1rem;
+  border-left:1rem;
+  border-right:1rem;
+  border-bottom:1rem;
+  border-color:#ffff0000;
 }
 
 

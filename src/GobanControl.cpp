@@ -102,7 +102,7 @@ bool GobanControl::command(const std::string& cmd) {
         view.toggleOverlay();
         view.requestRepaint();
     }
-    else if (cmd == "play/pass") {
+    else if (cmd == "play pass") {
         bool playNow = !firstGame;
         if (model.isGameOver()) {
             newGame(model.getBoardSize());

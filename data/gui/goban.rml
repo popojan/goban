@@ -105,7 +105,7 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Game</div>
-                            <div class="cmd" id="cmdPass" onmouseup="play/pass">Pass</div>
+                            <div class="cmd" id="cmdPass" onmouseup="play pass">Pass</div>
                             <div class="cmd" onmouseup="play once">Play once</div>
                             <div class="hr">Move</div>
                             <div class="cmd" onmouseup="undo move">Undo</div>
