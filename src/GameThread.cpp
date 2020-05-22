@@ -6,8 +6,7 @@ GameThread::GameThread(GobanModel &m) :
         playerToMove(0), human(0), sgf(0), coach(0), numPlayers(0), activePlayer({0, 0})
 {
     console = spdlog::get("console");
-    std::string list("./config/engines.enabled");
-    loadEngines(list);
+    loadEngines(config);
 }
 
 void GameThread::reset() {
@@ -322,34 +321,33 @@ void GameThread::playLocalMove(const Move& move) {
     if(playerToMove) playerToMove->suggestMove(move);
 }
 
-void GameThread::loadEngines(const std::string& dir) {
-    boost::filesystem::path p(dir);
+void GameThread::loadEngines(const Configuration& config) {
+    auto bots = config.data.find("bots");
+    bool hasCoach(false);
+    if(bots != config.data.end()) {
+        for(auto it = bots->begin(); it != bots->end(); ++it) {
+            auto enabled = it->value("enabled", 1);
+            if(enabled) {
+                auto path = it->value("path", "" );
+                auto name = it->value("name", "");
+                auto command = it->value("command", "");
+                auto parameters = it->value("parameters", "");
+                auto coach = it->value("main", 0);
 
-    if(boost::filesystem::is_directory(p)) {
+                int role = Player::SPECTATOR;
 
-        bool hasCoach(false);
+                if(!command.empty()) {
+                    std::size_t id = addEngine(new GtpEngine(command, parameters, path, name));
 
-        for (auto it = boost::filesystem::directory_iterator(p); it != boost::filesystem::directory_iterator(); ++it) {
-            std::string fengine(it->path().string());
-            std::ifstream fin(fengine.c_str());
-            std::string exe, path, cmd, name;
-            std::getline(fin, path);
-            std::getline(fin, exe);
-            std::getline(fin, cmd);
-            std::getline(fin, name);
-            int isCoach = 0;
-            fin >> isCoach;
-            fin.close();
-            int role = Player::SPECTATOR;
+                    if (coach && !hasCoach) {
+                        role |= Player::COACH;
+                        hasCoach = true;
+                        coach = id;
+                    }
 
-            std::size_t id = addEngine(new GtpEngine(exe, cmd, path, name));
-
-            if(isCoach && !hasCoach) {
-                role |= Player::COACH;
-                hasCoach = true;
-                coach = id;
+                    setRole(id, role, true);
+                }
             }
-            setRole(id, role, true);
         }
     }
     sgf = -1; //addPlayer(new SgfPlayer("SGF Record", "./problems/alphago-2016/3/13/Tictactoe.sgf"));

@@ -18,6 +18,8 @@
 #ifndef GOBAN_GOBANVIEW_H
 #define GOBAN_GOBANVIEW_H
 
+extern Configuration config;
+
 class GobanView: public GameObserver {
 public:
     enum {
@@ -36,7 +38,7 @@ public:
 	{
 
 	    console = spdlog::get("console");
-        player.preload({"data/sound/collision.wav", "data/sound/stone.wav"});
+        player.preload(config);
 
 	    gobanOverlay.init();
         gobanShader.init();

@@ -1,5 +1,0 @@
-./engine/pachi
-pachi
-pachi -t _120 threads=2,maximize_score
-Pachi 10.00
-0

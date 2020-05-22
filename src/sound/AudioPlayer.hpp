@@ -3,16 +3,17 @@
 
 #include "StreamHandler.hpp"
 #include "FileHandler.hpp"
+#include "Configuration.h"
 
 class AudioPlayer
 {
 public:
     AudioPlayer();
 
-    void play(const std::string& soundfile, double volume = 1.0);
-    void loop(const std::string& soundfile, double volume = 1.0);
+    void play(const std::string& id, double volume = 1.0);
+    void loop(const std::string& id, double volume = 1.0);
     void stop();
-    void preload(const std::vector<std::string>& files);
+    void preload(const Configuration& config);
     size_t playbackCount() { return streamHandler.playbackCount(); }
 private:
     FileHandler fileHandler;

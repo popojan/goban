@@ -1,29 +1,32 @@
 #include "AudioPlayer.hpp"
 
 AudioPlayer::AudioPlayer()
-        : fileHandler()
-        , streamHandler()
+    : fileHandler()
+    , streamHandler()
 {
 
 }
 
-void AudioPlayer::play(const std::string& soundfile, double volume)
+void AudioPlayer::play(const std::string& id, double volume)
 {
-        streamHandler.processEvent(AudioEventType::start, &fileHandler.getSound(soundfile), volume);
+    streamHandler.processEvent(AudioEventType::start, &fileHandler.getSound(id), volume);
 }
 
-void AudioPlayer::loop(const std::string& soundfile, double volume)
+void AudioPlayer::loop(const std::string& id, double volume)
 {
-        streamHandler.processEvent(AudioEventType::start, &fileHandler.getSound(soundfile), volume, true);
-
+    streamHandler.processEvent(AudioEventType::start, &fileHandler.getSound(id), volume, true);
 }
 
 void AudioPlayer::stop()
 {
-        streamHandler.processEvent(AudioEventType::stop);
+    streamHandler.processEvent(AudioEventType::stop);
 }
 
-void AudioPlayer::preload(const std::vector<std::string>& files) {
-    for(auto sit = files.begin(); sit != files.end(); ++sit)
-        (void)fileHandler.getSound(*sit);
+void AudioPlayer::preload(const Configuration& config) {
+    auto sounds = config.data.find("sounds");
+    if (sounds != config.data.end()) {
+        for (auto sit = sounds->begin(); sit != sounds->end(); ++sit) {
+            (void) fileHandler.getSound(sit.key(), sit.value());
+        }
+    }
 }

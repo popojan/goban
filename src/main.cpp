@@ -20,6 +20,7 @@
 #include "EventHandlerNewGame.h"
 
 Rocket::Core::Context* context = NULL;
+Configuration config;
 
 void GameLoop() {
     dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"))->gameLoop();
@@ -88,9 +89,11 @@ int main(int argc, char** argv)
 #endif
 {
     using namespace clipp;
-    std::string loglevel("info");
+    std::string logLevel("info");
+    std::string configurationFile("./config/config.json");
     auto cli = (
-        option("-v", "--verbosity") & word("level", loglevel)
+        option("-v", "--verbosity") & word("level", logLevel),
+        option("-c", "--config") & value("file", configurationFile)
     );
 #ifdef ROCKET_PLATFORM_WIN32
     ROCKET_UNUSED(instance_handle);
@@ -110,7 +113,7 @@ const char * WINDOW_NAME = "Goban";
         DoAllocConsole();
 #endif
     auto console = spdlog::stderr_color_mt("console");
-    spdlog::set_level(spdlog::level::from_str(loglevel));
+    spdlog::set_level(spdlog::level::from_str(logLevel));
 
     unsigned window_width = 1024;
     unsigned window_height = 768;
@@ -143,6 +146,7 @@ const char * WINDOW_NAME = "Goban";
     if (GLEW_OK != err)    { //win
         printf("Error: %s\n",glewGetErrorString(err)); //win
     }
+    config.load(configurationFile);
 
     // Create the main Rocket context and set it on the shell's input layer.
     context = Rocket::Core::CreateContext("main",

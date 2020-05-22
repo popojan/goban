@@ -1,5 +1,0 @@
-./engine/gnugo
-gnugo
-gnugo --mode gtp
-GNU go 3.8
-1

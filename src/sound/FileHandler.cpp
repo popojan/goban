@@ -15,17 +15,16 @@ FileHandler::~FileHandler()
         }*/
 }
 
-bool FileHandler::containsSound(const std::string& filename)
+bool FileHandler::containsSound(const std::string& id)
 {
-        return sounds.find(filename) != sounds.end();
+        return sounds.find(id) != sounds.end();
 }
 
-AudioFile & FileHandler::getSound(const std::string& filename)
+AudioFile & FileHandler::getSound(const std::string& id, const std::string& filename)
 {
-        if(sounds.find(filename) == sounds.end()){
-            //spdlog::get("console")->info("Preloading sound [{}]...", filename);
-            sounds[filename] = AudioFile();
-            sounds[filename].load(filename);
+        if(sounds.find(id) == sounds.end()) {
+            sounds[id] = AudioFile();
+            sounds[id].load(filename);
         }
-        return sounds[filename];
+        return sounds[id];
 }

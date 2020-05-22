@@ -13,8 +13,8 @@ public:
     FileHandler();
     ~FileHandler();
 
-    bool containsSound(const std::string& filename);
-    AudioFile & getSound(const std::string& filename);
+    bool containsSound(const std::string& id);
+    AudioFile & getSound(const std::string& id, const std::string& filename = std::string());
 private:
     std::map<std::string, AudioFile> sounds;
 };

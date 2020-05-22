@@ -183,7 +183,7 @@ void GobanView::Render(int w, int h)
 	}
     if(updateFlag & UPDATE_SOUND_STONE) {
         updateFlag &= ~UPDATE_SOUND_STONE;
-        player.play("data/sound/stone.wav", 1.0);
+        player.play("move", 1.0);
     }
 
 	if (updateFlag & UPDATE_STONES) {
@@ -194,7 +194,7 @@ void GobanView::Render(int w, int h)
         if(vol > 0) {
             updateFlag |= UPDATE_OVERLAY;
             if(player.playbackCount() < 5){
-	            player.play("data/sound/collision.wav", vol);
+	            player.play("clash", vol);
             }
             board.collision = false;
 	    }

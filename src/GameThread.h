@@ -9,6 +9,9 @@
 #include "GobanModel.h"
 #include "GameObserver.h"
 #include "Board.h"
+#include "Configuration.h"
+
+extern Configuration config;
 
 /** \brief Background thread responsible for rules enforcing
  *
@@ -50,7 +53,7 @@ public:
 
     void playLocalMove(const Move& move);
 
-    void loadEngines(const std::string& path);
+    void loadEngines(const Configuration& config);
 
 	int activatePlayer(int which, int delta = 1);
 
