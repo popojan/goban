@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 
 language: cpp
 
@@ -9,7 +9,6 @@ addons:
       - cmake
       - libtool
       - autoconf
-      - g++-4.8
       - libfreetype6-dev
       - libgl1-mesa-dev
       - libglew-dev
@@ -20,7 +19,7 @@ addons:
 matrix:
   include:
     - os: linux
-      compiler: gcc-4.8
+      compiler: gcc
       script:
           - make
     - os: windows
