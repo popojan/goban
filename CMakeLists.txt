@@ -141,7 +141,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/deps/clipp/include
     ${PROJECT_SOURCE_DIR}/src/sound/
     ${OPENGL_INCLUDE_DIRS}
-    ${GLEW_INCLUDE_DIRS}
+    ${GLEW_INCLUDE_DIR}
     ${CURSES_INCLUDE_DIR}
     ${LIBROCKET_INCLUDE_DIR}
     ${LIBGLYPHY_INCLUDE_DIR}

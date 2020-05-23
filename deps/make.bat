@@ -23,15 +23,8 @@ MSBuild.exe libRocket.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%
 cd ..\..
 
 REM glew
-if not exist glew-with-extensions git clone https://github.com/tamaskenez/glew-with-extensions
-cd glew-with-extensions
-if defined CLEAN rmdir /s /q BuildDir
-if not exist BuildDir mkdir BuildDir
-cd BuildDir
-cmake ..\build\cmake -G%STUDIO% -UGLEW_USE_STATIC_LIBS
-MSBuild.exe glew_s.vcxproj /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
-
-cd ..\..
+if not exist glew-2.1.0 wget https://github.com/nigels-com/glew/releases/download/glew-2.1.0/glew-2.1.0-win32.zip
+powershell Expand-Archive glew-2.1.0-win32.zip -DestinationPath .
 
 REM glm
 if not exist glm git clone https://github.com/g-truc/glm.git

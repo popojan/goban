@@ -9,8 +9,8 @@ set MSBUILD_PATH="C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools
 set CMAKE_PATH="C:\Program Files\CMake\bin"
 set PATH=%CMAKE_PATH%;%MSBUILD_PATH%;%PATH%
 set TOOLSET=v141
-set TARGET=10.0.17134.0
-REM set TARGET=10.0.17763.0
+REM set TARGET=10.0.17134.0
+set TARGET=10.0.17763.0
 set STUDIO="Visual Studio 15 2017 Win64"
 
 set PROJECT_DIR=%~dp0
@@ -25,8 +25,8 @@ cd %PROJECT_DIR%
 mkdir build
 cd build
 cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
-	-DGLEW_INCLUDE_DIR=../deps/glew-with-extensions/include ^
-	-DGLEW_LIBRARIES=../deps/glew-with-extensions/BuildDir/lib/Release/libglew32 ^
+	-DGLEW_INCLUDE_DIR=../deps/glew-2.1.0/include ^
+	-DGLEW_LIBRARY=../deps/glew-2.1.0/lib/Release/x64/glew32s ^
 	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
 	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/x64/Release/goban_glyphy.lib ^
 	-DBoost_NO_SYSTEM_PATHS=TRUE ^
