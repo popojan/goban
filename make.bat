@@ -26,7 +26,7 @@ mkdir build
 cd build
 cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
 	-DGLEW_INCLUDE_DIR=../deps/glew-with-extensions/include ^
-	-DGLEW_LIBRARY=../deps/glew-with-extensions/BuildDir/lib/Release/libglew32 ^
+	-DGLEW_LIBRARIES=../deps/glew-with-extensions/BuildDir/lib/Release/libglew32 ^
 	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
 	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/x64/Release/goban_glyphy.lib ^
 	-DBoost_NO_SYSTEM_PATHS=TRUE ^
