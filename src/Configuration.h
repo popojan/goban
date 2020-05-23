@@ -4,7 +4,7 @@
 #include <Rocket/Core/Input.h>
 #include <unordered_map>
 #include <string>
-#include <nlohmann/json.hpp>
+#include "json.hpp"
 
 struct Configuration {
 

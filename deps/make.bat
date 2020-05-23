@@ -25,6 +25,7 @@ cd ..\..
 REM glew
 if not exist glew-2.1.0 wget https://github.com/nigels-com/glew/releases/download/glew-2.1.0/glew-2.1.0-win32.zip
 powershell Expand-Archive glew-2.1.0-win32.zip -DestinationPath .
+DIR glew-2.1.0
 
 REM glm
 if not exist glm git clone https://github.com/g-truc/glm.git

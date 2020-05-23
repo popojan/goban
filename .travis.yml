@@ -16,7 +16,6 @@ addons:
       - libglm-dev
       - libboost-all-dev
       - libasound2-dev
-      - libjack-dev
 
 matrix:
   include:
