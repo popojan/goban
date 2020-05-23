@@ -62,7 +62,7 @@ if(WIN32)
     SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
 else()
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
-    SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio_static.a")
+    SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
 endif()
 # Search in the 'cmake' directory for additional CMake modules.
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
@@ -84,7 +84,6 @@ if(NOT WIN32)
 endif()
 
 if (WIN32)
-  set(CMAKE_FIND_ROOT_PATH "${PROJECT_SOURCE_DIRECTORY}/deps/glew-2.1.0")
   add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00)
   option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
   set(Boost_USE_STATIC_LIBS ON)
@@ -262,7 +261,7 @@ ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
 target_link_libraries(goban
     ${OPENGL_LIBRARIES}
-    GLEW::glew_s
+    ${GLEW_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     ${Boost_SYSTEM_LIBRARY}
     ${Boost_IOSTREAMS_LIBRARY}
