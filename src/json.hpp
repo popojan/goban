@@ -1,4 +1,4 @@
-#if defined ROCKET_PLATFORM_WIN32
+#if defined _MSC_VER
   #define nullptr __nullptr
   #include <nlohmann/json.hpp>
   #undef nullptr

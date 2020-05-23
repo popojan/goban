@@ -5,6 +5,7 @@
 project(goban C CXX)
 
 cmake_minimum_required(VERSION 3.0)
+cmake_policy(SET CMP0074 NEW)
 
 # paths
 include(GNUInstallDirs)
@@ -44,7 +45,7 @@ ExternalProject_Add(project_portaudio
     GIT_REPOSITORY      https://git.assembla.com/portaudio.git
     SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
     BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/portaudio/build
-    CONFIGURE_COMMAND cmake ${PROJECT_SOURCE_DIR}/deps/portaudio -DPA_USE_JACK=OFF -DPA_USE_ALSA=ON
+    CMAKE_ARGS  -DPA_USE_JACK=OFF -DPA_USE_ALSA=ON -DPA_USE_ASIO=OFF
     STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for portaudio
 )
@@ -83,6 +84,7 @@ if(NOT WIN32)
 endif()
 
 if (WIN32)
+  set(CMAKE_FIND_ROOT_PATH "${PROJECT_SOURCE_DIRECTORY}/deps/glew-2.1.0")
   add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00)
   option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
   set(Boost_USE_STATIC_LIBS ON)
@@ -260,7 +262,7 @@ ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
 target_link_libraries(goban
     ${OPENGL_LIBRARIES}
-    ${GLEW_LIBRARIES}
+    GLEW::glew_s
     ${CMAKE_THREAD_LIBS_INIT}
     ${Boost_SYSTEM_LIBRARY}
     ${Boost_IOSTREAMS_LIBRARY}
