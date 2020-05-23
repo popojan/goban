@@ -1,8 +1,8 @@
 all: libRocket glyphy spdlog clipp
 
 libRocket:
-	git clone https://github.com/popojan/libRocket.git && git checkout rem-fix
-	cd libRocket && mkdir -p buildDir && cd buildDir && cmake ../Build && make
+	git clone https://github.com/popojan/libRocket.git
+	cd libRocket && git checkout rem-fix && mkdir -p buildDir && cd buildDir && cmake ../Build && make
 
 glyphy:
 	git clone https://github.com/behdad/glyphy.git

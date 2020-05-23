@@ -40,4 +40,10 @@ cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
 	-DFREETYPE_LIBRARY=../deps/freetype2/build/Release/freetype
 
 MSBuild.exe goban.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
-cd %PROJECT_DIR%
+if %ERRORLEVEL% EQU 0 (
+  cd %PROJECT_DIR%
+  echo Success
+) else (
+  echo Failure %ERRORLEVEL%
+  exit /b %ERRORLEVEL%
+)

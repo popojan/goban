@@ -46,9 +46,9 @@ MSBuild.exe  glyphy\win32\goban_glyphy.vcxproj /t:%BUILD% /p:Configuration=Relea
 REM boost
 set FBOOST="boost_1_68_0-msvc-14.1-64.exe"
 if not exist boost (
-  if not exist "%FBOOST%" wget --progress=dot:giga https://dl.bintray.com/boostorg/release/1.68.0/binaries/%FBOOST%
-  innounp -b -q -x "%FBOOST%" {app}\boost\*
-  innounp -b -x "%FBOOST%" {app}\lib64-msvc-14.1\libboost_*-vc141-mt-x64-1_68.lib
+  if not exist %FBOOST% wget --progress=dot:giga https://dl.bintray.com/boostorg/release/1.68.0/binaries/%FBOOST%
+  innounp -b -q -x %FBOOST% {app}\boost\*
+  innounp -b -x %FBOOST% {app}\lib64-msvc-14.1\libboost_*-vc141-mt-x64-1_68.lib
   move {app} boost
 )
 
