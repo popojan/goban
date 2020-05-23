@@ -16,6 +16,8 @@ addons:
       - libglm-dev
       - libboost-all-dev
       - libasound2-dev
+      - libasound2-plugins
+      - alsa-utils
 
 matrix:
   include:

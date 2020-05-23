@@ -35,6 +35,9 @@ void GameLoop() {
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #if defined ROCKET_PLATFORM_WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <io.h>
 #include <fcntl.h>
