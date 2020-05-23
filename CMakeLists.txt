@@ -44,9 +44,8 @@ ExternalProject_Add(project_portaudio
     GIT_REPOSITORY      https://git.assembla.com/portaudio.git
     SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
     BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/portaudio/build
-    CONFIGURE_COMMAND cmake . -DPA_USE_JACK=OFF -DPA_USE_ALSA=ON
+    CONFIGURE_COMMAND cmake ${PROJECT_SOURCE_DIR}/deps/portaudio -DPA_USE_JACK=OFF -DPA_USE_ALSA=ON
     STEP_TARGETS build
-    GIT_TAG 396fe4b6699ae929d3a685b3ef8a7e97396139a4
     INSTALL_COMMAND     echo Skipping install step for portaudio
 )
 
