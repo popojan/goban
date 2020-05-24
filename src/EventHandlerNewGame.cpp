@@ -1,3 +1,4 @@
+#include "ElementGame.h"
 #include "EventHandlerNewGame.h"
 #include <Rocket/Core/Context.h>
 #include <Rocket/Controls/ElementFormControlSelect.h>
@@ -7,7 +8,6 @@
 #include <Rocket/Core/Event.h>
 #include "EventManager.h"
 #include <iostream>
-#include "ElementGame.h"
 
 EventHandlerNewGame::EventHandlerNewGame()
 {

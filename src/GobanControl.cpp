@@ -1,9 +1,9 @@
 //
 // Created by jan on 7.5.17.
 //
+#include "ElementGame.h"
 #include <Rocket/Core.h>
 #include <Shell.h>
-#include "ElementGame.h"
 #include "GobanControl.h"
 
 bool GobanControl::newGame(int boardSize) {
