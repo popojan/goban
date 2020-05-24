@@ -14,12 +14,12 @@
     #endif
 #endif
 
+#include "ElementGame.h"
 #include <Rocket/Core.h>
 #include <Rocket/Controls.h>
 #include <Rocket/Debugger.h>
 #include <Input.h>
 #include <Shell.h>
-#include "ElementGame.h"
 #include "EventManager.h"
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
