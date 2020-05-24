@@ -15,8 +15,6 @@
 
 #if defined ROCKET_PLATFORM_WIN32
   #undef __GNUC__
-  #define _WINSOCKAPI_
-  #include <winsock2.h>
   #include <windows.h>
   #include <io.h>
   #include <fcntl.h>
