@@ -8,7 +8,7 @@ Builds on Windows 7/10 and Linux.
 
 For windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/goban).
 
-[![screen06](/res/screen06_s.png)](https://www.youtube.com/watch?v=S3kmepVEipk)]
+[![screenshot](/res/screenshot.png)](https://hraj.si/goban/image/red-carpet-goban-0.png)
 
 ## Tasks
 *   refactor and clean-up code
