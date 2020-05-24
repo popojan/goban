@@ -2,24 +2,6 @@
 #define GTPCLIENT_H
 
 #include "spdlog/spdlog.h"
-
-#define USE_ASIO
-
-#ifdef _WIN32
-#  ifdef USE_ASIO
-//     Set the proper SDK version before including boost/Asio
-#      include <SDKDDKVer.h>
-//     Note boost/ASIO includes Windows.h.
-#      include <boost/asio.hpp>
-#   else
-#      include <Windows.h>
-#   endif
-#else
-#  ifdef USE_ASIO
-#     include <boost/asio.hpp>
-#  endif
-#endif
-
 #include <boost/process.hpp>
 #include <boost/filesystem/path.hpp>
 #include <string>

@@ -5,7 +5,7 @@
 	#define NOMINMAX
     #define FREEGLUT_STATIC
     #define GLEW_STATIC
-    #include <windows.h>
+    //#include <windows.h>
     #include <GL/glew.h>
     #include <GL/wglew.h>
     #include <GL/GLU.h>

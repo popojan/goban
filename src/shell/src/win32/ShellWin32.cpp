@@ -30,7 +30,7 @@
 #include <win32/InputWin32.h>
 #include "ShellFileInterface.h"
 //#include "resource.h"
-#include <windows.h>
+//#include <windows.h>
 #include <stdio.h>
 
 static LRESULT CALLBACK WindowProcedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);

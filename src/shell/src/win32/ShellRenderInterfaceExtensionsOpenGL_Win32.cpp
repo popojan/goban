@@ -27,7 +27,7 @@
 
 #include <ShellRenderInterfaceExtensions.h>
 #include <ShellRenderInterfaceOpenGL.h>
-#include <windows.h>
+//#include <windows.h>
 #include <Rocket/Core.h>
 #include <Rocket/Core/Platform.h>
 #include <Shell.h>

@@ -10,12 +10,9 @@
  */
 
 #include <clipp.h>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
 
 #if defined ROCKET_PLATFORM_WIN32
   #undef __GNUC__
-  #include <windows.h>
   #include <io.h>
   #include <fcntl.h>
 #endif
@@ -23,12 +20,15 @@
 #include <Rocket/Core.h>
 #include <Rocket/Controls.h>
 #include <Rocket/Debugger.h>
-#include <Input.h>
-#include <Shell.h>
 #include "EventManager.h"
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
 #include "ElementGame.h"
+#include <Input.h>
+#include <Shell.h>
+
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 Rocket::Core::Context* context = NULL;
 Configuration config;
