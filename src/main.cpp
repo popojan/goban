@@ -8,13 +8,20 @@
  * Limited at info@wanderingmonster.co.nz.
  *
  */
-#ifdef _MSC_VER
-    #ifndef WIN32_LEAN_AND_MEAN
-        #define WIN32_LEAN_AND_MEAN
-    #endif
+
+#include <clipp.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
+#if defined ROCKET_PLATFORM_WIN32
+  #undef __GNUC__
+  #define _WINSOCKAPI_
+  #include <winsock2.h>
+  #include <windows.h>
+  #include <io.h>
+  #include <fcntl.h>
 #endif
 
-#include "ElementGame.h"
 #include <Rocket/Core.h>
 #include <Rocket/Controls.h>
 #include <Rocket/Debugger.h>
@@ -23,6 +30,7 @@
 #include "EventManager.h"
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
+#include "ElementGame.h"
 
 Rocket::Core::Context* context = NULL;
 Configuration config;
@@ -31,20 +39,8 @@ void GameLoop() {
     dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"))->gameLoop();
 }
 
-#if defined ROCKET_PLATFORM_WIN32
-  #undef __GNUC__
-#endif
-
-#include <clipp.h>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
 
 #if defined ROCKET_PLATFORM_WIN32
-#include <windows.h>
-#include <io.h>
-#include <fcntl.h>
-
-
 
 void DoAllocConsole()
 {

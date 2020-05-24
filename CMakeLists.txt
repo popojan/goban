@@ -272,8 +272,9 @@ target_link_libraries(goban
     ${LIBGLYPHY_LIBRARIES}
     ${FREETYPE_LIBRARIES}
     ${LIBROCKET_LIBRARIES}
+    portaudio
+    libsndfile
     ${EXTRA_LIBS}
-    libsndfile portaudio
     nlohmann_json::nlohmann_json
 )
 
