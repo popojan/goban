@@ -1,7 +1,6 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#include "spdlog/spdlog.h"
 #include <string>
 #include "gtpclient.h"
 #include "Board.h"

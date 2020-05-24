@@ -4,7 +4,6 @@
 #include "GameThread.h"
 #include "GobanModel.h"
 #include "GobanView.h"
-#include "spdlog/spdlog.h"
 #include "Configuration.h"
 
 class ElementGame;

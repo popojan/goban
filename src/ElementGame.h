@@ -1,7 +1,6 @@
 #ifndef ROCKETINVADERSELEMENTGAME_H
 #define ROCKETINVADERSELEMENTGAME_H
 
-#include <spdlog/spdlog.h>
 #include "GobanControl.h"
 #include <Rocket/Core/Element.h>
 #include <Rocket/Core/EventListener.h>

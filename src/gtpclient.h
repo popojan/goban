@@ -1,13 +1,13 @@
 #ifndef GTPCLIENT_H
 #define GTPCLIENT_H
 
-#include "spdlog/spdlog.h"
 #include <boost/process.hpp>
 #include <boost/filesystem/path.hpp>
 #include <string>
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include "spdlog/spdlog.h"
 
 class GtpClient {
 private:

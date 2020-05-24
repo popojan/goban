@@ -11,21 +11,21 @@
 
 #include <clipp.h>
 
-#if defined ROCKET_PLATFORM_WIN32
-  #undef __GNUC__
-  #include <io.h>
-  #include <fcntl.h>
-#endif
-
+#include "ElementGame.h"
 #include <Rocket/Core.h>
 #include <Rocket/Controls.h>
 #include <Rocket/Debugger.h>
 #include "EventManager.h"
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
-#include "ElementGame.h"
 #include <Input.h>
 #include <Shell.h>
+
+#if defined ROCKET_PLATFORM_WIN32
+  #undef __GNUC__
+  #include <io.h>
+  #include <fcntl.h>
+#endif
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
