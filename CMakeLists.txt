@@ -45,7 +45,7 @@ ExternalProject_Add(project_portaudio
     GIT_REPOSITORY      https://git.assembla.com/portaudio.git
     SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
     BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/portaudio/build
-    CMAKE_ARGS  -DPA_USE_JACK=OFF -DPA_USE_ALSA=ON -DPA_USE_ASIO=OFF
+    CMAKE_ARGS  -DPA_USE_JACK=0 -DPA_USE_ALSA=1 -DPA_USE_ASIO=0 -DPA_USE_WASAPI=1
     STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for portaudio
 )
@@ -138,7 +138,6 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/sgf/include
     ${PROJECT_SOURCE_DIR}/deps/boost
     ${PROJECT_SOURCE_DIR}/deps/spdlog/include
-    ${PROJECT_SOURCE_DIR}/deps/clipp/include
     ${PROJECT_SOURCE_DIR}/deps/clipp/include
     ${PROJECT_SOURCE_DIR}/src/sound/
     ${OPENGL_INCLUDE_DIRS}
@@ -246,7 +245,7 @@ set(GOBAN_SRC_FILES
 
 
 if (WIN32)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib")
   add_executable(goban WIN32 ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES} ${PROJECT_SOURCE_DIR}/src/goban.rc)
   set_property(TARGET goban PROPERTY CXX_STANDARD 17)
   set_property(TARGET goban PROPERTY CXX_STANDARD_REQUIRED ON)
@@ -267,7 +266,6 @@ target_link_libraries(goban
     ${Boost_IOSTREAMS_LIBRARY}
     ${Boost_THREAD_LIBRARY}
     ${Boost_FILESYSTEM_LIBRARY}
-    ${Boost_LIBRARIES}
     ${CURSES_LIBRARY}
     ${X11_LIBRARIES}
     ${LIBGLYPHY_LIBRARIES}
