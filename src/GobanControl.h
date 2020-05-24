@@ -15,7 +15,7 @@ public:
               startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true)
     {
         console = spdlog::get("console");
-        config.load("./config/config.json");
+        config.load("./data/config.json");
     }
 
     ~GobanControl() { destroy(); }

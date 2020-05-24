@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 {
     using namespace clipp;
     std::string logLevel("info");
-    std::string configurationFile("./config/config.json");
+    std::string configurationFile("./data/config.json");
     auto cli = (
         option("-v", "--verbosity") & word("level", logLevel),
         option("-c", "--config") & value("file", configurationFile)
