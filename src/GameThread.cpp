@@ -1,5 +1,6 @@
 #include "GameThread.h"
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr), interruptRequested(false), hasThreadRunning(false),
@@ -332,11 +333,16 @@ void GameThread::loadEngines(const Configuration& config) {
                 auto command = it->value("command", "");
                 auto parameters = it->value("parameters", "");
                 auto main = it->value("main", 0);
+                auto messages = it->value("messages", nlohmann::json::array());
 
                 int role = Player::SPECTATOR;
 
                 if(!command.empty()) {
-                    std::size_t id = addEngine(new GtpEngine(command, parameters, path, name));
+                    auto engine = new GtpEngine(command, parameters, path, name);
+                    for(auto &&msg: messages) {
+                        engine->addOutputFilter(msg);
+                    }
+                    std::size_t id = addEngine(engine);
 
                     if (main) {
                         if(!hasCoach) {

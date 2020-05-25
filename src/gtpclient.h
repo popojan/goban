@@ -8,13 +8,19 @@
 #include <iostream>
 #include <sstream>
 #include <spdlog/spdlog.h>
+#include "InputThread.h"
+#include <regex>
 
 class GtpClient {
 private:
     boost::process::opstream pis;
+    boost::process::ipstream pes;
     boost::process::ipstream pos;
     boost::process::child c;
     std::string exe;
+    std::string lastLine;
+    std::vector<std::regex> outputFilters;
+    InputThread<GtpClient, boost::process::ipstream> *reader;
 public:
     typedef std::vector<std::string> CommandOutput;
     GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path): exe(exe) {
@@ -30,10 +36,39 @@ public:
         std::vector<std::string> params((std::istream_iterator<std::string>(iss)),
                                          std::istream_iterator<std::string>());
         spdlog::info("running child");
-        c = boost::process::child(file, params, boost::process::std_out > pos, boost::process::std_in < pis, boost::process::std_err.close());
+        c = boost::process::child(file, params,
+                                  boost::process::std_out > pos,
+                                  boost::process::std_in < pis,
+                                  boost::process::std_err > pes);
+        reader = new InputThread<GtpClient, boost::process::ipstream>(pes);
+        reader->bind(*this);
     }
     ~GtpClient() {
+        delete reader;
+    }
 
+    void operator()(const std::string& line) {
+        //TODO
+        spdlog::debug("gtp err = {}", line);
+        for (auto &re: outputFilters) {
+            std::smatch m;
+            if(std::regex_search(line, m,  re)){
+                if(m.size() > 1) {
+                    lastLine = m[1].str();
+                }
+                else if(m.size() > 0) {
+                    lastLine = m[0].str();
+                }
+            }
+        }
+    }
+
+    void addOutputFilter(const std::string& msg) {
+        outputFilters.push_back(std::regex(msg));
+    }
+
+    std::string lastError() {
+        return lastLine;
     }
 
     CommandOutput showboard() {

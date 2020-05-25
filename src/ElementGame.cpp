@@ -232,9 +232,12 @@ void ElementGame::OnUpdate()
 			requestRepaint();
 		}
 	}
+	bool noMessage = true;
+    Rocket::Core::Element* msg = context->GetDocument("game_window")->GetElementById("lblMessage");
 	if (view.state.msg != model.state.msg) {
 		view.state.msg = model.state.msg;
-		Rocket::Core::Element* msg = context->GetDocument("game_window")->GetElementById("lblMessage");
+        view.state.err = model.state.err;
+        noMessage = false;
 		switch (view.state.msg) {
 		case GameState::CALCULATING_SCORE:
 			msg->SetInnerRML("Calculating score...");
@@ -282,10 +285,23 @@ void ElementGame::OnUpdate()
         }
 			break;
 		default:
-			msg->SetInnerRML("");
+            noMessage = true;
 		}
-		requestRepaint();
+        requestRepaint();
 	}
+    if(noMessage) {
+        //TODO
+        for(auto &p: engine.getPlayers()) {
+            if(p->isTypeOf(Player::ENGINE)) {
+                std::string newMsg(dynamic_cast<GtpEngine*>(p)->lastError());
+                if(newMsg != view.state.err) {
+                    msg->SetInnerRML(newMsg.c_str());
+                    view.state.err = newMsg;
+                    requestRepaint();
+                }
+            }
+        }
+    }
 	view.Update();
 }
 

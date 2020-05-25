@@ -94,7 +94,7 @@ protected:
     //TODO GTP API
 };
 
-class GtpEngine : public Engine, protected GtpClient {
+class GtpEngine : public Engine, public GtpClient {
 public:
 
     GtpEngine(const std::string& exe, const std::string& cmdline, const std::string& path = "",
