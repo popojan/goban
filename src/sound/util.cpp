@@ -16,7 +16,7 @@ string util::getApplicationPathAndName()
         if (ret <= 0)
         {
             string error("Unable to ascertain application path");
-            spdlog::get("console")->error(error);
+            spdlog::error(error);
             throw string(error);
         } else
         {
@@ -32,14 +32,14 @@ string util::getApplicationPathAndName()
                 fullPath = buff;
         } else {
             string error("Unable to ascertain application path");
-            spdlog::get("console")->error(error);
+            spdlog::error(error);
             throw string(error);
         }
 
 #else
 
         string error("OS not supported for finding paths");
-        spdlog::get("console")->error(error);
+        spdlog::error(error);
         throw string(error);
 
 #endif

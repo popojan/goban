@@ -1,7 +1,7 @@
 {
   "bots": [
     {
-      "name": "GNU go 3.8",
+      "name": "GNU Go 3.8",
       "path": "./engine/gnugo",
       "command": "gnugo",
       "parameters": "--mode gtp",
@@ -30,7 +30,7 @@
     {"key": 25, "command": "overlay"},
     {"key": 27, "command": "play pass"},
     {"key": 14, "command": "reset camera"},
-    {"key": 32, "command": "undo"},
+    {"key": 32, "command": "undo move"},
     {"key": 15, "command": "pan camera"},
     {"key": 12, "command": "rotate camera"},
     {"key": 30, "command": "zoom camera"},
@@ -42,7 +42,42 @@
     {"key": 89, "command": "reset contrast and gamma"}
   ],
   "sounds": {
-    "move": "./data/sound/stone.wav",
+    "move":  "./data/sound/stone.wav",
     "clash": "./data/sound/collision.wav"
-  }
+  },
+  "fonts": {
+    "gui": [
+      "./data/fonts/Delicious-Roman.otf",
+      "./data/fonts/Delicious-Bold.otf",
+      "./data/fonts/Delicious-Italic.otf",
+      "./data/fonts/Delicious-BoldItalic.otf"
+    ],
+    "overlay": "./data/fonts/default-font.ttf"
+  },
+  "shaders": [
+    {
+      "name": "Red Carpet Goban",
+      "vertex": "./data/shaders/vertex.glsl",
+      "fragment": "./data/shaders/fragment.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Minimalistic Flat",
+      "vertex": "./data/shaders/vertex.glsl",
+      "fragment": "./data/shaders/fragment.2D.glsl",
+      "height": 0.0
+    },
+    {
+      "name": "Minimalistic Thin",
+      "vertex": "./data/shaders/vertex.glsl",
+      "fragment": "./data/shaders/fragment.25D.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Red Carpet Anaglyphic",
+      "vertex": "./data/shaders/vertex.anaglyph.glsl",
+      "fragment": "./data/shaders/fragment.anaglyph.glsl",
+      "height": 0.85
+    }
+  ]
 }

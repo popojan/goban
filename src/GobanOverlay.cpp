@@ -21,6 +21,8 @@ const char *font_path = NULL;
 
 static std::array<std::shared_ptr<GlyphyBuffer>, 3> buffer;
 
+extern Configuration config;
+
 std::array<Layer, 3> GobanOverlay::layers = {
 	{ { 0.0f, glm::vec4(0.0,0.0,0.0, 1.0) },
 	{ 1.0f, glm::vec4(0.9, 0.9, 0.9, 1.0) },
@@ -36,21 +38,25 @@ bool GobanOverlay::init() {
         FT_New_Face(ft_library, font_path, 0/*face_index*/, &ft_face);
     }
     else {
-        FT_New_Face(ft_library, "data/gui/default-font.ttf", 0/*face_index*/, &ft_face);
+        using nlohmann::json;
+        std::string font = config.data
+                .value("fonts", json({}))
+                .value("overlay", "./data/fonts/default-font.ttf");
+        FT_New_Face(ft_library, font.c_str(), 0/*face_index*/, &ft_face);
     }
     if (!ft_face) {
-		console->error("Failed to open font file");
+		spdlog::error("Failed to open font file");
 	}
     st->setup();
 
     font = std::shared_ptr<GlyphyFont>(new GlyphyFont(ft_face, st->get_atlas()));
 
 	for (std::size_t i = 0; i < layers.size(); ++i) {
-		console->debug("Creating overlay buffer[{0}]", i);
+		spdlog::debug("Creating overlay buffer[{0}]", i);
 	    auto b = std::shared_ptr<GlyphyBuffer>(new GlyphyBuffer());
         glyphy_point_t p = {.0, .0};
         b->move_to(&p);
-        console->debug("Adding text glyphs[{0}]", i);
+        spdlog::debug("Adding text glyphs[{0}]", i);
 	    b->add_text("0123456789X", font, 12.0);
 		buffer[i] = b;
 	}

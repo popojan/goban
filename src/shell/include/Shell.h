@@ -54,7 +54,8 @@ public:
 	static void Shutdown();
 
 	/// Loads the default fonts from the given path.
-	static void LoadFonts(const char* directory);
+	template <class T>
+	static void LoadFonts(const T& fonts);
 
 	/// Returns the path to the application's executable.
 	static const Rocket::Core::String& GetExecutablePath();

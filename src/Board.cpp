@@ -15,7 +15,6 @@ Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1
     territoryReady(false), lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0)
 
 {
-    console = spdlog::get("console");
     clear(size);
     positionNumber = generator();;
 }
@@ -129,13 +128,13 @@ bool Board::collides(int i, int j, int i0, int j0) {
 }
 
 double Board::fixStone(int i, int j, int i0, int j0) {
-    console->debug("fixStone ({},{})/({},{})", i, j, i0, j0);
+    spdlog::debug("fixStone ({},{})/({},{})", i, j, i0, j0);
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
     float mValue = glstones[idx0];
     double ret = 0.0;
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
-        console->debug("1st IF");
+        spdlog::debug("1st IF");
         if(collides(i, j, i0, j0)) {
             float x0 = glstones[idx0 - 2];
             float y0 = glstones[idx0 - 1];
@@ -146,7 +145,7 @@ double Board::fixStone(int i, int j, int i0, int j0) {
             v = glm::vec2(x, y) + 1.01f*safedist * rStone * glm::normalize(v);
             p.x = v.x;
             p.y = v.y;
-            console->debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
+            spdlog::debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
 	        x = glstones[idx - 2];
 	        y = glstones[idx - 1];
@@ -441,13 +440,13 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
 
             int size = 0;
             ssin >> size;
-            console->debug("Size: {}", size);
+            spdlog::debug("Size: {}", size);
             if(size >= MINBOARD && size <= MAXBOARD) {
                 unsigned bcaptured = 0u, wcaptured = 0u;
-                console->debug(lines.at(1));
+                spdlog::debug(lines.at(1));
 			    bool white = true;
                 for(int i = 2; i < 2 + size; ++i) {
-                    console->debug(lines[i]);
+                    spdlog::debug(lines[i]);
                     for(int j = 3; j < 3 + (size << 1); j += 2) {
                         char c = lines[i][j];
                         Position p((j - 3) >> 1, size - i + 1);
@@ -481,14 +480,14 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                 success = true;
                 capturedBlack = bcaptured;
                 capturedWhite = wcaptured;
-                console->debug("Captured: {}, {}", capturedBlack, capturedWhite);
-                console->debug(lines[2 + size]);
+                spdlog::debug("Captured: {}, {}", capturedBlack, capturedWhite);
+                spdlog::debug(lines[2 + size]);
                 moveNumber += 1;
             }
         }
     }
     catch (const std::out_of_range& oor) {
-        console->error("Gtp parse error: {}", oor.what());
+        spdlog::error("Gtp parse error: {}", oor.what());
     }
     return success;
 
@@ -498,7 +497,7 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
     bool success = false;
     try {
         for (int i = 0; i < boardSize; ++i) {
-            console->debug("row = {}/{}", i, boardSize);
+            spdlog::debug("row = {}/{}", i, boardSize);
             std::istringstream ssin(lines.at(i));
             if (i == 0) {
                 char c;
@@ -520,7 +519,7 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
         success = true;
     }
     catch (const std::out_of_range& oor) {
-        console->error("Gtp parse error: {}", oor.what());
+        spdlog::error("Gtp parse error: {}", oor.what());
     }
     return success;
 
@@ -568,9 +567,9 @@ double Board::placeCursor(const Position& coord, const Color& col) {
 
     return stoneChanged(pos, col);
     /*int oidx = ((boardSize  * coord.row() + coord.col()) << 2u) + 2u;
-    console->debug("oidx = [{},{}] = {} ... {} {}", coord.col(), coord.row(), oidx, board[coord].toString(), col.toString());
+    spdlog::debug("oidx = [{},{}] = {} ... {} {}", coord.col(), coord.row(), oidx, board[coord].toString(), col.toString());
     double altered = placeFuzzy(coord);
     stones[oidx + 0] = (col == Color::WHITE) ? mWhite : mBlack;
-    console->debug("overlay coord = [{},{}] = {}", stones[oidx - 2], stones[oidx - 1], stones[oidx + 0]);*/
+    spdlog::debug("overlay coord = [{},{}] = {}", stones[oidx - 2], stones[oidx - 1], stones[oidx + 0]);*/
     //return 0.2;//std::min(1.0, altered);
 }

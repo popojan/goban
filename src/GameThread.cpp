@@ -5,7 +5,6 @@ GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr), interruptRequested(false), hasThreadRunning(false),
         playerToMove(0), human(0), sgf(0), coach(0), numPlayers(0), activePlayer({0, 0})
 {
-    console = spdlog::get("console");
     loadEngines(config);
 }
 
@@ -54,7 +53,7 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
         std::unique_lock<std::mutex> lock(mutex2);
         Player* player = players[playerIndex];
         player->setRole(role, add);
-        console->debug("Player[{}] newType = [human = {}, computer = {}] newRole = [black = {}, whsite = {}]",
+        spdlog::debug("Player[{}] newType = [human = {}, computer = {}] newRole = [black = {}, whsite = {}]",
             playerIndex,
             player->isTypeOf(Player::HUMAN),
             player->isTypeOf(Player::ENGINE),
@@ -202,7 +201,7 @@ bool GameThread::undo(Player * engine, bool doubleUndo) {
         success &= engine->undo();
     }
     if (!success) {
-        console->debug("Undo not supported. Replaying game from the beginning.");
+        spdlog::debug("Undo not supported. Replaying game from the beginning.");
         success = engine->clear() || engine->boardsize(model.getBoardSize());
         for (auto it = model.history.begin(); it != model.history.end(); ++it) {
             success &= engine->play(*it);
@@ -231,7 +230,7 @@ void GameThread::gameLoop() {
             player->suggestMove(Move(Move::INVALID, model.state.colorToMove));
             //blocking wait for move
             Move move = player->genmove(model.state.colorToMove);
-            console->debug("MOVE to {}, valid = {}", move.toString(), move);
+            spdlog::debug("MOVE to {}, valid = {}", move.toString(), move);
             playerToMove = 0;
             if(player->isTypeOf(Player::HUMAN)){
                 lock.lock();
@@ -264,7 +263,7 @@ void GameThread::gameLoop() {
                     for (auto pit = players.begin(); pit != players.end(); ++pit) {
                         Player *p = *pit;
                         if (p != reinterpret_cast<Player *>(coach) && p != player) {
-                            console->debug("DEBUG play iter");
+                            spdlog::debug("DEBUG play iter");
                             if (move == Move::UNDO) {
                                 undo(p, doubleUndo);
                             } else
@@ -323,8 +322,8 @@ void GameThread::playLocalMove(const Move& move) {
 
 void GameThread::loadEngines(const Configuration& config) {
     auto bots = config.data.find("bots");
-    bool hasCoach(false);
     if(bots != config.data.end()) {
+        bool hasCoach(false);
         for(auto it = bots->begin(); it != bots->end(); ++it) {
             auto enabled = it->value("enabled", 1);
             if(enabled) {
@@ -332,17 +331,25 @@ void GameThread::loadEngines(const Configuration& config) {
                 auto name = it->value("name", "");
                 auto command = it->value("command", "");
                 auto parameters = it->value("parameters", "");
-                auto coach = it->value("main", 0);
+                auto main = it->value("main", 0);
 
                 int role = Player::SPECTATOR;
 
                 if(!command.empty()) {
                     std::size_t id = addEngine(new GtpEngine(command, parameters, path, name));
 
-                    if (coach && !hasCoach) {
-                        role |= Player::COACH;
-                        hasCoach = true;
-                        coach = id;
+                    if (main) {
+                        if(!hasCoach) {
+                          role |= Player::COACH;
+                          hasCoach = true;
+                          coach = id;
+                          spdlog::info("Setting [{}] engine as coach and referee.",
+                                  players[id]->getName());
+                        } else {
+                          spdlog::warn("Ignoring coach flag for [{}] engine, coach has already been set to [{}].",
+                                  players[id]->getName(),
+                                  players[coach]->getName());
+                        }
                     }
 
                     setRole(id, role, true);

@@ -49,7 +49,6 @@ private:
 	GLuint item_h_q; /* height quantum */
 	GLuint cursor_x;
 	GLuint cursor_y;
-	std::shared_ptr<spdlog::logger> console;
 };
 
 #endif /* DEMO_ATLAS_H */

@@ -25,7 +25,6 @@ struct Layer {
 class GobanOverlay {
 public:
     GobanOverlay(const GobanView& view): view(view), overlayReady(false) {
-		console = spdlog::get("console");
     }
     bool init();
     void use();
@@ -42,7 +41,6 @@ private:
     bool overlayReady;
 	double font_size;
 	static std::array<Layer, 3> layers;
-	std::shared_ptr<spdlog::logger> console;
 	std::shared_ptr<GlyphyState> st;
 };
 

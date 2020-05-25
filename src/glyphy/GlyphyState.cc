@@ -22,8 +22,7 @@
 
 GlyphyState::GlyphyState()
 {
-  console = spdlog::get("console");
-  program = demo_shader_create_program (console);
+  program = demo_shader_create_program();
   atlas = std::shared_ptr<GlyphyAtlas>(new GlyphyAtlas(2048, 1024, 64, 32));
 
   u_debug = false;
@@ -49,7 +48,7 @@ void GlyphyState::set_uniform (GLuint program, const char *name, double *p, doub
 {
   *p = value;
   glUniform1f (glGetUniformLocation (program, name), value);
-  console->debug("Setting {} to {}", name + 2, value);
+  spdlog::debug("Setting {} to {}", name + 2, value);
 }
 
 #define SET_UNIFORM(name, value) set_uniform (program, #name, &name, value)

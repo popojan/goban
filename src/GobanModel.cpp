@@ -197,7 +197,7 @@ Move GobanModel::getUndoMove() {
 }
 
 void GobanModel::onGameMove(const Move& move) {
-    console->debug("LOCK model");
+    spdlog::debug("LOCK model");
     std::lock_guard<std::mutex> lock(mutex);
 
     if(!(move == Move::UNDO))
@@ -207,7 +207,7 @@ void GobanModel::onGameMove(const Move& move) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
         board.toggleTerritoryAuto(true);
         over = true;
-        console->debug("Main Over! Reason {}", state.reason);
+        spdlog::debug("Main Over! Reason {}", state.reason);
     }
     else if (move == Move::PASS) {
         prevPass = true;
@@ -224,7 +224,7 @@ void GobanModel::onGameMove(const Move& move) {
 }
 
 void GobanModel::onBoardChange(const Board& result) {
-    console->debug("LOCK board");
+    spdlog::debug("LOCK board");
     std::lock_guard<std::mutex> lock(mutex);
 
     board.copyStateFrom(result);
@@ -234,7 +234,7 @@ void GobanModel::onBoardChange(const Board& result) {
     state.capturedWhite = board.capturedCount(Color::WHITE);
     calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
 
-    console->debug("over {} ready {}", over, result.territoryReady);
+    spdlog::debug("over {} ready {}", over, result.territoryReady);
 
     if(over && result.territoryReady) {
         this->result(history.back(), state.adata);
@@ -243,7 +243,7 @@ void GobanModel::onBoardChange(const Board& result) {
 
 void GobanModel::onKomiChange(float newKomi) {
     if (!started) {
-        console->debug("setting komi {}", newKomi);
+        spdlog::debug("setting komi {}", newKomi);
         state.komi = newKomi;
     }
 }

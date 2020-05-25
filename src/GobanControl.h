@@ -14,14 +14,12 @@ public:
             : parent(p), model(m), view(v), engine(e), rButtonDown(false), mButtonDown(false), startX(-1),
               startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true)
     {
-        console = spdlog::get("console");
         config.load("./data/config.json");
     }
 
     ~GobanControl() { destroy(); }
 
     void destroy();
-    void initControls();
 
     void mouseClick(int button, int state, int x, int y);
     void mouseMove(int x, int y);
@@ -37,6 +35,7 @@ public:
     bool newGame(int boardSize);
     void togglePlayer(int which, int delta = 1);
     void switchPlayer(int which, int idx);
+    void switchShader(int idx);
     void increaseHandicap();
     bool setHandicap(int);
     bool setKomi(float);
@@ -57,7 +56,6 @@ private:
     bool exit;
     float mouseX, mouseY;
     bool firstGame;
-    std::shared_ptr<spdlog::logger> console;
 };
 
 

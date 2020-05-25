@@ -6,6 +6,8 @@
 #include <string>
 #include <Rocket/Core/Types.h>
 #include <Rocket/Core/Texture.h>
+#include <Rocket/Controls/ElementFormControlSelect.h>
+#include <Rocket/Controls/SelectOption.h>
 #include "GobanShader.h"
 #include "GobanModel.h"
 #include "GameObserver.h"
@@ -36,8 +38,6 @@ public:
 		needsUpdate(0), cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
 		currentProgram(-1),	showOverlay(true),  lastCursor(-1,-1)
 	{
-
-	    console = spdlog::get("console");
         player.preload(config);
 
 	    gobanOverlay.init();
@@ -98,10 +98,13 @@ public:
 
     void toggleFpsLimit() {MAX_FPS = !MAX_FPS; }
 
-    void cycleShaders()  {
+    int cycleShaders();
+
+    void switchShader(int idx)  {
         updateFlag |= GobanView::UPDATE_ALL;
-		gobanShader.cycleShaders();
+        gobanShader.choose(idx);
         state.metricsReady = false;
+        gobanShader.setReady();
     }
 
     Position getBoardCoordinate(float x, float y)const ;
@@ -119,8 +122,6 @@ public:
 	void moveCursor(float, float);
     int updateCursor(const Position& last);
 
-private:
-    std::shared_ptr<spdlog::logger> console;
 public:
     GobanShader gobanShader;
     GobanOverlay gobanOverlay;

@@ -57,7 +57,6 @@ private:
 	glyphy_extents_t logical_extents;
 	bool dirty;
 	GLuint buf_name;
-	std::shared_ptr<spdlog::logger> console;
 };
 
 #endif /* DEMO_BUFFER_H */

@@ -121,6 +121,28 @@ if(NOT json_POPULATED)
   add_subdirectory(${json_SOURCE_DIR} ${json_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
+
+
+FetchContent_Declare(spdlog
+  GIT_REPOSITORY git://github.com/gabime/spdlog.git
+  GIT_TAG v1.6.0)
+
+FetchContent_GetProperties(spdlog)
+if(NOT spdlog_POPULATED)
+  FetchContent_Populate(spdlog)
+  add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+FetchContent_Declare(clipp
+  GIT_REPOSITORY git://github.com/muellan/clipp.git
+  GIT_TAG 2c32b2f1f7cc530b1ec1f62c92f698643bb368db)
+
+FetchContent_GetProperties(clipp)
+if(NOT clipp_POPULATED)
+  FetchContent_Populate(clipp)
+  add_subdirectory(${clipp_SOURCE_DIR} ${clipp_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
 #===================================
 # Setup paths ======================
 #===================================
@@ -138,8 +160,6 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src/glyphy
     ${PROJECT_SOURCE_DIR}/src/sgf/include
     ${PROJECT_SOURCE_DIR}/deps/boost
-    ${PROJECT_SOURCE_DIR}/deps/spdlog/include
-    ${PROJECT_SOURCE_DIR}/deps/clipp/include
     ${PROJECT_SOURCE_DIR}/src/sound/
     ${OPENGL_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIR}
@@ -243,6 +263,11 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp)
 
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+foreach(dir ${dirs})
+  message(STATUS "dir='${dir}'")
+endforeach()
+
 
 
 if (WIN32)
@@ -275,9 +300,10 @@ target_link_libraries(goban
     portaudio
     libsndfile
     ${EXTRA_LIBS}
+    spdlog
+    clipp
     nlohmann_json::nlohmann_json
 )
-
 
 set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/Release)
 

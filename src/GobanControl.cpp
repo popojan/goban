@@ -23,7 +23,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     view.mouseMoved(mouseX, mouseY);
 
     Position coord = view.getBoardCoordinate(x, y);
-    console->debug("COORD [{},{}]", coord.x, coord.y);
+    spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
             bool playNow = true;
@@ -136,24 +136,28 @@ bool GobanControl::command(const std::string& cmd) {
         view.endZoom();
     }
     else if (cmd == "cycle shaders") {
-        view.cycleShaders();
-        view.gobanShader.setReady();
-        view.gobanShader.setReady();
+        //TODO generalize linked select boxes and cycle commands
+        auto doc = parent->GetContext()->GetDocument("game_window");
+        if(doc) {
+            auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect *>(doc->GetElementById("selectShader"));
+            int currentProgram = select->GetSelection();
+            select->SetSelection((currentProgram + 1) % select->GetNumOptions());
+        }
     }
     else if (cmd == "increase gamma") {
-        console->debug("new gamma = {0}", view.getGamma() + 0.025f);
+        spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() + 0.025f);
     }
     else if (cmd == "decrease gamma") {
-        console->debug("new gamma = {0}", view.getGamma() + 0.025f);
+        spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() - 0.025f);
     }
     else if (cmd == "increase contrast") {
-        console->debug("new contrast = {0}", view.getContrast() + 0.025f);
+        spdlog::debug("new contrast = {0}", view.getContrast() + 0.025f);
         view.setContrast(view.getContrast() + 0.025f);
     }
     else if (cmd == "decrease contrast") {
-        console->debug("new contrast = {0}", view.getContrast() - 0.025f);
+        spdlog::debug("new contrast = {0}", view.getContrast() - 0.025f);
         view.setContrast(view.getContrast() - 0.025f);
     }
     else if (cmd == "reset contrast and gamma") {
@@ -244,7 +248,12 @@ void GobanControl::switchPlayer(int which, int newPlayerIndex) {
     engine.activatePlayer(which, newPlayerIndex - idx);
     model.state.holdsStone = false;
 }
+
+void GobanControl::switchShader(int newShaderIndex) {
+    view.switchShader(newShaderIndex);
+}
+
 void GobanControl::destroy() {
-    console->debug("GAME DESTRUCT");
+    spdlog::debug("GAME DESTRUCT");
     engine.interrupt();
 }

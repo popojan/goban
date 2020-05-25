@@ -31,8 +31,6 @@ GlyphyAtlas::GlyphyAtlas(unsigned int w, unsigned int h, unsigned int item_w, un
   cursor_x = 0;
   cursor_y = 0;
 
-  console = spdlog::get("console");
-
   bind_texture();
 
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -83,7 +81,7 @@ void GlyphyAtlas::alloc (glyphy_rgba_t *data,
     y = cursor_y;
     cursor_y += (h + item_h_q - 1) & ~(item_h_q - 1);
   } else
-    console->error("Ran out of atlas memory");
+    spdlog::error("Ran out of atlas memory");
 
   bind_texture();
 

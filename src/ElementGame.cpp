@@ -10,7 +10,6 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
         : Rocket::Core::Element(tag), model(this), view(model), engine(model),
           control(this, model, view, engine), hasResults(false), calculatingScore(false)
 {
-    console = spdlog::get("console");
     engine.addGameObserver(&model);
     engine.addGameObserver(&view);
 
@@ -26,21 +25,45 @@ void ElementGame::populateEngines() {
             GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
     const auto players(engine.getPlayers());
 
-    if(!selectBlack || !selectWhite) {
-        console->error("missing GUI element");
-        return;
+    if(!selectBlack) {
+        spdlog::warn("missing GUI element [selectBlack]");
+    }
+    if(!selectWhite) {
+        spdlog::warn("missing GUI element [selectWhite]");
     }
 
-    for(unsigned i = 0; i < players.size(); ++i) {
+    if(selectBlack && selectWhite) {
+        for (unsigned i = 0; i < players.size(); ++i) {
+            std::ostringstream ss;
+            ss << i;
+            std::string playerName(players[i]->getName());
+            std::string playerIndex(ss.str());
+            selectBlack->Add(playerName.c_str(), playerIndex.c_str());
+            selectWhite->Add(playerName.c_str(), playerIndex.c_str());
+        }
+        selectBlack->SetSelection(players.size() - 1);
+        selectWhite->SetSelection(0);
+    }
+
+    auto selectShader = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectShader"));
+
+    if(!selectShader) {
+        spdlog::warn("missing GUI element [selectShader]");
+    }
+
+    using nlohmann::json;
+    const auto shaders(config.data.value("shaders", json::array()));
+
+    int i = 0;
+    for(json::const_iterator it = shaders.begin(); it != shaders.end(); ++it, ++i){
         std::ostringstream ss;
         ss << i;
-        std::string playerName(players[i]->getName());
-        std::string playerIndex(ss.str());
-        selectBlack->Add(playerName.c_str(),playerIndex.c_str());
-        selectWhite->Add(playerName.c_str(),playerIndex.c_str());
+        std::string shaderName(it->value("name", ss.str()));
+        std::string shaderIndex(ss.str());
+        selectShader->Add(shaderName.c_str(),shaderIndex.c_str());
     }
-    selectBlack->SetSelection(players.size()-1);
-    selectWhite->SetSelection(0);
+    selectShader->SetSelection(0);
 }
 
 void ElementGame::gameLoop() {
@@ -57,7 +80,7 @@ void ElementGame::gameLoop() {
             debugElement->SetInnerRML(sfps.CString());
             view.requestRepaint();
         }
-        console->info(sfps.CString());
+        spdlog::debug(sfps.CString());
         //if(frames % 10 == 0)
         frames += 1;
 		lastTime = currentTime;
@@ -119,7 +142,7 @@ void ElementGame::ProcessEvent(Rocket::Core::Event& event)
     if (event == "load")
     {
         //control.Initialise();
-        console->debug("Load");
+        spdlog::debug("Load");
         populateEngines();
     }
 }

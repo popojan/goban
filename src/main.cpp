@@ -28,7 +28,6 @@
 #endif
 
 #include <spdlog/spdlog.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
 
 Rocket::Core::Context* context = NULL;
 Configuration config;
@@ -88,7 +87,7 @@ int main(int argc, char** argv)
 #endif
 {
     using namespace clipp;
-    std::string logLevel("info");
+    std::string logLevel("warning");
     std::string configurationFile("./data/config.json");
     auto cli = (
         option("-v", "--verbosity") & word("level", logLevel),
@@ -111,7 +110,6 @@ const char * WINDOW_NAME = "Goban";
 #ifdef ROCKET_PLATFORM_WIN32
         DoAllocConsole();
 #endif
-    auto console = spdlog::stderr_color_mt("console");
     spdlog::set_level(spdlog::level::from_str(logLevel));
 
     unsigned window_width = 1024;
@@ -161,7 +159,13 @@ const char * WINDOW_NAME = "Goban";
     //Rocket::Debugger::SetVisible(true);
     Input::SetContext(context);
 	shell_renderer->SetContext(context);
-    Shell::LoadFonts("data/gui/");
+
+	using nlohmann::json;
+	auto fonts = config.data
+	        .value("fonts", json({}))
+	        .value("gui", json::array());
+
+    Shell::LoadFonts(fonts);
 
     Rocket::Core::ElementInstancer* element_instancer = new Rocket::Core::ElementInstancerGeneric< ElementGame >();
     Rocket::Core::Factory::RegisterElementInstancer("game", element_instancer);
@@ -182,16 +186,16 @@ const char * WINDOW_NAME = "Goban";
 
     EventManager::Shutdown();
 
-    console->debug("Before context destroy");;
+    spdlog::debug("Before context destroy");;
 
     context->RemoveReference();
     context = 0;
 
-    console->debug("Before Rocket shutdown");
+    spdlog::debug("Before Rocket shutdown");
 
     Rocket::Core::ReleaseTextures();
     Rocket::Core::Shutdown();
-    console->debug("Before Window Close");
+    spdlog::debug("Before Window Close");
 
     Shell::CloseWindow();
     Shell::Shutdown();

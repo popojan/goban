@@ -27,23 +27,23 @@
 
 #include "Shell.h"
 #include <Rocket/Core/FontDatabase.h>
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 Rocket::Core::String Shell::executable_path;
 
 /// Loads the default fonts from the given path.
-void Shell::LoadFonts(const char* directory)
+template <class T>
+void Shell::LoadFonts(const T& fonts)
 {
-	Rocket::Core::String font_names[4];
-	font_names[0] = "Delicious-Roman.otf";
-	font_names[1] = "Delicious-Italic.otf";
-	font_names[2] = "Delicious-Bold.otf";
-	font_names[3] = "Delicious-BoldItalic.otf";
-
-	for (unsigned i = 0; i < sizeof(font_names) / sizeof(Rocket::Core::String); i++)
-	{
-		Rocket::Core::FontDatabase::LoadFontFace(Rocket::Core::String(directory) + font_names[i]);
+	for (auto it = fonts.begin(); it != fonts.end(); ++it) {
+    std::string file((*it).template get<std::string>());
+    spdlog::info("Loading font file [{}]", file);
+    Rocket::Core::FontDatabase::LoadFontFace(Rocket::Core::String(file.c_str()));
 	}
 }
+
+template void Shell::LoadFonts(const nlohmann::json& fonts);
 
 // Returns the path to the application's executable.
 const Rocket::Core::String& Shell::GetExecutablePath()

@@ -16,7 +16,6 @@ public:
 
 	virtual void ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value);
 private:
-    std::shared_ptr<spdlog::logger> console;
     int lastKomiSelection = -1;
     int lastBoardSelection = -1;
     int lastHandicapSelection = -1;

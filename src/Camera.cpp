@@ -31,7 +31,7 @@ static DDG::Quaternion toQuaternion(double pitch, double roll, double yaw)
 	return q;
 }
 
-static void toEulerianAngle(const DDG::Quaternion& q, double& roll, double& pitch, double& yaw)
+[[maybe_unused]] static void toEulerianAngle(const DDG::Quaternion& q, double& roll, double& pitch, double& yaw)
 {
 	double ysqr = q.im().y * q.im().y;
 
