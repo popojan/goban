@@ -13,7 +13,8 @@ public:
     int handicap;
     float result;
     std::string cmd;
-
+    std::string err;
+    
     enum Message {
         NONE, WHITE_PASS, BLACK_PASS, WHITE_RESIGNS, BLACK_RESIGNS,
         BLACK_RESIGNED, WHITE_RESIGNED, WHITE_WON, BLACK_WON, PAUSED,

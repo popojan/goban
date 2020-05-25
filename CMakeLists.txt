@@ -232,7 +232,7 @@ set(GOBAN_HDR_FILES
     ${PROJECT_SOURCE_DIR}/src/GobanShader.h
     ${PROJECT_SOURCE_DIR}/src/Metrics.h
     ${PROJECT_SOURCE_DIR}/src/GobanOverlay.h
-    ${PROJECT_SOURCE_DIR}/src/GameState.h src/Configuration.h)
+    ${PROJECT_SOURCE_DIR}/src/GameState.h src/Configuration.h src/InputThread.cpp src/InputThread.h)
 
 set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/Board.cpp
@@ -261,7 +261,7 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/sound/AudioPlayer.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/FileHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
-    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp)
+    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp src/InputThread.cpp src/InputThread.h)
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 foreach(dir ${dirs})
