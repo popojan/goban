@@ -56,7 +56,6 @@ private:
     double u_boldness;
     float u_color[4];
     double u_depth;
-    std::shared_ptr<spdlog::logger> console;
 };
 
 #endif /* DEMO_GLSTATE_H */

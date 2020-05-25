@@ -74,7 +74,6 @@ public:
     const std::vector<Player*> getPlayers() { return players;}
 
 private:
-	std::shared_ptr<spdlog::logger> console;
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;
     std::vector<Engine*> engines; //engines know the rules

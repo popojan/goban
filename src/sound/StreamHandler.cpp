@@ -119,7 +119,8 @@ StreamHandler::StreamHandler()
 {
 
 #if defined (__linux__)
-        putenv("PULSE_LATENCY_MSEC=20");
+        char latency[] = "PULSE_LATENCY_MSEC=20";
+        putenv(latency);
 #endif
 
         Pa_Initialize();
@@ -148,7 +149,7 @@ StreamHandler::StreamHandler()
 
                 stringstream error;
                 error << "Unable to open stream for output. Portaudio error code: " << errorCode;
-                spdlog::get("console")->error(error.str());
+                spdlog::error(error.str());
                 throw error.str();
         }
 }

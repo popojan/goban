@@ -45,9 +45,3 @@ if not exist boost (
   innounp -b -x %FBOOST% {app}\lib64-msvc-14.1\libboost_*-vc141-mt-x64-1_68.lib
   move {app} boost
 )
-
-REM spdlog
-if not exist spdlog git clone --recursive https://github.com/gabime/spdlog.git
-
-REM spdlog
-if not exist clipp git clone https://github.com/muellan/clipp.git

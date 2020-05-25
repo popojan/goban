@@ -41,7 +41,6 @@ GlyphyFont::GlyphyFont(FT_Face face, std::shared_ptr<GlyphyAtlas> atlas):
 {
   glyph_cache = new glyph_cache_t ();
   acc = glyphy_arc_accumulator_create ();
-  console = spdlog::get("console");
 }
 
 GlyphyFont::~GlyphyFont()
@@ -93,10 +92,10 @@ GlyphyFont::encode_ft_glyph (
 				  FT_LOAD_NO_SCALE |
 				  FT_LOAD_LINEAR_DESIGN |
 				  FT_LOAD_IGNORE_TRANSFORM))
-    console->error("Failed loading FreeType glyph");
+    spdlog::error("Failed loading FreeType glyph");
 
   if (face->glyph->format != FT_GLYPH_FORMAT_OUTLINE)
-    console->error("FreeType loaded glyph format is not outline");
+    spdlog::error("FreeType loaded glyph format is not outline");
 
   unsigned int upem = face->units_per_EM;
   double tolerance = upem * tolerance_per_em; /* in font design units */
@@ -110,7 +109,7 @@ GlyphyFont::encode_ft_glyph (
 				       &endpoints);
 
   if (FT_Err_Ok != glyphy_freetype(outline_decompose) (&face->glyph->outline, acc))
-    console->error("Failed converting glyph outline to arcs");
+    spdlog::error("Failed converting glyph outline to arcs");
 
   assert (glyphy_arc_accumulator_get_error (acc) <= tolerance);
 
@@ -147,14 +146,14 @@ GlyphyFont::encode_ft_glyph (
 				    nominal_width,
 				    nominal_height,
 				    extents))
-    console->error("Failed encoding arcs");
+    spdlog::error("Failed encoding arcs");
 
   glyphy_extents_scale (extents, 1. / upem, 1. / upem);
   glyphy_extents_scale (extents, SCALE, SCALE);
 
   *advance = face->glyph->metrics.horiAdvance / (double) upem;
 
-  console->debug("gid{0:3d}: endpoints{1:3d}; err{2:3g}; tex fetch{3:4.1f}; mem{4:4.1f}kb",
+  spdlog::debug("gid{0:3d}: endpoints{1:3d}; err{2:3g}; tex fetch{3:4.1f}; mem{4:4.1f}kb",
 	  glyph_index,
 	  (unsigned int) glyphy_arc_accumulator_get_num_endpoints (acc),
 	  round (100 * glyphy_arc_accumulator_get_error (acc) / tolerance),
@@ -206,7 +205,7 @@ void GlyphyFont::lookup_glyph (
 void
 GlyphyFont::print_stats ()
 {
-  console->debug("{0:3d} glyphs; avg num endpoints {1:6.2f}; avg error {2:5.1f};"
+  spdlog::debug("{0:3d} glyphs; avg num endpoints {1:6.2f}; avg error {2:5.1f};"
                  "avg tex fetch {3:5.2f}; avg {4:5.2f}kb per glyph",
 	num_glyphs,
 	(double) sum_endpoints / num_glyphs,

@@ -19,8 +19,7 @@ class GobanModel: public GameObserver {
 public:
     GobanModel(ElementGame* p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
             : parent(p), prevPass(false), over(false), invalidated(false), cursor({0,0}) {
-        console = spdlog::get("console");
-        console->info("Preloading sounds...");
+        spdlog::info("Preloading sounds...");
         //newGame(boardSize, handicap, komi);
     }
     ~GobanModel();
@@ -44,7 +43,7 @@ public:
 
     Color changeTurn() {
         state.colorToMove = Color::other(state.colorToMove);
-        console->debug("changeTurn = {}", state.colorToMove.toString());
+        spdlog::debug("changeTurn = {}", state.colorToMove.toString());
         return state.colorToMove;
     }
 
@@ -84,7 +83,6 @@ public:
     Metrics metrics;
 
 	std::mutex mutex;
-    std::shared_ptr<spdlog::logger> console;
 
     Position cursor;
 };

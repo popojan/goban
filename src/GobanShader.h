@@ -1,6 +1,5 @@
-//
-// Created by jan on 7.5.17.
-//
+#ifndef GOBAN_GOBANSHADER_H
+#define GOBAN_GOBANSHADER_H
 
 #include <string>
 #include "glyphy/GlyphyFont.h"
@@ -8,9 +7,6 @@
 #include "GobanModel.h"
 
 class GobanView;
-
-#ifndef GOBAN_GOBANSHADER_H
-#define GOBAN_GOBANSHADER_H
 
 #include "ShellOpenGL.h"
 #include "Board.h"
@@ -24,43 +20,13 @@ class GobanView;
 #include <glm/gtc/type_ptr.hpp>
 #include "spdlog/spdlog.h"
 
-#define OPTIMIZE_SHADERS
-#undef OPTIMIZE_SHADERS
-
-#define NOT_OPTIMIZED
-
-#ifdef OPTIMIZE_SHADERS
-#include <glsl/glsl_optimizer.h>
-    const bool OPTIMIZE = true;
-    #define FRAGMENT_FILE "data/glsl/fragment.2D.glsl"
-    #define VERTEX_FILE "data/glsl/vertex.glsl"
-#else
-const bool OPTIMIZE = false;
-#ifdef NOT_OPTIMIZED
-#define FRAGMENT_FILE "data/glsl/fragment.2D.glsl"
-#define VERTEX_FILE "data/glsl/vertex.glsl"
-#else
-#define FRAGMENT_FILE "data/glsl/fragment.glsl.opt"
-        #define VERTEX_FILE "data/glsl/vertex.glsl.opt"
-#endif
-#endif
-
 GLuint shaderCompileFromString(GLenum type, const std::string& source);
 
 bool shaderAttachFromString(GLuint program, GLenum type, const std::string& source);
 
 GLuint make_buffer(GLenum target, const void *, GLsizei);
 
-#ifdef OPTIMIZE_SHADERS
-
-bool replace(std::string& str, const std::string& from, const std::string& to);
-
-std::string createShader(const std::string& fname, bool optimize, glslopt_ctx* ctx, glslopt_shader_type shaderType);
-
-#else
-std::string createShader(const std::string& fname, bool optimize);
-#endif
-
+std::string createShaderFromFile(const std::string& filename);
 
 class GobanShader {
 public:
@@ -69,14 +35,13 @@ public:
         width(0), height(0), gamma(1.0f), contrast(0.0f),
 	view(view), animT(0.5f)
     {
-        console = spdlog::get("console");
     }
-    void initProgram(int which);
+    void initProgram(const std::string& vprogram, const std::string& fprogram);
     void setMetrics(const Metrics &);
     void init();
     void destroy();
     void draw(const GobanModel&, const DDG::Camera&, int, float);
-    void cycleShaders();
+    int choose(int idx);
     void use();
     void unuse();
     void setTime(float);
@@ -92,7 +57,6 @@ public:
     void setReady() { shadersReady = true; }
     int getCurrentProgram() const {return currentProgram;}
 private:
-    std::shared_ptr<spdlog::logger> console;
     GLuint gobanProgram = 0;
     GLuint iVertex = 0;
     GLint iMouse;
@@ -144,7 +108,6 @@ private:
 
     static const std::array<GLfloat, 16> vertexBufferData;
     static const GLushort elementBufferData[];
-    static const std::array<float, 4> programH;
 
     GLint iTranslate;
     GLint iTime;
@@ -167,4 +130,4 @@ public:
     const float animT;
 };
 
-#endif //GOBAN_GOBANSHADER_H
+#endif

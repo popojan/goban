@@ -47,8 +47,6 @@ public:
     ShellSystemInterface();
 	virtual float GetElapsedTime();
     virtual bool LogMessage(Rocket::Core::Log::Type logtype, const Rocket::Core::String& message);
-private:
-    std::shared_ptr<spdlog::logger> console;
 };
 
 #endif

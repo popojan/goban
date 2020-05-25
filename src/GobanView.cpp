@@ -53,6 +53,13 @@ void GobanView::endZoom() {
     translate[2] = newTranslate[2];
 }
 
+int GobanView::cycleShaders(){
+    updateFlag |= GobanView::UPDATE_ALL;
+    int currentProgram = gobanShader.getCurrentProgram();
+    currentProgram = gobanShader.choose(currentProgram + 1);
+    state.metricsReady = false;
+    return currentProgram;
+}
 void GobanView::resetView() {
     initCam();
     lastTime = 0.0;
@@ -154,7 +161,7 @@ void GobanView::shadeit(float time, GobanShader& gobanShader) {
 	gobanShader.setPan(newTranslate);
 
 	if (updateFlag & UPDATE_SHADER) {
-		console->debug("setMetrics");
+		spdlog::debug("setMetrics");
 		gobanShader.setMetrics(model.metrics);
 	}
 

@@ -10,6 +10,8 @@
 #include "GobanView.h"
 #include <Shell.h>
 
+extern Configuration config;
+
 const GLushort GobanShader::elementBufferData[] = {0, 1, 2, 3};
 const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
 	-1.0f, -1.0f, 0.0f, 1.0f,
@@ -37,7 +39,7 @@ GLuint shaderCompileFromString(GLenum type, const std::string& source) {
         log = new char[length];
         glGetShaderInfoLog(shader, length, &result, log);
 
-        spdlog::get("console")->error("shaderCompileFromString(): Unable to compile: {}", log);
+        spdlog::error("shaderCompileFromString(): Unable to compile: {}", log);
 
         delete [] log;
 
@@ -58,54 +60,10 @@ bool shaderAttachFromString(GLuint program, GLenum type, const std::string& sour
     }
     return false;
 }
-#ifdef OPTIMIZE_SHADERS
 
-bool replace(std::string& str, const std::string& from, const std::string& to) {
-    size_t start_pos = str.find(from);
-    if (start_pos == std::string::npos)
-        return false;
-    str.replace(start_pos, from.length(), to);
-    return true;
-}
-
-std::string createShader(const std::string& fname, bool optimize, glslopt_ctx* ctx, glslopt_shader_type shaderType) {
-
+std::string createShaderFromFile(const std::string& filename) {
     std::stringstream ss;
-    std::ifstream fin(fname);
-    std::string s;
-    //ss << "#version 300 es" << std::endl;
-    while (getline(fin, s)||fin){
-        ss << s << std::endl;
-    }
-    if (optimize) {
-        glslopt_shader* shader = glslopt_optimize(ctx, shaderType, ss.str().c_str(), 0);
-        std::string ret;
-        if (glslopt_get_status(shader)) {
-            ret = glslopt_get_output(shader);
-        }
-        else {
-            ret = glslopt_get_log(shader);
-        }
-        glslopt_shader_delete(shader);
-        std::ofstream fout(fname + ".opt");
-        if (shaderType = glslopt_shader_type::kGlslOptShaderFragment) {
-            std::string fs(ret);
-            replace(fs, "uniform vec4 iStones[361]", "layout(std140) uniform iStoneBlock{vec4 iStones[361];}");
-            fout << fs;
-            return fs.c_str();
-        }
-        else {
-            fout << ret;
-            return ret;
-        }
-    }
-    return ss.str().c_str();
-}
-#else
-std::string createShader(const std::string& fname, bool optimize) {
-    (void)optimize;
-    std::stringstream ss;
-    std::ifstream fin(fname);
+    std::ifstream fin(filename);
     std::string s;
     while (getline(fin, s)||fin){
         ss << s << std::endl;
@@ -113,41 +71,21 @@ std::string createShader(const std::string& fname, bool optimize) {
     return ss.str();
 }
 
-#endif
+void GobanShader::initProgram(const std::string& vertexProgram, const std::string& fragmentProgram) {
 
-void GobanShader::initProgram(int which) {
-    const char* vprogram[4] = {
-        "data/glsl/vertex.glsl",
-        "data/glsl/vertex.anaglyph.glsl",
-        "data/glsl/vertex.glsl",
-        "data/glsl/vertex.glsl"
-    };
-    const char* program[4] = {
-        "data/glsl/fragment.glsl",
-        "data/glsl/fragment.anaglyph.glsl",
-	"data/glsl/fragment.2D.glsl",
-        "data/glsl/fragment.25D.glsl"
-    };
     shadersReady = false;
     if (gobanProgram != 0) {
         glDeleteProgram(gobanProgram);
     }
     gobanProgram = glCreateProgram();
-#ifdef OPTIMIZE_SHADERS
-    glslopt_ctx* ctx = OPTIMIZE ? glslopt_initialize(glslopt_target::kGlslTargetOpenGLES30) : 0;
-    const std::string sVertexShader = createShader(VERTEX_FILE, OPTIMIZE, ctx, glslopt_shader_type::kGlslOptShaderVertex);
-    const std::string sFragmentShader = createShader(FRAGMENT_FILE, OPTIMIZE, ctx, glslopt_shader_type::kGlslOptShaderFragment);
-    glslopt_cleanup(ctx);
-#else
-    const std::string fnVertexShader(vprogram[std::max(0, which % 4)]);
-    const std::string fnFragmentShader(program[std::max(0, which % 4)]);
-    const std::string sVertexShader = createShader(fnVertexShader, OPTIMIZE);
-    const std::string sFragmentShader = createShader(fnFragmentShader, OPTIMIZE);
-#endif
+
+    const std::string sVertexShader = createShaderFromFile(vertexProgram);
+    const std::string sFragmentShader = createShaderFromFile(fragmentProgram);
+
     if(!shaderAttachFromString(gobanProgram, GL_VERTEX_SHADER, sVertexShader))
-        console->error("Vertex shader [{}] failed to compile. Err {}", fnVertexShader, glGetError());
+        spdlog::error("Vertex shader [{}] failed to compile. Err {}", vertexProgram, glGetError());
     if(!shaderAttachFromString(gobanProgram, GL_FRAGMENT_SHADER, sFragmentShader))
-        console->error("Fragment Shader [{}] failed to compile. Err {}", fnFragmentShader, glGetError());
+        spdlog::error("Fragment Shader [{}] failed to compile. Err {}", fragmentProgram, glGetError());
 
     glLinkProgram(gobanProgram);
 
@@ -162,7 +100,7 @@ void GobanShader::initProgram(int which) {
         log = (char*)malloc(static_cast<std::size_t>(length));
         glGetProgramInfoLog(gobanProgram, length, &result, log);
 
-        console->error("sceneInit(): Program linking failed: {0}", log);
+        spdlog::error("sceneInit(): Program linking failed: {0}", log);
         free(log);
 
         glDeleteProgram(gobanProgram);
@@ -226,12 +164,12 @@ void GobanShader::initProgram(int which) {
 }
 
 void GobanShader::setGamma(float gamma) {
-    console->debug("setting gamma = {0}", gamma);
+    spdlog::debug("setting gamma = {0}", gamma);
     this->gamma = gamma;
 }
 
 void GobanShader::setContrast(float contrast) {
-    console->debug("setting contrast = {0}", contrast);
+    spdlog::debug("setting contrast = {0}", contrast);
     this->contrast = contrast;
 }
 
@@ -303,16 +241,13 @@ void GobanShader::destroy(void) {
     glDeleteProgram(gobanProgram);
 }
 
-const std::array<float, 4> GobanShader::programH = { { 0.85f, 0.85f, 0.0f, 0.85f } };
-
 void GobanShader::init() {
 	vertexBuffer = make_buffer(GL_ARRAY_BUFFER, &vertexBufferData[0], sizeof(GLfloat)*vertexBufferData.size());
     elementBuffer = make_buffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferData, sizeof(elementBufferData));
 
 	currentProgram = 0;
-    currentProgramH = programH[0];
 
-    initProgram(currentProgram);
+	choose(currentProgram);
 
     glEnable(GL_BLEND);
 }
@@ -344,7 +279,7 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
 	}
     glUniform2fv(iResolution, 1, glm::value_ptr(view.resolution));
     if (updateFlag & GobanView::UPDATE_STONES) {
-        console->debug("place stones via glBufferData()");
+        spdlog::debug("place stones via glBufferData()");
         glUniform1i(iBlackCapturedCount,  view.state.capturedBlack);
         glUniform1i(iWhiteCapturedCount, view.state.capturedWhite);
 		glUniform3fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);
@@ -380,10 +315,31 @@ GLuint make_buffer(GLenum target, const void *buffer_data, GLsizei buffer_size) 
     return buffer;
 }
 
-void GobanShader::cycleShaders() {
-    currentProgram = (currentProgram + 1) % 4;
-    initProgram(currentProgram);
-    currentProgramH = programH[currentProgram];
+int GobanShader::choose(int idx) {
+
+    using nlohmann::json;
+    json shaders(config.data.value("shaders", json::array()));
+
+    if(shaders.size() < 1) {
+        spdlog::critical("No shader definition found.");
+        return -1;
+    }
+
+    int newProgram = idx % shaders.size();
+
+    json shader(shaders[newProgram]);
+
+    std::string vertexFile(shader.value("vertex", ""));
+    std::string fragmentFile(shader.value("fragment", ""));
+
+    currentProgramH = shader.value("height", 0.0f);
+    if(!vertexFile.empty() && !fragmentFile.empty()) {
+        initProgram(vertexFile, fragmentFile);
+        currentProgram = newProgram;
+    } else {
+        spdlog::warn("Shader [{}] must comprise both vertex and fragment programs.", newProgram);
+    }
+    return currentProgram;
 }
 
 void GobanShader::use() {

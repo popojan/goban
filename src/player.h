@@ -19,7 +19,7 @@ public:
     enum Type { LOCAL = 1, HUMAN = 2, ENGINE = 4 };
 
     Player(const std::string& name, int role, int type) : name(name), role(role), type(type) {
-        console = spdlog::get("console");
+
     }
     virtual Move genmove(const Color& colorToMove) = 0;
 
@@ -44,7 +44,6 @@ protected:
     std::string name;
     int role;
     int type;
-    std::shared_ptr<spdlog::logger> console;
 };
 
 class LocalHumanPlayer: public Player {
@@ -53,7 +52,7 @@ public:
     virtual Move genmove(const Color& ) {
         Move ret(move);
         if(move == Move::INVALID) {
-            console->debug("LOCK human genmove");
+            spdlog::debug("LOCK human genmove");
             std::unique_lock<std::mutex> lock(mut);
             waitingForInput = true;
             while(waitingForInput) {
@@ -68,7 +67,7 @@ public:
     virtual void suggestMove(const Move& move) {
         this->move = move;
         {
-            console->debug("LOCK suggest move = {}", move);
+            spdlog::debug("LOCK suggest move = {}", move);
             std::lock_guard<std::mutex> lock(mut);
             waitingForInput = false;
         }

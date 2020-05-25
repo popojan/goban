@@ -26,7 +26,6 @@ GlyphyBuffer::GlyphyBuffer() {
     glGenBuffers(1, &buf_name);
 
     clear();
-    console = spdlog::get("console");
 }
 
 GlyphyBuffer::~GlyphyBuffer()

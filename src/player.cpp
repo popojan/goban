@@ -5,7 +5,7 @@
     Move SgfPlayer::genmove(const Color& ) {
         Move ret(move);
         if(move == Move::INVALID) {
-            console->debug("LOCK human genmove");
+            spdlog::debug("LOCK human genmove");
             std::unique_lock<std::mutex> lock(mut);
             waitingForInput = true;
             while(waitingForInput) {
@@ -29,7 +29,7 @@
                         }
                         unsigned col = static_cast<unsigned>(c.at(0)- 'a');
                         unsigned row = 18 - static_cast<unsigned>(c.at(1) - 'a');
-                        console->debug("B {}", c);
+                        spdlog::debug("B {}", c);
                         move = Move(Position(col, row), Color::BLACK);
                         colorToMove = Color::WHITE;
                         haswb = true;
@@ -44,7 +44,7 @@
                         }
                         unsigned col = static_cast<unsigned>(c.at(0) - 'a');
                         unsigned row = 18 - static_cast<unsigned>(c.at(1) - 'a');
-                        console->debug("W {}", c);
+                        spdlog::debug("W {}", c);
                         move = Move(Position(col, row), Color::WHITE);
                         colorToMove = Color::BLACK;
                         haswb = true;
@@ -94,7 +94,7 @@
                 node = &nodes[ni];
             } else {
                 node = 0;
-                console->debug("PREMATURE END");
+                spdlog::debug("PREMATURE END");
             }
         }
     }
@@ -104,20 +104,20 @@
         else
             this->move = Move();
         {
-            console->debug("LOCK suggest move [{}]", move.toString());
+            spdlog::debug("LOCK suggest move [{}]", move.toString());
             std::lock_guard<std::mutex> lock(mut);
             waitingForInput = false;
         }
         cond.notify_one();
     }
     void SgfPlayer::parseSgf(const std::string& fname) {
-        console->debug("Before parsing SGF");
+        spdlog::debug("Before parsing SGF");
         auto problems(sgf::parse(fname));
-        console->debug("Parsed SGF");
+        spdlog::debug("Parsed SGF");
         for(std::size_t i = 0; i < problems.size(); ++i) {
             sgf.push_back(std::shared_ptr<sgf::GameTree>(new sgf::GameTree(problems[i])));
         }
-        console->debug("sgf.size() = {}", sgf.size());
+        spdlog::debug("sgf.size() = {}", sgf.size());
         variation = sgf.at(0).get();
         auto& nodes = variation->nodes();
         if(nodes.size() > 0) {
@@ -156,10 +156,10 @@
 Move GtpEngine::genmove(const Color& colorToMove) {
     GtpClient::CommandOutput ret(issueCommand(colorToMove == Color::BLACK ? "genmove B" : "genmove W"));
     if(ret.size() < 1) {
-        Player::console->warn("Invalid GTP response.");
+        spdlog::warn("Invalid GTP response.");
         return Move(Move::INVALID, colorToMove);
     }
-    Player::console->debug("Parsing move string [{}]", ret[0]);
+    spdlog::debug("Parsing move string [{}]", ret[0]);
     return Move::parseGtp(ret[0], colorToMove);
 }
 
@@ -215,13 +215,13 @@ bool GtpEngine::undo() {
 bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
     bool success = true;
     if (finalize) {
-        Player::console->debug("initial territory");
+        spdlog::debug("initial territory");
         board.clearTerritory(board.getSize());
-        Player::console->debug("dead");
+        spdlog::debug("dead");
         success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), board, Color::EMPTY);
-        Player::console->debug("white");
+        spdlog::debug("white");
         success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), board, Color::WHITE);
-        Player::console->debug("black");
+        spdlog::debug("black");
         success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), board, Color::BLACK);
     }
     else {
@@ -232,7 +232,7 @@ bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
         board.parseGtpInfluence(ret);
         ret = GtpClient::issueCommand("dragon_status");
         for (size_t i = 0; i < ret.size(); ++i) {
-            Player::console->debug(ret[i]);
+            spdlog::debug(ret[i]);
             std::stringstream ss(ret[i]);
             char c;
             if (i == 0) {
@@ -271,7 +271,7 @@ bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, cons
         ss << ret.front().substr(2) << "\n";
         std::copy(++ret.begin(), ret.end(), std::ostream_iterator<std::string>(ss, "\n"));
         std::string s;
-        Player::console->debug(ss.str());
+        spdlog::debug(ss.str());
         Position p;
         while((ss >> p)) {
             if(color == Color::EMPTY)
@@ -286,17 +286,17 @@ bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, cons
 
 void GtpEngine::setEngineName(const std::string& nameExtra) {
     GtpClient::CommandOutput retName = GtpClient::name();
-    Player::console->debug("name");
+    spdlog::debug("name");
     GtpClient::CommandOutput retVersion = GtpClient::version();
-    Player::console->debug("version");
+    spdlog::debug("version");
     std::ostringstream ss;
     try {
         ss << retName.at(0).substr(2) << " " << retVersion.at(0).substr(2);
-        Player::console->debug("parsed");
+        spdlog::debug("parsed");
     }
     catch( std::out_of_range&) { }
     if (!nameExtra.empty())
         ss << " " << nameExtra;
-    Player::console->debug(ss.str());
+    spdlog::debug(ss.str());
     Engine::setName(ss.str());
 }

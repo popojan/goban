@@ -36,7 +36,6 @@ public:
     virtual void OnRender();
 
 private:
-    std::shared_ptr<spdlog::logger> console;
 
     int WINDOW_WIDTH = 0, WINDOW_HEIGHT = 0;
 

@@ -83,8 +83,6 @@ private:
 	unsigned int sum_endpoints;
 	double       sum_fetch;
 	unsigned int sum_bytes;
-
-    std::shared_ptr<spdlog::logger> console;
 };
 
 #endif /* DEMO_FONT_H */

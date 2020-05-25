@@ -42,7 +42,7 @@ demo_shader_add_glyph_vertices (const glyphy_point_t        &p,
 
 
 GLuint
-demo_shader_create_program (std::shared_ptr<spdlog::logger> console);
+demo_shader_create_program ();
 
 
 #endif /* DEMO_SHADERS_H */

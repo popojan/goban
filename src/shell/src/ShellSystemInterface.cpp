@@ -29,7 +29,6 @@
 #include <Shell.h>
 
 ShellSystemInterface::ShellSystemInterface() {
-    console = spdlog::get("console");
 }
 
 float ShellSystemInterface::GetElapsedTime()
@@ -42,26 +41,26 @@ bool ShellSystemInterface::LogMessage(Rocket::Core::Log::Type logtype, const Roc
     switch (logtype) {
         case Log::LT_ALWAYS:
             {
-                auto level = console->level();
-                console->info(message.CString());
-                console->set_level(level);
+                auto level = spdlog::default_logger()->level();
+                spdlog::info(message.CString());
+                spdlog::set_level(level);
             }
             break;
         case Log::LT_ERROR:
         case Log::LT_ASSERT:
-            console->error(message.CString());
+            spdlog::error(message.CString());
             break;
         case Log::LT_WARNING:
-            console->warn(message.CString());
+            spdlog::warn(message.CString());
             break;
         case Log::LT_INFO:
-            //console->info(message.CString());
+            //spdlog::info(message.CString());
             //break;
         case Log::LT_DEBUG:
-            console->debug(message.CString());
+            spdlog::debug(message.CString());
             break;
         case Log::LT_MAX:
-            console->trace(message.CString());
+            spdlog::trace(message.CString());
             break;
   };
   return true;

@@ -227,8 +227,6 @@ private:
     const static float mDeltaCaptured;
     const static float safedist;
 
-    std::shared_ptr<spdlog::logger> console;
-
     std::array<float, 4*BOARDSIZE> glstones;
     std::array<Point, BOARDSIZE> points;
 

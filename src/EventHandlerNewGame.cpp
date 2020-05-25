@@ -11,7 +11,6 @@
 
 EventHandlerNewGame::EventHandlerNewGame()
 {
-    console = spdlog::get("console");
 }
 
 EventHandlerNewGame::~EventHandlerNewGame()
@@ -32,7 +31,7 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
 
         auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selBoard"));
         if(!controller.newGame(boardSize)) {
-            console->error("setting boardsize failed");
+            spdlog::error("setting boardsize failed");
             select->SetSelection(lastBoardSelection);
         } else {
             lastBoardSelection = select->GetSelection();
@@ -52,14 +51,14 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
 
         auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selectHandicap"));
         if(!controller.setHandicap(handicap)) {
-            console->error("setting handicap failed");
+            spdlog::error("setting handicap failed");
             select->SetSelection(lastHandicapSelection);
         } else {
             lastHandicapSelection = select->GetSelection();
         }
     }
     else if(value == "engine") {
-        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0.5").CString());
+        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0").CString());
         int index = 0;
         ss >> index;
         if(event.GetCurrentElement()->GetId() == "selectBlack") {
@@ -69,6 +68,13 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
             controller.switchPlayer(1, index);
         }
     }
+    else if(value == "shader") {
+        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0").CString());
+        int index = 0;
+        ss >> index;
+        spdlog::info("switching shader to #{}", index);
+        controller.switchShader(index);
+    }
     else if (value == "komi") {
       std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0.5").CString());
       float komi = 0.5;
@@ -76,7 +82,7 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
 
       auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
       if(!controller.setKomi(komi)) {
-          console->error("setting komi failed");
+          spdlog::error("setting komi failed");
           select->SetSelection(lastKomiSelection);
       } else {
           lastKomiSelection = select->GetSelection();

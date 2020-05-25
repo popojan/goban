@@ -25,6 +25,13 @@
                     <span>View</span>
                     <div class="menuitem show">
                         <div class="grp">
+                            <div class="hr">Appearence</div>
+                            <div class="cmd">
+                                <select id="selectShader"
+                                        onchange="shader" onmousedown="nop"/>
+                            </div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">Window</div>
                             <div class="cmd" id="cmdFullscreen" onmouseup="fullscreen">Fullscreen</div>
                         </div>
