@@ -294,7 +294,7 @@ void ElementGame::OnUpdate()
         for(auto &p: engine.getPlayers()) {
             if(p->isTypeOf(Player::ENGINE)) {
                 std::string newMsg(dynamic_cast<GtpEngine*>(p)->lastError());
-                if(newMsg != view.state.err) {
+                if(!newMsg.empty() && newMsg != view.state.err) {
                     msg->SetInnerRML(newMsg.c_str());
                     view.state.err = newMsg;
                     requestRepaint();
