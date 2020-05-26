@@ -19,7 +19,7 @@ private:
     boost::process::child c;
     std::string exe;
     std::string lastLine;
-    std::vector<std::regex> outputFilters;
+    std::vector<std::pair<std::regex, std::string> > outputFilters;
     InputThread<GtpClient, boost::process::ipstream> *reader;
 public:
     typedef std::vector<std::string> CommandOutput;
@@ -52,19 +52,26 @@ public:
         spdlog::debug("gtp err = {}", line);
         for (auto &re: outputFilters) {
             std::smatch m;
-            if(std::regex_search(line, m,  re)){
-                if(m.size() > 1) {
-                    lastLine = m[1].str();
+            if(std::regex_search(line, m,  re.first)){
+                std::string output(re.second);
+                for(size_t i = 0; i < m.size(); ++i) {
+                    std::ostringstream ss;
+                    ss << "$" << i;
+                    size_t index = 0;
+                    while (true) {
+                        index = output.find(ss.str(), index);
+                        if (index == std::string::npos) break;
+                        output.replace(index, 2, m[i].str());
+                        index += m[i].str().size();
+                    }
                 }
-                else if(m.size() > 0) {
-                    lastLine = m[0].str();
-                }
+                lastLine = output;
             }
         }
     }
 
-    void addOutputFilter(const std::string& msg) {
-        outputFilters.push_back(std::regex(msg));
+    void addOutputFilter(const std::string& msg, const std::string& format) {
+        outputFilters.push_back(std::make_pair(std::regex(msg), format));
     }
 
     std::string lastError() {
