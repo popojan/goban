@@ -21,9 +21,14 @@
       "enabled": 1,
       "messages": [
           {
-            "regex": "^:\\s+T\\s+[^\\s]+\\s+(.\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+.)",
+            "regex": "^:\\s+T.*--\\s*(..)",
+            "output": "$1",
+            "var": "$primaryMove"
+	        },
+          {
+            "regex": "^$primaryMove.*(W\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+L)",
             "output": "$1 $2"
-	      },
+          },
           {
             "regex": "Controller:",
             "output": " "
