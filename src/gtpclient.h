@@ -10,6 +10,16 @@
 #include <spdlog/spdlog.h>
 #include "InputThread.h"
 #include <regex>
+#include <nlohmann/json.hpp>
+
+struct OutputFilter {
+    std::string regex;
+    std::string output;
+    std::string var;
+    std::regex compiled;
+};
+
+void replaceAll(std::string& out, const std::string& what, const std::string& by);
 
 class GtpClient {
 private:
@@ -19,11 +29,12 @@ private:
     boost::process::child c;
     std::string exe;
     std::string lastLine;
-    std::vector<std::pair<std::regex, std::string> > outputFilters;
+    std::vector<OutputFilter> outputFilters;
     InputThread<GtpClient, boost::process::ipstream> *reader;
+    nlohmann::json vars;
 public:
     typedef std::vector<std::string> CommandOutput;
-    GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path): exe(exe) {
+    GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path): exe(exe), vars({}) {
         spdlog::info("Starting GTP client [{}/{}]", path, exe);
 
         auto where(::boost::this_process::path());
@@ -47,31 +58,45 @@ public:
         delete reader;
     }
 
+    void interpolate(std::string& out) {
+        for(auto it = vars.begin(); it != vars.end(); ++it) {
+            replaceAll(out, it.key(), it.value());
+        }
+    }
+
+    void compileFilters() {
+
+    }
+    
     void operator()(const std::string& line) {
         //TODO
         spdlog::debug("gtp err = {}", line);
         for (auto &re: outputFilters) {
             std::smatch m;
-            if(std::regex_search(line, m,  re.first)){
-                std::string output(re.second);
+            //prepare dynamic regex by replacing $vars
+            std::string regex(re.regex);
+            interpolate(regex);
+            spdlog::trace("dynamic regex template [{}] compiled as [{}]...", re.regex, regex);
+            if(std::regex_search(line, m,  std::regex(regex))){
+                std::string output(re.output);
                 for(size_t i = 0; i < m.size(); ++i) {
                     std::ostringstream ss;
                     ss << "$" << i;
-                    size_t index = 0;
-                    while (true) {
-                        index = output.find(ss.str(), index);
-                        if (index == std::string::npos) break;
-                        output.replace(index, 2, m[i].str());
-                        index += m[i].str().size();
-                    }
+                    replaceAll(output, ss.str(), m[i].str());
                 }
-                lastLine = output;
+                spdlog::trace("output template matched [{}]...", output);
+                interpolate(output);
+                if(!re.var.empty()) {
+                    vars[re.var] = output;
+                } else {
+                    lastLine = output;
+                }
             }
         }
     }
 
-    void addOutputFilter(const std::string& msg, const std::string& format) {
-        outputFilters.push_back(std::make_pair(std::regex(msg), format));
+    void addOutputFilter(const std::string& msg, const std::string& format, const std::string& var) {
+        outputFilters.push_back({msg, format, var});
     }
 
     std::string lastError() {

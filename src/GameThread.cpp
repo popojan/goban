@@ -340,7 +340,10 @@ void GameThread::loadEngines(const Configuration& config) {
                 if(!command.empty()) {
                     auto engine = new GtpEngine(command, parameters, path, name);
                     for(auto &&msg: messages) {
-                        engine->addOutputFilter(msg.value("regex", ""), msg.value("output", ""));
+                        engine->addOutputFilter(
+                                msg.value("regex", ""),
+                                msg.value("output", ""),
+                                msg.value("var", ""));
                     }
                     std::size_t id = addEngine(engine);
 
