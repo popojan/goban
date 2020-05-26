@@ -65,19 +65,26 @@ public:
     }
 
     void compileFilters() {
-
+        for (auto &re: outputFilters) {
+            //prepare dynamic regex by replacing $vars
+            std::string regex(re.regex);
+            interpolate(regex);
+            spdlog::trace("dynamic regex template [{}] compiled as [{}]...", re.regex, regex);
+            try {
+                re.compiled = std::regex(regex);
+            }
+            catch (const std::regex_error& e) {
+                spdlog::error("malformed regular expression [{}]: {}", regex, e.what());
+            }
+        }
     }
-    
+
     void operator()(const std::string& line) {
         //TODO
         spdlog::debug("gtp err = {}", line);
         for (auto &re: outputFilters) {
             std::smatch m;
-            //prepare dynamic regex by replacing $vars
-            std::string regex(re.regex);
-            interpolate(regex);
-            spdlog::trace("dynamic regex template [{}] compiled as [{}]...", re.regex, regex);
-            if(std::regex_search(line, m,  std::regex(regex))){
+            if(std::regex_search(line, m,  re.compiled)) {
                 std::string output(re.output);
                 for(size_t i = 0; i < m.size(); ++i) {
                     std::ostringstream ss;
@@ -88,6 +95,7 @@ public:
                 interpolate(output);
                 if(!re.var.empty()) {
                     vars[re.var] = output;
+                    compileFilters();
                 } else {
                     lastLine = output;
                 }
@@ -97,6 +105,7 @@ public:
 
     void addOutputFilter(const std::string& msg, const std::string& format, const std::string& var) {
         outputFilters.push_back({msg, format, var});
+        compileFilters();
     }
 
     std::string lastError() {
