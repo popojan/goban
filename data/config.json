@@ -18,7 +18,7 @@
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./engine/katago/models/g170-b20c256x2-s4384473088-d968438914.bin.gz -config ./engine/katago/default_gtp.cfg",
-      "enabled": 1,
+      "enabled": 0,
       "messages": [
           {
             "regex": "^:\\s+T.*--\\s*(..)",
