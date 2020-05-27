@@ -33,11 +33,12 @@
 #if defined ROCKET_PLATFORM_WIN32
 #define WIN32_LEAN_AND_MEAN
 //#include <windows.h>
-//#include <gl/Gl.h>
-//#include <gl/Glu.h>
-#include <opengl.h>
-//#include <GL/glext.h>
-#pragma warning(disable: 4505)
+    #define NOMINMAX
+    #define GLEW_STATIC
+    #include <GL/glew.h>
+    #include <GL/wglew.h>
+    #include <GL/GLU.h>
+    #pragma warning(disable: 4505)
 #elif defined ROCKET_PLATFORM_MACOSX
 #include <AGL/agl.h>
 #include <OpenGL/gl.h>

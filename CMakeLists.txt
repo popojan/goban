@@ -219,10 +219,8 @@ set(GOBAN_HDR_FILES
     ${PROJECT_SOURCE_DIR}/src/EventManager.h
     ${PROJECT_SOURCE_DIR}/src/GameThread.h
     ${PROJECT_SOURCE_DIR}/src/GameObserver.h
-    ${PROJECT_SOURCE_DIR}/src/BoardObserver.h
     ${PROJECT_SOURCE_DIR}/src/GameThread.h
     ${PROJECT_SOURCE_DIR}/src/gtpclient.h
-    ${PROJECT_SOURCE_DIR}/src/opengl.h
     ${PROJECT_SOURCE_DIR}/src/player.h
     ${PROJECT_SOURCE_DIR}/src/Quaternion.h
     ${PROJECT_SOURCE_DIR}/src/Vector.h
@@ -285,8 +283,6 @@ add_dependencies(goban project_portaudio project_libsndfile)
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
 target_link_libraries(goban
-    ${OPENGL_LIBRARIES}
-    ${GLEW_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     ${Boost_SYSTEM_LIBRARY}
     ${Boost_IOSTREAMS_LIBRARY}
@@ -303,6 +299,8 @@ target_link_libraries(goban
     spdlog
     clipp
     nlohmann_json::nlohmann_json
+    ${OPENGL_LIBRARIES}
+    ${GLEW_LIBRARIES}
 )
 
 set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/Release)

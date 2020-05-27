@@ -1,12 +1,9 @@
-//
-// Created by jan on 2.6.17.
-//
-
 #ifndef GOBAN_METRICS_H
 #define GOBAN_METRICS_H
 
+class Metrics {
 
-struct Metrics {
+public:
     float fNDIM;
     float w;
     float h;
@@ -27,7 +24,10 @@ struct Metrics {
     float tmpc[6 * maxc];
     float resolution[2];
     float translate[3];
+
+public:
     void calc(unsigned);
+
 };
 
-#endif //GOBAN_METRICS_H
+#endif

@@ -2,7 +2,9 @@
 
 #include <Board.h>
 
-struct GameObserver {
+class GameObserver {
+
+public:
     virtual void onGameMove(const Move& move) {}
     virtual void onKomiChange(float newKomi) {}
     virtual void onHandicapChange(int newHandicap) {}
