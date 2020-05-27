@@ -232,13 +232,9 @@ void ElementGame::OnUpdate()
 			requestRepaint();
 		}
 	}
-	bool noMessage = true;
     Rocket::Core::Element* msg = context->GetDocument("game_window")->GetElementById("lblMessage");
 	if (view.state.msg != model.state.msg) {
-		view.state.msg = model.state.msg;
-        view.state.err = model.state.err;
-        noMessage = false;
-		switch (view.state.msg) {
+		switch (model.state.msg) {
 		case GameState::CALCULATING_SCORE:
 			msg->SetInnerRML("Calculating score...");
 			break;
@@ -250,11 +246,9 @@ void ElementGame::OnUpdate()
 			break;
 		case GameState::BLACK_RESIGNED:
 			msg->SetInnerRML("White wins by resignation.");
-			//engine.showTerritory = model.board.toggleTerritoryAuto(true);
 			break;
 		case GameState::WHITE_RESIGNED:
 			msg->SetInnerRML("Black wins by resignation.");
-			//engine.showTerritory = model.board.toggleTerritoryAuto(true);
 			break;
 		case GameState::BLACK_PASS:
 			msg->SetInnerRML("Black passes");
@@ -274,7 +268,7 @@ void ElementGame::OnUpdate()
                     Rocket::Core::String(128, "Black: %d + %d + %d", model.state.adata.white_captured,
                                          model.state.adata.white_prisoners,
                                          model.state.adata.black_territory).CString());
-            if (view.state.msg == GameState::WHITE_WON)
+            if (model.state.msg == GameState::WHITE_WON)
                 msg->SetInnerRML(
                         Rocket::Core::String(128, "White wins by %.1f", model.state.adata.delta).CString());
             else
@@ -285,21 +279,24 @@ void ElementGame::OnUpdate()
         }
 			break;
 		default:
-            noMessage = true;
+            msg->SetInnerRML("");
 		}
         requestRepaint();
-	}
-    if(noMessage) {
-        //TODO
+        view.state.msg = model.state.msg;
+    }
+    if(view.state.msg == GameState::NONE) {
         for(auto &p: engine.getPlayers()) {
             if(p->isTypeOf(Player::ENGINE)) {
                 std::string newMsg(dynamic_cast<GtpEngine*>(p)->lastError());
-                if(!newMsg.empty() && newMsg != view.state.err) {
-                    msg->SetInnerRML(newMsg.c_str());
-                    view.state.err = newMsg;
-                    requestRepaint();
+                if(!newMsg.empty() && newMsg != model.state.err) {
+                    model.state.err = newMsg;
                 }
             }
+        }
+        if(view.state.err != model.state.err) {
+            msg->SetInnerRML(model.state.err.c_str());
+            view.state.err = model.state.err;
+            requestRepaint();
         }
     }
 	view.Update();

@@ -21,7 +21,7 @@
       "enabled": 0,
       "messages": [
           {
-            "regex": "^:\\s+T.*--\\s*(..)",
+            "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
             "output": "$1",
             "var": "$primaryMove"
 	        },
