@@ -39,22 +39,15 @@
     #include <GL/wglew.h>
     #include <GL/GLU.h>
     #pragma warning(disable: 4505)
-#elif defined ROCKET_PLATFORM_MACOSX
-#include <AGL/agl.h>
-#include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
-#include <OpenGL/glext.h>
 #elif defined ROCKET_PLATFORM_UNIX
-#include <GL/glew.h>
-#include <GL/glx.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
-//#include <GL/glut.h>
-//#include <GL/glext.h>
-//#include <GL/glx.h>
-//#include <GL/gl.h>
-//#include <GL/glext.h>
-//#include <GL/glu.h>
+    #include <GL/glew.h>
+    #include <GL/gl.h>
+    #include <GL/glu.h>
+#elif defined ROCKET_PLATFORM_MACOSX
+    #include <AGL/agl.h>
+    #include <OpenGL/gl.h>
+    #include <OpenGL/glu.h>
+    #include <OpenGL/glext.h>
 #endif
 
 #endif
