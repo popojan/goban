@@ -39,6 +39,8 @@
  */
 
 #if defined(ROCKET_PLATFORM_LINUX)
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 struct __X11NativeWindowData
 {
 	Window window;

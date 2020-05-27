@@ -43,6 +43,7 @@
     #include <GL/glew.h>
     #include <GL/gl.h>
     #include <GL/glu.h>
+    #include <GL/glx.h>
 #elif defined ROCKET_PLATFORM_MACOSX
     #include <AGL/agl.h>
     #include <OpenGL/gl.h>
