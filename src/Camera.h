@@ -21,6 +21,8 @@ namespace DDG
          Camera(float x, float y, float z, float w);
          // constructor
 
+         void setHorizontalLock(bool newLock);
+
          Quaternion clickToSphere( float x, float y, float w, float h );
          // projects a mouse click onto the unit sphere
 
@@ -65,6 +67,8 @@ namespace DDG
          // time of previous drag
 
          double zoom, vZoom;
+
+         bool lock;
 
 		 enum { BOTH_AXES, X_AXIS, Y_AXIS} axis;
          // zoom and zoom velocity

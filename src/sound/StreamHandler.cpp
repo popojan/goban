@@ -8,7 +8,7 @@ int StreamHandler::PortAudioCallback(const void * input,
                                      PaStreamCallbackFlags statusFlags,
                                      void * userData)
 {
-        StreamHandler * handler = (StreamHandler *) userData;
+        StreamHandler * handler = static_cast<StreamHandler *>(userData);
 
         unsigned long stereoFrameCount = frameCount * handler->CHANNEL_COUNT;
         memset((int *) output, 0, stereoFrameCount * sizeof(int));

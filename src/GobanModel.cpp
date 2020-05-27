@@ -53,7 +53,7 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
                     ret.black_area++;
                 }
             }
-            else if (stone != Color::EMPTY && area != stone){
+            else if (area != stone){
                 if (area == Color::WHITE) {
                     ret.black_prisoners++;
                     ret.white_territory++;
@@ -63,7 +63,7 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
                     ret.black_territory++;
                 }
             }
-            else if (stone != Color::EMPTY && area == stone) {
+            else if (area == stone) {
                 if (area == Color::WHITE)
                     ret.white_area++;
                 else if (area == Color::BLACK)

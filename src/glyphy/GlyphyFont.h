@@ -47,6 +47,7 @@ class GlyphyFont {
 
 public:
 	GlyphyFont(FT_Face face, std::shared_ptr<GlyphyAtlas> atlas);
+    GlyphyFont(const GlyphyFont& b);
 
 	~GlyphyFont();
 

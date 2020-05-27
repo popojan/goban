@@ -24,8 +24,12 @@
 GlyphyBuffer::GlyphyBuffer() {
     vertices = new std::vector<glyph_vertex_t>;
     glGenBuffers(1, &buf_name);
-
     clear();
+}
+
+GlyphyBuffer::GlyphyBuffer(const GlyphyBuffer& b) {
+    vertices = new std::vector<glyph_vertex_t>;
+    *vertices = *b.vertices;
 }
 
 GlyphyBuffer::~GlyphyBuffer()

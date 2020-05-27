@@ -122,7 +122,6 @@ bool Board::collides(int i, int j, int i0, int j0) {
     float y0 = glstones[idx0 - 1];
     float x = glstones[idx - 2];
     float y = glstones[idx - 1];
-    Position p(i0, j0);
     glm::vec2 v(x0-x,y0-y);
     return glm::length(v) <= safedist*rStone;
 }

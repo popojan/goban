@@ -39,6 +39,7 @@
                             <div class="hr">Overlay</div>
                             <div class="cmd" onmouseup="overlay">Last move</div>
                         </div>
+                        <!--
                         <div class="grp">
                             <div class="hr">Gamma correction</div>
                             <div class="cmd" onmouseup="reset gamma and contrast">Reset gamma</div>
@@ -47,9 +48,10 @@
                             <div class="hr">Contrast</div>
                             <div class="cmd" onmouseup="reset gamma and contrast">Reset contrast</div>
                         </div>
-
+                        -->
                         <div class="grp">
                             <div class="hr">Camera</div>
+                            <!--<div class="cmd" onmouseup="free camera toggle">Toggle free</div>-->
                             <div class="cmd" onmouseup="reset camera">Reset camera</div>
                             <div class="cmd" onmouseup="animate">Animate</div>
                         </div>
