@@ -20,9 +20,8 @@
 #include <glm/glm.hpp>
 #include "GlyphyState.h"
 
-GlyphyState::GlyphyState()
+GlyphyState::GlyphyState(): program(demo_shader_create_program())
 {
-  program = demo_shader_create_program();
   atlas = std::shared_ptr<GlyphyAtlas>(new GlyphyAtlas(2048, 1024, 64, 32));
 
   u_debug = false;

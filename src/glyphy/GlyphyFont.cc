@@ -43,6 +43,12 @@ GlyphyFont::GlyphyFont(FT_Face face, std::shared_ptr<GlyphyAtlas> atlas):
   acc = glyphy_arc_accumulator_create ();
 }
 
+GlyphyFont::GlyphyFont(const GlyphyFont& b) {
+  glyph_cache = new glyph_cache_t ();
+  *glyph_cache = *b.glyph_cache;
+}
+
+
 GlyphyFont::~GlyphyFont()
 {
   glyphy_arc_accumulator_destroy (acc);

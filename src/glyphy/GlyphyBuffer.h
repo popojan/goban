@@ -30,7 +30,10 @@
 class GlyphyBuffer {
 public:
 	GlyphyBuffer();
+    GlyphyBuffer(const GlyphyBuffer& b);
+
 	~GlyphyBuffer();
+
 
 	void clear ();
 

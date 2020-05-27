@@ -43,7 +43,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     view.requestRepaint();
                     firstGame = false;
                 }
-                else if(humanMove) {
+                else {
                     model.state.holdsStone = true;
                     view.requestRepaint(GobanView::UPDATE_STONES);
                 }
@@ -162,6 +162,12 @@ bool GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "reset contrast and gamma") {
         view.resetAdjustments();
+    }
+    else if(cmd == "free camera toggle") {
+        view.cam.setHorizontalLock(!view.cam.lock);
+    }
+    else if(cmd == "save") {
+        dynamic_cast<GtpEngine*>(engine.currentCoach())->issueCommand("printsgf ./data/sgf/lastgame.sgf");
     }
     return true;
 }
