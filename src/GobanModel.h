@@ -11,7 +11,6 @@
 #include <spdlog/spdlog.h>
 #include "AudioPlayer.hpp"
 #include "GameObserver.h"
-#include "BoardObserver.h"
 
 class ElementGame;
 
