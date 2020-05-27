@@ -31,6 +31,10 @@
     #include <GL/wglew.h>
     #include <GL/GLU.h>
     #pragma warning(disable: 4505)
+#else
+    #include <GL/glew.h>
+    #include <GL/gl.h>
+    #include <GL/glu.h>
 #endif
 
 class GlyphyAtlas {
