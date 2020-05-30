@@ -57,6 +57,28 @@ SET(portaudio_inc_dir "${SOURCE_DIR}/include")
 
 
 ADD_LIBRARY(portaudio STATIC IMPORTED)
+
+
+ExternalProject_Add(project_libsgfcplusplus
+    GIT_REPOSITORY     https://github.com/herzbube/libsgfcplusplus.git
+    SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsgfcplusplus
+    BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/libsgfcplusplus
+    STEP_TARGETS download
+    PATCH_COMMAND ../_patches/patch_sgfc
+    UPDATE_COMMAND ""
+    INSTALL_COMMAND     echo Skipping install step for libsndfile
+)
+
+#file(GLOB sgfc_patches ${PROJECT_SOURCE_DIR}/deps/libsgfcplusplus/patch/*.patch)
+
+
+ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)
+ExternalProject_Get_Property(project_libsgfcplusplus BINARY_DIR)
+SET(libsgfcplusplus_inc_dir "${SOURCE_DIR}/include" "${BINARY_DIR}/src")
+SET(libsgfcplusplus_lib_dir "${BINARY_DIR}")
+
+
+
 if(WIN32)
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/Release/sndfile.lib)
     SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
@@ -169,6 +191,7 @@ include_directories(
     ${FREETYPE_INCLUDE_DIRS}
     ${libsndfile_inc_dir}
     ${portaudio_inc_dir}
+    ${libsgfcplusplus_inc_dir}
 )
 
 # Include list of source files
@@ -230,7 +253,11 @@ set(GOBAN_HDR_FILES
     ${PROJECT_SOURCE_DIR}/src/GobanShader.h
     ${PROJECT_SOURCE_DIR}/src/Metrics.h
     ${PROJECT_SOURCE_DIR}/src/GobanOverlay.h
-    ${PROJECT_SOURCE_DIR}/src/GameState.h src/Configuration.h src/InputThread.cpp src/InputThread.h)
+    ${PROJECT_SOURCE_DIR}/src/GameState.h
+    src/Configuration.h
+    src/InputThread.h
+    src/GameRecord.h
+)
 
 set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/Board.cpp
@@ -259,7 +286,10 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/sound/AudioPlayer.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/FileHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
-    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp src/InputThread.cpp src/InputThread.h)
+    ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp
+    src/InputThread.cpp
+    src/GameRecord.cpp
+)
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 foreach(dir ${dirs})

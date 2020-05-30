@@ -1,0 +1,4 @@
+#!/bin/bash
+
+ls -l patch/*.patch;
+for PATCH_FILE in patch/*.patch; do git apply --directory sgfc "$PATCH_FILE"; done
