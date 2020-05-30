@@ -204,9 +204,11 @@ bool GameThread::undo(Player * engine, bool doubleUndo) {
     if (!success) {
         spdlog::debug("Undo not supported. Replaying game from the beginning.");
         success = engine->clear() || engine->boardsize(model.getBoardSize());
-        for (auto it = model.history.begin(); it != model.history.end(); ++it) {
-            success &= engine->play(*it);
-        }
+        model.game.replay(
+            [&](const Move &move) {
+                success &= engine->play(move);
+            }
+        );
     }
     return success;
 }
@@ -237,17 +239,18 @@ void GameThread::gameLoop() {
                 lock.lock();
                 locked = true;
             }
+            //TODO no direct access to model but via observers
             if (move == Move::UNDO) {
                 bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
                         && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
-                if(bothHumans && model.history.size() > 0) {
+                if(bothHumans && model.game.moveCount() > 0) {
                     success  = coach->undo();
-                    model.history.pop_back();
-                } else if(currentPlayer()->isTypeOf(Player::HUMAN) && model.history.size() > 1) {
+                    model.game.undo();
+                } else if(currentPlayer()->isTypeOf(Player::HUMAN) && model.game.moveCount() > 1) {
                         success  = coach->undo();
                         success &= coach->undo();
-                        model.history.pop_back();
-                        model.history.pop_back();
+                        model.game.undo();
+                        model.game.undo();
                         model.changeTurn();
                         doubleUndo = true;
                 }

@@ -346,7 +346,7 @@ void GobanView::onGameMove(const Move& move) {
     if(move == Move::NORMAL) {
         updateFlag |= UPDATE_SOUND_STONE;
         std::ostringstream ss;
-        ss << model.history.size();
+        ss << model.game.moveCount();
         if(lastMove) {
             board.removeOverlay(lastMove);
         }

@@ -8,7 +8,7 @@
 
 void GobanModel::onBoardSized(int boardSize) {
 
-    history.clear();
+    game.clear();
 
 	board.clear(boardSize);
     board.clearTerritory(boardSize);
@@ -201,7 +201,7 @@ void GobanModel::onGameMove(const Move& move) {
     std::lock_guard<std::mutex> lock(mutex);
 
     if(!(move == Move::UNDO))
-        history.push_back(move);
+        game.move(move);
 
     if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
@@ -237,7 +237,7 @@ void GobanModel::onBoardChange(const Board& result) {
     spdlog::debug("over {} ready {}", over, result.territoryReady);
 
     if(over && result.territoryReady) {
-        this->result(history.back(), state.adata);
+        this->result(game.lastMove(), state.adata);
     }
 }
 

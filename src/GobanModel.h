@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include "AudioPlayer.hpp"
 #include "GameObserver.h"
+#include "GameRecord.h"
 
 class ElementGame;
 
@@ -72,7 +73,9 @@ public:
     volatile bool over;
     volatile bool started;
     GameState state;
-    std::vector<Move> history;
+
+    GameRecord game; //TODO find usage and create API including SGF generation
+
     bool invalidated;
 
     static const int maxCaptured = 191;
