@@ -58,12 +58,13 @@ SET(portaudio_inc_dir "${SOURCE_DIR}/include")
 
 ADD_LIBRARY(portaudio STATIC IMPORTED)
 
+SET(SGFCPLUSPLUS_STATIC_DEFINE 1)
 
 ExternalProject_Add(project_libsgfcplusplus
     GIT_REPOSITORY     https://github.com/herzbube/libsgfcplusplus.git
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsgfcplusplus
     BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/libsgfcplusplus
-    STEP_TARGETS download
+    STEP_TARGETS build
     PATCH_COMMAND ../_patches/patch_sgfc
     UPDATE_COMMAND ""
     INSTALL_COMMAND     echo Skipping install step for libsndfile
@@ -75,8 +76,9 @@ ExternalProject_Add(project_libsgfcplusplus
 ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)
 ExternalProject_Get_Property(project_libsgfcplusplus BINARY_DIR)
 SET(libsgfcplusplus_inc_dir "${SOURCE_DIR}/include" "${BINARY_DIR}/src")
-SET(libsgfcplusplus_lib_dir "${BINARY_DIR}")
+SET(libsgfcplusplus_lib_dir "${BINARY_DIR}/src")
 
+ADD_LIBRARY(libsgfcplusplus STATIC IMPORTED)
 
 
 if(WIN32)
@@ -85,6 +87,7 @@ if(WIN32)
 else()
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
     SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
+    SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/liblibsgfcplusplus_static.a")
 endif()
 # Search in the 'cmake' directory for additional CMake modules.
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
@@ -174,8 +177,7 @@ foreach (_variableName ${_variableNames})
     message(STATUS "${_variableName}=${${_variableName}}")
 endforeach()
 
-
-include_directories(
+include_directories(SYSTEM 
     ${PROJECT_SOURCE_DIR}/deps/glm
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/shell/include
@@ -308,7 +310,7 @@ else()
   set(EXTRA_LIBS rt ${ALSA_LIBRARIES} pthread)
 endif()
 
-add_dependencies(goban project_portaudio project_libsndfile)
+add_dependencies(goban project_portaudio project_libsndfile project_libsgfcplusplus)
 
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
@@ -325,6 +327,7 @@ target_link_libraries(goban
     ${LIBROCKET_LIBRARIES}
     portaudio
     libsndfile
+    libsgfcplusplus
     ${EXTRA_LIBS}
     spdlog
     clipp
