@@ -1,11 +1,22 @@
 #ifndef GOBAN_GAMERECORD_H
 #define GOBAN_GAMERECORD_H
 
-#include <ISgfcGame.h>
+#define LIBSGFCPLUSPLUS_STATIC_DEFINE
+
+#include <memory>
 #include "Board.h"
+
+#include <ISgfcTreeBuilder.h>
+#include <SgfcPlusPlusFactory.h>
+#include <SgfcGameType.h>
+#include <ISgfcGame.h>
 
 class GameRecord {
 public:
+
+    GameRecord(): game(LibSgfcPlusPlus::SgfcPlusPlusFactory::CreateGame()) {
+    }
+
     int moveCount() { return history.size(); }
 
     void undo() { history.pop_back(); }
@@ -22,7 +33,6 @@ public:
 private:
     std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game;
     std::vector<Move> history;
-
 };
 
 #endif //GOBAN_GAMERECORD_H
