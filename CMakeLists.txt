@@ -46,6 +46,7 @@ ExternalProject_Add(project_portaudio
     SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
     BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/portaudio/build
     CMAKE_ARGS  -DPA_USE_JACK=0 -DPA_USE_ALSA=1 -DPA_USE_ASIO=0 -DPA_USE_WASAPI=1
+    UPDATE_COMMAND ""
     STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for portaudio
 )

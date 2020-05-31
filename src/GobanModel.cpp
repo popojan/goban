@@ -8,7 +8,7 @@
 
 void GobanModel::onBoardSized(int boardSize) {
 
-    game.clear();
+    game.clear(boardSize);
 
 	board.clear(boardSize);
     board.clearTerritory(boardSize);
