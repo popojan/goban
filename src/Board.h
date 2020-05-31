@@ -68,6 +68,12 @@ public:
     int col() const { return c; }
     int row() const { return r; }
 
+    std::string toSgf() const {
+        std::ostringstream ss;
+        ss << ('a' + r) << ('a' + c);
+        return ss.str();
+    }
+
     friend std::istream& operator>> (std::istream&, Position&);
 
     friend std::ostream& operator<< (std::ostream&, const Position&);
