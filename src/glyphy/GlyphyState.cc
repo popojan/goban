@@ -20,21 +20,18 @@
 #include <glm/glm.hpp>
 #include "GlyphyState.h"
 
-GlyphyState::GlyphyState(): program(demo_shader_create_program())
+GlyphyState::GlyphyState():
+    program(demo_shader_create_program()),
+    atlas(new GlyphyAtlas(2048, 1024, 64, 32)),
+    u_debug(false),
+    u_contrast(1.0),
+    u_gamma_adjust(1.0),
+    u_outline(false),
+    u_outline_thickness(0.0),
+    u_boldness(0.),
+    u_depth(0.),
+    u_color{.0f, .0f, .0f, 1.0f}
 {
-  atlas = std::shared_ptr<GlyphyAtlas>(new GlyphyAtlas(2048, 1024, 64, 32));
-
-  u_debug = false;
-  u_contrast = 1.0;
-  u_gamma_adjust = 1.0;
-  u_outline = false;
-  u_outline_thickness = 0.0;
-  u_boldness = 0.;
-  u_depth = 0.;
-  u_color[0] = 0.0f;
-  u_color[1] = 0.0f;
-  u_color[2] = 0.0f;
-  u_color[3] = 1.0f;
 }
 
 

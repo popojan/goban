@@ -33,6 +33,7 @@ public:
     void setup();
     void fast_setup();
     std::shared_ptr<GlyphyAtlas> get_atlas() { return atlas; }
+
     void scale_gamma_adjust(double factor);
     void scale_contrast(double contrast);
     void toggle_debug();
@@ -45,17 +46,21 @@ public:
     void set_uniform (GLuint program, const char *name, double *p, double value);
 
 private:
+
     GLuint program;
-    std::shared_ptr<GlyphyAtlas> atlas;
+     std::shared_ptr<GlyphyAtlas> atlas;
+
     /* Uniforms */
+
     double u_debug;
     double u_contrast;
     double u_gamma_adjust;
     double u_outline;
     double u_outline_thickness;
     double u_boldness;
-    float u_color[4];
     double u_depth;
+
+    float u_color[4];
 };
 
 #endif /* DEMO_GLSTATE_H */
