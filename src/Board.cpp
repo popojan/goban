@@ -139,11 +139,9 @@ double Board::fixStone(int i, int j, int i0, int j0) {
             float y0 = glstones[idx0 - 1];
             float x = glstones[idx - 2];
             float y = glstones[idx - 1];
-            Position p(i0, j0);
             glm::vec2 v(x0-x,y0-y);
             v = glm::vec2(x, y) + 1.01f*safedist * rStone * glm::normalize(v);
-            p.x = v.x;
-            p.y = v.y;
+            Position p(v.x, v.y);
             spdlog::debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
 	        x = glstones[idx - 2];

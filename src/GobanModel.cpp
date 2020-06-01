@@ -63,7 +63,7 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
                     ret.black_territory++;
                 }
             }
-            else if (area == stone) {
+            else {
                 if (area == Color::WHITE)
                     ret.white_area++;
                 else if (area == Color::BLACK)

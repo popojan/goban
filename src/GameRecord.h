@@ -38,7 +38,7 @@ public:
 
     int moveCount() { return history.size(); }
 
-    void undo() { history.pop_back(); }
+    void undo();
 
     template <class UnaryFunction>
     void replay(UnaryFunction fMove) {

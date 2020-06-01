@@ -40,3 +40,10 @@ void GameRecord::saveAs(const std::string& fileName) {
         spdlog::error("Writing sgf file [{}] failed: {}", fileName, ex.what());
     };
 }
+
+void  GameRecord::undo() {
+    if(currentNode->HasParent()) {
+        history.pop_back();
+        currentNode = currentNode->GetParent();
+    }
+}
