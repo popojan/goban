@@ -19,6 +19,7 @@
 #include <ISgfcGame.h>
 #include <ISgfcNode.h>
 #include <ISgfcDocument.h>
+#include <ISgfcDocumentWriter.h>
 #include <SgfcConstants.h>
 
 class GameRecord {
@@ -29,7 +30,8 @@ public:
         pF(F::CreatePropertyFactory()),
         currentNode(F::CreateNode()),
         game(F::CreateGame(currentNode)),
-        doc()
+        builder(game->GetTreeBuilder()),
+        doc(F::CreateDocument())
         {
             //clear();s
         }
@@ -44,34 +46,12 @@ public:
     }
 
     const Move& lastMove() const  { return history.back(); }
-    void move(const Move& move) {
 
-        history.push_back(move);
+    void move(const Move& move);
 
-        using namespace LibSgfcPlusPlus;
+    void clear(int boardSize);
 
-        auto pos = move.pos.toSgf();
-        auto col = move.col == Color::BLACK ? SgfcColor::Black : SgfcColor::White;
-        auto type = (move.col == Color::BLACK ? SgfcPropertyType::B : SgfcPropertyType::W);
-        auto value (vF->CreateGoMovePropertyValue(pos, boardSize, col));
-        std::shared_ptr<ISgfcProperty> property = pF->CreateProperty(type, value);
-        std::shared_ptr<ISgfcTreeBuilder> builder(game->GetTreeBuilder());
-        auto newNode(F::CreateNode());
-        std::vector<std::shared_ptr<ISgfcProperty> > properties; //(node->GetProperties());
-        properties.push_back(property);
-        newNode->SetProperties(properties);
-        builder->AppendChild(currentNode, newNode);
-        currentNode = newNode;
-    }
-    void clear(int boardSize) {
-        history.clear();
-
-        auto size = vF->CreateNumberPropertyValue(boardSize);
-        //this->boardSizeProperty = pF->CreateBoardSizeProperty(size);
-        this->boardSize.Columns = this->boardSize.Rows = boardSize;
-
-    }
-    void saveAs(const std::string& fileName) { }
+    void saveAs(const std::string& fileName);
 
 private:
 
@@ -84,6 +64,7 @@ private:
 
     std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> currentNode;
     std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game;
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcTreeBuilder> builder;
     std::shared_ptr<LibSgfcPlusPlus::ISgfcDocument> doc;
     LibSgfcPlusPlus::SgfcBoardSize boardSize;
     std::vector<Move> history;

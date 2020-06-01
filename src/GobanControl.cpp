@@ -167,7 +167,8 @@ bool GobanControl::command(const std::string& cmd) {
         view.cam.setHorizontalLock(!view.cam.lock);
     }
     else if(cmd == "save") {
-        dynamic_cast<GtpEngine*>(engine.currentCoach())->issueCommand("printsgf ./lastgame.sgf");
+        //dynamic_cast<GtpEngine*>(engine.currentCoach())->issueCommand("printsgf ./lastgame.sgf");
+        model.game.saveAs("./lastgame.sgf");
     }
     else if(cmd == "msg") {
         auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
