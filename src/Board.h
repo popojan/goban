@@ -165,7 +165,7 @@ public:
         r1 *= 0.98f;
     }
 
-    double fixStone(int i, int j, int i0, int j0);
+    double fixStone(int i, int j, int i0, int j0, size_t rep = 0);
 
     const
     std::array<Point, BOARDSIZE>& get() const {

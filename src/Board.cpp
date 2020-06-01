@@ -12,8 +12,8 @@ const float Board::safedist = 1.01f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
     dist(0.0f, 0.05f), invalidated(false), showTerritory(false), showTerritoryAuto(false),
-    territoryReady(false), lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0)
-
+    territoryReady(false), lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0),
+    collision(0.0)
 {
     clear(size);
     positionNumber = generator();;
@@ -126,7 +126,7 @@ bool Board::collides(int i, int j, int i0, int j0) {
     return glm::length(v) <= safedist*rStone;
 }
 
-double Board::fixStone(int i, int j, int i0, int j0) {
+double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
     spdlog::debug("fixStone ({},{})/({},{})", i, j, i0, j0);
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
@@ -134,7 +134,8 @@ double Board::fixStone(int i, int j, int i0, int j0) {
     double ret = 0.0;
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
         spdlog::debug("1st IF");
-        if(collides(i, j, i0, j0)) {
+        bool fixNeeded = collides(i, j, i0, j0);
+        if(fixNeeded && rep < 10) {
             float x0 = glstones[idx0 - 2];
             float y0 = glstones[idx0 - 1];
             float x = glstones[idx - 2];
@@ -154,13 +155,16 @@ double Board::fixStone(int i, int j, int i0, int j0) {
             (*this)[Position(j0, i0)].y = p.y;
             ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/boardSize);
             if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0))
-                ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0));
+                ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0, rep + 1));
             if (i0 - 1 >= 0 &&  collides(i0, j0, i0 - 1, j0))
-                ret = std::max(ret, fixStone(i0, j0, i0 - 1, j0));
+                ret = std::max(ret, fixStone(i0, j0, i0 - 1, j0, rep + 1));
             if (j0 + 1 < boardSize &&  collides(i0, j0, i0, j0 + 1))
-                ret = std::max(ret, fixStone(i0, j0, i0, j0 + 1));
+                ret = std::max(ret, fixStone(i0, j0, i0, j0 + 1, rep + 1));
             if (j0 - 1 >= 0 &&  collides(i0, j0, i0, j0 - 1))
-                ret = std::max(ret, fixStone(i0, j0, i0, j0 - 1));
+                ret = std::max(ret, fixStone(i0, j0, i0, j0 - 1, rep + 1));
+        } else if (fixNeeded) {
+            //TODO dump stone positions
+            spdlog::error("Cannot fix overlapping fuzzy-placed stones.");
         }
         return ret;
     }
@@ -299,12 +303,14 @@ int Board::updateStones(const Board& board, bool showTerritory) {
             }
 
             Point& p = (*this)[pos];
-            if(newStone != p.stone)
+            if(newStone != p.stone) {
+                spdlog::trace("stone changed [{},{}]", p.x, p.y);
                 changed |= stoneChanged(pos, newStone);
-
-            if(newArea != p.influence)
+            }
+            if(newArea != p.influence) {
+                spdlog::trace("area changed [{},{}]", p.x, p.y);
                 changed |= areaChanged(pos, newArea);
-
+            }
         }
     }
     return changed;
