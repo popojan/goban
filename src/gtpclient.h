@@ -36,7 +36,6 @@ public:
     typedef std::vector<std::string> CommandOutput;
     GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path): exe(exe), vars({}) {
         spdlog::info("Starting GTP client [{}/{}]", path, exe);
-
         auto where(::boost::this_process::path());
         where.push_back(path);
         auto gnugo = boost::process::search_path(exe, where);
