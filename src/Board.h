@@ -68,9 +68,9 @@ public:
     int col() const { return c; }
     int row() const { return r; }
 
-    std::string toSgf() const {
+    std::string toSgf(int boardSize) const {
         std::ostringstream ss;
-        ss << ('a' + r) << ('a' + c);
+        ss << static_cast<char>('a' + boardSize - c + 1) << static_cast<char>('a' + r);
         return ss.str();
     }
 
