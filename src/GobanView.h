@@ -20,7 +20,7 @@
 #ifndef GOBAN_GOBANVIEW_H
 #define GOBAN_GOBANVIEW_H
 
-extern Configuration config;
+extern std::shared_ptr<Configuration> config;
 
 class GobanView: public GameObserver {
 public:
@@ -40,8 +40,6 @@ public:
 	{
         player.preload(config);
 
-	    gobanOverlay.init();
-        gobanShader.init();
 		initCam();
 		updateTranslation();
 		translate[0] = newTranslate[0];

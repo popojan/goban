@@ -53,7 +53,7 @@ void ElementGame::populateEngines() {
     }
 
     using nlohmann::json;
-    const auto shaders(config.data.value("shaders", json::array()));
+    const auto shaders(config->data.value("shaders", json::array()));
 
     int i = 0;
     for(json::const_iterator it = shaders.begin(); it != shaders.end(); ++it, ++i){

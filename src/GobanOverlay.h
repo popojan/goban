@@ -25,6 +25,7 @@ struct Layer {
 class GobanOverlay {
 public:
     GobanOverlay(const GobanView& view): view(view), overlayReady(false) {
+        init();
     }
     bool init();
     void use();

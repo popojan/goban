@@ -47,6 +47,7 @@ ExternalProject_Add(project_portaudio
     BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/portaudio/build
     CMAKE_ARGS  -DPA_USE_JACK=0 -DPA_USE_ALSA=1 -DPA_USE_ASIO=0 -DPA_USE_WASAPI=1
     UPDATE_COMMAND ""
+    GIT_TAG ticket_263_alsa_uninitialized_var_2
     STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for portaudio
 )
@@ -104,7 +105,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(NOT WIN32)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-builtin")
   SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O0 -g")
   SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -s")
 endif()

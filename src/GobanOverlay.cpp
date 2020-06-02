@@ -21,7 +21,7 @@ const char *font_path = NULL;
 
 static std::array<std::shared_ptr<GlyphyBuffer>, 3> buffer;
 
-extern Configuration config;
+extern std::shared_ptr<Configuration> config;
 
 std::array<Layer, 3> GobanOverlay::layers = {
 	{ { 0.0f, glm::vec4(0.0,0.0,0.0, 1.0) },
@@ -39,7 +39,7 @@ bool GobanOverlay::init() {
     }
     else {
         using nlohmann::json;
-        std::string font = config.data
+        std::string font = config->data
                 .value("fonts", json({}))
                 .value("overlay", "./data/fonts/default-font.ttf");
         FT_New_Face(ft_library, font.c_str(), 0/*face_index*/, &ft_face);

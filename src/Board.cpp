@@ -127,6 +127,8 @@ bool Board::collides(int i, int j, int i0, int j0) {
 }
 
 double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
+    const double MAX_FIX = 100;
+
     spdlog::debug("fixStone ({},{})/({},{})", i, j, i0, j0);
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
@@ -135,14 +137,16 @@ double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
         spdlog::debug("1st IF");
         bool fixNeeded = collides(i, j, i0, j0);
-        if(fixNeeded && rep < 10) {
+        if(fixNeeded) {
             float x0 = glstones[idx0 - 2];
             float y0 = glstones[idx0 - 1];
             float x = glstones[idx - 2];
             float y = glstones[idx - 1];
+            Position p(i0, j0);
             glm::vec2 v(x0-x,y0-y);
             v = glm::vec2(x, y) + 1.01f*safedist * rStone * glm::normalize(v);
-            Position p(v.x, v.y);
+            p.x = v.x;
+            p.y = v.y;
             spdlog::debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
 	        x = glstones[idx - 2];
@@ -154,13 +158,13 @@ double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
             pt.y = p.y;
             (*this)[Position(j0, i0)].y = p.y;
             ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/boardSize);
-            if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0))
+            if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0) && rep < MAX_FIX)
                 ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0, rep + 1));
-            if (i0 - 1 >= 0 &&  collides(i0, j0, i0 - 1, j0))
+            if (i0 - 1 >= 0 &&  collides(i0, j0, i0 - 1, j0) && rep < MAX_FIX)
                 ret = std::max(ret, fixStone(i0, j0, i0 - 1, j0, rep + 1));
-            if (j0 + 1 < boardSize &&  collides(i0, j0, i0, j0 + 1))
+            if (j0 + 1 < boardSize &&  collides(i0, j0, i0, j0 + 1) && rep < MAX_FIX)
                 ret = std::max(ret, fixStone(i0, j0, i0, j0 + 1, rep + 1));
-            if (j0 - 1 >= 0 &&  collides(i0, j0, i0, j0 - 1))
+            if (j0 - 1 >= 0 &&  collides(i0, j0, i0, j0 - 1) && rep < MAX_FIX)
                 ret = std::max(ret, fixStone(i0, j0, i0, j0 - 1, rep + 1));
         } else if (fixNeeded) {
             //TODO dump stone positions

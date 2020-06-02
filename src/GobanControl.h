@@ -11,10 +11,10 @@ class ElementGame;
 class GobanControl {
 public:
     GobanControl(ElementGame* p, GobanModel& m, GobanView& v, GameThread& e)
-            : parent(p), model(m), view(v), engine(e), rButtonDown(false), mButtonDown(false), startX(-1),
-              startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true)
+            : parent(p), model(m), view(v), engine(e),
+            rButtonDown(false), mButtonDown(false), startX(-1),
+            startY(-1), initialized(false), exit(false), mouseX(-1), mouseY(-1), firstGame(true)
     {
-        config.load("./data/config.json");
     }
 
     ~GobanControl() { destroy(); }
@@ -46,7 +46,6 @@ private:
     GobanModel& model;
     GobanView& view;
     GameThread& engine;
-    Configuration config;
 private:
 
     bool rButtonDown, mButtonDown;

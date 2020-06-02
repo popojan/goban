@@ -17,7 +17,7 @@ class ElementGame;
 
 class GobanModel: public GameObserver {
 public:
-    GobanModel(ElementGame* p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
+    GobanModel(ElementGame *p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
             : parent(p), prevPass(false), over(false), invalidated(false), cursor({0,0}) {
         spdlog::info("Preloading sounds...");
         //newGame(boardSize, handicap, komi);

@@ -8,6 +8,9 @@
 
 struct Configuration {
 
+    Configuration(const std::string& fileName) {
+        load(fileName);
+    }
     void load(const std::string& fileName);
 
     nlohmann::json data;
