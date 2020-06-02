@@ -105,7 +105,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(NOT WIN32)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-builtin")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-builtin")
   SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O0 -g")
   SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -s")
 endif()
@@ -213,17 +213,17 @@ set(SHELL_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/shell/src/Win32/ShellWin32.cpp
 )
 else()
-set(SHELL_SRC_FILES
-    ${PROJECT_SOURCE_DIR}/src/shell/src/Input.cpp
-    ${PROJECT_SOURCE_DIR}/src/shell/src/Shell.cpp
-    ${PROJECT_SOURCE_DIR}/src/shell/src/ShellFileInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/shell/src/ShellRenderInterfaceOpenGL.cpp
-    ${PROJECT_SOURCE_DIR}/src/shell/src/ShellSystemInterface.cpp
-    ${PROJECT_SOURCE_DIR}/src/shell/src/x11
-    ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellRenderInterfaceExtensionsOpenGL_X11.cpp
-    ${PROJECT_SOURCE_DIR}/src/shell/src/x11/InputX11.cpp
-    ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellX11.cpp
-)
+    set(SHELL_SRC_FILES
+        ${PROJECT_SOURCE_DIR}/src/shell/src/Input.cpp
+        ${PROJECT_SOURCE_DIR}/src/shell/src/Shell.cpp
+        ${PROJECT_SOURCE_DIR}/src/shell/src/ShellFileInterface.cpp
+        ${PROJECT_SOURCE_DIR}/src/shell/src/ShellRenderInterfaceOpenGL.cpp
+        ${PROJECT_SOURCE_DIR}/src/shell/src/ShellSystemInterface.cpp
+        ${PROJECT_SOURCE_DIR}/src/shell/src/x11
+        ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellRenderInterfaceExtensionsOpenGL_X11.cpp
+        ${PROJECT_SOURCE_DIR}/src/shell/src/x11/InputX11.cpp
+        ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellX11.cpp
+    )
 endif()
 
 set(GLYPHY_SRC_FILES

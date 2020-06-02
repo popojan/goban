@@ -7,6 +7,10 @@ AudioPlayer::AudioPlayer()
 
 }
 
+void AudioPlayer::init() {
+    streamHandler.init();
+}
+
 void AudioPlayer::play(const std::string& id, double volume)
 {
     streamHandler.processEvent(AudioEventType::start, &fileHandler.getSound(id), volume);

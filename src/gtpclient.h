@@ -26,7 +26,7 @@ private:
     boost::process::opstream pis;
     boost::process::ipstream pes;
     boost::process::ipstream pos;
-    boost::process::child c;
+    std::shared_ptr<boost::process::child> c;
     std::string exe;
     std::string lastLine;
     std::vector<OutputFilter> outputFilters;
@@ -34,6 +34,7 @@ private:
     InputThread<GtpClient, boost::process::ipstream> *reader;
 
     nlohmann::json vars;
+
 public:
     typedef std::vector<std::string> CommandOutput;
     GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path)
@@ -50,16 +51,16 @@ public:
                                          std::istream_iterator<std::string>());
         spdlog::info("running child [{} {}]", file.generic_path().string(), cmdline);
 
-        c = boost::process::child(file, params,
-                                  boost::process::std_out > pos,
-                                  boost::process::std_in < pis,
-                                  boost::process::std_err > pes);
+        c.reset(new boost::process::child(file, params,
+                          boost::process::std_out > pos,
+                          boost::process::std_in < pis,
+                          boost::process::std_err > pes));
 
         reader = new InputThread<GtpClient, boost::process::ipstream>(pes);
         reader->bind(*this);
     }
     ~GtpClient() {
-        c.wait();
+        c->wait();
         delete reader;
     }
 

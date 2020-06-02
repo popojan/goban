@@ -31,24 +31,8 @@ public:
         UPDATE_ALL = (1|2|3|4|8|16|32)
     };
 
-	GobanView(GobanModel& m)
-		: gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),
-		translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f),
-		startTime(0.0f), animationRunning(false), isPanning(false), isZooming(false), isRotating(false),
-		needsUpdate(0), cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
-		currentProgram(-1),	showOverlay(true),  lastCursor(-1,-1)
-	{
-        player.preload(config);
+	GobanView(GobanModel& m);
 
-		initCam();
-		updateTranslation();
-		translate[0] = newTranslate[0];
-        translate[1] = newTranslate[1];
-        translate[2] = newTranslate[2];
-        updateFlag |= GobanView::UPDATE_SHADER;
-        gobanShader.setReady();
-        gobanOverlay.setReady();
-    }
     virtual void onGameMove(const Move& move);
 
     ~GobanView() {
