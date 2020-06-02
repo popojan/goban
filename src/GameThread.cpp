@@ -90,6 +90,10 @@ void GameThread::interrupt() {
  */
 bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
+    /*this->boardSize = boardSize;
+    this->komi = komi;
+    this->handicap = handicap;*/
+
     bool success = true;
 
     for (auto pit = players.begin(); pit != players.end(); ++pit) {
@@ -324,9 +328,9 @@ void GameThread::playLocalMove(const Move& move) {
     if(playerToMove) playerToMove->suggestMove(move);
 }
 
-void GameThread::loadEngines(const Configuration& config) {
-    auto bots = config.data.find("bots");
-    if(bots != config.data.end()) {
+void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
+    auto bots = config->data.find("bots");
+    if(bots != config->data.end()) {
         bool hasCoach(false);
         for(auto it = bots->begin(); it != bots->end(); ++it) {
             auto enabled = it->value("enabled", 1);

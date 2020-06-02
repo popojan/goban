@@ -28,9 +28,10 @@
 #endif
 
 #include <spdlog/spdlog.h>
+#include <memory>
 
 Rocket::Core::Context* context = NULL;
-Configuration config;
+std::shared_ptr<Configuration> config;
 
 void GameLoop() {
     dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"))->gameLoop();
@@ -143,7 +144,7 @@ const char * WINDOW_NAME = "Goban";
     if (GLEW_OK != err)    { //win
         printf("Error: %s\n",glewGetErrorString(err)); //win
     }
-    config.load(configurationFile);
+    config.reset(new Configuration(configurationFile));
 
     // Create the main Rocket context and set it on the shell's input layer.
     context = Rocket::Core::CreateContext("main",
@@ -161,7 +162,7 @@ const char * WINDOW_NAME = "Goban";
 	shell_renderer->SetContext(context);
 
 	using nlohmann::json;
-	auto fonts = config.data
+	auto fonts = config->data
 	        .value("fonts", json({}))
 	        .value("gui", json::array());
 
@@ -178,7 +179,9 @@ const char * WINDOW_NAME = "Goban";
     EventManager::RegisterEventHandler("goban", new EventHandlerNewGame());
 
     //Shell::ToggleFullscreen();
+
     auto window = EventManager::LoadWindow("goban");
+
     if(window) {
 		Shell::EventLoop(GameLoop);
     }

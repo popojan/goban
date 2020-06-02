@@ -35,6 +35,7 @@ public:
         width(0), height(0), gamma(1.0f), contrast(0.0f),
 	view(view), animT(0.5f)
     {
+        init();
     }
     void initProgram(const std::string& vprogram, const std::string& fprogram);
     void setMetrics(const Metrics &);

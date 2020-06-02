@@ -13,7 +13,7 @@ public:
     void play(const std::string& id, double volume = 1.0);
     void loop(const std::string& id, double volume = 1.0);
     void stop();
-    void preload(const Configuration& config);
+    void preload(const std::shared_ptr<Configuration> config);
     size_t playbackCount() { return streamHandler.playbackCount(); }
 private:
     FileHandler fileHandler;

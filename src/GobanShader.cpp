@@ -10,7 +10,7 @@
 #include "GobanView.h"
 #include <Shell.h>
 
-extern Configuration config;
+extern std::shared_ptr<Configuration> config;
 
 const GLushort GobanShader::elementBufferData[] = {0, 1, 2, 3};
 const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
@@ -318,7 +318,7 @@ GLuint make_buffer(GLenum target, const void *buffer_data, GLsizei buffer_size) 
 int GobanShader::choose(int idx) {
 
     using nlohmann::json;
-    json shaders(config.data.value("shaders", json::array()));
+    json shaders(config->data.value("shaders", json::array()));
 
     if(shaders.size() < 1) {
         spdlog::critical("No shader definition found.");

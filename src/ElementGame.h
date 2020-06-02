@@ -28,7 +28,6 @@ public:
     void Reshape();
     void gameLoop();
     void populateEngines();
-
     GobanControl& getController() { return control; }
 protected:
     virtual void OnUpdate();

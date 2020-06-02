@@ -184,7 +184,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     (void) y;
 
     if (!downNotUp) {
-        std::string cmd(config.getCommand(static_cast<Rocket::Core::Input::KeyIdentifier>(key)));
+        std::string cmd(config->getCommand(static_cast<Rocket::Core::Input::KeyIdentifier>(key)));
         if (!cmd.empty()) {
             command(cmd);
             return;

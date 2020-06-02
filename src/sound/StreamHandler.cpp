@@ -126,7 +126,6 @@ StreamHandler::StreamHandler()
         Pa_Initialize();
         PaError errorCode;
         PaStreamParameters outputParameters;
-
         outputParameters.device = Pa_GetDefaultOutputDevice();
         outputParameters.channelCount = CHANNEL_COUNT;
         outputParameters.sampleFormat = paInt32;

@@ -11,7 +11,7 @@
 #include "Board.h"
 #include "Configuration.h"
 
-extern Configuration config;
+extern std::shared_ptr<Configuration> config;
 
 /** \brief Background thread responsible for rules enforcing
  *
@@ -53,7 +53,7 @@ public:
 
     void playLocalMove(const Move& move);
 
-    void loadEngines(const Configuration& config);
+    void loadEngines(const std::shared_ptr<Configuration> config);
 
 	int activatePlayer(int which, int delta = 1);
 
@@ -86,6 +86,10 @@ private:
 	std::size_t numPlayers;
 	std::array<std::size_t, 2> activePlayer;
     std::mutex playerMutex;
+
+    int komi;
+    int boardSize;
+    int handicap;
  //public:
 //	bool showTerritory;
 };
