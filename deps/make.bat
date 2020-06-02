@@ -22,11 +22,6 @@ MSBuild.exe libRocket.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%
 
 cd ..\..
 
-REM glew
-if not exist glew-2.1.0-win32.zip wget https://github.com/nigels-com/glew/releases/download/glew-2.1.0/glew-2.1.0-win32.zip
-if not exist glew-2.1.0 powershell Expand-Archive glew-2.1.0-win32.zip -DestinationPath .
-DIR glew-2.1.0
-
 REM glm
 if not exist glm git clone https://github.com/g-truc/glm.git
 

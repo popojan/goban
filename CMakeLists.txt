@@ -114,7 +114,6 @@ if (WIN32)
   add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00)
   option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
   set(Boost_USE_STATIC_LIBS ON)
-  set(GLEW_USE_STATIC_LIBS ON)
   add_definitions(-DROCKET_STATIC_LIB)
 else()
   set(OpenGL_GL_PREFERENCE "GLVND")
@@ -125,7 +124,6 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 
 find_package(LibRocket REQUIRED)
 find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
 find_package(Boost 1.64.0 REQUIRED COMPONENTS thread system iostreams filesystem)
 if (NOT WIN32)
 	find_package(Curses REQUIRED)
@@ -179,7 +177,7 @@ foreach (_variableName ${_variableNames})
     message(STATUS "${_variableName}=${${_variableName}}")
 endforeach()
 
-include_directories(SYSTEM 
+include_directories(SYSTEM
     ${PROJECT_SOURCE_DIR}/deps/glm
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/shell/include
@@ -189,7 +187,6 @@ include_directories(SYSTEM
     ${PROJECT_SOURCE_DIR}/src/sound/
     ${PROJECT_SOURCE_DIR}/src/glad/include
     ${OPENGL_INCLUDE_DIRS}
-    ${GLEW_INCLUDE_DIR}
     ${CURSES_INCLUDE_DIR}
     ${LIBROCKET_INCLUDE_DIR}
     ${LIBGLYPHY_INCLUDE_DIR}
@@ -338,7 +335,6 @@ target_link_libraries(goban
     clipp
     nlohmann_json::nlohmann_json
     ${OPENGL_LIBRARIES}
-    ${GLEW_LIBRARIES}
 )
 
 set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/Release)
