@@ -7,7 +7,6 @@ void GameRecord::move(const Move& move)  {
     using namespace LibSgfcPlusPlus;
 
     auto pos = move.pos.toSgf(this->boardSize.Columns);
-    spdlog::warn("newNode property value [{}]", pos);
     auto col = move.col == Color::BLACK ? SgfcColor::Black : SgfcColor::White;
     auto type = (move.col == Color::BLACK ? T::B : T::W);
     auto value (vF->CreateGoMovePropertyValue(pos, boardSize, col));

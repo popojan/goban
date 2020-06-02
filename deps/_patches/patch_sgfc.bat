@@ -1,4 +1,1 @@
-#!/bin/bash
-
-ls -l patch/*.patch;
 git apply --directory sgfc patch/*.patch
