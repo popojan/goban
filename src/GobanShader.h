@@ -22,8 +22,6 @@ class GobanView;
 
 GLuint shaderCompileFromString(GLenum type, const std::string& source);
 
-bool shaderAttachFromString(GLuint program, GLenum type, const std::string& source);
-
 GLuint make_buffer(GLenum target, const void *, GLsizei);
 
 std::string createShaderFromFile(const std::string& filename);
@@ -57,6 +55,7 @@ public:
     float getStoneHeight() const { return currentProgramH; }
     void setReady() { shadersReady = true; }
     int getCurrentProgram() const {return currentProgram;}
+    bool shaderAttachFromString(GLuint program, GLenum type, const std::string& source);
 private:
     GLuint gobanProgram = 0;
     GLuint iVertex = 0;
@@ -114,6 +113,9 @@ private:
     GLint iTime;
     GLint iAnimT;
     GLint iAA;
+
+    GLuint vertexShader;
+    GLuint fragmentShader;
 
     bool shadersReady;
     bool shaderChanged;

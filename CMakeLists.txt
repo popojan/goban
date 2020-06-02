@@ -187,6 +187,7 @@ include_directories(SYSTEM
     ${PROJECT_SOURCE_DIR}/src/sgf/include
     ${PROJECT_SOURCE_DIR}/deps/boost
     ${PROJECT_SOURCE_DIR}/src/sound/
+    ${PROJECT_SOURCE_DIR}/src/glad/include
     ${OPENGL_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIR}
     ${CURSES_INCLUDE_DIR}
@@ -223,6 +224,7 @@ else()
         ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellRenderInterfaceExtensionsOpenGL_X11.cpp
         ${PROJECT_SOURCE_DIR}/src/shell/src/x11/InputX11.cpp
         ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellX11.cpp
+        ${PROJECT_SOURCE_DIR}/src/glad/src/glad.c
     )
 endif()
 
@@ -317,6 +319,7 @@ add_dependencies(goban project_portaudio project_libsndfile project_libsgfcplusp
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
 target_link_libraries(goban
+    ${CMAKE_DL_LIBS}
     ${CMAKE_THREAD_LIBS_INIT}
     ${Boost_SYSTEM_LIBRARY}
     ${Boost_IOSTREAMS_LIBRARY}
