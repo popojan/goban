@@ -6,7 +6,7 @@ GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr), interruptRequested(false), hasThreadRunning(false),
         playerToMove(0), human(0), sgf(0), coach(0), numPlayers(0), activePlayer({0, 0})
 {
-    loadEngines(config);
+
 }
 
 void GameThread::reset() {

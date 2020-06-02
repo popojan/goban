@@ -20,6 +20,7 @@
 #include "EventHandlerNewGame.h"
 #include <Input.h>
 #include <Shell.h>
+#include <locale>
 
 #if defined ROCKET_PLATFORM_WIN32
   #undef __GNUC__
@@ -135,6 +136,8 @@ const char * WINDOW_NAME = "Goban";
 
     ShellSystemInterface system_interface;
     Rocket::Core::SetSystemInterface(&system_interface);
+
+    //std::locale::global(std::locale("C"));
 
     Rocket::Core::Initialise();
     Rocket::Controls::Initialise();

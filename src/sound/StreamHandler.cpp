@@ -115,12 +115,12 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
 }
 
 StreamHandler::StreamHandler()
-        : data()
-{
-
+        : data() {
+}
+void StreamHandler::init() {
 #if defined (__linux__)
-        char latency[] = "PULSE_LATENCY_MSEC=20";
-        putenv(latency);
+        ;//char latency[] = "PULSE_LATENCY_MSEC=20\0";
+        //putenv(latency);
 #endif
 
         Pa_Initialize();

@@ -36,6 +36,8 @@ class StreamHandler
         StreamHandler();
         ~StreamHandler();
 
+        void init();
+
         void processEvent(AudioEventType audioEventType,
                           AudioFile * audioFile = nullptr,
                           double volume = 1.0,
