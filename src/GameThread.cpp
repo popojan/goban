@@ -54,7 +54,7 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
         std::unique_lock<std::mutex> lock(mutex2);
         Player* player = players[playerIndex];
         player->setRole(role, add);
-        spdlog::debug("Player[{}] newType = [human = {}, computer = {}] newRole = [black = {}, whsite = {}]",
+        spdlog::debug("Player[{}] newType = [human = {}, computer = {}] newRole = [black = {}, white = {}]",
             playerIndex,
             player->isTypeOf(Player::HUMAN),
             player->isTypeOf(Player::ENGINE),

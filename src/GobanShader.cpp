@@ -50,12 +50,13 @@ GLuint shaderCompileFromString(GLenum type, const std::string& source) {
     return shader;
 }
 
-bool shaderAttachFromString(GLuint program, GLenum type, const std::string& source)
+bool GobanShader::shaderAttachFromString(GLuint program, GLenum type, const std::string& source)
 {
-    GLuint shader = shaderCompileFromString(type, source);
-    if (shader != 0) {
-        glAttachShader(program, shader);
-        glDeleteShader(shader);
+    GLuint *pshader = type == GL_VERTEX_SHADER ? &this->vertexShader : &this->fragmentShader;
+    *pshader = shaderCompileFromString(type, source);
+    if (*pshader != 0) {
+        glAttachShader(program, *pshader);
+        //glDeleteShader(*pshader);
         return true;
     }
     return false;
@@ -88,6 +89,10 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
         spdlog::error("Fragment Shader [{}] failed to compile. Err {}", fragmentProgram, glGetError());
 
     glLinkProgram(gobanProgram);
+    glDetachShader(gobanProgram, vertexShader);
+    glDeleteShader(vertexShader);
+    glDetachShader(gobanProgram, fragmentShader);
+    glDeleteShader(fragmentShader);
 
     GLint result;
     glGetProgramiv(gobanProgram, GL_LINK_STATUS, &result);
@@ -242,8 +247,9 @@ void GobanShader::destroy(void) {
 }
 
 void GobanShader::init() {
+
 	vertexBuffer = make_buffer(GL_ARRAY_BUFFER, &vertexBufferData[0], sizeof(GLfloat)*vertexBufferData.size());
-    elementBuffer = make_buffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferData, sizeof(elementBufferData));
+	elementBuffer = make_buffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferData, sizeof(elementBufferData));
 
 	currentProgram = 0;
 

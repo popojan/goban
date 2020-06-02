@@ -142,11 +142,11 @@ const char * WINDOW_NAME = "Goban";
     Rocket::Core::Initialise();
     Rocket::Controls::Initialise();
 
-    glewExperimental = 1; //win
-    GLenum err = glewInit(); //win
-    if (GLEW_OK != err)    { //win
-        printf("Error: %s\n",glewGetErrorString(err)); //win
+    if(!gladLoadGL()) {
+        spdlog::critical("Error: cannot initialize GL");
+        throw std::runtime_error("cannot initialize GL");
     }
+
     config.reset(new Configuration(configurationFile));
 
     // Create the main Rocket context and set it on the shell's input layer.
@@ -188,7 +188,6 @@ const char * WINDOW_NAME = "Goban";
     if(window) {
 		Shell::EventLoop(GameLoop);
     }
-    EventManager::
 
     EventManager::Shutdown();
 

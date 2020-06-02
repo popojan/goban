@@ -40,7 +40,6 @@
     #include <GL/GLU.h>
     #pragma warning(disable: 4505)
 #elif defined ROCKET_PLATFORM_UNIX
-    #include <GL/glew.h>
     #include <GL/gl.h>
     #include <GL/glu.h>
     #include <GL/glx.h>
