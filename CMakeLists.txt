@@ -2,24 +2,31 @@
 # Build script for TheGoban ========
 #===================================
 
-project(goban C CXX)
+cmake_minimum_required(VERSION 3.1)
 
-cmake_minimum_required(VERSION 3.0)
+cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0074 NEW)
+
+# MUST be done before call to 'project'
+get_cmake_property(vars CACHE_VARIABLES)
+foreach(var ${vars})
+    get_property(currentHelpString CACHE "${var}" PROPERTY HELPSTRING)
+        if("${currentHelpString}" MATCHES "No help, variable specified on the command line." OR "${currentHelpString}" STREQUAL "")
+            # message("${var} = [${${var}}]  --  ${currentHelpString}") # uncomment to see the variables being processed
+            list(APPEND CL_ARGS "-D${var}=${${var}}")
+         endif()
+endforeach()
+
+project(goban C CXX)
+project(goban VERSION 0.0.1.0)
 
 # paths
 include(GNUInstallDirs)
 
-set(GOBAN_VERSION_MAJOR 0)
-set(GOBAN_VERSION_MINOR 1)
-set(GOBAN_VERSION_PATCH 0)
-set(GOBAN_VERSION_TWEAK 0)
-set(PROJECT_VERSION ${GOBAN_VERSION_MAJOR}.${GOBAN_VERSION_MINOR}.${GOBAN_VERSION_PATCH}.${GOBAN_VERSION_TWEAK})
-
 set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 
 INCLUDE(ExternalProject)
-
+	
 ExternalProject_Add(project_libsndfile
     GIT_REPOSITORY     https://github.com/erikd/libsndfile.git
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
@@ -31,7 +38,7 @@ ExternalProject_Add(project_libsndfile
 
 ExternalProject_Get_Property(project_libsndfile SOURCE_DIR)
 ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
-SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${BINARY_DIR}/src")
+SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${BINARY_DIR}/src" "${PROJECT_BINARY_DIR}/deps/")
 SET(libsndfile_lib_dir "${BINARY_DIR}")
 
 ADD_LIBRARY(libsndfile STATIC IMPORTED)
@@ -46,7 +53,6 @@ ExternalProject_Add(project_portaudio
     SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
     BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/portaudio/build
     CMAKE_ARGS  -DPA_USE_JACK=0 -DPA_USE_ALSA=1 -DPA_USE_ASIO=0 -DPA_USE_WASAPI=1
-    UPDATE_COMMAND ""
     GIT_TAG ticket_263_alsa_uninitialized_var_2
     STEP_TARGETS build
     INSTALL_COMMAND     echo Skipping install step for portaudio
@@ -61,19 +67,20 @@ SET(portaudio_inc_dir "${SOURCE_DIR}/include")
 ADD_LIBRARY(portaudio STATIC IMPORTED)
 
 SET(SGFCPLUSPLUS_STATIC_DEFINE 1)
-
-ExternalProject_Add(project_libsgfcplusplus
-    GIT_REPOSITORY     https://github.com/herzbube/libsgfcplusplus.git
-    SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsgfcplusplus
-    BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/libsgfcplusplus
+ExternalProject_Add(project_libsgfcplusplus 
+    GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
+    GIT_TAG goban-build
+    CMAKE_ARGS  ${CL_ARGS}
+    BUILD_COMMAND ${CMAKE_COMMAND} ${CL_ARGS} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config Release 
+    SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
+    BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
     STEP_TARGETS build
-    PATCH_COMMAND ../_patches/patch_sgfc
-    UPDATE_COMMAND ""
+    UPDATE_DISCONNECTED TRUE
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 
-#file(GLOB sgfc_patches ${PROJECT_SOURCE_DIR}/deps/libsgfcplusplus/patch/*.patch)
-
+ExternalProject_Add_StepTargets(project_libsgfcplusplus patching)
 
 ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)
 ExternalProject_Get_Property(project_libsgfcplusplus BINARY_DIR)
@@ -86,6 +93,7 @@ ADD_LIBRARY(libsgfcplusplus STATIC IMPORTED)
 if(WIN32)
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/Release/sndfile.lib)
     SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
+    SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Release/libsgfcplusplus_static.lib")
 else()
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
     SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
@@ -105,7 +113,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if(NOT WIN32)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-builtin")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-builtin")
   SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O0 -g")
   SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -s")
 endif()
@@ -221,7 +229,6 @@ else()
         ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellRenderInterfaceExtensionsOpenGL_X11.cpp
         ${PROJECT_SOURCE_DIR}/src/shell/src/x11/InputX11.cpp
         ${PROJECT_SOURCE_DIR}/src/shell/src/x11/ShellX11.cpp
-        ${PROJECT_SOURCE_DIR}/src/glad/src/glad.c
     )
 endif()
 
@@ -260,6 +267,7 @@ set(GOBAN_HDR_FILES
     src/Configuration.h
     src/InputThread.h
     src/GameRecord.h
+    ${}
 )
 
 set(GOBAN_SRC_FILES
@@ -290,6 +298,7 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/sound/FileHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp
+    ${PROJECT_SOURCE_DIR}/src/glad/src/glad.c
     src/InputThread.cpp
     src/GameRecord.cpp
 )
@@ -302,7 +311,7 @@ endforeach()
 
 
 if (WIN32)
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib")
   add_executable(goban WIN32 ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES} ${PROJECT_SOURCE_DIR}/src/goban.rc)
   set_property(TARGET goban PROPERTY CXX_STANDARD 17)
   set_property(TARGET goban PROPERTY CXX_STANDARD_REQUIRED ON)

@@ -25,12 +25,11 @@
 #include <spdlog/spdlog.h>
 
 #if _WIN32
-    #define NOMINMAX
-    #define GLEW_STATIC
-    #include <GL/glew.h>
-    #include <GL/wglew.h>
-    #include <GL/GLU.h>
-    #pragma warning(disable: 4505)
+    #include <boost/process.hpp>
+    #include <windows.h>
+    #include <glad/glad.h>
+    //#include <windows.h>
+    //#include <glad/glad.h>
 #else
     //#include <GLFW/glfw3.h>
     #include <glad/glad.h>

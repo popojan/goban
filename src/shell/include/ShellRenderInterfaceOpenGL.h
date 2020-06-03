@@ -47,6 +47,10 @@ struct __X11NativeWindowData
 	Display *display;
 	XVisualInfo *visual_info;
 };
+#else
+    #include <boost/process.hpp>
+    #include <windows.h>
+    #include <glad/glad.h>
 #endif
 
 class ShellRenderInterfaceOpenGL : public Rocket::Core::RenderInterface,  public ShellRenderInterfaceExtensions

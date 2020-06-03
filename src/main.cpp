@@ -10,6 +10,9 @@
  */
 
 #include <clipp.h>
+#include <boost/process.hpp>
+#include <windows.h>
+#include <glad/glad.h>
 
 #include "ElementGame.h"
 #include <Rocket/Core.h>
