@@ -17,6 +17,7 @@ set PROJECT_DIR=%~dp0
 set PROJECT_DIR=%PROJECT_DIR:~0,-1%
 set BUILD_TYPE=Debug
 set BUILD_T=d
+set BUILD_DIR=cmake-build-debug
 
 REM build dependencies
 cd deps
@@ -25,8 +26,9 @@ call make.bat
 
 REM build goban
 cd %PROJECT_DIR%
-mkdir build
-cd build
+mkdir %BUILD_DIR%
+cd %BUILD_DIR%
+
 cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
 	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
 	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/x64/%BUILD_TYPE%/goban_glyphy.lib ^
