@@ -7,16 +7,16 @@
     APIs: wgl=1.0
     Profile: -
     Extensions:
-        
+        WGL_ARB_extensions_string
     Loader: True
     Local files: False
     Omit khrplatform: False
     Reproducible: True
 
     Commandline:
-        --api="wgl=1.0" --generator="c" --spec="wgl" --extensions=""
+        --api="wgl=1.0" --generator="c" --spec="wgl" --extensions="WGL_ARB_extensions_string"
     Online:
-        https://glad.dav1d.de/#language=c&specification=wgl&loader=on&api=wgl%3D1.0
+        https://glad.dav1d.de/#language=c&specification=wgl&loader=on&api=wgl%3D1.0&extensions=WGL_ARB_extensions_string
 */
 
 #include <stdio.h>
@@ -199,9 +199,15 @@ static int has_ext(const char *ext) {
     return 0;
 }
 int GLAD_WGL_VERSION_1_0 = 0;
+int GLAD_WGL_ARB_extensions_string = 0;
+PFNWGLGETEXTENSIONSSTRINGARBPROC glad_wglGetExtensionsStringARB = NULL;
+static void load_WGL_ARB_extensions_string(GLADloadproc load) {
+	if(!GLAD_WGL_ARB_extensions_string) return;
+	glad_wglGetExtensionsStringARB = (PFNWGLGETEXTENSIONSSTRINGARBPROC)load("wglGetExtensionsStringARB");
+}
 static int find_extensionsWGL(void) {
 	if (!get_exts()) return 0;
-	(void)&has_ext;
+	GLAD_WGL_ARB_extensions_string = has_ext("WGL_ARB_extensions_string");
 	free_exts();
 	return 1;
 }
@@ -217,6 +223,7 @@ int gladLoadWGLLoader(GLADloadproc load, HDC hdc) {
 	find_coreWGL(hdc);
 
 	if (!find_extensionsWGL()) return 0;
+	load_WGL_ARB_extensions_string(load);
 	return 1;
 }
 
