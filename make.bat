@@ -15,18 +15,21 @@ set STUDIO="Visual Studio 15 2017 Win64"
 
 set PROJECT_DIR=%~dp0
 set PROJECT_DIR=%PROJECT_DIR:~0,-1%
+set BUILD_TYPE=Debug
+set BUILD_T=d
 
 REM build dependencies
 cd deps
 call make.bat
 
+
 REM build goban
 cd %PROJECT_DIR%
 mkdir build
 cd build
-cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
+cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
 	-DLIBGLYPHY_INCLUDE_DIR=../deps/glyphy/src ^
-	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/x64/Release/goban_glyphy.lib ^
+	-DLIBGLYPHY_LIBRARY=../deps/glyphy/win32/x64/%BUILD_TYPE%/goban_glyphy.lib ^
 	-DGLEW_ROOT=../deps/glew-2.1.0 ^
 	-DBoost_NO_SYSTEM_PATHS=TRUE ^
 	-DBoost_NO_BOOST_CMAKE=TRUE ^
@@ -36,9 +39,9 @@ cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=Release ^
 	-DFREETYPE_INCLUDE_DIRS=../deps/freetype2/include ^
 	-DFREETYPE_INCLUDE_DIR_freetype2=../deps/freetype2/include ^
 	-DFREETYPE_INCLUDE_DIR_ft2build=../deps/freetype2/include ^
-	-DFREETYPE_LIBRARY=../deps/freetype2/build/Release/freetype
+	-DFREETYPE_LIBRARY=../deps/freetype2/build/%BUILD_TYPE%/freetype%BUILD_T%
 
-MSBuild.exe goban.sln /t:Build /p:Configuration=Release /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
+MSBuild.exe goban.sln /t:Build /p:Configuration=%BUILD_TYPE% /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
 if %ERRORLEVEL% EQU 0 (
   cd %PROJECT_DIR%
   echo Success

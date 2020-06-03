@@ -129,6 +129,7 @@ const char * WINDOW_NAME = "Goban";
     if (!Shell::Initialise(APP_PATH) ||
         !Shell::OpenWindow(WINDOW_NAME, shell_renderer, window_width, window_height, true))
     {
+        spdlog::critical("cannot Shell::OpenWindow.");
         Shell::Shutdown();
         return -1;
     }
@@ -147,7 +148,7 @@ const char * WINDOW_NAME = "Goban";
 
     if(!gladLoadGL()) {
         spdlog::critical("Error: cannot initialize GL");
-        throw std::runtime_error("cannot initialize GL");
+        //throw std::runtime_error("cannot initialize GL");
     }
 
     config.reset(new Configuration(configurationFile));
@@ -191,7 +192,10 @@ const char * WINDOW_NAME = "Goban";
     if(window) {
 		Shell::EventLoop(GameLoop);
     }
-
+    else {
+        spdlog::critical("cannot create window, exiting immediately");
+        return 13;
+    }
     EventManager::Shutdown();
 
     spdlog::debug("Before context destroy");;

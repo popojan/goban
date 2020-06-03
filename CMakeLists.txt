@@ -71,16 +71,14 @@ ExternalProject_Add(project_libsgfcplusplus
     GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
     GIT_TAG goban-build
     CMAKE_ARGS  ${CL_ARGS}
-    BUILD_COMMAND ${CMAKE_COMMAND} ${CL_ARGS} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
-    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config Release 
+    BUILD_COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config Debug
     SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
     BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
     STEP_TARGETS build
     UPDATE_DISCONNECTED TRUE
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
-
-ExternalProject_Add_StepTargets(project_libsgfcplusplus patching)
 
 ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)
 ExternalProject_Get_Property(project_libsgfcplusplus BINARY_DIR)
@@ -91,9 +89,15 @@ ADD_LIBRARY(libsgfcplusplus STATIC IMPORTED)
 
 
 if(WIN32)
-    SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/Release/sndfile.lib)
-    SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
-    SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Release/libsgfcplusplus_static.lib")
+    IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION "${libsndfile_lib_dir}/Debug/sndfile.lib")
+	SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Debug/portaudio_static_x64.lib")
+        SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Debug/libsgfcplusplus_staticd.lib")
+    ELSE()
+        SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/Release/sndfile.lib)
+        SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
+	SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Release/libsgfcplusplus_static.lib")
+    ENDIF()
 else()
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
     SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
@@ -348,10 +352,10 @@ target_link_libraries(goban
 
 set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/Release)
 
-file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
+#file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
 
-install(DIRECTORY DESTINATION ${RELEASE_DIR})
-install(TARGETS goban
-    RUNTIME DESTINATION ${RELEASE_DIR}
-    BUNDLE DESTINATION ${RELEASE_DIR})
+#install(DIRECTORY DESTINATION ${RELEASE_DIR})
+#install(TARGETS goban
+#    RUNTIME DESTINATION ${RELEASE_DIR}
+#    BUNDLE DESTINATION ${RELEASE_DIR})
 

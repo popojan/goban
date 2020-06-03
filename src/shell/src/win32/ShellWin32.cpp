@@ -36,7 +36,7 @@
 static LRESULT CALLBACK WindowProcedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
 
 static bool activated = true;
-static bool running = false;
+static bool running = true;
 static const char* instance_name = NULL;
 static HWND window_handle = NULL;
 static HINSTANCE instance_handle = NULL;
@@ -203,7 +203,8 @@ void Shell::EventLoop(ShellIdleFunction idle_function)
 		if (!activated)
 			Sleep(100);
 	}
-	exit(0);
+	spdlog::warn("Exiting gracefully...");
+	//exit(0);
 }
 
 void Shell::RequestExit()
