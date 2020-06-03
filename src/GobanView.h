@@ -4,6 +4,7 @@
 
 #include <utility>
 #include <string>
+#include "GobanOverlay.h"
 #include <Rocket/Core/Types.h>
 #include <Rocket/Core/Texture.h>
 #include <Rocket/Controls/ElementFormControlSelect.h>
@@ -13,7 +14,6 @@
 #include "GameObserver.h"
 #include "Metrics.h"
 #include "Camera.h"
-#include "GobanOverlay.h"
 #include "GameState.h"
 #include "Shell.h"
 

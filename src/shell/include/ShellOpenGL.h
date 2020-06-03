@@ -14,7 +14,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ *window
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -32,17 +32,9 @@
 
 #if defined ROCKET_PLATFORM_WIN32
 #define WIN32_LEAN_AND_MEAN
-//#include <windows.h>
-    #define NOMINMAX
-    #define GLEW_STATIC
-    #include <GL/glew.h>
-    #include <GL/wglew.h>
-    #include <GL/GLU.h>
-    #pragma warning(disable: 4505)
+    //#include <glad/glad.h>
 #elif defined ROCKET_PLATFORM_UNIX
-    #include <GL/gl.h>
-    #include <GL/glu.h>
-    #include <GL/glx.h>
+    #include <glad/glad.h>
 #elif defined ROCKET_PLATFORM_MACOSX
     #include <AGL/agl.h>
     #include <OpenGL/gl.h>
