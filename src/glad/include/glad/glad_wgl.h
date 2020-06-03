@@ -7,16 +7,17 @@
     APIs: wgl=1.0
     Profile: -
     Extensions:
-        WGL_ARB_extensions_string
+        WGL_ARB_extensions_string,
+        WGL_EXT_extensions_string
     Loader: True
     Local files: False
     Omit khrplatform: False
     Reproducible: True
 
     Commandline:
-        --api="wgl=1.0" --generator="c" --spec="wgl" --extensions="WGL_ARB_extensions_string"
+        --api="wgl=1.0" --generator="c" --spec="wgl" --extensions="WGL_ARB_extensions_string,WGL_EXT_extensions_string"
     Online:
-        https://glad.dav1d.de/#language=c&specification=wgl&loader=on&api=wgl%3D1.0&extensions=WGL_ARB_extensions_string
+        https://glad.dav1d.de/#language=c&specification=wgl&loader=on&api=wgl%3D1.0&extensions=WGL_ARB_extensions_string&extensions=WGL_EXT_extensions_string
 */
 
 
@@ -106,6 +107,13 @@ GLAPI int GLAD_WGL_ARB_extensions_string;
 typedef const char * (APIENTRYP PFNWGLGETEXTENSIONSSTRINGARBPROC)(HDC hdc);
 GLAPI PFNWGLGETEXTENSIONSSTRINGARBPROC glad_wglGetExtensionsStringARB;
 #define wglGetExtensionsStringARB glad_wglGetExtensionsStringARB
+#endif
+#ifndef WGL_EXT_extensions_string
+#define WGL_EXT_extensions_string 1
+GLAPI int GLAD_WGL_EXT_extensions_string;
+typedef const char * (APIENTRYP PFNWGLGETEXTENSIONSSTRINGEXTPROC)(void);
+GLAPI PFNWGLGETEXTENSIONSSTRINGEXTPROC glad_wglGetExtensionsStringEXT;
+#define wglGetExtensionsStringEXT glad_wglGetExtensionsStringEXT
 #endif
 
 #ifdef __cplusplus
