@@ -12,7 +12,7 @@
 #include <clipp.h>
 #include <boost/process.hpp>
 #include <windows.h>
-#include <glad/glad.h>
+#include <glad/glad_wgl.h>
 
 #include "ElementGame.h"
 #include <Rocket/Core.h>

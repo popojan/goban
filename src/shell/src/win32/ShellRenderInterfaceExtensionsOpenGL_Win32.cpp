@@ -29,7 +29,7 @@
 #include <ShellRenderInterfaceOpenGL.h>
 //#include <windows.h>
 #include <Rocket/Core.h>
-#include <Rocket/Core/Platform.h>
+#include <Rocket/Core/Platform.h>g
 #include <Shell.h>
 #include <iostream>
 

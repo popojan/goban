@@ -5,6 +5,9 @@
     <mapping directory="$PROJECT_DIR$/build/_deps/clipp-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/build/_deps/json-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/build/_deps/spdlog-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/clipp-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/json-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/spdlog-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/clipp-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/json-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/spdlog-src" vcs="Git" />
