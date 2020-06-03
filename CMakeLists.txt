@@ -303,6 +303,7 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp
     ${PROJECT_SOURCE_DIR}/src/glad/src/glad.c
+    ${PROJECT_SOURCE_DIR}/src/glad/src/glad_wgl.c
     src/InputThread.cpp
     src/GameRecord.cpp
 )
