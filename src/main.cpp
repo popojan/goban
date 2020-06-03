@@ -123,7 +123,6 @@ const char * WINDOW_NAME = "Goban";
     ShellRenderInterfaceOpenGL opengl_renderer;
     ShellRenderInterfaceExtensions *shell_renderer = &opengl_renderer;
 
-
     // Generic OS initialisation, creates a window and attaches OpenGL.
 
     if (!Shell::Initialise(APP_PATH) ||
@@ -131,6 +130,11 @@ const char * WINDOW_NAME = "Goban";
     {
         spdlog::critical("cannot Shell::OpenWindow.");
         Shell::Shutdown();
+        return -1;
+    }
+
+    if(!gladLoadGL()) {
+        spdlog::critical("Error: cannot initialize GL");
         return -1;
     }
 
@@ -145,11 +149,6 @@ const char * WINDOW_NAME = "Goban";
 
     Rocket::Core::Initialise();
     Rocket::Controls::Initialise();
-
-    if(!gladLoadGL()) {
-        spdlog::critical("Error: cannot initialize GL");
-        //throw std::runtime_error("cannot initialize GL");
-    }
 
     config.reset(new Configuration(configurationFile));
 
