@@ -34,7 +34,7 @@
 #define WIN32_LEAN_AND_MEAN
     //#include <glad/glad.h>
 #elif defined ROCKET_PLATFORM_UNIX
-    #include <glad/glad.h>
+    #include <glad/glad_wgl.h>
 #elif defined ROCKET_PLATFORM_MACOSX
     #include <AGL/agl.h>
     #include <OpenGL/gl.h>

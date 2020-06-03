@@ -27,7 +27,7 @@
 #if _WIN32
     #include <boost/process.hpp>
     #include <windows.h>
-    #include <glad/glad.h>
+    #include <glad/glad_wgl.h>
     //#include <windows.h>
     //#include <glad/glad.h>
 #else
