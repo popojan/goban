@@ -31,7 +31,7 @@
 //#define DEBUG_NVIDIA
 
 #include "Rocket/Core/RenderInterface.h"
-#include "ShellOpenGL.h"
+#include "OpenGL.h"
 
 /**
 	Low level OpenGL render interface for Rocket
@@ -53,7 +53,7 @@ struct __X11NativeWindowData
     #include <glad/glad.h>
 #endif
 
-class ShellRenderInterfaceOpenGL : public Rocket::Core::RenderInterface,  public ShellRenderInterfaceExtensions
+class ShellRenderInterfaceOpenGL : public ShellRenderInterfaceExtensions, public Rocket::Core::RenderInterface
 {
 public:
 	ShellRenderInterfaceOpenGL();
@@ -90,20 +90,21 @@ public:
 	virtual void PrepareRenderBuffer(void);
 	virtual void PresentRenderBuffer(void);
     virtual void Invalidate(void);
+
 protected:
 	int m_width;
 	int m_height;
 	void *m_rocket_context;
-	
+private:
 #if defined(ROCKET_PLATFORM_MACOSX)
-	AGLContext gl_context;
+    AGLContext gl_context;
 #elif defined(ROCKET_PLATFORM_LINUX)
-	struct __X11NativeWindowData nwData;
+    struct __X11NativeWindowData nwData;
 	GLXContext gl_context;
 #elif defined(ROCKET_PLATFORM_WIN32)
-	HWND window_handle;
-	HDC device_context;
-	HGLRC render_context;
+    HWND window_handle;
+    HDC device_context;
+    HGLRC render_context;
 #else
 #error Platform is undefined, this must be resolved so gl_context is usable.
 #endif

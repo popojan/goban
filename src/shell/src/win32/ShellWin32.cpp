@@ -45,6 +45,7 @@ static double time_frequency;
 static LARGE_INTEGER time_startup;
 
 static ShellFileInterface* file_interface = NULL;
+static ShellRenderInterfaceExtensions *shell_renderer = NULL;
 
 struct SavedWindowInfo {
 	bool maximized;
@@ -86,7 +87,6 @@ void Shell::Shutdown()
 	file_interface = NULL;
 }
 
-static ShellRenderInterfaceExtensions *shell_renderer = NULL;
 bool Shell::OpenWindow(const char* name, ShellRenderInterfaceExtensions *_shell_renderer, unsigned int width, unsigned int height, bool allow_resize)
 {
 	WNDCLASS window_class;
@@ -148,7 +148,7 @@ bool Shell::OpenWindow(const char* name, ShellRenderInterfaceExtensions *_shell_
 	if (_shell_renderer != NULL)
 	{
 		shell_renderer = _shell_renderer;
-		if(!shell_renderer->AttachToNative(window_handle))
+		if(!(shell_renderer->AttachToNative(window_handle)))
 		{
 			CloseWindow();
 			return false;

@@ -1,5 +1,5 @@
 /*
- * This source file is part of libRocket, the HTML/CSS Interface Middleware
+ * ThisD source file is part of libRocket, the HTML/CSS Interface Middleware
  *
  * For the latest information, see http://www.librocket.com
  *
@@ -43,7 +43,7 @@ void ShellRenderInterfaceOpenGL::Invalidate(void) {
 
 void ShellRenderInterfaceOpenGL::SetViewport(int width, int height)
 {
-	if(m_width != width || m_height != height) {
+    if(m_width != width || m_height != height) {
 		m_width = width;
 		m_height = height;
 		glViewport(0, 0, width, height);
@@ -63,56 +63,60 @@ void ShellRenderInterfaceOpenGL::SetViewport(int width, int height)
 
 bool ShellRenderInterfaceOpenGL::AttachToNative(void *nativeWindow)
 {
-	this->render_context = NULL;
-	this->window_handle = (HWND)nativeWindow;
-	this->device_context = GetDC(this->window_handle);
-	if (this->device_context == NULL)
+    window_handle = reinterpret_cast<HWND>(nativeWindow);
+    render_context = NULL;
+    device_context = GetDC(window_handle);
+	if (device_context == NULL)
 	{
 		Shell::DisplayError("Could not get device context.");
 		return false;
 	}
 
 	PIXELFORMATDESCRIPTOR pixel_format_descriptor;
-	memset(&pixel_format_descriptor, 0, sizeof(pixel_format_descriptor));
-	pixel_format_descriptor.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-	pixel_format_descriptor.nVersion = 1;
-	pixel_format_descriptor.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;// | PFD_DEPTH_DONTCARE;
-	pixel_format_descriptor.iPixelType = PFD_TYPE_RGBA;
-	pixel_format_descriptor.cColorBits = 32;
-	pixel_format_descriptor.cRedBits = 8;
-	pixel_format_descriptor.cGreenBits = 8;
-	pixel_format_descriptor.cBlueBits = 8;
-	pixel_format_descriptor.cAlphaBits = 8;
-	pixel_format_descriptor.cDepthBits = 8;
-	pixel_format_descriptor.cStencilBits = 0;
+    memset(&pixel_format_descriptor, 0, sizeof(pixel_format_descriptor));
+    pixel_format_descriptor.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+    pixel_format_descriptor.nVersion = 1;
+    pixel_format_descriptor.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;// | PFD_DEPTH_DONTCARE;
+    pixel_format_descriptor.iPixelType = PFD_TYPE_RGBA;
+    pixel_format_descriptor.cColorBits = 32;
+    pixel_format_descriptor.cRedBits = 8;
+    pixel_format_descriptor.cGreenBits = 8;
+    pixel_format_descriptor.cBlueBits = 8;
+    pixel_format_descriptor.cAlphaBits = 8;
+    pixel_format_descriptor.cDepthBits = 8;
+    pixel_format_descriptor.cStencilBits = 0;
 
-	int pixel_format = ChoosePixelFormat(this->device_context, &pixel_format_descriptor);
-	if (pixel_format == 0)
+	int pixel_format = ChoosePixelFormat(device_context, &pixel_format_descriptor);
+    if (pixel_format == 0 || GetLastError() != 0)
 	{
-		Shell::DisplayError("Could not choose 32-bit pixel format.");
+		spdlog::critical("choosepixelformat failed {}, {}", pixel_format, GetLastError());
 		return false;
 	}
 
-	if (SetPixelFormat(this->device_context, pixel_format, &pixel_format_descriptor) == FALSE)
+	if (SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) == FALSE &&  GetLastError() == 0)
 	{
-		Shell::DisplayError("Could not set pixel format.");
+        spdlog::critical("could not set pixel format {}, {}", pixel_format, GetLastError());
 		return false;
 	}
 
-	this->render_context = wglCreateContext(this->device_context);
-	if (this->render_context == NULL)
-	{ 
-		Shell::DisplayError("Could not create OpenGL rendering context.");
+	render_context = wglCreateContext(device_context);
+	if (render_context == NULL || GetLastError() != 0)
+	{
+        spdlog::critical("wglCreateContext failing {}", GetLastError());
 		return false;
 	}
 
 	// Activate the rendering context.
-	if (wglMakeCurrent(this->device_context, this->render_context) == FALSE)
+	if (wglMakeCurrent(device_context, render_context) == FALSE || GetLastError() != 0)
 	{
-		Shell::DisplayError("Unable to make rendering context current.");
+        spdlog::critical("wglMakeCurrent failing {}", GetLastError());
 		return false;
 	}
 
+    if(!gladLoadGL()) {
+        spdlog::critical("Error: cannot initialize GL");
+        return -1;
+    }
 	// Set up the GL state.
 #ifndef DEBUG_NVIDIA
 	glClearColor(0, 0, 0, 1);
@@ -125,7 +129,7 @@ bool ShellRenderInterfaceOpenGL::AttachToNative(void *nativeWindow)
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	RECT crect;
-	GetClientRect(this->window_handle, &crect);
+	GetClientRect(window_handle, &crect);
 	glOrtho(0, (crect.right - crect.left), (crect.bottom - crect.top), 0, -1, 1);
 
 	glMatrixMode(GL_MODELVIEW);
@@ -137,17 +141,17 @@ bool ShellRenderInterfaceOpenGL::AttachToNative(void *nativeWindow)
 void ShellRenderInterfaceOpenGL::DetachFromNative()
 {
 	// Shutdown OpenGL
-	if (this->render_context != NULL)
+	if (render_context != NULL)
 	{
 		wglMakeCurrent(NULL, NULL); 
-		wglDeleteContext(this->render_context);
-		this->render_context = NULL;
+		wglDeleteContext(render_context);
+		render_context = NULL;
 	}
 
-	if (this->device_context != NULL)
+	if (device_context != NULL)
 	{
-		ReleaseDC(this->window_handle, this->device_context);
-		this->device_context = NULL;
+		ReleaseDC(window_handle, device_context);
+		device_context = NULL;
 	}
 }
 
@@ -159,5 +163,5 @@ void ShellRenderInterfaceOpenGL::PrepareRenderBuffer()
 void ShellRenderInterfaceOpenGL::PresentRenderBuffer()
 {
 	// Flips the OpenGL buffers.
-	SwapBuffers(this->device_context);
+	SwapBuffers(device_context);
 }

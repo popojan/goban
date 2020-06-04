@@ -34,6 +34,9 @@
 //#define DEBUG_NVIDIA
 
 ShellRenderInterfaceOpenGL::ShellRenderInterfaceOpenGL()
+#ifdef ROCKET_PLATFORM_WIN32
+: window_handle(NULL), device_context(NULL), render_context(NULL)
+#endif
 {
 	m_rocket_context = NULL;
 	m_width = 0;
