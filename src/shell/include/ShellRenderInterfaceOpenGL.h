@@ -37,8 +37,9 @@
 	@author Peter Curry
  */
 
+#include "OpenGL.h"
+
 #if defined(ROCKET_PLATFORM_LINUX)
-  #include "OpenGL.h"
   struct __X11NativeWindowData
   {
     Window window;
@@ -94,7 +95,7 @@ private:
     AGLContext gl_context;
 #elif defined(ROCKET_PLATFORM_LINUX)
     struct __X11NativeWindowData nwData;
-	GLXContext gl_context;
+    GLXContext gl_context;
 #elif defined(ROCKET_PLATFORM_WIN32)
     HWND window_handle;
     HDC device_context;
