@@ -8,7 +8,7 @@
 
 class GobanView;
 
-#include "ShellOpenGL.h"
+#include "OpenGL.h"
 #include "Board.h"
 #include "GobanModel.h"
 #include "Camera.h"

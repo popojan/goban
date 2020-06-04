@@ -24,19 +24,7 @@
 #include <glyphy.h>
 #include <spdlog/spdlog.h>
 
-#if _WIN32
-    #include <boost/process.hpp>
-    #include <windows.h>
-    #include <glad/glad_wgl.h>
-    //#include <windows.h>
-    //#include <glad/glad.h>
-#else
-    //#include <GLFW/glfw3.h>
-    #include <glad/glad.h>
-    //#include <GL/glew.h>
-    //#include <GL/gl.h>
-    //#include <GL/glu.h>
-#endif
+#include "OpenGL.h"
 
 class GlyphyAtlas {
 public:

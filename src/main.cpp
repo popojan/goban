@@ -10,9 +10,7 @@
  */
 
 #include <clipp.h>
-#include <boost/process.hpp>
-#include <windows.h>
-#include <glad/glad_wgl.h>
+#include "OpenGL.h"
 
 #include "ElementGame.h"
 #include <Rocket/Core.h>
@@ -48,7 +46,7 @@ void DoAllocConsole()
 {
     static const WORD MAX_CONSOLE_LINES = 500;
     int hConHandle;
-    long lStdHandle;
+    intptr_t lStdHandle;
     CONSOLE_SCREEN_BUFFER_INFO coninfo;
     FILE *fp;
 
@@ -61,7 +59,7 @@ void DoAllocConsole()
     SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coninfo.dwSize);
 
     // redirect unbuffered STDOUT to the console
-    lStdHandle = (long)GetStdHandle(STD_OUTPUT_HANDLE);
+    lStdHandle = reinterpret_cast<intptr_t>(GetStdHandle(STD_OUTPUT_HANDLE));
     hConHandle = _open_osfhandle(lStdHandle, _O_TEXT);
     fp = _fdopen(hConHandle, "w");
 
@@ -69,7 +67,7 @@ void DoAllocConsole()
     setvbuf(stdout, NULL, _IONBF, 0);
 
     // redirect unbuffered STDIN to the console
-    lStdHandle = (long)GetStdHandle(STD_INPUT_HANDLE);
+    lStdHandle =  reinterpret_cast<intptr_t>(GetStdHandle(STD_INPUT_HANDLE));
     hConHandle = _open_osfhandle(lStdHandle, _O_TEXT);
     fp = _fdopen(hConHandle, "r");
 
@@ -77,7 +75,7 @@ void DoAllocConsole()
     setvbuf(stdin, NULL, _IONBF, 0);
 
     // redirect unbuffered STDERR to the console
-    lStdHandle = (long)GetStdHandle(STD_ERROR_HANDLE);
+    lStdHandle =  reinterpret_cast<intptr_t>(GetStdHandle(STD_ERROR_HANDLE));
     hConHandle = _open_osfhandle(lStdHandle, _O_TEXT);
     fp = _fdopen(hConHandle, "w");
     *stderr = *fp;
@@ -116,12 +114,12 @@ const char * WINDOW_NAME = "Goban";
         DoAllocConsole();
 #endif
     spdlog::set_level(spdlog::level::from_str(logLevel));
-
+    spdlog::critical("sizeof(HWND)={} sizeof(void*)={}", sizeof(HWND), sizeof(void*));
     unsigned window_width = 1024;
     unsigned window_height = 768;
 
-    ShellRenderInterfaceOpenGL opengl_renderer;
-    ShellRenderInterfaceExtensions *shell_renderer = &opengl_renderer;
+    std::shared_ptr<ShellRenderInterfaceOpenGL> popengl_renderer(new ShellRenderInterfaceOpenGL());
+    ShellRenderInterfaceOpenGL *shell_renderer = popengl_renderer.get();
 
     // Generic OS initialisation, creates a window and attaches OpenGL.
 
@@ -133,13 +131,8 @@ const char * WINDOW_NAME = "Goban";
         return -1;
     }
 
-    if(!gladLoadGL()) {
-        spdlog::critical("Error: cannot initialize GL");
-        return -1;
-    }
-
     // Rocket initialisation.
-    Rocket::Core::SetRenderInterface(&opengl_renderer);
+    Rocket::Core::SetRenderInterface(popengl_renderer.get());
     //(&opengl_renderer)->SetViewport(window_width, window_height);
 
     ShellSystemInterface system_interface;
