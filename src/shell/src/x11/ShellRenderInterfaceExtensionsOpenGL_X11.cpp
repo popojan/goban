@@ -80,6 +80,11 @@ bool ShellRenderInterfaceOpenGL::AttachToNative(void *nativeWindow)
     if (!glXIsDirect(nwData.display, this->gl_context))
         Shell::Log("OpenGL context does not support direct rendering; performance is likely to be poor.");
 
+    if(!gladLoadGL()) {
+        spdlog::critical("Error: cannot initialize GL");
+        return -1;
+    }
+
     Window root_window;
     int x, y;
     unsigned int width, height;

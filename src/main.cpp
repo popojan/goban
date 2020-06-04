@@ -114,7 +114,7 @@ const char * WINDOW_NAME = "Goban";
         DoAllocConsole();
 #endif
     spdlog::set_level(spdlog::level::from_str(logLevel));
-    spdlog::critical("sizeof(HWND)={} sizeof(void*)={}", sizeof(HWND), sizeof(void*));
+
     unsigned window_width = 1024;
     unsigned window_height = 768;
 

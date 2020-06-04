@@ -5,25 +5,8 @@
 
 #include <memory>
 #include "Board.h"
-#ifdef _WIN32
-	#include <io.h>
-#endif
-#define SGFCPLUSPLUS_STATIC_DEFINE 1
-#include <ISgfcTreeBuilder.h>
-#include <SgfcPlusPlusFactory.h>
-#include <ISgfcPropertyFactory.h>
-#include <ISgfcPropertyValueFactory.h>
-#include <ISgfcPropertyValue.h>
-#include <SgfcPropertyType.h>
-#include <SgfcPlusPlusExport.h>
-#include <SgfcPropertyValueType.h>
-#include <ISgfcGoMovePropertyValue.h>
-#include <SgfcGameType.h>
-#include <ISgfcGame.h>
-#include <ISgfcNode.h>
-#include <ISgfcDocument.h>
-#include <ISgfcDocumentWriter.h>
-#include <SgfcConstants.h>
+
+#include "OpenGL.h"
 
 class GameRecord {
 public:

@@ -26,7 +26,7 @@ include(GNUInstallDirs)
 set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 
 INCLUDE(ExternalProject)
-	
+
 ExternalProject_Add(project_libsndfile
     GIT_REPOSITORY     https://github.com/erikd/libsndfile.git
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
@@ -91,13 +91,13 @@ ADD_LIBRARY(libsgfcplusplus STATIC IMPORTED)
 if(WIN32)
     IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
         SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION "${libsndfile_lib_dir}/Debug/sndfile.lib")
-	SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Debug/portaudio_static_x64.lib")
+	      SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Debug/portaudio_static_x64.lib")
         SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Debug/libsgfcplusplus_staticd.lib")
     ELSE()
         SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/Release/sndfile.lib)
         SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
-	SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Release/libsgfcplusplus_static.lib")
-    ENDIF()
+	      SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Release/libsgfcplusplus_static.lib")
+  ENDIF()
 else()
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
     SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
@@ -303,7 +303,6 @@ set(GOBAN_SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/sound/StreamHandler.cpp
     ${PROJECT_SOURCE_DIR}/src/sound/util.cpp src/Configuration.cpp
     ${PROJECT_SOURCE_DIR}/src/glad/src/glad.c
-    ${PROJECT_SOURCE_DIR}/src/glad/src/glad_wgl.c
     src/InputThread.cpp
     src/GameRecord.cpp
 )
@@ -316,11 +315,24 @@ endforeach()
 
 if (MSVC)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libcmtd.lib")
-  add_executable(goban WIN32 ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES} ${PROJECT_SOURCE_DIR}/src/goban.rc)
+  add_executable(goban WIN32
+    ${GOBAN_SRC_FILES}
+    ${GOBAN_HDR_FILES}
+    ${SHELL_SRC_FILES}
+    ${GLYPHY_SRC_FILES}
+    ${PROJECT_SOURCE_DIR}/src/goban.rc
+    ${PROJECT_SOURCE_DIR}/src/glad/src/glad_wgl.c
+  )
   set_property(TARGET goban PROPERTY CXX_STANDARD 17)
   set_property(TARGET goban PROPERTY CXX_STANDARD_REQUIRED ON)
 else()
-  add_executable(goban ${GOBAN_SRC_FILES} ${GOBAN_HDR_FILES} ${SHELL_SRC_FILES} ${GLYPHY_SRC_FILES})
+  add_executable(goban
+    ${GOBAN_SRC_FILES}
+    ${GOBAN_HDR_FILES}
+    ${SHELL_SRC_FILES}
+    ${GLYPHY_SRC_FILES}
+    ${PROJECT_SOURCE_DIR}/src/glad/src/glad_glx.c
+  )
   set(EXTRA_LIBS rt ${ALSA_LIBRARIES} pthread)
 endif()
 
