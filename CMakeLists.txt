@@ -71,12 +71,12 @@ ExternalProject_Add(project_libsgfcplusplus
     GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
     GIT_TAG goban-build
     CMAKE_ARGS  ${CL_ARGS}
-    BUILD_COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
-    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config Debug
+    BUILD_COMMAND ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE}
     SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
     BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
     STEP_TARGETS build
-    UPDATE_DISCONNECTED TRUE
+    UPDATE_DISCONNECTED FALSE
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 
@@ -91,12 +91,12 @@ ADD_LIBRARY(libsgfcplusplus STATIC IMPORTED)
 if(WIN32)
     IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
         SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION "${libsndfile_lib_dir}/Debug/sndfile.lib")
-	      SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Debug/portaudio_static_x64.lib")
+        SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Debug/portaudio_static_x64.lib")
         SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Debug/libsgfcplusplus_staticd.lib")
     ELSE()
         SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/Release/sndfile.lib)
         SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
-	      SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Release/libsgfcplusplus_static.lib")
+        SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Release/libsgfcplusplus_static.lib")
   ENDIF()
 else()
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
@@ -362,12 +362,12 @@ target_link_libraries(goban
     ${OPENGL_LIBRARIES}
 )
 
-set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/Release)
+set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/publish/Goban)
 
-#file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
+file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
+file(COPY ${PROJECT_SOURCE_DIR}/engine DESTINATION ${RELEASE_DIR})
 
-#install(DIRECTORY DESTINATION ${RELEASE_DIR})
-#install(TARGETS goban
-#    RUNTIME DESTINATION ${RELEASE_DIR}
-#    BUNDLE DESTINATION ${RELEASE_DIR})
-
+install(DIRECTORY DESTINATION ${RELEASE_DIR})
+install(TARGETS goban
+    RUNTIME DESTINATION ${RELEASE_DIR}
+    BUNDLE DESTINATION ${RELEASE_DIR})

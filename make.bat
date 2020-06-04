@@ -12,12 +12,21 @@ set TOOLSET=v141
 REM set TARGET=10.0.17134.0
 set TARGET=10.0.17763.0
 set STUDIO="Visual Studio 15 2017 Win64"
+set DEBUG=
 
 set PROJECT_DIR=%~dp0
 set PROJECT_DIR=%PROJECT_DIR:~0,-1%
-set BUILD_TYPE=Debug
-set BUILD_T=d
-set BUILD_DIR=cmake-build-debug
+
+if defined DEBUG (
+    set BUILD_TYPE=Debug
+    set BUILD_T=d
+    set BUILD_DIR=cmake-build-debug
+)
+else (
+    set BUILD_TYPE=Release
+    set BUILD_T=
+    set BUILD_DIR=cmake-build-release
+)
 
 REM build dependencies
 cd deps
@@ -45,6 +54,7 @@ cmake .. -G%STUDIO% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
 
 MSBuild.exe goban.sln /t:Build /p:Configuration=%BUILD_TYPE% /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
 if %ERRORLEVEL% EQU 0 (
+  cmake --install .
   cd %PROJECT_DIR%
   echo Success
 ) else (
