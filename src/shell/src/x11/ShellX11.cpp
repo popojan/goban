@@ -91,7 +91,9 @@ bool Shell::OpenWindow(const char* name, ShellRenderInterfaceExtensions *_shell_
                             GLX_ALPHA_SIZE, 0,
 							GLX_DEPTH_SIZE, 8,
 							None};
-
+    if(!gladLoadGLX(display, screen)) {
+        spdlog::critical("Error: cannot initialize GLX");
+    }
 	visual_info = glXChooseVisual(display, screen, attribute_list);
 	if (visual_info == NULL)
 	{

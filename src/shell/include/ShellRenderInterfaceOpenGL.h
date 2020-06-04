@@ -31,7 +31,6 @@
 //#define DEBUG_NVIDIA
 
 #include "Rocket/Core/RenderInterface.h"
-#include "OpenGL.h"
 
 /**
 	Low level OpenGL render interface for Rocket
@@ -39,18 +38,13 @@
  */
 
 #if defined(ROCKET_PLATFORM_LINUX)
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-struct __X11NativeWindowData
-{
-	Window window;
-	Display *display;
-	XVisualInfo *visual_info;
-};
-#else
-    #include <boost/process.hpp>
-    #include <windows.h>
-    #include <glad/glad.h>
+  #include "OpenGL.h"
+  struct __X11NativeWindowData
+  {
+    Window window;
+    Display *display;
+    XVisualInfo *visual_info;
+  };
 #endif
 
 class ShellRenderInterfaceOpenGL : public ShellRenderInterfaceExtensions, public Rocket::Core::RenderInterface

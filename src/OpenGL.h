@@ -1,17 +1,31 @@
-//
-// Created by popoj on 04.06.2020.
-//
-
 #ifndef GOBAN_OPENGL_H
 #define GOBAN_OPENGL_H
 
 #include <Rocket/Core/Platform.h>
 
+#define SGFCPLUSPLUS_STATIC_DEFINE 1
+#include <ISgfcTreeBuilder.h>
+#include <SgfcPlusPlusFactory.h>
+#include <ISgfcPropertyFactory.h>
+#include <ISgfcPropertyValueFactory.h>
+#include <ISgfcPropertyValue.h>
+#include <SgfcPropertyType.h>
+#include <SgfcPlusPlusExport.h>
+//#include <SgfcPropertyValueType.h>
+#include <ISgfcGoMovePropertyValue.h>
+#include <SgfcGameType.h>
+#include <ISgfcGame.h>
+#include <ISgfcNode.h>
+#include <ISgfcDocument.h>
+#include <ISgfcDocumentWriter.h>
+#include <SgfcConstants.h>
+
 #if defined(ROCKET_PLATFORM_MACOSX)
-AGLContext gl_context;
 #elif defined(ROCKET_PLATFORM_LINUX)
-struct __X11NativeWindowData nwData;
-	GLXContext gl_context;
+    #include <glad/glad.h>
+    #include <glad/glad_glx.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #elif defined(ROCKET_PLATFORM_WIN32)
     #include <boost/process.hpp>
     #include <windows.h>

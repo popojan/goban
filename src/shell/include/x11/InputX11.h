@@ -28,7 +28,7 @@
 #ifndef INPUTX11_H
 #define INPUTX11_H
 
-#include <X11/Xlib.h>
+#include "OpenGL.h"
 #include "Input.h"
 
 /**
