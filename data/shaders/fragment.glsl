@@ -132,10 +132,10 @@ const vec3 bgB = vec3(0.0, 0.0, 0.0);
 
 const Material mCupBlack = Material(idCupBlack, vec3(0.4, 0.6, 0.15), 16.0, vec3(0.65826, 0.528209, 0.238209), vec3(0.387763, 0.3289191, 0.12761), vec3(0.22005, 0.180002, 0.1244), 1.3);
 const Material mCupWhite = Material(idCupWhite, vec3(0.4, 0.6, 0.15), 16.0, vec3(0.45826, 0.428209, 0.238209), vec3(0.287763, 0.289191, 0.12761), vec3(0.12005, 0.120002, 0.085744), 1.3);
-const Material mBoard = Material(idBoard, vec3(0.7, 0.3, 0.15), 42.0, vec3(0.93333, 0.713725, 0.38039), vec3(0.53333,0.313725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
+const Material mBoard = Material(idBoard, vec3(0.7, 0.3, 0.05), 42.0, vec3(0.93333, 0.713725, 0.38039), vec3(0.53333,0.313725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
 const Material mTable = Material(idTable, vec3(1.2, 0.15, 0.0), 4.0, vec3(0.566,0.1196,0.0176), vec3(0.766,0.3196,0.2176), vec3(0.666,0.2196,0.1176), 0.0);
 const Material mWhite = Material(idWhiteStone, vec3(0.23, 0.63, 0.2), 42.0, vec3(0.94), vec3(0.92,0.97,0.67), vec3(0.92), 0.5);
-const Material mBlack = Material(idBlackStone, vec3(0.23, 0.83, 0.1), 8.0, vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
+const Material mBlack = Material(idBlackStone, vec3(0.23, 0.83, 0.15), 28.0, vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
 const Material mRed = Material(idLastBlackStone, vec3(0.3, 0.7, 0.25), 4.0, vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
 const Material mBack = Material(idBack, vec3(0.0, 1.0, 0.0), 1.0, bgA, bgB, bgA, 0.0);
 const Material mGrid  = Material(idGrid, vec3(1.5, 0.4, 0.15), 42.0, vec3(0.0),vec3(0.0), vec3(0.0), 0.0);
@@ -795,7 +795,6 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
             ret.d = -farClip;
             bool exter = d2 < -d3;
             ret.d = max(d2 > -boardaa ? d2 : -farClip, d3 < boardaa ? -d3 : -farClip);
-	    ret.dummy.xz = cc[i].xz;
             if (ts2.x != noIntersection2.x)
                 isInCup = ret.p.x < 0.0 ? 1 : 2;
             if (d1 < 0.0 && ret.d < 0.0 && ro.y > -0.3) {
@@ -1169,6 +1168,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         scoord.x = 2.0*length(scoord.xy);
         scoord.z = 2.0*scoord.y;
         scoord.y = 2.0*length(scoord.xy);
+        scoord.xyz = 0.1*vec3(length(scoord.yz));
         noisy = true;
         scrd = scoord;
     }
@@ -1255,8 +1255,8 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
     if (mat.id == mBoard.id || mat.id == mCupBlack.id || mat.id == mCupWhite.id) {
         float w1 = 3.0*length(scoord.yx - 0.5*vec2(1.57 + 3.1415*rnd));
         float w2 = 0.1*(scoord.x + scoord.z);
-        smult1 = mix(rnd, 1.0, 0.05)*(clamp(0.25*(sin(grad.x)), 0.0, 1.0));
-        smult2 = mix(rnd, 1.0, 0.05)*(clamp(0.25*(sin(1.5*grad.y)), 0.0, 1.0));
+        smult1 = mix(clamp(abs(rnd),0.0,1.0), 1.0, 0.01)*(clamp(0.25*(sin(grad.x)), 0.0, 1.0));
+        smult2 = mix(1.0 - clamp(abs(rnd),0.0,1.0), 1.0, 0.01)*(clamp(0.25*(sin(1.5*grad.y)), 0.0, 1.0));
 
         smult3 = 1.0 - smult2;
     }
@@ -1267,7 +1267,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         mixmult = 1.0;
     }
     mcol = mix(mix(mcol, mcolb, smult2), mix(mcol, mcolc, 1.0 - smult2), smult1);
-    nn = normalize(mix(ip.n, grad2, 0.01));
+    nn = normalize(mix(ip.n, grad2, 0.015));
     return mat;
 }
 
