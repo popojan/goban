@@ -1,4 +1,4 @@
-#version 330
+#version 300 es
 precision highp float;
 
 /* === DO NOT CHANGE BELOW === */
@@ -132,9 +132,9 @@ const vec3 bgB = vec3(0.0, 0.0, 0.0);
 
 const Material mCupBlack = Material(idCupBlack, vec3(0.4, 0.6, 0.15), 16.0, vec3(0.65826, 0.528209, 0.238209), vec3(0.387763, 0.3289191, 0.12761), vec3(0.22005, 0.180002, 0.1244), 1.3);
 const Material mCupWhite = Material(idCupWhite, vec3(0.4, 0.6, 0.15), 16.0, vec3(0.45826, 0.428209, 0.238209), vec3(0.287763, 0.289191, 0.12761), vec3(0.12005, 0.120002, 0.085744), 1.3);
-const Material mBoard = Material(idBoard, vec3(0.7, 0.3, 0.05), 42.0, vec3(0.93333, 0.713725, 0.38039), vec3(0.53333,0.313725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
+const Material mBoard = Material(idBoard, 1.3*vec3(0.7, 0.3, 0.05), 42.0, vec3(0.93333, 0.713725, 0.38039), vec3(0.53333,0.313725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
 const Material mTable = Material(idTable, vec3(1.2, 0.15, 0.0), 4.0, vec3(0.566,0.1196,0.0176), vec3(0.766,0.3196,0.2176), vec3(0.666,0.2196,0.1176), 0.0);
-const Material mWhite = Material(idWhiteStone, vec3(0.23, 0.63, 0.2), 42.0, vec3(0.94), vec3(0.92,0.97,0.67), vec3(0.92), 0.5);
+const Material mWhite = Material(idWhiteStone, vec3(0.23, 0.73, 0.2), 42.0, vec3(0.96), vec3(0.86,0.82,0.87), vec3(0.93), 0.5);
 const Material mBlack = Material(idBlackStone, vec3(0.23, 0.83, 0.15), 28.0, vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
 const Material mRed = Material(idLastBlackStone, vec3(0.3, 0.7, 0.25), 4.0, vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
 const Material mBack = Material(idBack, vec3(0.0, 1.0, 0.0), 1.0, bgA, bgB, bgA, 0.0);
@@ -1040,8 +1040,12 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
                             else {
                                 vec3 u = normalize(cross(nor, nBoard));
                                 vec3 v = cross(u, nor);
-                                float acs = acos(dot(v, normalize(vec3(pos.x, 0.000, pos.z) - vec3(xz.x, 0.0, xz.y))));
-                                //ret.y *= min(1.0, acs / PI);
+				vec3 diff = vec3(pos.x, 0.000, pos.z) - vec3(xz.x, 0.0, xz.y);
+				if(length(diff) > 0.01) {
+	                               float acs = acos(dot(v, normalize(diff)));
+                                       //ret.y *= min(1.0, acs / PI);
+				       ret.y *= mix(1.0,min(1.0, acs / PI),2.0*(length(diff)-0.01)/ww);
+				}
                             }
                         }
                         if (isBoard && pos.y > -0.001){
@@ -1151,15 +1155,16 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
     float sfreq;
     float mixcoef, smult1, smult2, smult3, sadd1, mixmult;
     float fpow = 1.0;
-    mixmult = 1.0;
+    mixmult = 0.0;
     smult1 = 0.0;
     smult2 = 0.0;
     smult3 = 1.0;
     mcol = m0.clrA;
     vec3 mcolb = m0.clrB;
     vec3 mcolc = m0.clrC;
-    vec3 scrd2 = 64.0*(ip.p-ip.dummy.xyz);
-    vec3 scrd = ip.p.xyz - ip.dummy.xyz;
+    vec3 flr = ip.dummy.xyz;
+    vec3 scrd2 = 64.0*(ip.p.xyz-flr);
+    vec3 scrd = ip.p.xyz - flr;
     float degrade = (1.0 + floor(length(ro) / 3.0));
     vec2 xz;
     xz = scrd.xz;
@@ -1171,6 +1176,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         scoord.xyz = 0.1*vec3(length(scoord.yz));
         noisy = true;
         scrd = scoord;
+	mixmult = 0.015;
     }
     else if (mat.id == mGrid.id) {
         scoord = 350.0*scrd;
@@ -1191,12 +1197,13 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
 		scrd2 *= 5.0;
 	}
         else {
-		scrd2 *= 3.0;
+		//scrd2 *= 3.0;
 		vec2 xz = mat2(cosa, sina, -sina, cosa)*scrd2.xz;
 		scrd2 = xz.xyy;
 		scrd2.y = scrd.y;
 		scrd2.z = 1.0;
 	}
+	mixmult = 0.015;
     }
     if (m0.id == mTable.id) {
         vec3 color;// = mix(mTable.clrA,mTable.clrB,density);
@@ -1236,7 +1243,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
             float sina = sin(alpha);
             xz = mat2(cosa, sina, -sina, cosa)*ip.p.xz;
             scoord = 16.0*vec3(xz.x, ip.p.y, xz.y) + vec3(0.0, 0.25, 0.0);
-        scrd = 13.3*scoord;
+        scrd = 3.3*scoord;
         noisy = true;
         const float al = 0.15;
         float mixt = exp(-0.35*max(0.0, length(ip.p)));
@@ -1249,8 +1256,8 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
     vec3 grad = vec3(0.0, 1.0, 0.0);
     vec3 grad2 = vec3(0.0, 1.0, 0.0);
     //if (noisy) {
-        rnd2 = snoise(scrd2, grad2);
         rnd = snoise(scrd, grad);
+        rnd2 = snoise(scrd2+grad, grad2);
     //}
     if (mat.id == mBoard.id || mat.id == mCupBlack.id || mat.id == mCupWhite.id) {
         float w1 = 3.0*length(scoord.yx - 0.5*vec2(1.57 + 3.1415*rnd));
@@ -1264,10 +1271,11 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         smult1 = clamp(abs(rnd),0.0,1.0);
         smult2 = clamp(abs(rnd2),0.0,1.0);
         smult3 = 0.5;//clamp(abs(grad.z),0.0,1.0);
-        mixmult = 1.0;
+        mixmult = 0.0;
     }
     mcol = mix(mix(mcol, mcolb, smult2), mix(mcol, mcolc, 1.0 - smult2), smult1);
-    nn = normalize(mix(ip.n, grad2, 0.015));
+    nn = normalize(mix(ip.n, grad2, mixmult));
+    //nn = ip.n;
     return mat;
 }
 

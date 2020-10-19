@@ -209,16 +209,18 @@ public:
     int updateStones(const Board& previous, bool showTerritory);
 
     bool isEmpty() const;
-	bool toggleTerritory();
-	bool toggleTerritoryAuto(bool);
+    bool toggleTerritory();
+    bool toggleTerritoryAuto(bool);
 
-	double placeCursor(const Position& p, const Color& col);
+    double placeCursor(const Position& p, const Color& col);
     double placeFuzzy(const Position& p, bool nofix = false);
 
     bool collides(int i, int j, int i0, int j0);
     void removeOverlay(const Position& p);
     void setOverlay(const Position& p, const std::string& text, const Color& c);
-
+    void setRandomStoneRotation() {
+    	randomStoneRotation = 3.1415f * udist(generator);
+    }
 private:
 
     inline int ord(const Position& p) const {
@@ -244,19 +246,21 @@ private:
 
     std::default_random_engine generator;
     std::normal_distribution<float> dist;
+    std::uniform_real_distribution<float> udist;
 
     bool invalidated;
 
     const static float mEmpty;
+    double randomStoneRotation;
 
 public:
-	volatile long positionNumber;
+    volatile long positionNumber;
     bool showTerritory;
     bool showTerritoryAuto;
     bool territoryReady;
 private:
-	int lastPlayed_i, lastPlayed_j;
-	Position cursor;
+    int lastPlayed_i, lastPlayed_j;
+    Position cursor, lastCursor;
     volatile long moveNumber;
 public:
     double collision;

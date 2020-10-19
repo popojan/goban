@@ -149,8 +149,8 @@ double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
             p.y = v.y;
             spdlog::debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
             unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
-	        x = glstones[idx - 2];
-	        y = glstones[idx - 1];
+	    x = glstones[idx - 2];
+	    y = glstones[idx - 1];
             glstones[idx0 - 2] = p.x;
             glstones[idx0 - 1] = p.y;
             Point& pt = (*this)[Position(j0, i0)];
@@ -199,7 +199,8 @@ double Board::placeFuzzy(const Position& p, bool nofix){
     (*this)[p].x = x;
     (*this)[p].y = y;
 
-    glstones[idx + 1] = 3.14f*dist(generator);
+    //random rotation for the first time
+    glstones[idx + 1] = randomStoneRotation;
     if(nofix == false) {
         if (i + 1 < boardSize)
             ret = std::max(ret, fixStone(i, j, i + 1u, j));
@@ -244,7 +245,7 @@ int Board::stoneChanged(const Position& p, const Color& c) {
         removeOverlay(p);
     }
     //TODO refactor arrays and indexing to simplify
-	glstones[idx + 0] = mValue;
+    glstones[idx + 0] = mValue;
     (*this)[p].stone = c;
     return ret;
 }
@@ -573,10 +574,4 @@ double Board::placeCursor(const Position& coord, const Color& col) {
     pos.y = coord.row() + add.y;
 
     return stoneChanged(pos, col);
-    /*int oidx = ((boardSize  * coord.row() + coord.col()) << 2u) + 2u;
-    spdlog::debug("oidx = [{},{}] = {} ... {} {}", coord.col(), coord.row(), oidx, board[coord].toString(), col.toString());
-    double altered = placeFuzzy(coord);
-    stones[oidx + 0] = (col == Color::WHITE) ? mWhite : mBlack;
-    spdlog::debug("overlay coord = [{},{}] = {}", stones[oidx - 2], stones[oidx - 1], stones[oidx + 0]);*/
-    //return 0.2;//std::min(1.0, altered);
 }
