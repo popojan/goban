@@ -1,6 +1,32 @@
 #include "StreamHandler.hpp"
 #include <spdlog/spdlog.h>
 
+#include <Rocket/Core/Platform.h>
+
+#if defined(ROCKET_PLATFORM_LINUX)
+    #include <alsa/error.h>
+    #include <cstdarg>
+    #include <cstdio>
+
+    void alsa_error_callback (
+            const char *file,
+            int line,
+            const char *function,
+            int err, const char *fmt, ...)
+    {
+        va_list args;
+        va_start(args, fmt);
+        char * msg;
+        vasprintf(&msg, fmt, args);
+        if(err >= SND_ERROR_BEGIN)
+            spdlog::error("Alsa error {} in {} at {}:{}: {}", err, function, file, line, msg);
+        else
+            spdlog::warn("Alsa info {} in {} at {}:{}: {}", err, function, file, line, msg);
+        free(msg);
+        va_end(args);
+    }
+#endif
+
 int StreamHandler::PortAudioCallback(const void * input,
                                      void * output,
                                      unsigned long frameCount,
@@ -123,6 +149,10 @@ void StreamHandler::init() {
         //putenv(latency);
 #endif
 
+#if defined(ROCKET_PLATFORM_LINUX)
+        snd_lib_error_set_handler(alsa_error_callback);
+#endif
+
         Pa_Initialize();
         PaError errorCode;
         PaStreamParameters outputParameters;
@@ -155,10 +185,12 @@ void StreamHandler::init() {
 
 StreamHandler::~StreamHandler()
 {
+        spdlog::debug("PortAudio Termination in progress..");
         Pa_CloseStream(stream);
         for (auto wrapper : data)
         {
                 delete wrapper;
         }
+        Pa_Sleep(1000);
         Pa_Terminate();
 }

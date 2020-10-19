@@ -11,7 +11,8 @@
       "name": "Pachi 10.00",
       "path": "./engine/pachi",
       "command": "pachi",
-      "parameters": "-t _120 threads=2,maximize_score"
+      "parameters": "-t _120 threads=2,maximize_score",
+      "enabled": 0
     },
     {
       "name": "Katago #170 b20",

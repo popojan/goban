@@ -355,10 +355,13 @@ int GobanView::updateCursor(const Position& lastCursor){
     int ret = 0;
     auto& np = model.board[cursor];
 
+    if(state.holdsStone != model.state.holdsStone) {
+	board.setRandomStoneRotation();
+        state.holdsStone = model.state.holdsStone;
+    }
     if(model.state.holdsStone && model.isPointOnBoard(cursor) && np.stone == Color::EMPTY){
         board.placeCursor(cursor, state.colorToMove);
     }
-    state.holdsStone = model.state.holdsStone;
     return ret;
 }
 
@@ -372,6 +375,7 @@ void GobanView::onGameMove(const Move& move) {
             board.removeOverlay(lastMove);
         }
         lastMove = move.pos;
+	board.setRandomStoneRotation();
         board.setOverlay(move.pos, ss.str(), move.col);
     }
 }

@@ -76,7 +76,9 @@ ExternalProject_Add(project_libsgfcplusplus
     SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
     BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
     STEP_TARGETS build
-    UPDATE_DISCONNECTED TRUE
+    UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
+    COMMAND git fetch
+    COMMAND git checkout sgfc
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 
