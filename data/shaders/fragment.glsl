@@ -1,4 +1,4 @@
-#version 300 es
+#version 330
 precision highp float;
 
 /* === DO NOT CHANGE BELOW === */
@@ -134,8 +134,8 @@ const Material mCupBlack = Material(idCupBlack, vec3(0.4, 0.6, 0.15), 16.0, vec3
 const Material mCupWhite = Material(idCupWhite, vec3(0.4, 0.6, 0.15), 16.0, vec3(0.45826, 0.428209, 0.238209), vec3(0.287763, 0.289191, 0.12761), vec3(0.12005, 0.120002, 0.085744), 1.3);
 const Material mBoard = Material(idBoard, vec3(0.7, 0.3, 0.15), 42.0, vec3(0.93333, 0.713725, 0.38039), vec3(0.53333,0.313725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
 const Material mTable = Material(idTable, vec3(1.2, 0.15, 0.0), 4.0, vec3(0.566,0.1196,0.0176), vec3(0.766,0.3196,0.2176), vec3(0.666,0.2196,0.1176), 0.0);
-const Material mWhite = Material(idWhiteStone, vec3(0.23, 0.63, 0.2), 42.0, vec3(0.92), vec3(0.94), vec3(1.0), 0.5);
-const Material mBlack = Material(idBlackStone, vec3(0.23, 0.83, 0.6), 42.0, vec3(0.08), vec3(0.04), vec3(0.16), 0.5);
+const Material mWhite = Material(idWhiteStone, vec3(0.23, 0.63, 0.2), 42.0, vec3(0.94), vec3(0.92,0.97,0.67), vec3(0.92), 0.5);
+const Material mBlack = Material(idBlackStone, vec3(0.23, 0.83, 0.1), 8.0, vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
 const Material mRed = Material(idLastBlackStone, vec3(0.3, 0.7, 0.25), 4.0, vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
 const Material mBack = Material(idBack, vec3(0.0, 1.0, 0.0), 1.0, bgA, bgB, bgA, 0.0);
 const Material mGrid  = Material(idGrid, vec3(1.5, 0.4, 0.15), 42.0, vec3(0.0),vec3(0.0), vec3(0.0), 0.0);
@@ -376,14 +376,14 @@ bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out ve
             vec2 d1 = intersectionRaySphere(ro, rd, dd + dn);
             float p1 = max(d1.x, d2.x);
             float p2 = min(d1.y, d2.y);
-            if (p1 >= 0.0 && p1 < p2 && p1 < mint) {
+            if (p1 >= 0.0 && p1 <= p2 && p1 < mint) {
                 vec2 d3 = intersectionRayCylinder(ro, rd, dd, px*px);
                 vec2 d4;
                 vec4 tt = intersectionRayEllipsoid(ro, rd, dd, d4);
                 vec3 ip = ro + p1*rd;
                 vec3 rcc = dd + (d1.x < d2.x ? -dn : dn);
                 vec3 n = normalize(ip - rcc);
-                if (p1 > d3.x && p1 < d3.y && d3.x < farClip) {
+                if (p1 >= d3.x && p1 < d3.y && d3.x < farClip) {
                     res = vec4(n, p1);
                     t2 = p2;
                     rval = true;
@@ -430,84 +430,106 @@ float floatConstruct(uint m) {
     return f - 1.0;                        // Range [0:1]
 }
 
-// Pseudo-random value in half-open range [0:1].
-float rand(float x) { return floatConstruct(hash(floatBitsToUint(x))); }
-float rand(vec2  v) { return floatConstruct(hash(floatBitsToUint(v))); }
-float rand(vec3  v) { return floatConstruct(hash(floatBitsToUint(v))); }
-float rand(vec4  v) { return floatConstruct(hash(floatBitsToUint(v))); }
+vec3 mod289(vec3 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
 
-highp float rand_(vec3 co)
+vec4 mod289(vec4 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 permute(vec4 x) {
+     return mod289(((x*34.0)+1.0)*x);
+}
+
+vec4 taylorInvSqrt(vec4 r)
 {
-    const highp vec4 abcd = vec4(12.9898, 78.233, 37.6253, 43758.5453);
-    highp float dt = dot(abcd.zyx + co, abcd.xzy);
-    //highp float sn= mod(dt,3.14159265358979);
-    return fract(sin(dt)*abcd.z);
-    //sn = fract(mod(1.0 - 2.0*dt, 1.0)*d);
-    //return sn;
+  return 1.79284291400159 - 0.85373472095314 * r;
 }
 
-float cnoise(vec3 P) {
-    vec3 Pi0 = floor(P); // Integer part for indexing
-    vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1
-    //Pi0 = mod289(Pi0);
-    Pi0 = Pi0 - floor(Pi0 * (1.0 / 289.0)) * 289.0;
-    Pi1 = Pi1 - floor(Pi1 * (1.0 / 289.0)) * 289.0;
-    //Pi1 = mod289(Pi1);
-    vec3 Pf0 = fract(P); // Fractional part for interpolation
-    vec3 Pf1 = Pf0 - vec3(1.0); // Fractional part - 1.0
-
-    float rnd1 = rand(vec3(Pi0.x, Pi0.y, Pi0.z));
-    float rnd2 = rand(vec3(Pi0.x, Pi0.y, Pi1.z));
-    float rnd3 = rand(vec3(Pi1.x, Pi0.y, Pi1.z));
-    float rnd4 = rand(vec3(Pi1.x, Pi0.y, Pi0.z));
-    float rnd5 = rand(vec3(Pi0.x, Pi1.y, Pi0.z));
-    float rnd6 = rand(vec3(Pi0.x, Pi1.y, Pi1.z));
-    float rnd7 = rand(vec3(Pi1.x, Pi1.y, Pi1.z));
-    float rnd8 = rand(vec3(Pi1.x, Pi1.y, Pi0.z));
-    return mix(
-        mix(mix(rnd1, rnd2, Pf0.z), mix(rnd4, rnd3, Pf0.z), Pf0.x),
-        mix(mix(rnd5, rnd6, Pf0.z), mix(rnd8, rnd7, Pf0.z), Pf0.x),
-        Pf0.y);
-}
-float dnoise(vec3 P)
+float snoise(vec3 v, out vec3 gradient)
 {
+  const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
+  const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
 
-    vec3 Pi0 = floor(P); // Integer part for indexing
-    vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1
-    //Pi0 = mod289(Pi0);
-    Pi0 = Pi0 - floor(Pi0 * (1.0 / 289.0)) * 289.0;
-    Pi1 = Pi1 - floor(Pi1 * (1.0 / 289.0)) * 289.0;
-    //Pi1 = mod289(Pi1);
-    vec3 Pf0 = fract(P); // Fractional part for interpolation
-    vec3 Pf1 = Pf0 - vec3(1.0); // Fractional part - 1.0
+// First corner
+  vec3 i  = floor(v + dot(v, C.yyy) );
+  vec3 x0 =   v - i + dot(i, C.xxx) ;
 
-    float rnd1 = rand(vec3(Pi0.x, Pi0.y, Pi0.z));
-    float rnd2 = rand(vec3(Pi0.x, Pi0.y, Pi1.z));
-    float rnd3 = rnd1; //rand(vec3(Pi1.x, Pi0.y, Pi1.z));
-    float rnd4 = rnd2; //rand(vec3(Pi1.x, Pi0.y, Pi0.z));
-    float rnd5 = rand(vec3(Pi0.x, Pi1.y, Pi0.z));
-    float rnd6 = rand(vec3(Pi0.x, Pi1.y, Pi1.z));
-    float rnd7 = rnd5;//rand(vec3(Pi1.x, Pi1.y, Pi1.z));
-    float rnd8 = rnd6;//rand(vec3(Pi1.x, Pi1.y, Pi0.z));
-    return mix(
-        mix(mix(rnd1, rnd2, Pf0.z), mix(rnd4, rnd3, Pf0.z), Pf0.x),
-        mix(mix(rnd5, rnd6, Pf0.z), mix(rnd8, rnd7, Pf0.z), Pf0.x),
-        Pf0.y);
+// Other corners
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min( g.xyz, l.zxy );
+  vec3 i2 = max( g.xyz, l.zxy );
+
+  //   x0 = x0 - 0.0 + 0.0 * C.xxx;
+  //   x1 = x0 - i1  + 1.0 * C.xxx;
+  //   x2 = x0 - i2  + 2.0 * C.xxx;
+  //   x3 = x0 - 1.0 + 3.0 * C.xxx;
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + C.yyy; // 2.0*C.x = 1/3 = C.y
+  vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y
+
+// Permutations
+  i = mod289(i); 
+  vec4 p = permute( permute( permute( 
+             i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+           + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
+           + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+
+// Gradients: 7x7 points over a square, mapped onto an octahedron.
+// The ring size 17*17 = 289 is close to a multiple of 49 (49*6 = 294)
+  float n_ = 0.142857142857; // 1.0/7.0
+  vec3  ns = n_ * D.wyz - D.xzx;
+
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);  //  mod(p,7*7)
+
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)
+
+  vec4 x = x_ *ns.x + ns.yyyy;
+  vec4 y = y_ *ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+
+  vec4 b0 = vec4( x.xy, y.xy );
+  vec4 b1 = vec4( x.zw, y.zw );
+
+  //vec4 s0 = vec4(lessThan(b0,0.0))*2.0 - 1.0;
+  //vec4 s1 = vec4(lessThan(b1,0.0))*2.0 - 1.0;
+  vec4 s0 = floor(b0)*2.0 + 1.0;
+  vec4 s1 = floor(b1)*2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+
+  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+
+  vec3 p0 = vec3(a0.xy,h.x);
+  vec3 p1 = vec3(a0.zw,h.y);
+  vec3 p2 = vec3(a1.xy,h.z);
+  vec3 p3 = vec3(a1.zw,h.w);
+
+//Normalise gradients
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+  p0 *= norm.x;
+  p1 *= norm.y;
+  p2 *= norm.z;
+  p3 *= norm.w;
+
+// Mix final noise value
+  vec4 m = max(0.5 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  vec4 m2 = m * m;
+  vec4 m4 = m2 * m2;
+  vec4 pdotx = vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3));
+
+// Determine noise gradient
+  vec4 temp = m2 * m * pdotx;
+  gradient = -8.0 * (temp.x * x0 + temp.y * x1 + temp.z * x2 + temp.w * x3);
+  gradient += m4.x * p0 + m4.y * p1 + m4.z * p2 + m4.w * p3;
+  gradient *= 105.0;
+
+  return 105.0 * dot(m4, pdotx);
 }
 
-float surface3(vec3 coord, float frequency) {
-    float n = 0.0;
-    const int N = 3;
-    vec3 v;
-    v = coord*frequency;
-    //    v[1] = 7.0 * v[0];
-    //    v[2] = 13.0 * v[0];
-    vec3 Pi0;
-    //    for(int i = 0; i < N; ++i) {
-    return cnoise(v);
-    //    }
-    //    return n;///3.0;
-}
 
 void updateResult(inout Intersection result[2], Intersection ret) {
     if (ret.t.x <= result[0].t.x) {
@@ -527,6 +549,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
     ret.n = nBoard;
     ret.t = vec2(farClip);
     ret.p = vec3(-farClip);
+    ret.dummy = vec4(0.0);
     ret.isBoard = false;
     result[0] = result[1] = ret;
 
@@ -772,6 +795,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
             ret.d = -farClip;
             bool exter = d2 < -d3;
             ret.d = max(d2 > -boardaa ? d2 : -farClip, d3 < boardaa ? -d3 : -farClip);
+	    ret.dummy.xz = cc[i].xz;
             if (ts2.x != noIntersection2.x)
                 isInCup = ret.p.x < 0.0 ? 1 : 2;
             if (d1 < 0.0 && ret.d < 0.0 && ro.y > -0.3) {
@@ -1017,8 +1041,8 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
                             else {
                                 vec3 u = normalize(cross(nor, nBoard));
                                 vec3 v = cross(u, nor);
-                                float acs = acos(dot(v, normalize(vec3(pos.x, 0.0, pos.z) - vec3(xz.x, 0.0, xz.y))));
-                                ret.y *= min(1.0, acs / PI);
+                                float acs = acos(dot(v, normalize(vec3(pos.x, 0.000, pos.z) - vec3(xz.x, 0.0, xz.y))));
+                                //ret.y *= min(1.0, acs / PI);
                             }
                         }
                         if (isBoard && pos.y > -0.001){
@@ -1119,7 +1143,7 @@ Material getMaterial(int m) {
     return ret;
 }
 
-Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3 ro) {
+Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3 ro, out vec3 nn) {
     Material mat = getMaterial(ip.m);
     Material m0 = mat;//;at = mBoard;// getMaterial(idBoard);//ip.m
     bool noisy = false;
@@ -1135,21 +1159,21 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
     mcol = m0.clrA;
     vec3 mcolb = m0.clrB;
     vec3 mcolc = m0.clrC;
-    vec3 scrd;
+    vec3 scrd2 = 64.0*(ip.p-ip.dummy.xyz);
+    vec3 scrd = ip.p.xyz - ip.dummy.xyz;
     float degrade = (1.0 + floor(length(ro) / 3.0));
     vec2 xz;
-    xz = ip.p.xz;
+    xz = scrd.xz;
     if (mat.id == mBoard.id || mat.id == mCupBlack.id || mat.id == mCupWhite.id) {
-        scoord = 16.0*vec3(xz.x,ip.p.y,xz.y) + vec3(0.0, 0.25, 0.0);
-        //scoord.z *= 0.24;
-        //scoord.y += 1.2;
-        scoord.x *= 6.14;
-        scoord.y *= 5.14;
+        scoord = 16.0*vec3(xz.x,scrd.y,xz.y) + vec3(0.0, 0.25, 0.0);
+        scoord.x = 2.0*length(scoord.xy);
+        scoord.z = 2.0*scoord.y;
+        scoord.y = 2.0*length(scoord.xy);
         noisy = true;
-        scrd = 0.5*scoord;
+        scrd = scoord;
     }
     else if (mat.id == mGrid.id) {
-        scoord = 350.0*ip.p;
+        scoord = 350.0*scrd;
         sfreq = 1.5;
         noisy = true;
         scrd = scoord;
@@ -1158,15 +1182,21 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         float alpha = ip.dummy.w;
         float cosa = cos(alpha);
         float sina = sin(alpha);
-        vec2 xz = mat2(cosa, sina, -sina, cosa)*ip.p.xz;
-        scoord = xz.xyy;
-        scoord.y = 1.0;
-        scoord = reflect(rd, ip.n);
-        scoord = 0.5*(1.0 + sin(vec3(3.0,3.0,3.0)*scoord));
+        //scoord = reflect(rd, ip.n);
+        //scoord = 0.5*(1.0 + sin(vec3(3.0,3.0,3.0)*scoord));
         sfreq = 1.0*(1.0 + 0.1*sin(11.0 + xz.x));
         sadd1 = 5.0 + sin(131.0 + 15.0*xz.x);
         noisy = true;
-        scrd = scoord;
+	if(mat.id == mBlack.id) {
+		scrd2 *= 5.0;
+	}
+        else {
+		scrd2 *= 3.0;
+		vec2 xz = mat2(cosa, sina, -sina, cosa)*scrd2.xz;
+		scrd2 = xz.xyy;
+		scrd2.y = scrd.y;
+		scrd2.z = 1.0;
+	}
     }
     if (m0.id == mTable.id) {
         vec3 color;// = mix(mTable.clrA,mTable.clrB,density);
@@ -1215,23 +1245,29 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         mcol *= mixt;
     }
     float rnd = 0.0;
+    float rnd2 = 0.0;
+    vec3 grad = vec3(0.0, 1.0, 0.0);
+    vec3 grad2 = vec3(0.0, 1.0, 0.0);
     //if (noisy) {
-        rnd = surface3(scrd, 1.0);
+        rnd2 = snoise(scrd2, grad2);
+        rnd = snoise(scrd, grad);
     //}
     if (mat.id == mBoard.id || mat.id == mCupBlack.id || mat.id == mCupWhite.id) {
         float w1 = 3.0*length(scoord.yx - 0.5*vec2(1.57 + 3.1415*rnd));
         float w2 = 0.1*(scoord.x + scoord.z);
-        smult1 = mix(rnd, 1.0, 0.05)*(clamp(0.25*(sin(w1)), 0.0, 1.0));
-        smult2 = mix(rnd, 1.0, 0.05)*(clamp(0.25*(sin(1.5*w1)), 0.0, 1.0));
+        smult1 = mix(rnd, 1.0, 0.05)*(clamp(0.25*(sin(grad.x)), 0.0, 1.0));
+        smult2 = mix(rnd, 1.0, 0.05)*(clamp(0.25*(sin(1.5*grad.y)), 0.0, 1.0));
+
         smult3 = 1.0 - smult2;
     }
     else if (mat.id == mBlack.id || mat.id == mGrid.id || mat.id == mWhite.id || mat.id == mTable.id) {
-        smult1 = rnd;
-        smult2 = 0.2;//5;
-        smult3 = 1.0 - smult2;
+        smult1 = clamp(abs(rnd),0.0,1.0);
+        smult2 = clamp(abs(rnd2),0.0,1.0);
+        smult3 = 0.5;//clamp(abs(grad.z),0.0,1.0);
         mixmult = 1.0;
     }
     mcol = mix(mix(mcol, mcolb, smult2), mix(mcol, mcolc, 1.0 - smult2), smult1);
+    nn = normalize(mix(ip.n, grad2, 0.01));
     return mat;
 }
 
@@ -1275,8 +1311,10 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
     float alpha1 = smoothstep(boardaa, 0.0, -ret[0].d);
     float alpha2 = smoothstep(boardaa, 0.0, -ret[1].d);
     vec3 col, mcol;
-    Material mat;
-    mat = getMaterialColor(ret[0], mcol, rd, ro);
+    Material mat; 
+    vec3 nn;
+    mat = getMaterialColor(ret[0], mcol, rd, ro, nn);
+    ret[0].n = nn;
     float w = alpha1;
     float wcol = (1.0-w);
     col = shading(ro, rd, ret[0], mat, mcol);
@@ -1290,7 +1328,8 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
     gl_FragDepth = (ret[0].m == mBlack.id || ret[0].m == mWhite.id) ? 0.5 : (ret[0].p.y < -0.001 ? 0.25 : 0.75);//; distance(ro, ret[0].p) / 100.0;
     if (alpha1 > 0.0) {
         //ret[0] = mix(ret[0].n, ret[1].n, alpha1)
-        mat = getMaterialColor(ret[1], mcol, rd, ro);
+        mat = getMaterialColor(ret[1], mcol, rd, ro, nn);
+        ret[1].n = nn;
         //mcol = 0.5*(mat.clrA+mat.clrB);
 
         col1 = shading(ro, rd, ret[1], mat, mcol);
