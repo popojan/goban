@@ -1153,9 +1153,10 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
     float mult = 1.0;
     vec3 scoord;
     float sfreq;
-    float mixcoef, smult1, smult2, smult3, sadd1, mixmult;
+    float mixcoef, smult1, smult2, smult3, sadd1, mixmult, mixnorm;
     float fpow = 1.0;
     mixmult = 0.0;
+    mixnorm = mixmult;
     smult1 = 0.0;
     smult2 = 0.0;
     smult3 = 1.0;
@@ -1176,7 +1177,8 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         scoord.xyz = 0.1*vec3(length(scoord.yz));
         noisy = true;
         scrd = scoord;
-	mixmult = 0.015;
+	mixmult = 1.0;
+  mixnorm = 0.015;
     }
     else if (mat.id == mGrid.id) {
         scoord = 350.0*scrd;
@@ -1204,6 +1206,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
 		scrd2.z = 1.0;
 	}
 	mixmult = 0.015;
+  mixnorm = 0.015;
     }
     if (m0.id == mTable.id) {
         vec3 color;// = mix(mTable.clrA,mTable.clrB,density);
@@ -1242,14 +1245,17 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
             float cosa = cos(alpha);
             float sina = sin(alpha);
             xz = mat2(cosa, sina, -sina, cosa)*ip.p.xz;
-            scoord = 16.0*vec3(xz.x, ip.p.y, xz.y) + vec3(0.0, 0.25, 0.0);
-        scrd = 3.3*scoord;
+        scoord = ip.p;//16.0*vec3(xz.x, ip.p.y, xz.y) + vec3(0.0, 0.25, 0.0);
+        scrd = 66.1*scoord;
+        scrd2 = 16.1*scoord;
         noisy = true;
         const float al = 0.15;
         float mixt = exp(-0.35*max(0.0, length(ip.p)));
         mcolb = mixt*(mcol + (al)*(vec3(1.0) - mcol));
         mcolc = mixt*((1.0 - al)*mcol);
         mcol *= mixt;
+        mixmult = 0.1;
+        mixnorm = 0.0;
     }
     float rnd = 0.0;
     float rnd2 = 0.0;
@@ -1257,7 +1263,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
     vec3 grad2 = vec3(0.0, 1.0, 0.0);
     //if (noisy) {
         rnd = snoise(scrd, grad);
-        rnd2 = snoise(scrd2+grad, grad2);
+        rnd2 = snoise(scrd2+mixmult*grad, grad2);
     //}
     if (mat.id == mBoard.id || mat.id == mCupBlack.id || mat.id == mCupWhite.id) {
         float w1 = 3.0*length(scoord.yx - 0.5*vec2(1.57 + 3.1415*rnd));
@@ -1274,7 +1280,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         mixmult = 0.0;
     }
     mcol = mix(mix(mcol, mcolb, smult2), mix(mcol, mcolc, 1.0 - smult2), smult1);
-    nn = normalize(mix(ip.n, grad2, mixmult));
+    nn = normalize(mix(ip.n, grad2, mixnorm));
     //nn = ip.n;
     return mat;
 }
