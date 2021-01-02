@@ -15,7 +15,7 @@
 class Player
 {
 public:
-    enum Role { NONE = 0, WHITE = 1, BLACK = 2, COACH = 4, SPECTATOR = 8, STANDBY = 16};
+    enum Role { NONE = 0, WHITE = 1, BLACK = 2, COACH = 4, SPECTATOR = 8, KIBITZ = 16, STANDBY = 32};
     enum Type { LOCAL = 1, HUMAN = 2, ENGINE = 4 };
 
     Player(const std::string& name, int role, int type) : name(name), role(role), type(type) {

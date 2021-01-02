@@ -83,7 +83,7 @@ class Move {
 
 public:
 
-    enum Special { INVALID, INTERRUPT, NORMAL, PASS, UNDO, RESIGN };
+    enum Special { INVALID, INTERRUPT, NORMAL, PASS, UNDO, RESIGN, KIBITZED};
 
     Move(): spec(INVALID), col(Color::EMPTY) {}
 
@@ -93,7 +93,7 @@ public:
         : spec(NORMAL), pos(pos), col(col)
     { }
 
-    operator bool() const { return spec != INVALID && spec != INTERRUPT; }
+    operator bool() const { return spec != INVALID && spec != INTERRUPT && spec != KIBITZED; }
     operator Position() const { return pos; }
     operator Color() const { return col; }
 
@@ -220,6 +220,10 @@ public:
     void setOverlay(const Position& p, const std::string& text, const Color& c);
     void setRandomStoneRotation() {
     	randomStoneRotation = 3.1415f * udist(generator);
+    }
+
+    double getRandomStoneRotation() {
+        return 3.1415f * udist(generator);
     }
 private:
 

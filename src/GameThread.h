@@ -28,6 +28,7 @@ public:
     size_t addPlayer(Player* player);
 
     Engine* currentCoach();
+    Engine* currentKibitz();
 
     Player* currentPlayer();
 
@@ -52,6 +53,7 @@ public:
     bool humanToMove();
 
     void playLocalMove(const Move& move);
+    void playKibitzMove();
 
     void loadEngines(const std::shared_ptr<Configuration> config);
 
@@ -82,7 +84,7 @@ private:
     std::mutex mutex2;
     volatile bool interruptRequested, hasThreadRunning;
     Player* playerToMove;
-	std::size_t human, sgf, coach;
+	std::size_t human, sgf, coach, kibitz;
 	std::size_t numPlayers;
 	std::array<std::size_t, 2> activePlayer;
     std::mutex playerMutex;

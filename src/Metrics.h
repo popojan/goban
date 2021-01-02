@@ -16,12 +16,12 @@ public:
     float stoneSphereRadius;
     float stoneRadius;
     float innerBowlRadius;
-    float bowlsCenters[6];
+    float bowlsCenters[12];
     float squareSize;
     float stoneHeight;
 
-    static const int maxc = 32;
-    float tmpc[6 * maxc];
+    static const int maxc = 91;
+    float tmpc[8 * maxc];
     float resolution[2];
     float translate[3];
 

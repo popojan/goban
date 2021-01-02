@@ -18,7 +18,8 @@ class ElementGame;
 class GobanModel: public GameObserver {
 public:
     GobanModel(ElementGame *p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
-            : parent(p), prevPass(false), over(false), invalidated(false), cursor({0,0}) {
+            : parent(p), prevPass(false), over(false), invalidated(false),
+            calcCapturedBlack(0), calcCapturedWhite(0), cursor({0,0}) {
         spdlog::info("Preloading sounds...");
         //newGame(boardSize, handicap, komi);
     }
@@ -80,7 +81,7 @@ public:
 
     static const int maxCaptured = 191;
     int calcCapturedBlack, calcCapturedWhite;
-    float ddc[6 * maxCaptured];
+    float ddc[8 * maxCaptured];
 
     Metrics metrics;
 
