@@ -9,6 +9,7 @@ public:
     std::string black;
     std::string white;
     int capturedBlack, capturedWhite;
+    int reservoirBlack, reservoirWhite;
     float komi;
     int handicap;
     float result;
@@ -24,6 +25,7 @@ public:
     Message msg;
 
     GameState(): colorToMove(Color::BLACK), black(""), white(""), capturedBlack(0), capturedWhite(0),
+            reservoirBlack(32), reservoirWhite(32),
             komi(0.5f), handicap(0), result(0.0f), cmd("xxx"), msg(PAUSED),
             reason(NOREASON), adata(), metricsReady(false), showTerritory(false), showOverlay(false),
             holdsStone(false), dirty(true)

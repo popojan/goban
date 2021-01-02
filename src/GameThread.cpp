@@ -4,7 +4,7 @@
 
 GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr), interruptRequested(false), hasThreadRunning(false),
-        playerToMove(0), human(0), sgf(0), coach(0), numPlayers(0), activePlayer({0, 0})
+        playerToMove(0), human(0), sgf(0), coach(0), kibitz(0), numPlayers(0), activePlayer({0, 0})
 {
 
 }
@@ -41,6 +41,14 @@ Engine* GameThread::currentCoach() {
     }
     return 0;
 }
+
+Engine* GameThread::currentKibitz() {
+    for(auto eit = engines.begin(); eit != engines.end(); ++eit) {
+        if((*eit)->hasRole(Player::KIBITZ)) return *eit;
+    }
+    return 0;
+}
+
 Player* GameThread::currentPlayer() {
     int roleToMove = model.state.colorToMove == Color::BLACK ? Player::BLACK : Player::WHITE;
     for(auto pit = players.begin(); pit != players.end(); ++pit) {
@@ -222,11 +230,13 @@ void GameThread::gameLoop() {
     interruptRequested = false;
     while (model && !interruptRequested) {
         Engine* coach = currentCoach();
+        Engine* kibitz = currentKibitz();
         Player* player = currentPlayer();
         std::unique_lock<std::mutex> lock(playerMutex, std::defer_lock);
         bool locked = false;
         if(coach && player && !interruptRequested) {
             bool success = false;
+            bool kibitzed = false;
             bool doubleUndo = false;
             playerToMove = player;
             if(!player->isTypeOf(Player::HUMAN)){
@@ -237,6 +247,10 @@ void GameThread::gameLoop() {
             player->suggestMove(Move(Move::INVALID, model.state.colorToMove));
             //blocking wait for move
             Move move = player->genmove(model.state.colorToMove);
+            if(move == Move::KIBITZED) {
+                move = kibitz->genmove(model.state.colorToMove);
+                kibitzed = true;
+            }
             spdlog::debug("MOVE to {}, valid = {}", move.toString(), move);
             playerToMove = 0;
             if(player->isTypeOf(Player::HUMAN)){
@@ -262,6 +276,7 @@ void GameThread::gameLoop() {
             else if (move) {
                 // coach plays
                 success = player == coach
+                          || (kibitzed && kibitz == coach)
                           || move == Move::RESIGN
                           || coach->play(move);
             }
@@ -270,7 +285,7 @@ void GameThread::gameLoop() {
                 if (!(move == Move::RESIGN)) {
                     for (auto pit = players.begin(); pit != players.end(); ++pit) {
                         Player *p = *pit;
-                        if (p != reinterpret_cast<Player *>(coach) && p != player) {
+                        if (p != reinterpret_cast<Player *>(coach) && p != player && (!kibitzed || p != kibitz)) {
                             spdlog::debug("DEBUG play iter");
                             if (move == Move::UNDO) {
                                 undo(p, doubleUndo);
@@ -328,10 +343,17 @@ void GameThread::playLocalMove(const Move& move) {
     if(playerToMove) playerToMove->suggestMove(move);
 }
 
+void GameThread::playKibitzMove() {
+    std::unique_lock<std::mutex> lock(playerMutex);
+    Move kibitzed(Move::KIBITZED, model.state.colorToMove);
+    if(playerToMove) playerToMove->suggestMove(kibitzed);
+}
+
 void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
     auto bots = config->data.find("bots");
     if(bots != config->data.end()) {
         bool hasCoach(false);
+        bool hasKibitz(false);
         for(auto it = bots->begin(); it != bots->end(); ++it) {
             auto enabled = it->value("enabled", 1);
             if(enabled) {
@@ -340,6 +362,7 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
                 auto command = it->value("command", "");
                 auto parameters = it->value("parameters", "");
                 auto main = it->value("main", 0);
+                auto kibitz = it->value("kibitz", 0);
                 auto messages = it->value("messages", nlohmann::json::array());
 
                 int role = Player::SPECTATOR;
@@ -367,13 +390,32 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
                                   players[coach]->getName());
                         }
                     }
-
+                    if (kibitz) {
+                        if(!hasKibitz) {
+                            role |= Player::KIBITZ;
+                            hasKibitz = true;
+                            kibitz = id;
+                            spdlog::info("Setting [{}] engine as trusted kibitz.",
+                                         players[id]->getName());
+                        } else {
+                            spdlog::warn("Ignoring kibitz flag for [{}] engine, kibitz has already been set to [{}].",
+                                         players[id]->getName(),
+                                         players[coach]->getName());
+                        }
+                    }
                     setRole(id, role, true);
                 }
             }
         }
+        if(!hasKibitz) {
+            kibitz = coach;
+            spdlog::info("No kibitz set. Defaulting to [{}] coach engine.",
+                         players[kibitz]->getName());
+            players[coach]->setRole(players[coach]->getRole() | Player::KIBITZ);
+        }
     }
-    sgf = -1; //addPlayer(new SgfPlayer("SGF Record", "./problems/alphago-2016/3/13/Tictactoe.sgf"));
+
+    sgf = -1;
 
     human = addPlayer(new LocalHumanPlayer("Human"));
 

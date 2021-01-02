@@ -45,6 +45,10 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 }
                 else {
                     model.state.holdsStone = true;
+                    if(model.state.colorToMove == Color::BLACK)
+                        model.state.reservoirBlack -= 1;
+                    else
+                        model.state.reservoirWhite -= 1;
                     view.requestRepaint(GobanView::UPDATE_STONES);
                 }
             }
@@ -100,6 +104,10 @@ bool GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "overlay") {
         view.toggleOverlay();
+        view.requestRepaint();
+    }
+    else if (cmd == "play once") {
+        engine.playKibitzMove();
         view.requestRepaint();
     }
     else if (cmd == "play pass") {

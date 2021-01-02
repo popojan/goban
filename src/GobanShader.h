@@ -101,6 +101,8 @@ private:
 
     GLint iWhiteCapturedCount;
     GLint iBlackCapturedCount;
+    GLint iWhiteReservoirCount;
+    GLint iBlackReservoirCount;
     GLint iddc;
 
 

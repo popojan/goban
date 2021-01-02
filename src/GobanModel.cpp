@@ -20,11 +20,13 @@ void GobanModel::onBoardSized(int boardSize) {
 
 	state = GameState();
 
+    state.reservoirBlack = state.reservoirWhite = (boardSize*boardSize - 1)/2 + 1;
 	calcCapturedBlack = 0;
 	calcCapturedWhite = 0;
 
     if(!state.metricsReady) {
         metrics.calc(boardSize);
+        calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
         state.metricsReady = true;
     }
 
@@ -104,17 +106,19 @@ bool GobanModel::isPointOnBoard(const Position& p) {
 
 void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) {
     using namespace glm;
-    if (capturedBlack != calcCapturedBlack || capturedWhite != calcCapturedWhite) {
+    capturedBlack = capturedWhite = m.maxc;
+    //if (capturedBlack != calcCapturedBlack || capturedWhite != calcCapturedWhite) {
 
-        float cc0x = m.bowlsCenters[0];
-        float cc0z = m.bowlsCenters[2];
-        float cc1x = m.bowlsCenters[3];
-        float cc1z = m.bowlsCenters[5];
-        float ddcy = 0.5f*m.h - m.innerBowlRadius - 0.3f;
+        float cc0x = 0.0f;//m.bowlsCenters[0];
+        float cc0z = 0.0f;//m.bowlsCenters[2];
+        float cc1x = 0.0f;//m.bowlsCenters[3];
+        float cc1z = 0.0f;//m.bowlsCenters[5];
+        float magic = 0.0f;
+        float ddcy = 0.5f*m.h - m.innerBowlRadius - magic;
 
-        vec3 s0a(cc0x, -0.3, cc0z);
+        vec3 s0a(cc0x, -magic, cc0z);
         vec3 s1a(cc0x, ddcy, cc0z);
-        vec3 s0b(cc1x, -0.3, cc1z);
+        vec3 s0b(cc1x, -magic, cc1z);
         vec3 s1b(cc1x, ddcy, cc1z);
         vec3 sy(0.0f, m.stoneSphereRadius - 0.5*m.h, 0.0f);
 
@@ -122,16 +126,17 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         for (int i = 0; i < 2 * maxCaptured; ++i) {
             float ccx = cc0x;
             float ccz = cc0z;
-            float rr = m.innerBowlRadius;
-            float ccy = 0.1f - rr;
+            float rr = 0.99f * m.innerBowlRadius;
+            float ccy = 0.0f;//0.1f - rr;
             vec3 s1 = s1a;
             vec3 s0 = s0a;
             int di = calcCapturedBlack;
             bool white = false;
 
-            if (i + calcCapturedWhite >= maxCaptured + capturedWhite || (i + calcCapturedBlack >= capturedBlack && i <maxCaptured)) {
+            /*if (i + calcCapturedWhite >= maxCaptured + capturedWhite
+                || (i + calcCapturedBlack >= capturedBlack && i <maxCaptured)) {
                 continue;
-            }
+            }*/
             if (i + calcCapturedBlack >= capturedBlack) {
                 ccx = cc1x;
                 ccz = cc1z;
@@ -157,10 +162,10 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
                     dz = dir.z;
                 }
                 for (int j = white ? maxCaptured:0; j < i + di; ++j) {
-                    float ax = (dx + ccx - ddc[3 * j + 0]);
-                    float az = (dz + ccz - ddc[3 * j + 2]);
+                    float ax = (dx + ccx - ddc[4 * j + 0]);
+                    float az = (dz + ccz - ddc[4 * j + 2]);
                     if (az*az + ax * ax < 4.0f*m.stoneSphereRadius*m.stoneSphereRadius) {
-                        dy = max(dy, ddc[3 * j + 1] + sqrt(4.0f*m.stoneSphereRadius*m.stoneSphereRadius - az*az - ax*ax) - 2.0f*m.stoneSphereRadius + m.h - ccy);//ddc[3 * j + 1] + h - ccy);
+                        dy = max(dy, ddc[4 * j + 1] + sqrt(4.0f*m.stoneSphereRadius*m.stoneSphereRadius - az*az - ax*ax) - 2.0f*m.stoneSphereRadius + m.h - ccy);
                     }
                 }
                 if (dy < mindy) {
@@ -169,23 +174,25 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
                     mindz = dz;
                 }
             }
-            ddc[3 * (i+di) + 0] = ccx + mindx;
-            ddc[3 * (i+di) + 1] = ccy + mindy;
-            ddc[3 * (i+di) + 2] = ccz + mindz;
+            ddc[4 * (i+di) + 0] = ccx + mindx;
+            ddc[4 * (i+di) + 1] = ccy + mindy;
+            ddc[4 * (i+di) + 2] = ccz + mindz;
+            ddc[4 * (i+di) + 3] = board.getRandomStoneRotation();
         }
         calcCapturedBlack = capturedBlack;
         calcCapturedWhite = capturedWhite;
-    }
+    //}
     int dBlack = max(capturedBlack - m.maxc, 0);
     int dWhite = max(capturedWhite - m.maxc, 0);
     for (int i = 0; i < m.maxc; ++i){
-        m.tmpc[3 * i + 0] = ddc[3 * (i + dBlack) + 0];
-        m.tmpc[3 * i + 1] = ddc[3 * (i + dBlack) + 1];
-        m.tmpc[3 * i + 2] = ddc[3 * (i + dBlack) + 2];
-        m.tmpc[3 * m.maxc + 3 * i + 0] = ddc[3 * maxCaptured + 3 * (i + dWhite) + 0];
-        m.tmpc[3 * m.maxc + 3 * i + 1] = ddc[3 * maxCaptured + 3 * (i + dWhite) + 1];
-        m.tmpc[3 * m.maxc + 3 * i + 2] = ddc[3 * maxCaptured + 3 * (i + dWhite) + 2];
-
+        m.tmpc[4 * i + 0] = ddc[4 * (i + dBlack) + 0];
+        m.tmpc[4 * i + 1] = ddc[4 * (i + dBlack) + 1];
+        m.tmpc[4 * i + 2] = ddc[4 * (i + dBlack) + 2];
+        m.tmpc[4 * i + 3] = ddc[4 * (i + dBlack) + 3];
+        m.tmpc[4 * m.maxc + 4 * i + 0] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 0];
+        m.tmpc[4 * m.maxc + 4 * i + 1] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 1];
+        m.tmpc[4 * m.maxc + 4 * i + 2] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 2];
+        m.tmpc[4 * m.maxc + 4 * i + 3] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 3];
     }
 }
 
@@ -218,6 +225,12 @@ void GobanModel::onGameMove(const Move& move) {
     else {
         prevPass = false;
         state.msg = GameState::NONE;
+        if(state.holdsStone == false) {
+            if (state.colorToMove == Color::BLACK)
+                state.reservoirBlack -= 1;
+            else
+                state.reservoirWhite -= 1;
+        }
     }
     state.holdsStone = false;
     changeTurn();
@@ -232,7 +245,6 @@ void GobanModel::onBoardChange(const Board& result) {
 
     state.capturedBlack = board.capturedCount(Color::BLACK);
     state.capturedWhite = board.capturedCount(Color::WHITE);
-    calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
 
     spdlog::debug("over {} ready {}", over, result.territoryReady);
 

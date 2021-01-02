@@ -129,6 +129,8 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     iContrast = glGetUniformLocation(gobanProgram, "contrast");
     iBlackCapturedCount = glGetUniformLocation(gobanProgram, "iBlackCapturedCount");
     iWhiteCapturedCount = glGetUniformLocation(gobanProgram, "iWhiteCapturedCount");
+    iBlackReservoirCount = glGetUniformLocation(gobanProgram, "iBlackReservoirCount");
+    iWhiteReservoirCount = glGetUniformLocation(gobanProgram, "iWhiteReservoirCount");
     iModelView = glGetUniformLocation(gobanProgram, "glModelViewMatrix");
     iAnimT = glGetUniformLocation(gobanProgram, "iAnimT");
 
@@ -239,7 +241,7 @@ void GobanShader::setMetrics(const Metrics &m) {
     glUniform1f(iContrast, contrast);
     glUniform1f(fsu_bowlRadius, br);
     glUniform1f(fsu_bowlRadius2, br2);
-    glUniform3fv(fsu_cc, 2, m.bowlsCenters);
+    glUniform3fv(fsu_cc, 4, m.bowlsCenters);
 }
 
 void GobanShader::destroy(void) {
@@ -288,7 +290,10 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
         spdlog::debug("place stones via glBufferData()");
         glUniform1i(iBlackCapturedCount,  view.state.capturedBlack);
         glUniform1i(iWhiteCapturedCount, view.state.capturedWhite);
-		glUniform3fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);
+        glUniform1i(iBlackReservoirCount,  static_cast<int>(view.state.reservoirBlack / 2));
+        glUniform1i(iWhiteReservoirCount, static_cast<int>(view.state.reservoirWhite / 2));
+		glUniform4fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);
+
         glBindBuffer(GL_UNIFORM_BUFFER, bufStones);
         glBufferData(GL_UNIFORM_BUFFER, view.board.getSizeOf(), view.board.getStones(), GL_DYNAMIC_DRAW);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);

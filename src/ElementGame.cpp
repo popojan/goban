@@ -172,7 +172,7 @@ void ElementGame::OnUpdate()
     }
 
 
-	std::string cmd(isOver ? "New" : !isRunning ? "Play" : "Pass");
+	std::string cmd(isOver ? "Clear" : !isRunning ? "Start" : "Pass");
 	model.state.cmd = cmd;
 	if (view.state.cmd != model.state.cmd) {
 		Rocket::Core::Element* cmdPass = context->GetDocument("game_window")->GetElementById("cmdPass");
@@ -216,6 +216,12 @@ void ElementGame::OnUpdate()
 		view.state.capturedBlack = model.state.capturedBlack;
 		view.state.capturedWhite = model.state.capturedWhite;
         view.state.reason = model.state.reason;
+	}
+	if(view.state.reservoirBlack != model.state.reservoirBlack
+	    || view.state.reservoirWhite != model.state.reservoirWhite) {
+	    view.state.reservoirBlack = model.state.reservoirBlack;
+        view.state.reservoirWhite = model.state.reservoirWhite;
+        requestRepaint();
 	}
 	if (view.state.handicap != model.state.handicap) {
 		Rocket::Core::Element* hand = context->GetDocument("game_window")->GetElementById("lblHandicap");
