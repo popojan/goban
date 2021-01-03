@@ -801,7 +801,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
         vec3 cc2 = cc1;
         vec2 ts = intersectionRaySphereR(ro, rd, cc1, bowlRadius2*bowlRadius2);
         float cuty = cc2.y + cc[i].y * bowlRadius;
-        vec2 tc = vec2(dot(-ro + vec3(cuty), nBoard), dot(bnx.xyz - vec3(10.0, legh, 10.0) - ro, nBoard)) / dot(rd, nBoard);
+        vec2 tc = vec2(dot(-ro + vec3(cuty), nBoard), dot(bnx.xyz - vec3(10.0) - ro, nBoard)) / dot(rd, nBoard);
         bool between = ro.y < cuty && ro.y > bnx.y - legh;
         float ipy = ro.y + ts.x * rd.y;
         if (((ro.y > cuty && max(tc.x, ts.x) <= min(tc.y, ts.y)) || (ro.y <= cuty && ipy< cuty)) && ts.x != noIntersection2.x){
@@ -856,13 +856,13 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                 ret.p = ro + ret.t.x*rd;
                 ret.n = nBoard;
                 updateResult(result, ret);
-                ret.pid = isInCup;
                 ret.d = farClip;
                 if (!exter) {
                     ret.d = -farClip;
                     ret.t = vec2(ts2.x < farClip && ts2.y > tc.x ? ts2.y : tc.x + 0.001);
                     ret.p = ro + ret.t.x*rd;
                     ret.n = normalize(cc2 - ret.p);
+                    ret.pid = isInCup;
                 }
                 else if (dot1 - dot2 < 0.0 && d1 < -0.5*boardaa) {
                     ret.d = -farClip;
@@ -883,6 +883,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                     ret.t = vec2(ts2.y);
                     ret.p = ro + ret.t.x*rd;
                     ret.n = normalize(cc2 - ret.p);
+                    ret.pid = isInCup;
                 }
             }
             if (ret.d < farClip){
@@ -912,7 +913,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
     for (int i = si; i < ei; ++i) {
         vec4 ddc = ddc[i];
         ddc.xz += cci.xz;
-        ddc.y += bnx.y - legh + bowlRadius2 - bowlRadius;
+        ddc.y += bnx.y - legh + bowlRadius2 - bowlRadius - 0.5 * (bowlRadius2 - bowlRadius);
         int mm0;
         vec4 ret0;
         float tt2;
@@ -1178,8 +1179,10 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
             for (int j = si; j < ei; ++j) {
                 vec4 ddcj = ddc[j];
                 ddcj.xz += cc[isInCup-1].xz;
-                ddcj.y += bnx.y - legh + bowlRadius2 - bowlRadius;
-                if ((m == idCupBlack || m == idCupWhite || m == idLidWhite || m == idLidBlack) || ((m == idBowlBlackStone || m == idBowlWhiteStone) && uid != j && pos.y < ddcj.y - 0.01*h)){
+                ddcj.y += bnx.y - legh - 0.5*(bowlRadius2 - bowlRadius);
+                float cuty = bnx.y - legh - 0.5*(bowlRadius2 - bowlRadius) + bowlRadius2 + cc[isInCup-1].y * bowlRadius;
+                if (((m == idCupBlack || m == idCupWhite || m == idLidWhite || m == idLidBlack) && pos.y < cuty - 0.0001)
+                    || ((m == idBowlBlackStone || m == idBowlWhiteStone) && uid != j && pos.y < ddcj.y - 0.01*h)){
                     vec3 ddpos = ddcj.xyz - pos;
                     float ln = length(ddpos);
                     vec3 ldir = ddpos;
