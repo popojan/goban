@@ -8,6 +8,7 @@
 #include <sstream>
 #include <fstream>
 #include "GobanView.h"
+#include "Shadinclude.hpp"
 #include <Shell.h>
 
 extern std::shared_ptr<Configuration> config;
@@ -63,13 +64,7 @@ bool GobanShader::shaderAttachFromString(GLuint program, GLenum type, const std:
 }
 
 std::string createShaderFromFile(const std::string& filename) {
-    std::stringstream ss;
-    std::ifstream fin(filename);
-    std::string s;
-    while (getline(fin, s)||fin){
-        ss << s << std::endl;
-    }
-    return ss.str();
+    return Shadinclude::load(filename);
 }
 
 void GobanShader::initProgram(const std::string& vertexProgram, const std::string& fragmentProgram) {
@@ -82,6 +77,10 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
 
     const std::string sVertexShader = createShaderFromFile(vertexProgram);
     const std::string sFragmentShader = createShaderFromFile(fragmentProgram);
+
+    std::ofstream fout("./debug_fragment_shader.glsl");
+    fout << sFragmentShader << std::endl;
+    fout.close();
 
     if(!shaderAttachFromString(gobanProgram, GL_VERTEX_SHADER, sVertexShader))
         spdlog::error("Vertex shader [{}] failed to compile. Err {}", vertexProgram, glGetError());

@@ -75,7 +75,7 @@
     {
       "name": "Red Carpet Goban",
       "vertex": "./data/shaders/vertex.glsl",
-      "fragment": "./data/shaders/fragment.glsl",
+      "fragment": "./data/shaders/nuovo/red_carpet.glsl",
       "height": 0.85
     },
     {
