@@ -266,6 +266,7 @@ set(GOBAN_HDR_FILES
     ${PROJECT_SOURCE_DIR}/src/GobanView.h
     ${PROJECT_SOURCE_DIR}/src/GobanModel.h
     ${PROJECT_SOURCE_DIR}/src/GobanControl.h
+    ${PROJECT_SOURCE_DIR}/src/Shadinclude.hpp
     ${PROJECT_SOURCE_DIR}/src/GobanShader.h
     ${PROJECT_SOURCE_DIR}/src/Metrics.h
     ${PROJECT_SOURCE_DIR}/src/GobanOverlay.h
