@@ -51,6 +51,7 @@ float distanceLineLine(vec3 ro, vec3 rd, vec3 p0, vec3 v, out float s, out vec3 
     s = dot(rr, v);
     vec3 q1 = ro + s * rd;
     q2 = p0 + dot(rr, rd) * v;
+    s = dot(rr, rd);
     return -distance(q1, q2) / distance(ro, q1);
 }
 
@@ -80,12 +81,59 @@ vec2 distanceRayStone(in vec3 ro, in vec3 rd, in vec3 dd){
     vec3 rd2 = -normalize(ro2 / (R*R));
     float dt = dot(rd2, ro2);
     float sqt = sqrt(max(0.0, dt*dt - dot(ro2, ro2) + 1.0));
-    float dd0 = length((dt + sqt)*R*rd2);///*rd2  dot(rd,X0-ro);
-    return vec2(-dd0, distance(ro, X0 + dd));
+    float dd0 = sign(-dt-sqt)*length((dt + sqt)*R*rd2);///*rd2  dot(rd,X0-ro);
+    return vec2(dd0, distance(ro, X0 + dd));
 }
 
 float distanceRaySquare(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 bmin, in vec3 bmax, out vec3 q2) {
-    vec3 c = 0.5*(bmin + bmax);
+    float t; vec3 tt;
+    vec3 a = vec3(bmin.x, bmax.y, bmin.z);
+    vec3 b = vec3(bmin.x, bmin.y, bmin.z);
+    vec3 c = vec3(bmin.x, bmin.y, bmax.z);
+    vec3 d = vec3(bmin.x, bmax.y, bmax.z);
+
+    vec3 e = vec3(bmax.x, bmax.y, bmin.z);
+    vec3 f = vec3(bmax.x, bmin.y, bmin.z);
+    vec3 g = vec3(bmax.x, bmin.y, bmax.z);
+    vec3 h = vec3(bmax.x, bmax.y, bmax.z);
+
+    //if(ro.x > )
+
+
+    float ret = farClip;
+    float d1 = distanceLineLine(ro, rd, a, b-a, t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, b, (c-b), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, c, (d-c), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, d, (a-d), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    float ret2 = ret;
+
+    ret = farClip;
+    d1 = distanceLineLine(ro, rd, e, (f-e), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, f, (g-f), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, g, (h-g), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, h, (e-h), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    ret2 = max(-ret2, -ret);
+
+    ret = farClip;
+    d1 = distanceLineLine(ro, rd, a, (e-a), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, b, (f-b), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, c, (g-c), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    d1 = distanceLineLine(ro, rd, d, (h-d), t, tt);
+    if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
+    //ret2 = max(-ret2, -ret);
+    return ret2;
+    /*vec3 c = 0.5*(bmin + bmax);
     vec3 r = 0.5*abs(bmax - bmin);
     vec3 aip = abs(abs(ip - c) - r);
     if (r.y == 0.0) aip.y = 1.0;
@@ -132,6 +180,6 @@ float distanceRaySquare(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 bmin, in vec
     float t = dot(rr, rd);
     vec3 q1 = ro + s * rd;
     q2 = p0 + t * v;
-    ret = -distance(q1, q2) / distance(ro, q1);
-    return ret;
+    ret = -distance(q1, q2) / distance(ro, q1);*/
+    //return ret;
 }

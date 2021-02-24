@@ -162,6 +162,7 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     fsu_bowlRadius2 = glGetUniformLocation(gobanProgram, "bowlRadius2");
     fsu_cc = glGetUniformLocation(gobanProgram, "cc");
     iddc = glGetUniformLocation(gobanProgram, "ddc");
+    fsu_cursor = glGetUniformLocation(gobanProgram, "cursor");
 
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
@@ -296,6 +297,12 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
         glBindBuffer(GL_UNIFORM_BUFFER, bufStones);
         glBufferData(GL_UNIFORM_BUFFER, view.board.getSizeOf(), view.board.getStones(), GL_DYNAMIC_DRAW);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        Position coord = view.getBoardCoordinate(view.lastX, view.lastY);
+        float cur[2];
+        int size = view.board.getSize();
+        cur[0] = coord.x - size/2;
+        cur[1] = coord.y - size/2;
+        glUniform2fv(fsu_cursor, 1, cur);
         //if (boardChanged > 1) { //TODO sound
             //stoneSound();
             //stoneSound(true);

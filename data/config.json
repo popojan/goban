@@ -20,7 +20,7 @@
       "command": "katago",
       "parameters": "gtp -model ./engine/katago/models/g170-b20c256x2-s4384473088-d968438914.bin.gz -config ./engine/katago/default_gtp.cfg",
       "enabled": 1,
-      "kibitz": 1,
+      "kibitz": 0,
       "messages": [
           {
             "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
@@ -74,6 +74,12 @@
   "shaders": [
     {
       "name": "Red Carpet Goban",
+      "vertex": "./data/shaders/vertex.glsl",
+      "fragment": "./data/shaders/fragment.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Refactor Nuovo",
       "vertex": "./data/shaders/vertex.glsl",
       "fragment": "./data/shaders/nuovo/red_carpet.glsl",
       "height": 0.85

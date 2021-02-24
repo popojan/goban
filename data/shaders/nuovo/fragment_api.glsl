@@ -62,7 +62,7 @@ uniform float bowlRadius2;
 
 uniform mat4 glModelViewMatrix;
 uniform vec3 iTranslate;
-
+uniform vec2 cursor;
 uniform vec3 cc[4];
 const int maxCaptured = 91;
 uniform vec4 ddc[2 * maxCaptured];

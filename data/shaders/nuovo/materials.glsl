@@ -8,49 +8,56 @@ const Material mWhite = Material(idWhiteStone, vec3(0.53, 0.53, 0.2), vec3(32.0,
 const Material mBlack = Material(idBlackStone, vec3(0.53, 0.53, 0.15), vec3(28.0), vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
 const Material mRed = Material(idLastBlackStone, vec3(0.3, 0.15, 0.25), vec3(4.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
 const Material mBack = Material(idBack, vec3(0.0, 1.0, 0.0), vec3(1.0), bgA, bgB, bgA, 0.0);
+const Material mDummy = Material(idBoard, vec3(0.5, 0.5, 0.0), vec3(1.0), vec3(0.5), vec3(0.5), vec3(0.5), 0.0);
 const Material mGrid  = Material(idGrid, vec3(1.5, 0.15, 0.15), vec3(42.0), vec3(0.0),vec3(0.0), vec3(0.0), 0.0);
 
 Material getMaterial(int m) {
     Material ret;
-    if (m == idTable) {
-        ret = mTable;
-    }
-    else if (m == idBoard || m == idLeg1 || m == idLeg2 || m == idLeg3 || m == idLeg4) {
-        ret = mBoard;
-    }
-    else if (m == idCupBlack) {
-        ret = mCup;
-    }
-    else if (m == idCupWhite) {
-        ret = mCup;
-    }
-    else if (m == idLidBlack) {
-        ret = mCup;
-    }
-    else if (m == idLidWhite) {
-        ret = mCup;
-    }
-    else if (m == idWhiteStone || m == idWhiteArea || m == idCapturedWhiteStone || m == idBowlWhiteStone) {
-        ret = mWhite;
-    }
-    else if (m == idBlackStone || m == idBlackArea || m == idCapturedBlackStone || m == idBowlBlackStone) {
-        ret = mBlack;
-    }
-    else if (m == idLastBlackStone || m == idLastWhiteStone) {
-        ret = mRed;
-    }
-    else if (m == idGrid) {
-        ret = mGrid;
-    }
-    else {
-        ret = mBack;
+    switch(m) {
+        /*case idTable:
+            ret = mTable;
+            break;
+        case idBoard:
+        case idLeg1:
+        case idLeg2:
+        case idLeg3:
+        case idLeg4:
+            ret = mBoard;
+            break;
+        case idCupBlack:
+        case idCupWhite:
+        case idLidBlack:
+        case idLidWhite:
+            ret = mCup;
+            break;
+        case idWhiteStone:
+        case idWhiteArea:
+        case idCapturedWhiteStone:
+        case idBowlWhiteStone:
+            ret = mWhite;
+            break;
+        case idBlackStone:
+        case idBlackArea:
+        case idCapturedBlackStone:
+        case idBowlBlackStone:
+            ret = mBlack;
+            break;
+        case idLastBlackStone:
+        case idLastWhiteStone:
+            ret = mRed;
+            break;
+        case idGrid:
+            ret = mGrid;
+            break;*/
+        default:
+            ret = mDummy;
     }
     return ret;
 }
 
 Material getMaterialColor(in Intersection ip, out vec4 mcol, in vec3 rd, in vec3 ro, out vec3 nn) {
     Material mat = getMaterial(ip.m);
-    Material m0 = mat;//;at = mBoard;// getMaterial(idBoard);//ip.m
+    //Material m0 = mat;
     bool noisy = false;
     float mult = 1.0;
     vec3 scoord;
@@ -62,9 +69,9 @@ Material getMaterialColor(in Intersection ip, out vec4 mcol, in vec3 rd, in vec3
     smult1 = 0.0;
     smult2 = 0.0;
     smult3 = 1.0;
-    mcol.xyz = m0.clrA;
-    vec3 mcolb = m0.clrB;
-    vec3 mcolc = m0.clrC;
+    mcol.xyz = mat.clrA;
+    vec3 mcolb = mat.clrB;
+    vec3 mcolc = mat.clrC;
     vec3 flr = ip.dummy.xyz;
     vec3 scrd2 = 64.0*(ip.p.xyz-flr);
     vec3 scrd = ip.p.xyz - flr;
@@ -110,7 +117,7 @@ Material getMaterialColor(in Intersection ip, out vec4 mcol, in vec3 rd, in vec3
 	mixmult = 0.015;
   mixnorm = 0.015;
     }
-    if (m0.id == mTable.id) {
+    if (mat.id == mTable.id) {
         vec3 color;// = mix(mTable.clrA,mTable.clrB,density);
         const float DT = 2.0*3.1415926 / 8.0;
         float fa = atan(xz.y, xz.x);
@@ -159,14 +166,14 @@ Material getMaterialColor(in Intersection ip, out vec4 mcol, in vec3 rd, in vec3
         mixmult = 0.1;
         mixnorm = 0.0;
     }
-    float rnd = 0.0;
-    float rnd2 = 0.0;
+    float rnd = 0.5;
+    float rnd2 = 0.5;
     vec3 grad = vec3(0.0, 1.0, 0.0);
     vec3 grad2 = vec3(0.0, 1.0, 0.0);
-    //if (noisy) {
+    if (false) {
         rnd = snoise(scrd, grad);
         rnd2 = snoise(scrd2+mixmult*grad, grad2);
-    //}
+    }
     if (mat.id == mBoard.id || mat.id == mCup.id) {
         float w1 = 3.0*length(scoord.yx - 0.5*vec2(1.57 + 3.1415*rnd));
         float w2 = 0.1*(scoord.x + scoord.z);

@@ -104,7 +104,7 @@ private:
     GLint iWhiteReservoirCount;
     GLint iBlackReservoirCount;
     GLint iddc;
-
+    GLint fsu_cursor;
 
     int AA;
 

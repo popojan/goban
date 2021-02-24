@@ -217,6 +217,7 @@ void GobanView::Render(int w, int h)
 	if (updateFlag & UPDATE_STONES) {
 	    board.updateStones(model.board, model.board.showTerritory);
         updateCursor(model.cursor);
+
         lastCursor = model.cursor;
         double vol = board.collision;
         if(vol > 0) {

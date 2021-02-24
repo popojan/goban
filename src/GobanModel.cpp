@@ -146,10 +146,20 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
                 white = true;
             }
 
+            float randx = (float(rand()) / RAND_MAX - 0.5f);
+            float randz = (float(rand()) / RAND_MAX - 0.5f);
             float mindy = 1e6, mindx = 0, mindz = 0;
-            for (int k = 0; k < 5000; ++k) {
-                float dx = 2.0f*rr * (float(rand()) / RAND_MAX - 0.5f);
-                float dz = 2.0f*rr * (float(rand()) / RAND_MAX - 0.5f);
+            const int ITERS = 500;
+            for (int k = 0; k < ITERS; ++k) {
+                const int turns = int(sqrt(ITERS));
+                const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * turns);
+                const float phi = turns * 2.0f * 3.1415926f * k/float(ITERS);
+                const float r = a * phi;
+                const float alpha = (rand() < (RAND_MAX >> 10)) ? 0.9 : 0.0;
+                float nrandx = cos(phi)*r; //;alpha * randx + (1.0 - alpha) * (float(rand()) / RAND_MAX - 0.5f);
+                float nrandz = sin(phi)*r;//;alpha * randz + (1.0 - alpha) * (float(rand()) / RAND_MAX - 0.5f);
+                float dx = nrandx;
+                float dz = nrandz;
                 float d = rr*rr - dx*dx - dz*dz;
                 if (d < 0) continue;
                 float dy = rr - sqrt(d) + 0.5f*m.h;
@@ -172,6 +182,8 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
                     mindy = dy;
                     mindx = dx;
                     mindz = dz;
+                    randx = nrandx;
+                    randz = nrandz;
                 }
             }
             ddc[4 * (i+di) + 0] = ccx + mindx;
