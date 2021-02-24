@@ -10,7 +10,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
     ret.isBoard = false;
     ret.pid = 0;
     ret.uid = 0;
-    result[0] = result[1] = ret;
+    result[0] = ret;
 
     rBoard(ro, rd, result, ret);
     rStones(ro, rd, result, ret);
@@ -20,4 +20,3 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
     rLegs(ro, rd, result, ret);
     finalizeStoneIntersection(ro, rd, result);
 }
-

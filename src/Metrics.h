@@ -24,6 +24,7 @@ public:
     float tmpc[8 * maxc];
     float resolution[2];
     float translate[3];
+    float cur[2];
 
 public:
     void calc(unsigned);
