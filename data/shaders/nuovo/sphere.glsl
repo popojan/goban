@@ -70,7 +70,7 @@ vec2 sCircle(in vec3 center, float r1, in vec3 pos, in vec3 lig, float ldia2, in
         }
         else if (d > rmR.x) {
             A = 0.0;
-        ;}
+        }
         ret.x *= clamp(1.0 - A / (PI*ldia2), 0.0, 1.0);
     }
     return mix(ret, vec2(1.0), avoid);
