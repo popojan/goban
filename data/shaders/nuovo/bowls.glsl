@@ -48,14 +48,17 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
 
 
             vec3 nn = nBoard;
+            float xxx = max(d2 > -boardaa ? d2 : -farClip, d3 < boardaa ? -d3 : -farClip);
             if(rett.x == tc.x) { //top edge
                 nn = nBoard;
             } else {
                 if(rett.x == ts2.y) { //inside sphere
                     nn = -normalize(retp - cc2);
                     isInCup = i+1;
+                    //xxx = -farClip;
                 } else { //outside sphere
                     nn = normalize(retp - cc1);
+                    //xxx = d1;
                 }
             }
             //(ts2.x > rett || ts2.y < rett) && tc.x > ts.x ? nBoard : ts2.x < rett && ts2.y > rett ? -normalize(ret.p - cc2) : normalize(ret.p - cc1);
@@ -70,6 +73,9 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
 
             //ret.d = max(d2 > -boardaa ? d2 : -farClip, d3 < boardaa ? -d3 : -farClip);
             //if(ret.d < farClip) {
+            vec4 uvw = vec4(5.0*retp, 1.0);
+            uvw = vec4(2.0*uvw.x/ww + ww*uvw.z, uvw.y, uvw.z, 1.0);
+
             if(rett.x > 0.0) {
                 IP ipp;
                 ipp.t = vec3(rett, 0.0);
@@ -80,12 +86,100 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                     ret.ip[j].pid = idBlackStone;
                     ret.ip[j].isInCup = isInCup;
                     ret.ip[j].uid = idCupBlack + i;
-                    ret.ip[j].d = max(d1, clamp(min(d2, -d3),-10.0,0.0));
+                    ret.ip[j].d = xxx;//max(d1, clamp(min(d2, -d3),-10.0,0.0));
                     ret.ip[j].a = vec2(0.0);
-                    vec4 uvw = vec4(5.0*retp, 1.0);
-                    uvw = vec4(2.0*uvw.x/ww + ww*uvw.z, uvw.y, uvw.z, 1.0);
+
                     ret.ip[j].uvw = uvw;
+
+
+                    /*if (d1 < 0.0 && ret.ip[j].d < 0.0 && ro.y > bnx.y - legh) {
+                        //ret.d = max(d1, ret.d);
+                        //ret.t = tc;
+                        //ret.p = ro + ret.t.x*rd;
+                        //ret.n = nBoard;
+                        //updateResult(result, ret);
+                        //ret.d = farClip;
+                        if (!exter) {
+                            ret.ip[j].d = -farClip;
+                            ret.t = vec2(ts2.x < farClip && ts2.y > tc.x ? ts2.y : tc.x + 0.001);
+                            ret.p = ro + ret.t.x*rd;
+                            ret.n = normalize(cc2 - ret.p);
+                            ret.pid = isInCup;
+                        }
+                        else if (dot1 - dot2 < 0.0 && d1 < -0.5*boardaa) {
+                            ret.ip[j].d = -farClip;
+                            ret.t = vec2(tc.x + 0.001);
+                            ret.p = ro + ret.t.x*rd;
+                            ret.n = normalize(ret.p - cc1);
+                        }
+                    }
+                    else {
+                        if (tc.x - 0.02 < ts.x && ts.x < farClip && ts.x > 0.0) {
+                            ret.d = d1;
+                            ret.t = vec2(ts.x - 0.01);
+                            ret.p = ro + ret.t.x*rd;
+                            ret.n = normalize(ret.p - cc1);
+                        }
+                        else if (ts2.y > tc.x && ts2.x < farClip && ts2.y > bnx.y - legh) {
+                            ret.d = -farClip;
+                            ret.t = vec2(ts2.y);
+                            ret.p = ro + ret.t.x*rd;
+                            ret.n = normalize(cc2 - ret.p);
+                            ret.pid = isInCup;
+                        }
+                    }*/
                 }
+                vec3 retn = nBoard;
+                //updateResult(result, ret);
+                float retd = farClip;
+                vec2 rett = vec2(0.0);
+                vec3 retp;
+               if (d1 < 0.0 && ret.ip[j].d < 0.0 && ro.y > bnx.y - legh) {
+                   //ipp.p = ro + ret.t.x*rd;
+
+                   if (!exter) {
+                       retd = -farClip;
+                       rett = vec2(ts2.x < farClip && ts2.y > tc.x ? ts2.y : tc.x + 0.001);
+                       retp = ro + rett.x*rd;
+                       retn = normalize(cc2 - retp);
+                       //ret.pid = isInCup;
+                   }
+                   else if (dot1 - dot2 < 0.0 && d1 < -0.5*boardaa) {
+                       retd = -farClip;
+                       rett = vec2(tc.x + 0.001);
+                       retp = ro + rett.x*rd;
+                       retn = normalize(retp - cc1);
+                   }
+               }
+               else {
+                   if (tc.x - 0.02 < ts.x && ts.x < farClip && ts.x > 0.0) {
+                       retd = d1;
+                       rett = vec2(ts.x - 0.01);
+                       retp = ro + rett.x*rd;
+                       retn = normalize(retp - cc1);
+                   }
+                   else if (ts2.y > tc.x && ts2.x < farClip && ts2.y > bnx.y - legh) {
+                       retd = -farClip;
+                       rett = vec2(ts2.y);
+                       retp = ro + rett.x*rd;
+                       retn = normalize(cc2 - retp);
+                       //ret.pid = isInCup;
+                   }
+               }
+               if(retd < farClip) {
+                   ipp.t = vec3(rett, 0.0);
+                   j = insert(ret, ipp);
+                   if (j < N) {
+                       ret.ip[j].n = retn;
+                       ret.ip[j].oid = i < 2 ? (i == 0 ? idCupBlack :idCupWhite) : (i == 2 ? idLidBlack : idLidWhite);
+                       ret.ip[j].pid = idBlackStone;
+                       ret.ip[j].isInCup = isInCup;
+                       ret.ip[j].uid = idCupBlack + i;
+                       ret.ip[j].d = retd;
+                       ret.ip[j].a = vec2(0.0);
+                       ret.ip[j].uvw = uvw;
+                   }
+               }
             }
             //retp = ro + ret.t.x*rd;
             //ret.pid = isInCup;
@@ -148,6 +242,18 @@ vec2 sBowls(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
             //float r1 = sqrt(bowlRadius*bowlRadius - ln*ln);
             float r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
             ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
+
+            cci.y = cci.y + 0.5 * (bnx.y- legh + cci.y);
+            ln = yy - cci.y;
+            r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
+            ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
+
+            cci.y = 0.5 * (bnx.y- legh + cci.y);
+            ln = yy - cci.y;
+            r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
+            ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
+
+            //ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
         }
     }
     return ret;

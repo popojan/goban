@@ -2,11 +2,16 @@ float dBox(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 minimum, in vec3 maximum,
     float r = boardaa*distance(ro, ip);
     mat4x3 rect;
 
+    minimum -= r;
+    maximum += r;
+
     float dx = min(abs(ip.x - minimum.x), abs(ip.x - maximum.x));
     float dy = min(abs(ip.y - minimum.y), abs(ip.y - maximum.y));
     float dz = min(abs(ip.z - minimum.z), abs(ip.z - maximum.z));
+
     minimum += r;
     maximum -= r;
+
     if(dx < dy && dx < dz) {
         rect = mat4x3(
         vec3(ip.x, maximum.y, minimum.z),
@@ -70,8 +75,8 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
         //uvw = vec4(2.0*uvw.x/ww + ww*uvw.z, uvw.y, uvw.z, 1.0);
         if(ipp.t.x > 0.0 /*&& all(lessThanEqual(abs(ip.xz), vec2(1.0) + r))*/) {
             int i = insert(ret, ipp);
-            //ipp.t = vec3(tb2, tb2, 0.0);
-            int j = insert(ret, ipp);
+            //ipp.t = vec3(tb2, tb2, -1.0);
+            //int j = insert(ret, ipp);
             if(i < N) {
                 vec3 n0, n1;
                 vec3 cc = vec3(0.0, 0.5*bnx.y, 0.0);
@@ -81,11 +86,11 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 float dd = farClip;
                 bool extremeTilt = false;
 
-                /*if (all(lessThan(dif.xx, dif.yz))) {
+                if (all(lessThan(dif.xx, dif.yz))) {
                     n1 = vec3(1.0, 0.0, 0.0);
                     n0 = vec3(0.0, ip0.y, ip0.z);
                 }
-                else */if (all(lessThan(dif.yy, dif.xz))){
+                else if (all(lessThan(dif.yy, dif.xz))){
 
                     n1 = vec3(0.0, 1.0, 0.0);
                     n0 = vec3(ip0.x, 0.0, ip0.z);
@@ -164,10 +169,10 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                         }
                     }
                 }
-                /*else {
+                else {
                     n1 = vec3(0.0, 0.0, 1.0);
                     n0 = vec3(ip0.x, ip0.y, 0.0);
-                }*/
+                }
                 float dist0 = -dd*boardaa;// : tb2 - tb;
                 //float xxx = distanceRaySquare(ro, rd, ip, bnx.xyz, -bnx.xwz, q2);
                 //ret.ip[i].d = -farClip;
@@ -177,34 +182,36 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 float tc = 0.0, tc2 = 0.0;
                 //IntersectBox(ro, q2 - ro, bnx.xyz, -bnx.xwz, tc, tc2);
 
-                /*
-                mat4x3 rect;
-                //ret.ip[i].a = min(xxx, -dist0/boardaa);
-                if(abs(ip.x - bnx.x) < 0.001 || abs(ip.x + bnx.x) < 0.001) {
-                    rect = mat4x3(
+                //ret.ip[i].a = vec2(min(xxx, -dist0/boardaa));
+
+
+                //mat4x3 rect;
+                //if(abs(ip.x - bnx.x) < 0.001 || abs(ip.x + bnx.x) < 0.001) {
+                   /* rect = mat4x3(
                         vec3(ip.x, -bnx.w, bnx.z),
                         vec3(ip.x, bnx.y, bnx.z),
                         vec3(ip.x, bnx.y, -bnx.z),
                         vec3(ip.x, -bnx.w, -bnx.z)
-                    );
-                    n0 = vec3(sign(ip.x),0.0,0.0);
-                } else if(abs(ip.z - bnx.z) < 0.001 || abs(ip.z + bnx.z) < 0.001) {
-                    rect = mat4x3(
+                    );*/
+                  //  n0 = vec3(sign(ip.x),0.0,0.0);
+                //} else if(abs(ip.z - bnx.z) < 0.001 || abs(ip.z + bnx.z) < 0.001) {
+                    /*rect = mat4x3(
                         vec3(bnx.x, -bnx.w, ip.z),
                         vec3(bnx.x, bnx.y,  ip.z),
                         vec3(-bnx.x, bnx.y,  ip.z),
                         vec3(-bnx.x, -bnx.w,  ip.z)
-                    );
-                    n0 = vec3(0.0,0.0, sign(ip.z));
-                } else {
-                    rect = mat4x3(
+                    );*/
+                  //  n0 = vec3(0.0,0.0, sign(ip.z));
+                //} else {
+                    /*rect = mat4x3(
                         vec3(bnx.x, ip.y, bnx.z),
                         vec3(bnx.x, ip.y, -bnx.z),
                         vec3(-bnx.x, ip.y, -bnx.z),
                         vec3(-bnx.x, ip.y, bnx.z)
-                    );
-                    n0 = vec3(0.0,sign(ip.y-0.5 * bnx.y),0.0);
-                }
+                    );*/
+                  //  n0 = vec3(0.0,sign(ip.y-0.5 * bnx.y),0.0);
+                //}
+                /*
                 vec3 ccc = 0.25*(rect[0] + rect[1]+rect[2] + rect[3]);
                 mat3 ps = mat3(rect[0], rect[1], ccc);
                 mat3 cs = point32plane(ps, ip, rd);
@@ -219,8 +226,24 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 cs = point32plane(ps, ip, rd);
                 xxx = min(xxx, circleHalfPlaneIntersectionArea(ip, r, cs));
                 */
+                vec3 ip2 = ro + tb2*rd;
                 float xxx = dBox(ro, rd, ip, bnx.xyz, -bnx.xwz, n0);
-
+                //float yyy = dBox(ro, rd, ip2, bnx.xyz, -bnx.xwz, n1);
+                //float xxx = 1.0 - sqrt((1.0 - zzz)*(1.0 - yyy));
+                //if(zzz < 1.0 && yyy < 1.0 && tb2 - tb > 0.05)   {
+                //if (dist0 > -boardaa) {
+                    //if (tb2 - tb > 0.1) {
+                        //n0 = normalize(n0);
+                        //vec3 cdist = abs(abs(ip0) - abs(bn0));
+                        //vec2 ab = clamp(vec2(abs(dist0), min(cdist.z, min(cdist.x, cdist.y))) / boardcc, 0.0, 1.0);
+                        //n0 = normalize(mix(normalize(ip0), n0, ab.y));
+                        //n0 = normalize(mix(n0, n1, ab.x));
+                        //ret.ip[i].d2 = -farClip;
+                        //ret.p = q2;
+                  //      edge = true;
+                  //      xxx = 1.0;
+                    //}
+                //}
                 ret.ip[i].a = vec2(clamp(1.0-dd, 0.0, 1.0),1.0-xxx);
 
 
@@ -228,16 +251,16 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 ret.ip[i].d = -xxx*boardaa;
                 ret.ip[i].pid = all( lessThan(abs(ip.xz), vec2(0.95))) ? idBlackStone : idBoard;
                 ret.ip[i].oid = idBoard;
-                uvw = vec4(23.5, 23.5, 2.3, 1.0)*(uvw + vec4(-0.3, -3.6 * bnx.y, 0.0,0.0));
-                float ns = 0.1*sin(0.4+1.8*uvw.z);
+                uvw = fNDIM/19.0 * 0.3*vec4(23.5, 23.5, 11.3, 1.0)*uvw;// + vec4(-0.3, -3.6 * bnx.y, 0.0,0.0));
+                float ns = 0.08*sin(0.4+1.8*uvw.z);
                 vec3 grad;
                 float rnd = snoise(uvw.xyz, grad);
                 uvw = vec4(length(uvw.xy+0.13*rnd),  length(uvw.xy+0.13 * rnd), 1.0, 1.0);
-                ret.ip[i].uvw = uvw;
+                ret.ip[i].uvw = 13.0*uvw;
                 ret.ip[i].n = n0;
                 //mix(vec3(0.31, 0.015,0.02), vec3(0.68,0.65,0.15), xxx);//idBoard;
                 //if (dist0 > -boardaa) {
-                   // if(tc2 - tc > 0.001) {
+                   /*if(tc2 - tc > 0.001) {
                         //n0 = normalize(n0);
                         //vec3 cdist = abs(abs(ip0) - abs(bn0));
                         //vec2 ab = clamp(vec2(abs(dist0), min(cdist.z, min(cdist.x, cdist.y))) / boardcc, 0.0, 1.0);
@@ -246,8 +269,9 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                         //ret.ip[i].d2 = -farClip;
                         //ret.p = q2;
                         edge = true;
-                   //}
-                    //updateResult(result, ret);
+                        xxx = 1.0;
+                   }*/
+                   //updateResult(result, ret);
                 //} else {
                     //ret.p = ip;
                     //bool upit = false;
@@ -280,15 +304,15 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 //ret.m = idBoard;
                 //updateResult(result, ret);
                 //ret.isBoard = false;
-                if(j < N) {
+                /*if(j < N) {
                     ret.ip[j].a = vec2(1.0, 1.0);
-                    float xxx = dBox(ro, rd, ro + tb2*rd, bnx.xyz, -bnx.xwz, n1);
-                    ret.ip[j].d = -xxx*boardaa;
+                    //float xxx = dBox(ro, rd, ro + tb2*rd, bnx.xyz, -bnx.xwz, n1);
+                    ret.ip[j].d = -boardaa;//xxx*boardaa;
                     ret.ip[j].pid = idBoard;
                     ret.ip[j].oid = idBoard;
                     ret.ip[j].uvw = uvw;
                     ret.ip[j].n = n0;
-                }
+                }*/
             }
             return i;
         }

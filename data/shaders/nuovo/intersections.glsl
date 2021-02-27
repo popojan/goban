@@ -5,7 +5,7 @@ bool IntersectBox(in vec3 ro, in vec3 rd, in vec3 minimum, in vec3 maximum, out 
     vec3 MAX = max(OMAX, OMIN);
     vec3 MIN = min(OMAX, OMIN);
     final = min(MAX.x, min(MAX.y, MAX.z));
-    start = max(max(MIN.x, 0.0), max(MIN.y, MIN.z));
+    start = max(MIN.x, max(MIN.y, MIN.z));
     return final > start;
 }
 

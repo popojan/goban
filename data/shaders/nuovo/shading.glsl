@@ -44,7 +44,7 @@ vec3 shade(in vec3 ro, in vec3 rd, in SortedLinkedList ret) {
             float den = 0.0;
             int pos = 0;
             int neg = 0;
-            float shadow = sScene(ipp, lposs, 10.5, ret.ip[j]).x;
+            vec2 shadow = sScene(ipp, lposs, 10.5, ret.ip[j]);
             //clamp(softshadow(ro, rd, ret.ip[j], lpos2, 3.5).x, 0.0, 1.0);
             float power = pow(clamp(dot(ref, lig2), 0.0, 1.0), das.w);
             vec3 specular= vec3(0.5);
@@ -68,7 +68,8 @@ vec3 shade(in vec3 ro, in vec3 rd, in SortedLinkedList ret) {
             float power = pow(clamp(dot(ref, lig2), 0.0, 1.0), 64.0);
             //if(ipp.y < 0.001) power = 0.0;
             //if(iqq.y > ipp.y) shadow = 1.0;*/
-            diffuse = clamp(das.x * (1.0-das.y)*shadow*diffuse + ambient + das.z*power*specular*shadow, 0.0,1.0);
+            diffuse = clamp(das.x * (1.0-das.y)*shadow.x*diffuse + ambient
+                + das.z*power*specular*shadow.x, 0.0,1.0);
 
             col  = mix(diffuse, col, alpha);
             //col = vec3(-d/boardaa/3.0);
