@@ -19,31 +19,6 @@ const vec4 bnx = vec4(-c.x, -0.2, -c.x, 0.0);
 const float mw = 0.85;
 const float legh = 0.15;
 
-
-struct Material {
-    int id;
-    vec3 diffuseAmbientSpecularWeight;
-    vec3 specularPower;
-    vec3 clrA;
-    vec3 clrB;
-    vec3 clrC;
-    float refl;
-};
-
-struct Intersection {
-    vec2 t;
-    vec3 p;
-    vec3 n;
-    int m;
-    float d;
-    float d2;
-    vec4 dummy;
-    bool isBoard;
-    int uid;
-    int pid;
-};
-
-//const float gamma = 1.0;
 const int idBack = -1;
 const int idTable = 0;
 const int idBoard = 1;
@@ -69,7 +44,6 @@ const int idBowlWhiteStone = 20;
 const int idYin = 21;
 const int idYang = 22;
 const int idLastObject = 23;
-
 
 struct IP {
     vec3 t; //parameter; distance along the ray, z == z-score
@@ -147,7 +121,7 @@ vec4 getTextureCoordinates(vec4 coord, int algo, float scale) {
             noisy = true;
             break;
     }
-    //
+
     if(noisy) {
         return uvw;
     }
