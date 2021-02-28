@@ -251,13 +251,8 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 ret.ip[i].d = -xxx*boardaa;
                 ret.ip[i].pid = all( lessThan(abs(ip.xz), vec2(0.95))) ? idBlackStone : idBoard;
                 ret.ip[i].oid = idBoard;
-                uvw = fNDIM/19.0 * 0.3*vec4(23.5, 23.5, 11.3, 1.0)*uvw;// + vec4(-0.3, -3.6 * bnx.y, 0.0,0.0));
-                float ns = 0.08*sin(0.4+1.8*uvw.z);
-                vec3 grad;
-                float rnd = snoise(uvw.xyz, grad);
-                uvw = vec4(length(uvw.xy+0.13*rnd),  length(uvw.xy+0.13 * rnd), 1.0, 1.0);
-                ret.ip[i].uvw = 13.0*uvw;
                 ret.ip[i].n = n0;
+                ret.ip[i].uvw = uvw;
                 //mix(vec3(0.31, 0.015,0.02), vec3(0.68,0.65,0.15), xxx);//idBoard;
                 //if (dist0 > -boardaa) {
                    /*if(tc2 - tc > 0.001) {

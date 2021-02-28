@@ -1,5 +1,5 @@
 void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
-    //int isInCup = ret.ip[ret.idx[0]].gid;
+    //int isInCup0 = ret.ip[ret.idx[0]].isInCup;
     int si = 0;
     int ei = 0;
     //int i = isInCup - 1;

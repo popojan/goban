@@ -24,7 +24,7 @@ bool shadow, int uid) {
                     //res = vec4(n, p1);
                     //t2 = p2;
                     rval = true;
-                    rip.t = vec3(p1, p2,-2.0);
+                    rip.t = vec3(p1, p2,-0.0);
                     //rip.n = n;
                 }
                 else if (tt.x < farClip) {
@@ -32,7 +32,7 @@ bool shadow, int uid) {
                     //res = vec4(normalize(n), d4.x);
                     //t2 = d4.y;
                     rval = true;
-                    rip.t = vec3(d4,-2.0);
+                    rip.t = vec3(d4,-0.0);
                     //rip.n = normalize(n);
                 }
             }
@@ -69,7 +69,8 @@ void finalizeStone(vec3 ro, vec3 rd, vec3 dd, inout IP ipp, float rot, bool mark
         0.0,0.0,0.0,1.0
     );
     vec3 ip = (ro + ipp.t.x * rd);
-    ipp.uvw = rmat * vec4(ip-dd, 1.0)+vec4(dd, 0.0);
+    vec3 add = 4.0*(ip.xyz - vec3(13.0+dd.x,dd.y-13.0, dd.z));
+    ipp.uvw = rmat * vec4(add, 1.0);//+vec4(add+ip, 0.0);
 
     if(marked) {
         vec3 cc = dd;
@@ -201,7 +202,7 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                     vec3 maxb = dd.xzy + w25.xyx;
                     IP ipp;
                     float tb = dot(-ro+vec3(0.0, 0.0, 0.0), nBoard) / dot(rd, nBoard);
-                    ipp.t = vec3(tb, tb, -1.0);
+                    ipp.t = vec3(tb, tb, -0.0);
                     vec3 ip = ro + tb*rd;
                     float r = boardbb*distance(ro, ip);
                     if (all(lessThanEqual(abs(ip.xz - dd.xy), w25.xx+r))) {

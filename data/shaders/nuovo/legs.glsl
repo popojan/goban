@@ -40,8 +40,8 @@ int rLegs(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 ret.ip[j].uid = idLeg1+i;
                 ret.ip[j].pid = idBoard;
                 ret.ip[j].a = vec2(0.0);
-                vec4 uvw = vec4(5.0*ip, 1.0);
-                uvw = vec4(2.0*uvw.x/ww + ww*uvw.z, uvw.y, uvw.z, 1.0);
+                vec4 uvw = vec4(ip, 1.0);
+                //uvw = vec4(2.0*uvw.x/ww + ww*uvw.z, uvw.y, uvw.z, 1.0);
                 ret.ip[j].uvw = uvw;
             }
             return j;
