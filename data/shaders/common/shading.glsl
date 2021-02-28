@@ -32,9 +32,8 @@ vec3 shade(in vec3 ro, in vec3 rd, in SortedLinkedList ret) {
             vec4 uvw = ret.ip[j].uvw;
             float rnd = 0.5;
             if(ret.ip[j].oid != idTable) {
-                uvw = fNDIM/19.0 * 0.3*vec4(23.5, 23.5, 11.3, 1.0)*uvw;// + vec4(-0.3, -3.6 * bnx.y, 0.0,0.0));
+                uvw *= fNDIM/19.0 * 0.3*vec4(23.5, 23.5, 11.3, 1.0);
                 float ns = 0.08*sin(0.4+1.8*uvw.z);
-                //vec3 grad;
                 rnd = snoise(uvw.xyz, grad);
                 uvw = vec4(length(uvw.xy+0.13*rnd), length(uvw.xy+0.13 * rnd), 1.0, 1.0);
                 uvw = 13.0*uvw;
@@ -43,12 +42,11 @@ vec3 shade(in vec3 ro, in vec3 rd, in SortedLinkedList ret) {
             vec4 texo = uvw * sqrt(19.0 / fNDIM);
             vec4 texp = vec4(0.0);
             vec2 a = ret.ip[j].a;
-            //float rnd = snoise(texo.xyz, grad);
-            //float rnd = 0.5;
-            rnd =  mix(smoothstep(-2.0, 2.0, rnd/max(1.0, 0.5*distance(ipp, ro))), 0.0, 0.0);//(1.0 + 0.5/(1.0+ exp(-rnd)));
+
+            rnd =  mix(smoothstep(-2.0, 2.0, rnd/max(1.0, 0.5*distance(ipp, ro))), 0.0, 0.0);
 
             vec3 c = mix(mix(mix(mcola1, mcolb1, rnd), bg, a.y), mcolc1, a.x);
-            vec3 diffuse = (clamp(dot(nn, lig2), 0.0, 1.0)/*+clamp(dot(nn, lig3), 0.0, 1.0)*/) * c;
+            vec3 diffuse = (clamp(dot(nn, lig2), 0.0, 1.0)) * c;
             vec4 das = materials[midxo].das;
             float ambientLevel = das.y;
             vec3 ambient = ambientLevel * c;
@@ -58,34 +56,15 @@ vec3 shade(in vec3 ro, in vec3 rd, in SortedLinkedList ret) {
             int pos = 0;
             int neg = 0;
             vec2 shadow = sScene(ipp, lposs, 10.5, ret.ip[j]);
-            //clamp(softshadow(ro, rd, ret.ip[j], lpos2, 3.5).x, 0.0, 1.0);
+
             float power = pow(clamp(dot(ref, lig2), 0.0, 1.0), das.w);
             vec3 specular= vec3(0.5);
-            /*SortedLinkedList x;
-            init(x);
-            //x.ip[x.idx[0]].gid = ret.ip[ret.idx[0]].gid;
-            vec3 ldir = normalize(lposs-ipp);
 
-            rScene(ipp + 0.001*ldir, ldir, x, true);
-            bool valid = false;
-            float d2 = 1.0;
-
-            vec3 iqq = ipp + 0.001*ldir + x.ip[x.idx[0]].t.x * ldir;
-            for(int k = 0; k < N; ++k) {
-                if(x.size > k) {
-                    d2 *= smoothstep(-0.5,0.5, x.ip[x.idx[k]].d);//min(d0, x.ip[x.idx[k]].d);
-                }
-            }
-            float shadow = d2;
-            vec3 specular= vec3(0.5);
-            float power = pow(clamp(dot(ref, lig2), 0.0, 1.0), 64.0);
-            //if(ipp.y < 0.001) power = 0.0;
-            //if(iqq.y > ipp.y) shadow = 1.0;*/
             diffuse = clamp(das.x * (1.0-das.y)*shadow.x*diffuse + ambient
                 + das.z*power*specular*shadow.x, 0.0,1.0);
 
             col  = mix(diffuse, col, alpha);
-            //col = vec3(-d/boardaa/3.0);
+
         }
     }
     return pow(col, gamma*exp(contrast*(vec3(0.5) - col)));

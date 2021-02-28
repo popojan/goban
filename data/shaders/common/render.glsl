@@ -6,7 +6,6 @@ vec3 render(in vec3 ro, in vec3 rd) {
     return shade(ro, rd, ret);
 }
 
-void main(void)
-{
+void main(void) {
     glFragColor =  render(roo, normalize(rdb));
 }

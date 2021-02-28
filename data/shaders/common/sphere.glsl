@@ -33,23 +33,7 @@ vec2 sCircle(in vec3 center, float r1, in vec3 pos, in vec3 lig, float ldia2, in
     vec2 ret = vec2(1.0);
     vec2 xz = center.xz;
     float avoid = smoothstep(center.y-0.01, center.y, 0.99*pos.y);
-   /* if (distance(pos.xz, xz) <= r1 + 0.001) {
-        float ldia = 1000.0;
-        float phi = PI;
-        //if(diffUid)
-        ret.y *= 1.0 - max(0.0, (1.0 - distance(pos.xz, xz) / r1));
-        //}
-        //else  {
-           vec3 u = normalize(cross(nor, nBoard));
-            vec3 v = cross(u, nor);
-            vec3 diff = vec3(pos.x, 0.000, pos.z) - vec3(xz.x, 0.0, xz.y);
-            if (length(diff) > 0.01) {
-                float acs = acos(dot(v, normalize(diff)));
-                //ret.y *= min(1.0, acs / PI);
-                ret.y *= clamp(mix(1.0, max(0.0, acs / PI), 2.0*(length(diff)-0.01)/ww), 0.9,1.0);
-            }
-        //}
-    }*/
+
     if(center.y > pos.y) {
         vec3 ddpos = center.xyz - pos;
         float ln = length(ddpos);
