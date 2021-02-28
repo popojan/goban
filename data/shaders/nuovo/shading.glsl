@@ -1,7 +1,12 @@
+float rand2(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
 vec3 shade(in vec3 ro, in vec3 rd, in SortedLinkedList ret) {
     float tb = dot(-ro, nBoard) / dot(rd, nBoard);
     vec3 bg = vec3(exp(-0.35*max(0.0,length(ro + rd * tb))));
     vec3 col = vec3(0.0);
+    vec3 grad0;
     if(ret.size > 0) {
         float wcol = 1.0;
         int k = ret.idx[0];
@@ -25,13 +30,21 @@ vec3 shade(in vec3 ro, in vec3 rd, in SortedLinkedList ret) {
             vec3 mcolb1 = fog * materials[midxo].col[1];
             vec3 mcolc1 = fog * materials[midxp].col[1];
             vec4 uvw = ret.ip[j].uvw;
-
+            float rnd = 0.5;
+            if(ret.ip[j].oid != idTable) {
+                uvw = fNDIM/19.0 * 0.3*vec4(23.5, 23.5, 11.3, 1.0)*uvw;// + vec4(-0.3, -3.6 * bnx.y, 0.0,0.0));
+                float ns = 0.08*sin(0.4+1.8*uvw.z);
+                //vec3 grad;
+                rnd = snoise(uvw.xyz, grad);
+                uvw = vec4(length(uvw.xy+0.13*rnd), length(uvw.xy+0.13 * rnd), 1.0, 1.0);
+                uvw = 13.0*uvw;
+                rnd = snoise(uvw.xyz, grad);
+            }
             vec4 texo = uvw * sqrt(19.0 / fNDIM);
             vec4 texp = vec4(0.0);
             vec2 a = ret.ip[j].a;
-            float rnd = snoise(texo.xyz, grad);
-            //rnd = snoise(texo.xyz + 0.03*grad, grad);
-
+            //float rnd = snoise(texo.xyz, grad);
+            //float rnd = 0.5;
             rnd =  mix(smoothstep(-2.0, 2.0, rnd/max(1.0, 0.5*distance(ipp, ro))), 0.0, 0.0);//(1.0 + 0.5/(1.0+ exp(-rnd)));
 
             vec3 c = mix(mix(mix(mcola1, mcolb1, rnd), bg, a.y), mcolc1, a.x);

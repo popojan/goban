@@ -73,8 +73,8 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
 
             //ret.d = max(d2 > -boardaa ? d2 : -farClip, d3 < boardaa ? -d3 : -farClip);
             //if(ret.d < farClip) {
-            vec4 uvw = vec4(5.0*retp, 1.0);
-            uvw = vec4(2.0*uvw.x/ww + ww*uvw.z, uvw.y, uvw.z, 1.0);
+            vec4 uvw = vec4(retp, 1.0);
+            //uvw = vec4(2.0*uvw.x/ww + ww*uvw.z, uvw.y, uvw.z, 1.0);
 
             if(rett.x > 0.0) {
                 IP ipp;
@@ -152,7 +152,7 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                    }
                }
                else {
-                   if (tc.x - 0.02 < ts.x && ts.x < farClip && ts.x > 0.0) {
+                   if (tc.x < ts.x && ts.x < farClip && ts.x > 0.0) {
                        retd = d1;
                        rett = vec2(ts.x - 0.01);
                        retp = ro + rett.x*rd;
@@ -166,7 +166,7 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                        //ret.pid = isInCup;
                    }
                }
-               if(retd < farClip) {
+               if(retd < farClip && rett.x > 0.0) {
                    ipp.t = vec3(rett, 0.0);
                    j = insert(ret, ipp);
                    if (j < N) {
