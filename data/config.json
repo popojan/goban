@@ -74,32 +74,32 @@
   "shaders": [
     {
       "name": "Red Carpet Goban",
-      "vertex": "./data/shaders/vertex.glsl",
-      "fragment": "./data/shaders/fragment.glsl",
+      "vertex": "./data/shaders/common/vertex.glsl",
+      "fragment": "./data/shaders/red_carpet.glsl",
       "height": 0.85
     },
     {
-      "name": "Refactor Nuovo",
-      "vertex": "./data/shaders/vertex.glsl",
-      "fragment": "./data/shaders/nuovo/red_carpet.glsl",
+      "name": "Red Carpet Goban Legacy",
+      "vertex": "./data/shaders/common/vertex.glsl",
+      "fragment": "./data/shaders/legacy/fragment.glsl",
       "height": 0.85
     },
     {
       "name": "Minimalistic Flat",
-      "vertex": "./data/shaders/vertex.glsl",
-      "fragment": "./data/shaders/fragment.2D.glsl",
+      "vertex": "./data/shaders/common/vertex.glsl",
+      "fragment": "./data/shaders/legacy/fragment.2D.glsl",
       "height": 0.0
     },
     {
       "name": "Minimalistic Thin",
-      "vertex": "./data/shaders/vertex.glsl",
-      "fragment": "./data/shaders/fragment.25D.glsl",
+      "vertex": "./data/shaders/common/vertex.glsl",
+      "fragment": "./data/shaders/legacy/fragment.25D.glsl",
       "height": 0.85
     },
     {
       "name": "Red Carpet Anaglyphic",
-      "vertex": "./data/shaders/vertex.anaglyph.glsl",
-      "fragment": "./data/shaders/fragment.anaglyph.glsl",
+      "vertex": "./data/shaders/legacy/vertex.anaglyph.glsl",
+      "fragment": "./data/shaders/legacy/fragment.anaglyph.glsl",
       "height": 0.85
     }
   ]
