@@ -138,13 +138,7 @@ void initMaterials() {
 
 vec4 getTextureCoordinates(vec4 coord, int algo, float scale) {
     vec4 uvw = coord;
-    /*vec4 dt = vec4(
-        dot(uvw * mats[i], uvw),
-        dot(uvw * mats[j], uvw),
-        dot(uvw * mats[k], uvw),
-        1.0
-    );
-    return sqrt(dt);*/
+
     bool noisy = false;
     switch(algo) {
         case texWood:
@@ -207,29 +201,3 @@ int insert(inout SortedLinkedList ret, in IP ip) {
     }
     return N;
 }
-
-
-/*
-const int AAN = 2;
-void updateResult(inout Intersection result[AAN], in Intersection ret) {
-    for(int i = 0; i < AAN; ++i) {
-        if(ret.t.x <= result[i].t.x) {
-            for(int j = i + 1; j < AAN; ++j) {
-                result[j] = result[j - 1];
-            }
-            result[i] = ret;
-            break;
-        }
-    }
-}
-*/
-
-/*void updateResult(inout Intersection result[2], in Intersection ret) {
-    if (ret.t.x <= result[0].t.x) {
-        result[1] = result[0];
-        result[0] = ret;
-    }
-    else if (ret.t.x <= result[1].t.x) {
-        result[1] = ret;
-    }
-}*/
