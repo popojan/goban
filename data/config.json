@@ -73,15 +73,15 @@
   },
   "shaders": [
     {
-      "name": "Red Carpet Goban",
-      "vertex": "./data/shaders/common/vertex.glsl",
-      "fragment": "./data/shaders/red_carpet.glsl",
-      "height": 0.85
-    },
-    {
       "name": "Red Carpet Goban Legacy",
       "vertex": "./data/shaders/common/vertex.glsl",
       "fragment": "./data/shaders/legacy/fragment.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Red Carpet Goban",
+      "vertex": "./data/shaders/common/vertex.glsl",
+      "fragment": "./data/shaders/red_carpet.glsl",
       "height": 0.85
     },
     {
