@@ -138,7 +138,7 @@ const vec3 bgB = vec3(0.0, 0.0, 0.0);
 const Material mCup = Material(idCupBlack, vec3(0.7, 0.15, 0.25), vec3(32.0), vec3(0.293333, 0.1713725, 0.038039), vec3(0.053333,0.0133725,0.029039), vec3(0.17333,0.1613725,0.089039), 1.5);
 const Material mBoard = Material(idBoard, vec3(0.7, 0.15, 0.05), vec3(42.0), vec3(0.93333, 0.813725, 0.38039), vec3(0.53333,0.413725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
 const Material mTable = Material(idTable, vec3(1.0, 0.15, 0.0), vec3(4.0), vec3(0.566,0.0196,0.0176), vec3(0.766,0.1196,0.1176), vec3(0.666,0.0196,0.0176), 0.0);
-const Material mWhite = Material(idWhiteStone, vec3(0.53, 0.53, 0.2), vec3(32.0, 41.0, 2.0), vec3(0.96), vec3(0.96,0.91,0.97), vec3(0.93), 0.5);
+const Material mWhite = Material(idWhiteStone, vec3(0.43, 0.43, 0.04), vec3(32.0, 41.0, 2.0), vec3(0.98), vec3(0.98,0.95,0.97), vec3(0.96), 0.5);
 const Material mBlack = Material(idBlackStone, vec3(0.53, 0.53, 0.15), vec3(28.0), vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
 const Material mRed = Material(idLastBlackStone, vec3(0.3, 0.15, 0.25), vec3(4.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
 const Material mBack = Material(idBack, vec3(0.0, 1.0, 0.0), vec3(1.0), bgA, bgB, bgA, 0.0);
@@ -292,7 +292,8 @@ vec2 distanceRayCircle(in vec3 ro, in vec3 rd, in vec3 ip, in vec2 t0, in vec3 d
     vec3 dif = vec3(ip.x, dd.y, ip.z) - dd;
     vec3 x0 = dd + r*normalize(dif);
     float s = 0.0;
-    return vec2(abs(t0.x - s) - abs(t0.y - s), sign(length(dif) - r) * distanceLineLine(ro, rd, x0, normalize(vec3(dd.z - ip.z, 0.0, ip.x - dd.x)), s, q2));
+    return vec2(abs(t0.x - s) - abs(t0.y - s), sign(length(dif) - r)
+    * distanceLineLine(ro, rd, x0, normalize(vec3(dd.z - ip.z, 0.0, ip.x - dd.x)), s, q2));
 }
 
 vec2 distanceRayStone(in vec3 ro, in vec3 rd, in vec3 dd){
@@ -305,17 +306,17 @@ vec2 distanceRayStone(in vec3 ro, in vec3 rd, in vec3 dd){
     vec3 RR = R*R;
     vec3 BB = B*B;
     vec3 xyz0 = RR*vec3(
-        dot(RR.yz, A.xx*BB.zy + A.zy*(B.xx*(A.zy - B.zy) - A.xx*B.zy)),
-        dot(RR.zx, A.yy*BB.xz + A.xz*(B.yy*(A.xz - B.xz) - A.yy*B.xz)),
-        dot(RR.xy, A.zz*BB.yx + A.yx*(B.zz*(A.yx - B.yx) - A.zz*B.yx))
-        );
+    dot(RR.yz, A.xx*BB.zy + A.zy*(B.xx*(A.zy - B.zy) - A.xx*B.zy)),
+    dot(RR.zx, A.yy*BB.xz + A.xz*(B.yy*(A.xz - B.xz) - A.yy*B.xz)),
+    dot(RR.xy, A.zz*BB.yx + A.yx*(B.zz*(A.yx - B.yx) - A.zz*B.yx))
+    );
     vec3 X0 = xyz0 / den;
     vec3 ro2 = X0 / R;
     vec3 rd2 = -normalize(ro2 / (R*R));
     float dt = dot(rd2, ro2);
     float sqt = sqrt(max(0.0, dt*dt - dot(ro2, ro2) + 1.0));
-    float dd0 = length((dt + sqt)*R*rd2);///*rd2  dot(rd,X0-ro);
-    return vec2(-dd0, distance(ro, X0 + dd));
+    float dd0 = sign(-dt-sqt)*length((dt + sqt)*R*rd2);///*rd2  dot(rd,X0-ro);
+    return vec2(dd0, distance(ro, X0 + dd));
 }
 
 float distanceRaySquare(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 bmin, in vec3 bmax, out vec3 q2) {
@@ -370,17 +371,17 @@ float distanceRaySquare(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 bmin, in vec
     return ret;
 }
 
-bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out vec4 res, out float t2){
+bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, out vec4 res, out float t2){
     vec2 dpre = intersectionRaySphereR(ro, rd, dd, r1*r1);
     bool rval = false;
-    if (dpre.x < mint && dpre.y > 0.0) { /*dd.y -  0.5*h*/
+    if (dpre.x < farClip && dpre.y > 0.0) { /*dd.y -  0.5*h*/
         vec2 d2 = intersectionRaySphere(ro, rd, dd - dn);
         float d2x = d2.x < 0.0 ? d2.y : d2.x;
-        if (d2x < mint && d2x > 0.0) {
+        if (d2x < farClip && d2x > 0.0) {
             vec2 d1 = intersectionRaySphere(ro, rd, dd + dn);
             float p1 = max(d1.x, d2.x);
             float p2 = min(d1.y, d2.y);
-            if (p1 >= 0.0 && p1 <= p2 && p1 < mint) {
+            if (p1 >= 0.0 && p1 <= p2 && p1 > 0.0) {
                 vec2 d3 = intersectionRayCylinder(ro, rd, dd, px*px);
                 vec2 d4;
                 vec4 tt = intersectionRayEllipsoid(ro, rd, dd, d4);
@@ -389,17 +390,14 @@ bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out ve
                 vec3 n = normalize(ip - rcc);
                 if (p1 >= d3.x && p1 < d3.y && d3.x < farClip) {
                     res = vec4(n, p1);
-                    t2 = p2;
+                    t2 = p1;
                     rval = true;
                 }
                 else if (tt.x < farClip) {
                     n.y = mix(n.y, tt.y, smoothstep(px, r1, length(ip.xz - dd.xz)));
                     res = vec4(normalize(n), d4.x);
-                    t2 = d4.y;
+                    t2 = d4.x;
                     rval = true;
-                }
-                else {
-                    rval = false;
                 }
             }
         }
@@ -535,13 +533,18 @@ float snoise(vec3 v, out vec3 gradient)
 }
 
 
-void updateResult(inout Intersection result[2], Intersection ret) {
-    if (ret.t.x <= result[0].t.x) {
-        result[1] = result[0];
-        result[0] = ret;
+void updateResult(inout Intersection result0, inout Intersection result1, inout Intersection result2, in Intersection ret) {
+    if (ret.t.x <= result0.t.x) {
+        result2 = result1;
+        result1 = result0;
+        result0 = ret;
     }
-    else if (ret.t.x <= result[1].t.x) {
-        result[1] = ret;
+    else if (ret.t.x <= result1.t.x) {
+        result2 = result1;
+        result1 = ret;
+    }
+    else if (ret.t.x <= result2.t.x) {
+        result2 = ret;
     }
 }
 
@@ -571,7 +574,155 @@ vec2 csg_difference(in vec2 a, in vec2 b) {
     return vec2(max(b.y, a.x), max(b.y, a.y));
 }
 
-void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
+//void finalizeStone(vec3 ro, vec3 rd, vec3 dd, inout Intersection ipp, float rot, bool marked) {
+/*    mat4 rmat = mat4(
+    cos(rot),0.0,sin(rot),0.0,
+    0.0,1.0,0.0,0.0,
+    -sin(rot),0.0,cos(rot),0.0,
+    0.0,0.0,0.0,1.0
+    );
+    vec3 ip = (ro + ipp.t.x * rd);
+    //vec3 add = 4.0*(ip.xyz - vec3(13.0+dd.x,dd.y-13.0, dd.z));
+    //ipp.uvw = rmat * vec4(add, 1.0);
+
+    if(marked) {
+        vec3 cc = dd;
+        cc.y -= dn.y - sqrt(stoneRadius2 - 0.25*r1*r1);
+        vec3 ip0 = ro + rd*dot(cc - ro, nBoard) / dot(rd, nBoard);
+        vec3 q2;
+
+        ipp.a = vec2(0.0);
+        bool isNotArea = length(ip.xz - cc.xz) > 0.5*r1 || ip.y < dd.y;
+        if (isNotArea) {
+            vec2 rr = distanceRayCircle(ro, rd, ip0, ipp.t.xy, cc, 0.5*r1, q2);
+            float d = abs(rr.y);
+            if (sign(ro.y - dd.y) * rr.x <= 0.0 && d < boardaa){
+                ipp.a = vec2(max(d/boardaa, ipp.d));
+            }
+            else {
+                ipp.a = vec2(1.0);
+            }
+        }
+    }*/
+//}
+
+float dBox(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 minimum, in vec3 maximum, out vec3 n0) {
+    float r = boardaa*distance(ro, ip);
+    mat4x3 rect;
+
+    minimum -= r;
+    maximum += r;
+
+    float dx = min(abs(ip.x - minimum.x), abs(ip.x - maximum.x));
+    float dy = min(abs(ip.y - minimum.y), abs(ip.y - maximum.y));
+    float dz = min(abs(ip.z - minimum.z), abs(ip.z - maximum.z));
+
+    minimum += r;
+    maximum -= r;
+
+    if(dx < dy && dx < dz) {
+        rect = mat4x3(
+        vec3(ip.x, maximum.y, minimum.z),
+        vec3(ip.x, minimum.y, minimum.z),
+        vec3(ip.x, minimum.y, maximum.z),
+        vec3(ip.x, maximum.y, maximum.z)
+        );
+        n0 = vec3(sign(ip.x),0.0,0.0);
+    } else if(dz < dy && dz < dx) {
+        rect = mat4x3(
+        vec3(minimum.x, maximum.y, ip.z),
+        vec3(minimum.x, minimum.y,  ip.z),
+        vec3(maximum.x, minimum.y,  ip.z),
+        vec3(maximum.x, maximum.y,  ip.z)
+        );
+        n0 = vec3(0.0,0.0, sign(ip.z));
+    } else {
+        rect = mat4x3(
+        vec3(minimum.x, ip.y, minimum.z),
+        vec3(minimum.x, ip.y, maximum.z),
+        vec3(maximum.x, ip.y, maximum.z),
+        vec3(maximum.x, ip.y, minimum.z)
+        );
+        n0 = vec3(0.0,sign(ip.y-0.5 * (maximum.y+minimum.y)),0.0);
+    }
+    vec3 ccc = 0.25*(rect[0] + rect[1]+rect[2] + rect[3]);
+    mat3 ps = mat3(rect[0], rect[1], ccc);
+    mat3 cs = point32plane(ps, ip, rd);
+    float xxx = circleHalfPlaneIntersectionArea(ip, r, cs);
+    ps = mat3(rect[1], rect[2], ccc);
+    cs = point32plane(ps, ip, rd);
+    xxx = min(xxx, circleHalfPlaneIntersectionArea(ip, r, cs));
+    ps = mat3(rect[2], rect[3], ccc);
+    cs = point32plane(ps, ip, rd);
+    xxx = min(xxx, circleHalfPlaneIntersectionArea(ip, r, cs));
+    ps = mat3(rect[3], rect[0], ccc);
+    cs = point32plane(ps, ip, rd);
+    xxx = min(xxx, circleHalfPlaneIntersectionArea(ip, r, cs));
+    return xxx;
+}
+
+void finalizeStone(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersection result1, inout Intersection result2) {
+    vec3 dd = result0.dummy.xyz;
+    bvec3 isStone = bvec3(result0.m == idBlackStone || result0.m == idWhiteStone
+    || result0.m == idBowlBlackStone || result0.m == idBowlWhiteStone,
+    result0.m == idCapturedBlackStone || result0.m == idCapturedWhiteStone,
+    result0.m == idLastBlackStone || result0.m == idLastWhiteStone);
+    vec3 dist0a;
+    vec3 ip = (ro + result0.t.x * rd);
+    /*if (any(isStone)) {
+        vec3 dist0a = distanceRayStoneSphere(ro, rd, dd.xyz - dn, stoneRadius);
+        vec3 dist0b = distanceRayStoneSphere(ro, rd, dd.xyz + dn, stoneRadius);
+        dist0a = dist0a.y > dist0b.y ? dist0a : dist0b;
+        dist0b.yz = distanceRayStone(ro, rd, dd.xyz);
+        //result0.d = distance(ip.xz, dd.xz) > px ? dist0b.y / dist0b.z : dist0a.y / dist0a.z;
+        result0.d = mix(dist0a.y / dist0a.z, dist0b.y / dist0b.z, step(0.0, dist0a.x));
+    }*/
+    if (any(isStone.yz)) {
+        int idStoneInside = result0.m;
+        int idStone = idStoneInside;
+        if (idStone == idCapturedBlackStone){
+            idStone = idBlackStone;
+            idStoneInside = idWhiteStone;
+        }
+        else if (idStone == idCapturedWhiteStone){
+            idStone = idWhiteStone;
+            idStoneInside = idBlackStone;
+        }
+        else if (idStone == idLastBlackStone){
+            idStone = idBlackStone;
+            idStoneInside = idLastBlackStone;
+        }
+        else if (idStone == idLastWhiteStone){
+            idStone = idWhiteStone;
+            idStoneInside = idLastWhiteStone;
+        }
+        result0.m = idStoneInside;
+
+        vec3 cc = dd;
+        cc.y -= dn.y - sqrt(stoneRadius2 - 0.25*r1*r1);
+        vec3 ip0 = ro + rd*dot(cc - ro, nBoard) / dot(rd, nBoard);
+        vec3 q2;
+
+
+        bool isNotArea = length(result0.p.xz - cc.xz) > 0.5*r1 || ip.y < dd.y;
+        if (isNotArea) {
+            vec2 rr = distanceRayCircle(ro, rd, ip0, result0.t, cc, 0.5*r1, q2);
+            Intersection r2 = result0;
+            //r2.t += 0.00001;//TODO
+            float d = abs(rr.y);
+            //r2.t -= 0.0001;
+            if (sign(ro.y - dd.y) * rr.x <= 0.0 && d < boardaa){
+                r2.d = -min(d, -r2.d);
+                r2.m = idStone;
+                updateResult(result0, result1, result2, r2);
+            }
+            else{
+                result0.m = idStone;
+            }
+        }
+    }
+}
+void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersection result1, inout Intersection result2) {
 
     Intersection ret;
     ret.m = idBack;
@@ -583,7 +734,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
     ret.isBoard = false;
     ret.pid = 0;
     ret.uid = 0;
-    result[0] = result[1] = ret;
+    result0 = result1 = result2 = ret;
 
     float tb, tb2;
     vec3 q2;
@@ -687,13 +838,14 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
             n1 = vec3(0.0, 0.0, sign(ip0.z));
             n0 = vec3(ip0.x, ip0.y, 0.0);
         }
-        ret.t = vec2(tb, tb);
+        ret.t = vec2(tb,tb);
         ret.m = idBoard;
         ret.d = -farClip;
         ret.d2 = -farClip;
         ret.p = ip;
         ret.isBoard = isBoardTop;
         bool edge = false;
+        float xxx = dBox(ro, rd, ip, bnx.xyz, -bnx.xwz, n0);
         if (dist0 > -boardaa) {
             float tc = 0.0, tc2 = 0.0;
             IntersectBox(ro, q2 - ro, bnx.xyz, -bnx.xwz, tc, tc2);
@@ -701,25 +853,29 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                 n0 = normalize(n0);
                 vec3 cdist = abs(abs(ip0) - abs(bn0));
                 vec2 ab = clamp(vec2(abs(dist0), min(cdist.z, min(cdist.x, cdist.y))) / boardcc, 0.0, 1.0);
-                n0 = normalize(mix(normalize(ip0), n0, ab.y));
-                n0 = normalize(mix(n0, n1, ab.x));
+                //n0 = normalize(mix(normalize(ip0), n0, ab.y));
+                //n0 = normalize(mix(n0, n1, ab.x));
                 ret.n = n0;
                 ret.d = -farClip;
                 ret.d2 = -farClip;
                 ret.p = q2;
                 edge = true;
-                updateResult(result, ret);
+                //updateResult(result0, result1, result2, ret);
             }
         }
-        ret.n = n1;
+        ret.n = n0;
         ret.p = ip;
         bool upit = false;
-        ret.d = dist0;
-        dist0 = max(dist0, -dd*boardaa);
-        ret.d2 = edge ? -farClip : dist0;
+        ret.m = dist0 > -dd*boardaa  ? idBoard : idGrid;
+        ret.d = -xxx*boardaa;
+        updateResult(result0, result1, result2, ret);
+        ret.d = max(dist0, -dd*boardaa);
+        //dist0 = dist0;
         ret.m = idBoard;
-        updateResult(result, ret);
+        //ret.t.x -= 0.0001;//TODO
+        updateResult(result0, result1, result2, ret);
         ret.isBoard = false;
+        ret.d = -farClip;
     }
     float t1, t2;
     if (IntersectBox(ro, rd, minBound, maxBound, t1, t2)) {
@@ -738,7 +894,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                     vec3 dd = vec3(xz.x, 0.5*h, xz.y);
                     float tt2;
                     vec4 ret0;
-                    if (intersectionRayStone(ro, rd, dd, result[1].t.x, ret0, tt2)) {
+                    if (intersectionRayStone(ro, rd, dd, ret0, tt2)) {
                         //vec3 w25 = vec3(0.25*w, h*vec2(-0.5, 0.6));
                         //vec3 minb = dd - w25.xyx;;
                         //vec3 maxb = dd + w25.xzx;
@@ -756,11 +912,18 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                             mm0 = m0 == cidBlackStone ? idBlackStone : idWhiteStone;
                         }
                         ret.dummy = vec4(dd, stone0.w);
-                        ret.t = vec2(ret0.w, tt2);
+                        ret.t = vec2(tt2);
                         ret.m = mm0;
                         ret.d = -farClip;
                         ret.n = ret0.xyz;
                         ret.p = ip;
+                        //TODO
+                        vec3 dist0a = distanceRayStoneSphere(ro, rd, dd.xyz - dn, stoneRadius);
+                        vec3 dist0b = distanceRayStoneSphere(ro, rd, dd.xyz + dn, stoneRadius);
+                        dist0a = dist0a.y > dist0b.y ? dist0a : dist0b;
+                        dist0b.yz = distanceRayStone(ro, rd, dd.xyz);
+                        ret.d = mix(dist0a.y / dist0a.z, dist0b.y / dist0b.z, step(0.0, dist0a.x));
+
                     }
                 }
                 else if (isBoardTop && (m0 == cidWhiteArea || m0 == cidBlackArea)) {
@@ -782,14 +945,18 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
 
                 if (mm0 > idBack) {
                     //updateResult(result, ret);
-                    if (ret.t.x <= result[0].t.x) {
-                        result[1] = result[0];
-                        result[0] = ret;
+                    if (ret.t.x <= result0.t.x) {
+                        result2 = result1;
+                        result1 = result0;
+                        result0 = ret;
                     }
-                    else if (ret.t.x <= result[1].t.x) {
-                        result[1] = ret;
+                    else if (ret.t.x <= result1.t.x) {
+                        result2 = result1;
+                        result1 = ret;
                     }
-                }
+                    else if (ret.t.x <= result2.t.x) {
+                        result2 = ret;
+                    }                }
             }
         }
     }
@@ -855,7 +1022,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                 //ret.t = tc;
                 ret.p = ro + ret.t.x*rd;
                 ret.n = nBoard;
-                updateResult(result, ret);
+                updateResult(result0, result1, result2, ret);
                 ret.d = farClip;
                 if (!exter) {
                     ret.d = -farClip;
@@ -887,56 +1054,83 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                 }
             }
             if (ret.d < farClip){
-                updateResult(result, ret);
+                updateResult(result0, result1, result2, ret);
             }
         }
     }
 
     int si = 0;
     int ei = 0;
-    vec3 cci;
-    cci = cc[isInCup - 1];
-    if (isInCup == 2 || isInCup ==4) {
-        si = 0;
-        if(isInCup == 2)
-            ei = min(maxCaptured, iWhiteCapturedCount);
-        else
-            ei = min(maxCaptured, iBlackReservoirCount);
-    }
-    else if (isInCup == 1 || isInCup == 3){
-        si = maxCaptured;
-        if(isInCup == 1)
-            ei = maxCaptured + min(maxCaptured, iBlackCapturedCount);
-        else
-            ei = maxCaptured + min(maxCaptured, iWhiteReservoirCount);
-    }
-    for (int i = si; i < ei; ++i) {
-        vec4 ddc = ddc[i];
-        ddc.xz += cci.xz;
-        ddc.y += bnx.y - legh + bowlRadius2 - bowlRadius - 0.5 * (bowlRadius2 - bowlRadius);
-        int mm0;
+    //vec3 cci;
+    for(int i = 0; i < 4; ++i) {
+        //int isInCup = i + 1;
+        vec3 cc1 = cc[i].xyz;
+        //vec3 cc1 = cc[i].xyz;
+        cc1.y = bnx.y - legh + bowlRadius2 - 0.5* (bowlRadius2 - bowlRadius);
         vec4 ret0;
         float tt2;
-        if (intersectionRayStone(ro, rd, ddc.xyz, result[1].t.x, ret0, tt2)) {
-            vec3 ip = ro + rd*ret0.w;
-            int mm0 = (i < maxCaptured != (isInCup < 3)) ? idBowlBlackStone : idBowlWhiteStone;
-            ret.dummy = ddc;
-            ret.t = vec2(ret0.w, tt2);
-            ret.m = mm0;
-            ret.d = -farClip;
-            ret.n = ret0.xyz;
-            ret.p = ip;
-            ret.uid = i+ (isInCup - 1)*maxCaptured;
-            ret.pid = isInCup;
+        float t = intersectionRaySphereR(ro, rd, cc1, bowlRadius2*bowlRadius2).x;
+        int isInCup = t < farClip ? i +1: 0;
+        if(isInCup == 0)
+            continue;
+        vec3 cci;
+        cci = cc[isInCup - 1].xyz;
+        if (isInCup == 2 || isInCup ==4) {
+            si = 0;
+            if (isInCup == 2)
+            ei = min(maxCaptured, iWhiteCapturedCount);
+            else
+            ei = min(maxCaptured, iBlackReservoirCount);
+        }
+        else if (isInCup == 1 || isInCup == 3){
+            si = maxCaptured;
+            if (isInCup == 1)
+            ei = maxCaptured + min(maxCaptured, iBlackCapturedCount);
+            else
+            ei = maxCaptured + min(maxCaptured, iWhiteReservoirCount);
+        }
+        for (int i = si; i < ei; ++i) {
+            vec4 ddc = ddc[i];
+            ddc.xz += cci.xz;
+            ddc.y += bnx.y - legh + bowlRadius2 - bowlRadius - 0.5 * (bowlRadius2 - bowlRadius);
+            int mm0;
+            vec4 ret0;
+            float tt2;
+            if (intersectionRayStone(ro, rd, ddc.xyz, ret0, tt2)) {
+                vec3 ip = ro + rd*ret0.w;
+                int mm0 = (i < maxCaptured != (isInCup < 3)) ? idBowlBlackStone : idBowlWhiteStone;
+                ret.dummy = ddc;
+                ret.t = vec2(ret0.w, tt2);
+                ret.m = mm0;
+                ret.d = -farClip;
+                ret.n = ret0.xyz;
+                ret.p = ip;
+                ret.uid = i+ (isInCup - 1)*maxCaptured;
+                ret.pid = isInCup;
 
-            if (mm0 > idBack) {
-                //        updateResult(result, ret);
-                if (ret.t.x <= result[0].t.x) {
-                    result[1] = result[0];
-                    result[0] = ret;
-                }
-                else if (ret.t.x <= result[1].t.x) {
-                    result[1] = ret;
+                vec3 dist0a = distanceRayStoneSphere(ro, rd, ddc.xyz - dn, stoneRadius);
+                vec3 dist0b = distanceRayStoneSphere(ro, rd, ddc.xyz + dn, stoneRadius);
+                dist0a = dist0a.y > dist0b.y ? dist0a : dist0b;
+                dist0b.yz = distanceRayStone(ro, rd, ddc.xyz);
+                ret.d = mix(dist0a.y / dist0a.z, dist0b.y / dist0b.z, step(0.0, dist0a.x));
+
+
+                //finalizeStoneIntersection(ro, rd, ddc, ret, 0.0, false);
+
+                if (mm0 > idBack) {
+                    //        updateResult(result, ret);
+                    if (ret.t.x <= result0.t.x) {
+                        result2 = result1;
+                        result1 = result0;
+                        result0 = ret;
+                    }
+                    else if (ret.t.x <= result1.t.x) {
+                        result2 = result1;
+                        result1 = ret;
+                    }
+                    else if (ret.t.x <= result2.t.x) {
+                        result2 = ret;
+                    }
                 }
             }
         }
@@ -949,7 +1143,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
         ret.p = ro + t*rd;
         ret.n = nBoard;
         ret.d = -farClip;
-        updateResult(result, ret);
+        updateResult(result0, result1, result2, ret);
     }
     for (int i = 0; i < 4; i++){
         const float r = legh;
@@ -963,65 +1157,17 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
             ret.m = idLeg1 + i;
             ret.p = ip;
             ret.n = normalize(ip - cc);
-            updateResult(result, ret);
+            updateResult(result0, result1, result2, ret);
         }
     }
-    //finalizeStoneIntersection(ro, rd, result, 0);
-    vec3 dd = result[0].dummy.xyz;
-    bvec3 isStone = bvec3(result[0].m == idBlackStone || result[0].m == idWhiteStone || result[0].m == idBowlBlackStone || result[0].m == idBowlWhiteStone,
-        result[0].m == idCapturedBlackStone || result[0].m == idCapturedWhiteStone,
-        result[0].m == idLastBlackStone || result[0].m == idLastWhiteStone);
-    vec3 dist0a;
-    Intersection r2 = result[0];
-    if (any(isStone)) {
-        dist0a = distanceRayStoneSphere(ro, rd, dd - dn, stoneRadius);
-        vec3 dist0b = distanceRayStoneSphere(ro, rd, dd + dn, stoneRadius);
-        dist0a = dist0a.y > dist0b.y ? dist0a : dist0b;
-        dist0b.yz = distanceRayStone(ro, rd, dd);
-        result[0].d = mix(dist0a.y / dist0a.z, dist0b.y / dist0b.z, step(0.0, dist0a.x));
+    if(result1.t.x < farClip) {
+        //finalizeStone(ro, rd, result1, result0, result1, result2);
     }
-    if (any(isStone.yz)) {
-        int idStoneInside = result[0].m;
-        int idStone = idStoneInside;
-        if(idStone == idCapturedBlackStone){
-            idStone = idBlackStone;
-            idStoneInside = idWhiteStone;
-        }
-        else if(idStone == idCapturedWhiteStone){
-            idStone = idWhiteStone;
-            idStoneInside = idBlackStone;
-        }
-        else if(idStone == idLastBlackStone){
-            idStone = idBlackStone;
-            idStoneInside = idLastBlackStone;
-        }
-        else if(idStone == idLastWhiteStone){
-            idStone = idWhiteStone;
-            idStoneInside = idLastWhiteStone;
-        }
-        result[0].m = idStoneInside;
-
-        vec3 cc = dd;
-        cc.y -= dn.y - sqrt(stoneRadius2 - 0.25*r1*r1);
-        vec3 ip0 = ro + rd*dot(cc - ro, nBoard) / dot(rd, nBoard);
-        vec3 q2;
-
-        bool isNotArea = length(result[0].p.xz - cc.xz) > 0.5*r1;
-        if (isNotArea) {
-            vec2 rr = distanceRayCircle(ro, rd, ip0, result[0].t, cc, 0.5*r1, q2);
-            r2.d = abs(rr.y);
-            if (rr.x <0.0 && r2.d < boardaa){
-                r2.d = max(-r2.d, result[0].d);
-                r2.m = idStone;
-                updateResult(result, r2);
-            }
-            else{
-                result[0].m = idStone;
-            }
-        }
+    if(result0.t.x < farClip) {
+        finalizeStone(ro, rd, result0, result1, result2);
     }
-    //finalizeStoneIntersection(ro, rd, result, 1);
 }
+
 
 vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int m, bool ao, int uid, int pid) {
     vec2 ret = vec2(1.0);
@@ -1179,7 +1325,8 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
             for (int j = si; j < ei; ++j) {
                 vec4 ddcj = ddc[j];
                 ddcj.xz += cc[isInCup-1].xz;
-                ddcj.y += bnx.y - legh - 0.5*(bowlRadius2 - bowlRadius);
+                ddcj.y += bnx.y - legh + bowlRadius2 - bowlRadius - 0.5 * (bowlRadius2 - bowlRadius);
+
                 float cuty = bnx.y - legh - 0.5*(bowlRadius2 - bowlRadius) + bowlRadius2 + cc[isInCup-1].y * bowlRadius;
                 if (((m == idCupBlack || m == idCupWhite || m == idLidWhite || m == idLidBlack) && pos.y < cuty - 0.0001)
                     || ((m == idBowlBlackStone || m == idBowlWhiteStone) && uid != j && pos.y < ddcj.y - 0.01*h)){
@@ -1424,51 +1571,62 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
     vec3 col0, col1, col2;
     col0 = col1 = col2 = vec3(0.0);
 
-    Intersection ret[2];
+    Intersection ret0;
+    Intersection ret1;
+    Intersection ret2;
 
-    castRay(ro, rd, ret);
+    castRay(ro, rd, ret0, ret1, ret2);
 
-    float alpha1 = smoothstep(boardaa, 0.0, -ret[0].d);
-    float alpha2 = smoothstep(boardaa, 0.0, -ret[1].d);
+
     vec3 col;
     vec4 mcol;
     Material mat; 
     vec3 nn;
-    mat = getMaterialColor(ret[0], mcol, rd, ro, nn);
-    ret[0].n = nn;
-    float w = alpha1;
-    float wcol = (1.0-w);
-    col = shading(ro, rd, ret[0], mat, mcol);
-    if (ret[0].m == idBoard) {
-        float alpha3 = smoothstep(boardaa, 0.0, -ret[0].d2);
-        if(alpha3 > 0.0) {
-            col = mix(col, shading(ro, rd, ret[0], mGrid, vec4(mGrid.clrA, mGrid.specularPower.x)), alpha3);
-        }
-    }
-    col *= (1.0-w);
-    gl_FragDepth = (ret[0].m == mBlack.id || ret[0].m == mWhite.id) ? 0.5 : (ret[0].p.y < -0.001 ? 0.25 : 0.75);//; distance(ro, ret[0].p) / 100.0;
-    if (alpha1 > 0.0) {
-        //ret[0] = mix(ret[0].n, ret[1].n, alpha1)
-        mat = getMaterialColor(ret[1], mcol, rd, ro, nn);
-        ret[1].n = nn;
-        //mcol = 0.5*(mat.clrA+mat.clrB);
 
-        col1 = shading(ro, rd, ret[1], mat, mcol);
-        if (ret[1].m == idBoard) {
-            float alpha3 = smoothstep(boardaa, 0.0, -ret[1].d2);
-            if(alpha3 > 0.0) {
-                vec3 col3 = shading(ro, rd, ret[1], mGrid, vec4(mGrid.clrA, mGrid.specularPower.x));
-                col1 = mix(col1, col3, alpha3);
-            }
-            col += alpha1*col1;
-            wcol += alpha1;
-        }
-        else {
-            col += alpha1*(1.0-alpha2)*col1;
-            wcol += alpha1*(1.0-alpha2);
-        }
+    gl_FragDepth = (ret0.m == mBlack.id || ret0.m == mWhite.id) ? 0.5 : (ret0.p.y < -0.001 ? 0.25 : 0.75);//; distance(ro, ret[0].p) / 100.0;
+
+    float alpha0 = 0.0;
+    float alpha1 = 0.0;
+    float alpha2 = 0.0;
+    if(ret0.t.x < farClip) {
+        alpha0 = smoothstep(-boardaa, 0.0, ret0.d);
+        //if(alpha0 > 0.0) {
+            mat = getMaterialColor(ret0, mcol, rd, ro, nn);
+            ret0.n = nn;
+            col0 = shading(ro, rd, ret0, mat, mcol);
+        //}
     }
-    return col/wcol;
+
+    if(ret1.t.x < farClip) {
+        alpha1 = smoothstep(-boardaa, 0.0, ret1.d);
+        //if(alpha1 > 0.0) {
+            mat = getMaterialColor(ret1, mcol, rd, ro, nn);
+            ret1.n = nn;
+            col1 = shading(ro, rd, ret1, mat, mcol);
+        //}
+    }
+
+    if(ret2.t.x < farClip) {
+        alpha2 = smoothstep(-boardaa, 0.0, ret2.d);
+        //if(alpha2 > 0.0) {
+            mat = getMaterialColor(ret2, mcol, rd, ro, nn);
+            ret2.n = nn;
+            col2 = shading(ro, rd, ret2, mat, mcol);
+        //}
+    }
+
+    if(ret2.t.x < farClip) {
+        col2 = vec3(0.0) * alpha2 + col2 * (1.0-alpha2);
+        col1 = col2 * alpha1 + col1 * (1.0-alpha1);
+        col0 = col1 * alpha0 + col0 * (1.0-alpha0);
+    }
+    else if(ret1.t.x < farClip) {
+        col1 = vec3(0.0) * alpha1 + col1 * (1.0-alpha1);
+        col0 = col1 * alpha0 + col0 * (1.0-alpha0);
+    } else if (ret0.t.x < farClip) {
+        col0 = vec3(0.0) * alpha0 + col0 * (1.0-alpha0);
+    }
+    return col0;
 }
 
 
