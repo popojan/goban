@@ -1092,7 +1092,7 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
         for (int i = si; i < ei; ++i) {
             vec4 ddc = ddc[i];
             ddc.xz += cci.xz;
-            ddc.y += bnx.y - legh + bowlRadius2 - bowlRadius - 0.5 * (bowlRadius2 - bowlRadius);
+            ddc.y += bnx.y - legh + 0.5 * (bowlRadius2 - bowlRadius);
             int mm0;
             vec4 ret0;
             float tt2;
@@ -1331,6 +1331,7 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
                 if (((m == idCupBlack || m == idCupWhite || m == idLidWhite || m == idLidBlack) && pos.y < cuty - 0.0001)
                     || ((m == idBowlBlackStone || m == idBowlWhiteStone) && uid != j && pos.y < ddcj.y - 0.01*h)){
                     vec3 ddpos = ddcj.xyz - pos;
+                    float avoid = smoothstep(ddcj.y-0.01, ddcj.y, 0.99*pos.y);
                     float ln = length(ddpos);
                     vec3 ldir = ddpos;
                     float res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
@@ -1349,7 +1350,7 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
                     else if (d > rmR.x) {
                         A = 0.0;
                     }
-                    ret.x *= 1.0 - A / (PI*ldia2);
+                    ret.x *= mix(1.0 - A / (PI*ldia2), 1.0, avoid);
                 }
                 /*else if ((m == idBowlBlackStone || m == idBowlWhiteStone) && (pos.y < ddcj.y + 0.01*h || uid == j)) {
                     vec3 u = normalize(cross(nor, nBoard));
@@ -1559,7 +1560,7 @@ vec3 shading(in vec3 ro, in vec3 rd, in Intersection ip, const Material mat, vec
         vec4 pws = clamp(vec4(dot(ref, lig), dot(ref, lig2), dot(ref, lig3), dot(ref, lig3)), 0.0, 1.0);
         vec3 cupsab = vec3(1.0);//ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? vec3(0.125,0.9,0.25) : vec3(0.125,1.0,0.5);
         vec3 pwr = pow(pws.xyz, col.w*cupsab);
-        vec3 score  = mat.diffuseAmbientSpecularWeight * vec3(adsy * shadow.x, shadow.y,shadow.y*(0.25*pwr.x + pwr.y + pwr.z));
+        vec3 score  = mat.diffuseAmbientSpecularWeight * vec3(adsy * shadow.x, shadow.y,shadow.x * shadow.y*(0.25*pwr.x + pwr.y + pwr.z));
         ret = (score.x + score.y)*col.xyz + score.z;
     }
     ret = pow(ret, gamma*exp(contrast*(vec3(0.5) - ret)));

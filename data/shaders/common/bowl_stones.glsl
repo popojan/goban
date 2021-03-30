@@ -4,7 +4,7 @@ void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow
     int ei = 0;
 
     for (int i = 0; i < 4; i++) {
-        vec3 cc1 = cc[i];
+        vec3 cc1 = cc[i].xyz;
         cc1.y = bnx.y - legh + bowlRadius2 - 0.5* (bowlRadius2 - bowlRadius);
         vec4 ret0;
         float tt2;
@@ -13,7 +13,7 @@ void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow
         if(isInCup == 0)
             continue;
         vec3 cci;
-        cci = cc[isInCup - 1];
+        cci = cc[isInCup - 1].xyz;
         ivec2 mm0;
         if (isInCup == 2 || isInCup ==4) {
             si = 0;
@@ -59,7 +59,7 @@ vec2 sBowlStones(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
 
     int isInCup = ipp.isInCup;
     vec3 cci;
-    cci = cc[isInCup - 1];
+    cci = cc[isInCup - 1].xyz;
     vec3 m;
     if (isInCup == 2 || isInCup ==4) {
         si = 0;
