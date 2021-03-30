@@ -2,7 +2,7 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
     int isInCup = 0;
 
     for (int i = 0; i < 4; i++) {
-        vec3 cc1 = cc[i];
+        vec3 cc1 = cc[i].xyz;
         cc1.y = bnx.y - legh + bowlRadius2 - 0.5* (bowlRadius2 - bowlRadius);
         vec3 cc2 = cc1;
         vec2 ts = intersectionRaySphereR(ro, rd, cc1, bowlRadius2*bowlRadius2);
@@ -129,7 +129,7 @@ vec2 sBowls(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
     for (int j = 0; j <= 2; j += 2) {
         int jj = pos.x < 0.0 ? j+0 : j+1;
         if(ipp.oid != idBowlBlackStone && ipp.oid != idBowlWhiteStone && ipp.uid != idCupBlack +jj) {
-            vec3 cci = cc[jj];
+            vec3 cci = cc[jj].xyz;
             float yy = bnx.y - legh + bowlRadius2 - 0.5* (bowlRadius2 - bowlRadius);
             cci.y = yy + cci.y * bowlRadius;
             float ln = yy - cci.y;

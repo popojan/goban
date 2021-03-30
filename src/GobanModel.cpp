@@ -108,95 +108,97 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
     using namespace glm;
     capturedBlack = capturedWhite = m.maxc;
     //if (capturedBlack != calcCapturedBlack || capturedWhite != calcCapturedWhite) {
+    float cc0x = 0.0f;//m.bowlsCenters[0];
+    float cc0z = 0.0f;//m.bowlsCenters[2];
+    float cc1x = 0.0f;//m.bowlsCenters[3];
+    float cc1z = 0.0f;//m.bowlsCenters[5];
+    float magic = 0.0f;
+    float factor = 1.00f;
+    float ddcy = 0.5f * m.h - factor * m.innerBowlRadius - magic;
 
-        float cc0x = 0.0f;//m.bowlsCenters[0];
-        float cc0z = 0.0f;//m.bowlsCenters[2];
-        float cc1x = 0.0f;//m.bowlsCenters[3];
-        float cc1z = 0.0f;//m.bowlsCenters[5];
-        float magic = 0.0f;
-        float ddcy = 0.5f*m.h - m.innerBowlRadius - magic;
-
-        vec3 s0a(cc0x, -magic, cc0z);
-        vec3 s1a(cc0x, ddcy, cc0z);
-        vec3 s0b(cc1x, -magic, cc1z);
-        vec3 s1b(cc1x, ddcy, cc1z);
-        vec3 sy(0.0f, m.stoneSphereRadius - 0.5*m.h, 0.0f);
+    vec3 s0a(cc0x, -magic, cc0z);
+    vec3 s1a(cc0x, ddcy, cc0z);
+    vec3 s0b(cc1x, -magic, cc1z);
+    vec3 s1b(cc1x, ddcy, cc1z);
+    vec3 sy(0.0f, m.stoneSphereRadius - 0.5 * m.h, 0.0f);
 
 
-        for (int i = 0; i < 2 * maxCaptured; ++i) {
-            float ccx = cc0x;
-            float ccz = cc0z;
-            float rr = 0.99f * m.innerBowlRadius;
-            float ccy = 0.0f;//0.1f - rr;
-            vec3 s1 = s1a;
-            vec3 s0 = s0a;
-            int di = calcCapturedBlack;
-            bool white = false;
+    for (int i = 0; i < 2 * maxCaptured; ++i) {
+        float ccx = cc0x;
+        float ccz = cc0z;
+        float rr = factor * m.innerBowlRadius;
+        float ccy = 0.0f;//0.1f - rr;
+        vec3 s1 = s1a;
+        vec3 s0 = s0a;
+        int di = calcCapturedBlack;
+        bool white = false;
 
-            /*if (i + calcCapturedWhite >= maxCaptured + capturedWhite
-                || (i + calcCapturedBlack >= capturedBlack && i <maxCaptured)) {
-                continue;
-            }*/
-            if (i + calcCapturedBlack >= capturedBlack) {
-                ccx = cc1x;
-                ccz = cc1z;
-                s1 = s1b;
-                s0 = s0b;
-                di = calcCapturedWhite;
-                white = true;
-            }
-
-            float randx = (float(rand()) / RAND_MAX - 0.5f);
-            float randz = (float(rand()) / RAND_MAX - 0.5f);
-            float mindy = 1e6, mindx = 0, mindz = 0;
-            const int ITERS = 500;
-            for (int k = 0; k < ITERS; ++k) {
-                const int turns = int(sqrt(ITERS));
-                const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * turns);
-                const float phi = turns * 2.0f * 3.1415926f * k/float(ITERS);
-                const float r = a * phi;
-                const float alpha = (rand() < (RAND_MAX >> 10)) ? 0.9 : 0.0;
-                float nrandx = cos(phi)*r; //;alpha * randx + (1.0 - alpha) * (float(rand()) / RAND_MAX - 0.5f);
-                float nrandz = sin(phi)*r;//;alpha * randz + (1.0 - alpha) * (float(rand()) / RAND_MAX - 0.5f);
-                float dx = nrandx;
-                float dz = nrandz;
-                float d = rr*rr - dx*dx - dz*dz;
-                if (d < 0) continue;
-                float dy = rr - sqrt(d) + 0.5f*m.h;
-                vec3 dir(dx, rr - dy - m.stoneSphereRadius + 0.5f*m.h, dz);
-                float mult = m.innerBowlRadius / (m.stoneSphereRadius + sqrt(dot(dir, dir)));
-                if (mult < 1.0f) {
-                    dir *= mult;
-                    dx = dir.x;
-                    dy = rr - m.stoneSphereRadius + 0.5f*m.h - dir.y;
-                    dz = dir.z;
-                }
-                for (int j = white ? maxCaptured:0; j < i + di; ++j) {
-                    float ax = (dx + ccx - ddc[4 * j + 0]);
-                    float az = (dz + ccz - ddc[4 * j + 2]);
-                    if (az*az + ax * ax < 4.0f*m.stoneSphereRadius*m.stoneSphereRadius) {
-                        dy = max(dy, ddc[4 * j + 1] + sqrt(4.0f*m.stoneSphereRadius*m.stoneSphereRadius - az*az - ax*ax) - 2.0f*m.stoneSphereRadius + m.h - ccy);
-                    }
-                }
-                if (dy < mindy) {
-                    mindy = dy;
-                    mindx = dx;
-                    mindz = dz;
-                    randx = nrandx;
-                    randz = nrandz;
-                }
-            }
-            ddc[4 * (i+di) + 0] = ccx + mindx;
-            ddc[4 * (i+di) + 1] = ccy + mindy;
-            ddc[4 * (i+di) + 2] = ccz + mindz;
-            ddc[4 * (i+di) + 3] = board.getRandomStoneRotation();
+        /*if (i + calcCapturedWhite >= maxCaptured + capturedWhite
+            || (i + calcCapturedBlack >= capturedBlack && i <maxCaptured)) {
+            continue;
+        }*/
+        if (i + calcCapturedBlack >= capturedBlack) {
+            ccx = cc1x;
+            ccz = cc1z;
+            s1 = s1b;
+            s0 = s0b;
+            di = calcCapturedWhite;
+            white = true;
         }
-        calcCapturedBlack = capturedBlack;
-        calcCapturedWhite = capturedWhite;
+
+        float randx = (float(rand()) / RAND_MAX - 0.5f);
+        float randz = (float(rand()) / RAND_MAX - 0.5f);
+        float mindy = 1e6, mindx = 0, mindz = 0;
+        const int ITERS = 500;
+        for (int k = 0; k < ITERS; ++k) {
+            const int turns = int(sqrt(ITERS));
+            const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * turns);
+            const float phi = turns * 2.0f * 3.1415926f * k / float(ITERS);
+            const float r = a * phi;
+            const float alpha = (rand() < (RAND_MAX >> 10)) ? 0.9 : 0.0;
+            float nrandx = cos(phi) * r; //;alpha * randx + (1.0 - alpha) * (float(rand()) / RAND_MAX - 0.5f);
+            float nrandz = sin(phi) * r;//;alpha * randz + (1.0 - alpha) * (float(rand()) / RAND_MAX - 0.5f);
+            float dx = nrandx;
+            float dz = nrandz;
+            float d = rr * rr - dx * dx - dz * dz;
+            if (d < 0) continue;
+            float dy = rr - sqrt(d) + 0.5f * m.h;
+            vec3 dir(dx, rr - dy - m.stoneSphereRadius + 0.5f * m.h, dz);
+            float mult = rr / (m.stoneSphereRadius + sqrt(dot(dir, dir)));
+            if (mult < 1.0f) {
+                dir *= mult ;
+                dx = dir.x;
+                dy = rr - m.stoneSphereRadius + 0.5f * m.h - dir.y;
+                dz = dir.z;
+            }
+            for (int j = white ? maxCaptured : 0; j < i + di; ++j) {
+                float ax = (dx + ccx - ddc[4 * j + 0]);
+                float az = (dz + ccz - ddc[4 * j + 2]);
+                if (az * az + ax * ax < 4.0f * m.stoneSphereRadius * m.stoneSphereRadius) {
+                    dy = max(dy, ddc[4 * j + 1] +
+                                 sqrt(4.0f * m.stoneSphereRadius * m.stoneSphereRadius - az * az - ax * ax) -
+                                 2.0f * m.stoneSphereRadius + m.h - ccy);
+                }
+            }
+            if (dy < mindy) {
+                mindy = dy;
+                mindx = dx;
+                mindz = dz;
+                randx = nrandx;
+                randz = nrandz;
+            }
+        }
+        ddc[4 * (i + di) + 0] = ccx + mindx;
+        ddc[4 * (i + di) + 1] = ccy + mindy;
+        ddc[4 * (i + di) + 2] = ccz + mindz;
+        ddc[4 * (i + di) + 3] = board.getRandomStoneRotation();
+    }
+    calcCapturedBlack = capturedBlack;
+    calcCapturedWhite = capturedWhite;
     //}
     int dBlack = max(capturedBlack - m.maxc, 0);
     int dWhite = max(capturedWhite - m.maxc, 0);
-    for (int i = 0; i < m.maxc; ++i){
+    for (int i = 0; i < m.maxc; ++i) {
         m.tmpc[4 * i + 0] = ddc[4 * (i + dBlack) + 0];
         m.tmpc[4 * i + 1] = ddc[4 * (i + dBlack) + 1];
         m.tmpc[4 * i + 2] = ddc[4 * (i + dBlack) + 2];
@@ -206,6 +208,7 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         m.tmpc[4 * m.maxc + 4 * i + 2] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 2];
         m.tmpc[4 * m.maxc + 4 * i + 3] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 3];
     }
+
 }
 
 Move GobanModel::getPassMove() {
