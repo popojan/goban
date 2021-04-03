@@ -138,7 +138,7 @@ const vec3 bgB = vec3(0.0, 0.0, 0.0);
 const Material mCup = Material(idCupBlack, vec3(0.7, 0.15, 0.25), vec3(32.0), vec3(0.293333, 0.1713725, 0.038039), vec3(0.053333,0.0133725,0.029039), vec3(0.17333,0.1613725,0.089039), 1.5);
 const Material mBoard = Material(idBoard, vec3(0.7, 0.15, 0.05), vec3(42.0), vec3(0.93333, 0.813725, 0.38039), vec3(0.53333,0.413725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
 const Material mTable = Material(idTable, vec3(1.0, 0.15, 0.0), vec3(4.0), vec3(0.566,0.0196,0.0176), vec3(0.766,0.1196,0.1176), vec3(0.666,0.0196,0.0176), 0.0);
-const Material mWhite = Material(idWhiteStone, vec3(0.43, 0.43, 0.04), vec3(32.0, 41.0, 2.0), vec3(0.98), vec3(0.98,0.95,0.97), vec3(0.96), 0.5);
+const Material mWhite = Material(idWhiteStone, vec3(0.5, 0.5, 0.14), vec3(32.0, 41.0, 8.0), vec3(0.98), vec3(0.98,0.95,0.97), vec3(0.96), 0.5);
 const Material mBlack = Material(idBlackStone, vec3(0.53, 0.53, 0.15), vec3(28.0), vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
 const Material mRed = Material(idLastBlackStone, vec3(0.3, 0.15, 0.25), vec3(4.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
 const Material mBack = Material(idBack, vec3(0.0, 1.0, 0.0), vec3(1.0), bgA, bgB, bgA, 0.0);
@@ -574,38 +574,6 @@ vec2 csg_difference(in vec2 a, in vec2 b) {
     return vec2(max(b.y, a.x), max(b.y, a.y));
 }
 
-//void finalizeStone(vec3 ro, vec3 rd, vec3 dd, inout Intersection ipp, float rot, bool marked) {
-/*    mat4 rmat = mat4(
-    cos(rot),0.0,sin(rot),0.0,
-    0.0,1.0,0.0,0.0,
-    -sin(rot),0.0,cos(rot),0.0,
-    0.0,0.0,0.0,1.0
-    );
-    vec3 ip = (ro + ipp.t.x * rd);
-    //vec3 add = 4.0*(ip.xyz - vec3(13.0+dd.x,dd.y-13.0, dd.z));
-    //ipp.uvw = rmat * vec4(add, 1.0);
-
-    if(marked) {
-        vec3 cc = dd;
-        cc.y -= dn.y - sqrt(stoneRadius2 - 0.25*r1*r1);
-        vec3 ip0 = ro + rd*dot(cc - ro, nBoard) / dot(rd, nBoard);
-        vec3 q2;
-
-        ipp.a = vec2(0.0);
-        bool isNotArea = length(ip.xz - cc.xz) > 0.5*r1 || ip.y < dd.y;
-        if (isNotArea) {
-            vec2 rr = distanceRayCircle(ro, rd, ip0, ipp.t.xy, cc, 0.5*r1, q2);
-            float d = abs(rr.y);
-            if (sign(ro.y - dd.y) * rr.x <= 0.0 && d < boardaa){
-                ipp.a = vec2(max(d/boardaa, ipp.d));
-            }
-            else {
-                ipp.a = vec2(1.0);
-            }
-        }
-    }*/
-//}
-
 float dBox(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 minimum, in vec3 maximum, out vec3 n0) {
     float r = boardaa*distance(ro, ip);
     mat4x3 rect;
@@ -661,7 +629,7 @@ float dBox(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 minimum, in vec3 maximum,
     return xxx;
 }
 
-void finalizeStone(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersection result1, inout Intersection result2) {
+void finalizeStone(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersection result00, inout Intersection result1, inout Intersection result2) {
     vec3 dd = result0.dummy.xyz;
     bvec3 isStone = bvec3(result0.m == idBlackStone || result0.m == idWhiteStone
     || result0.m == idBowlBlackStone || result0.m == idBowlWhiteStone,
@@ -677,6 +645,8 @@ void finalizeStone(in vec3 ro, in vec3 rd, inout Intersection result0, inout Int
         //result0.d = distance(ip.xz, dd.xz) > px ? dist0b.y / dist0b.z : dist0a.y / dist0a.z;
         result0.d = mix(dist0a.y / dist0a.z, dist0b.y / dist0b.z, step(0.0, dist0a.x));
     }*/
+        bool up = false;
+        Intersection r2 = result0;
     if (any(isStone.yz)) {
         int idStoneInside = result0.m;
         int idStone = idStoneInside;
@@ -703,24 +673,24 @@ void finalizeStone(in vec3 ro, in vec3 rd, inout Intersection result0, inout Int
         vec3 ip0 = ro + rd*dot(cc - ro, nBoard) / dot(rd, nBoard);
         vec3 q2;
 
-
         bool isNotArea = length(result0.p.xz - cc.xz) > 0.5*r1 || ip.y < dd.y;
         if (isNotArea) {
             vec2 rr = distanceRayCircle(ro, rd, ip0, result0.t, cc, 0.5*r1, q2);
-            Intersection r2 = result0;
             //r2.t += 0.00001;//TODO
             float d = abs(rr.y);
             //r2.t -= 0.0001;
             if (sign(ro.y - dd.y) * rr.x <= 0.0 && d < boardaa){
                 r2.d = -min(d, -r2.d);
                 r2.m = idStone;
-                updateResult(result0, result1, result2, r2);
+                up = true;
             }
             else{
                 result0.m = idStone;
             }
         }
     }
+    updateResult(result00, result1, result2, result0);
+    if(up) { updateResult(result00, result1, result2, r2); }
 }
 void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersection result1, inout Intersection result2) {
 
@@ -943,7 +913,7 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
                     }
                 }
 
-                if (mm0 > idBack) {
+                /*if (mm0 > idBack) {
                     //updateResult(result, ret);
                     if (ret.t.x <= result0.t.x) {
                         result2 = result1;
@@ -956,7 +926,11 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
                     }
                     else if (ret.t.x <= result2.t.x) {
                         result2 = ret;
-                    }                }
+                    }
+                }*/
+                if(mm0 > idBack) {
+                    finalizeStone(ro, rd, ret, result0, result1, result2);
+                }
             }
         }
     }
@@ -1160,18 +1134,12 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
             updateResult(result0, result1, result2, ret);
         }
     }
-    if(result1.t.x < farClip) {
-        //finalizeStone(ro, rd, result1, result0, result1, result2);
-    }
-    if(result0.t.x < farClip) {
-        finalizeStone(ro, rd, result0, result1, result2);
-    }
 }
 
 
 vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int m, bool ao, int uid, int pid) {
     vec2 ret = vec2(1.0);
-    bool isBoard = m == idBoard || m == idLeg1 || m == idLeg2 || m == idLeg3 || m == idLeg4 || m == idGrid;
+    bool isBoard = m == idBoard || m == idLeg1 || m == idLeg2 || m == idLeg3 || m == idLeg4;// || m == idGrid;
     if (isBoard && pos.y > h) return ret;
     const float eps = -0.00001;
     float ldia2 = ldia*ldia;
