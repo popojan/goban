@@ -83,31 +83,31 @@ bool ShellRenderInterfaceOpenGL::AttachToNative(void *nativeWindow)
     pixel_format_descriptor.cGreenBits = 8;
     pixel_format_descriptor.cBlueBits = 8;
     pixel_format_descriptor.cAlphaBits = 8;
-    pixel_format_descriptor.cDepthBits = 8;
+    pixel_format_descriptor.cDepthBits = 24;
     pixel_format_descriptor.cStencilBits = 0;
 
 	int pixel_format = ChoosePixelFormat(device_context, &pixel_format_descriptor);
-    if (pixel_format == 0 || GetLastError() != 0)
+    if (pixel_format == 0)
 	{
 		spdlog::critical("choosepixelformat failed {}, {}", pixel_format, GetLastError());
 		return false;
 	}
 
-	if (SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) == FALSE &&  GetLastError() == 0)
+	if (SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) == FALSE)
 	{
         spdlog::critical("could not set pixel format {}, {}", pixel_format, GetLastError());
 		return false;
 	}
 
 	render_context = wglCreateContext(device_context);
-	if (render_context == NULL || GetLastError() != 0)
+	if (render_context == NULL)
 	{
         spdlog::critical("wglCreateContext failing {}", GetLastError());
 		return false;
 	}
 
 	// Activate the rendering context.
-	if (wglMakeCurrent(device_context, render_context) == FALSE || GetLastError() != 0)
+	if (wglMakeCurrent(device_context, render_context) == FALSE)
 	{
         spdlog::critical("wglMakeCurrent failing {}", GetLastError());
 		return false;
