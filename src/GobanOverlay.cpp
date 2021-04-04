@@ -77,7 +77,7 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 		buffer[layer]->clear();
 		for (auto oit = points.begin(); oit != points.end(); ++oit) {
 			if (!oit->overlay.text.empty() && oit->overlay.layer == layer) {
-                glyphy_point_t pos = { model.metrics.squareSize * oit->x, -model.metrics.squareSize * oit->y };
+                glyphy_point_t pos = { model.metrics.squareSizeX * oit->x, -model.metrics.squareSizeY * oit->y };
 				buffer[layer]->move_to(&pos);
 				buffer[layer]->add_text(oit->overlay.text.c_str(), font, font_size);
 				cnt += 1;

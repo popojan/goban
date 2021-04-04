@@ -154,7 +154,7 @@ void ElementGame::OnUpdate()
         return;
 
     //model.update();
-    view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSize);
+    view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSizeX);
     //view.board.updateStones(model.board, model.territory, view.showTerritory);
     //nstate = state;
     bool isOver = model.state.reason != GameState::NOREASON;

@@ -33,6 +33,7 @@ void Metrics::calc(unsigned NDIM) {
     bowlsCenters[10] = 0.35f;
     bowlsCenters[11] = -1.0f + 3.2*br2;
 
-    squareSize = ww;
+    squareSizeX = ww;
+    squareSizeY = 13.0f * ww / 12.0f;
     stoneHeight = 0.5f*h;
 }
