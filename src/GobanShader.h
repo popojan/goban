@@ -75,8 +75,8 @@ private:
     GLint fsu_boardaa;
     GLint fsu_boardbb;
     GLint fsu_boardcc;
-    GLint fsu_ww;
-    GLint fsu_iww;
+    GLint fsu_wwx;
+    GLint fsu_wwy;
     GLint fsu_w;
     GLint fsu_h;
     GLint fsu_stoneRadius;

@@ -17,7 +17,8 @@ public:
     float stoneRadius;
     float innerBowlRadius;
     float bowlsCenters[12];
-    float squareSize;
+    float squareSizeX;
+    float squareSizeY;
     float stoneHeight;
 
     static const int maxc = 91;

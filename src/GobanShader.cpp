@@ -137,8 +137,8 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     fsu_boardaa = glGetUniformLocation(gobanProgram, "boardaa");
     fsu_boardbb = glGetUniformLocation(gobanProgram, "boardbb");
     fsu_boardcc = glGetUniformLocation(gobanProgram, "boardcc");
-    fsu_ww = glGetUniformLocation(gobanProgram, "ww");
-    fsu_iww = glGetUniformLocation(gobanProgram, "iww");
+    fsu_wwx = glGetUniformLocation(gobanProgram, "wwx");
+    fsu_wwy = glGetUniformLocation(gobanProgram, "wwy");
     fsu_w = glGetUniformLocation(gobanProgram, "w");
     fsu_h = glGetUniformLocation(gobanProgram, "h");
     iAnimT = glGetUniformLocation(gobanProgram, "iAnimT");
@@ -199,7 +199,8 @@ void GobanShader::setMetrics(const Metrics &m) {
     float r = m.stoneSphereRadius;
     float br = m.innerBowlRadius;
     float br2 = m.br2;
-    float ww = m.squareSize;
+    float wwx = m.squareSizeX;
+    float wwy = m.squareSizeY;
 
     float r2 = b*r1/(2.0f*sqrtf(r1*r1-px*px)); //ellipsoid
     float dn[3];
@@ -215,8 +216,8 @@ void GobanShader::setMetrics(const Metrics &m) {
     glUniform1f(fsu_boardaa, boardaa);
     glUniform1f(fsu_boardbb, boardbb);
     glUniform1f(fsu_boardcc, 8.0f*boardaa);
-    glUniform1f(fsu_ww, ww);
-    glUniform1f(fsu_iww, 1.0f/ww);
+    glUniform1f(fsu_wwx, wwx);
+    glUniform1f(fsu_wwy, wwy);
 
     glUniform1f(fsu_w, w); //initial width
     glUniform1f(fsu_h, h); //initial height
@@ -235,8 +236,8 @@ void GobanShader::setMetrics(const Metrics &m) {
     glUniform3fv(fsu_rrr, 1, rrr);
     glUniform1f(fsu_r1r1ir2ir2, r1*r1/(r2*r2));
     glUniform3fv(fsu_maxBound, 1, maxBound);
-    glUniform1f(fsu_dw, 0.015f*ww);
-    glUniform1f(fsu_iscale, 0.2f/ww);
+    glUniform1f(fsu_dw, 0.015f*wwx);
+    glUniform1f(fsu_iscale, 0.2f/wwx);
     glUniform1f(iGamma, gamma);
     glUniform1f(iContrast, contrast);
     glUniform1f(fsu_bowlRadius, br);

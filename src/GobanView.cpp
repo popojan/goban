@@ -289,8 +289,8 @@ void GobanView::updateTranslation() {
 
 Position GobanView::getBoardCoordinate(float x, float y) const {
     glm::vec2 p = boardCoordinate(x, y);
-    float xx = p.x/model.metrics.squareSize + 0.5f*model.metrics.fNDIM;
-    float yy = p.y/model.metrics.squareSize + 0.5f*model.metrics.fNDIM;
+    float xx = p.x/model.metrics.squareSizeX + 0.5f*model.metrics.fNDIM;
+    float yy = p.y/model.metrics.squareSizeY + 0.5f*model.metrics.fNDIM;
     int px = static_cast<int>(floorf(xx));
     int py = static_cast<int>(floorf(yy));
     Position ret(px, py);

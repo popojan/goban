@@ -35,26 +35,6 @@ uniform vec3 iTranslate;
 
 /* === DO NOT CHANGE ABOVE == */
 
-const float PI = 3.1415926535;
-const float farClip = 10000.0;
-const vec2 noIntersection2 = vec2(farClip, farClip);
-const vec4 noIntersection4 = vec4(farClip);
-const vec3 lpos = vec3(-2.0, 12.0, -2.0);
-const vec3 lpos2 = vec3(-4.0, 6.0, -2.0);
-const vec3 lpos3 = vec3(-12.0, 6.0, 8.0);
-const vec3 lpos4 = vec3(1.0, 2.0, 4.0);
-const vec3 lposA = vec3(6.0, -1.0, 6.0);
-const vec3 lposB = vec3(-6.0, -1.0, 6.0);
-const vec3 lposC = vec3(-6.0, -1.0, -6.0);
-const vec3 lposD = vec3(6.0, -1.0, -6.0);
-const float ldia = 3.5;
-const vec3 nBoard = vec3(0.0, 1.0, 0.0);
-const vec3 minBound = vec3(-1.2, -0.02, -1.2);
-const vec3 p = vec3(0.0, -0.25, 0.0);
-const vec3 c = vec3(1.0, 0.25, 1.0);
-const vec4 bnx = vec4(-c.x, -0.2, -c.x, 0.0);
-const float mw = 0.85;
-const float legh = 0.15;
 
 uniform float gamma;
 uniform float contrast;
@@ -62,8 +42,8 @@ uniform float fNDIM;
 uniform float boardaa;
 uniform float boardbb;
 uniform float boardcc;
-uniform float ww;
-uniform float iww;
+uniform float wwx;
+uniform float wwy;
 uniform float w;
 uniform float h;
 uniform float stoneRadius;
@@ -85,6 +65,27 @@ uniform float dw;
 uniform float iscale;
 uniform float bowlRadius;
 uniform float bowlRadius2;
+
+const float PI = 3.1415926535;
+const float farClip = 10000.0;
+const vec2 noIntersection2 = vec2(farClip, farClip);
+const vec4 noIntersection4 = vec4(farClip);
+const vec3 lpos = vec3(-2.0, 12.0, -2.0);
+const vec3 lpos2 = vec3(-4.0, 6.0, -2.0);
+const vec3 lpos3 = vec3(-12.0, 6.0, 8.0);
+const vec3 lpos4 = vec3(1.0, 2.0, 4.0);
+const vec3 lposA = vec3(6.0, -1.0, 6.0);
+const vec3 lposB = vec3(-6.0, -1.0, 6.0);
+const vec3 lposC = vec3(-6.0, -1.0, -6.0);
+const vec3 lposD = vec3(6.0, -1.0, -6.0);
+const float ldia = 3.5;
+const vec3 nBoard = vec3(0.0, 1.0, 0.0);
+const vec3 minBound = vec3(-1.2, -0.02, -1.2);
+const vec3 p = vec3(0.0, -0.25, 0.0);
+vec3 c;
+vec4 bnx;
+const float mw = 0.85;
+const float legh = 0.15;
 
 struct Material {
     int id;
@@ -132,14 +133,14 @@ const int idCupWhite = 18;
 const int idBowlBlackStone = 19;
 const int idBowlWhiteStone = 20;
 
-const vec3 bgA = vec3(0.0, 0.0, 0.0);
-const vec3 bgB = vec3(0.0, 0.0, 0.0);
+const vec3 bgA = vec3(0.5);
+const vec3 bgB = vec3(0.5);
 
-const Material mCup = Material(idCupBlack, vec3(0.7, 0.15, 0.25), vec3(32.0), vec3(0.293333, 0.1713725, 0.038039), vec3(0.053333,0.0133725,0.029039), vec3(0.17333,0.1613725,0.089039), 1.5);
+const Material mCup = Material(idCupBlack, vec3(0.7, 0.15, 0.25), vec3(32.0), vec3(0.183333, 0.113725, 0.028039), vec3(0.73333,0.4137,0.1829039), vec3(0.07333,0.0613725,0.089039), 1.5);
 const Material mBoard = Material(idBoard, vec3(0.7, 0.15, 0.05), vec3(42.0), vec3(0.93333, 0.813725, 0.38039), vec3(0.53333,0.413725,0.09039), vec3(0.7333,0.613725,0.19039), 1.5);
 const Material mTable = Material(idTable, vec3(1.0, 0.15, 0.0), vec3(4.0), vec3(0.566,0.0196,0.0176), vec3(0.766,0.1196,0.1176), vec3(0.666,0.0196,0.0176), 0.0);
-const Material mWhite = Material(idWhiteStone, vec3(0.5, 0.5, 0.14), vec3(32.0, 41.0, 8.0), vec3(0.98), vec3(0.98,0.95,0.97), vec3(0.96), 0.5);
-const Material mBlack = Material(idBlackStone, vec3(0.53, 0.53, 0.15), vec3(28.0), vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
+const Material mWhite = Material(idWhiteStone, vec3(0.53, 0.53, 0.14), vec3(32.0, 41.0, 8.0), vec3(0.98), vec3(0.98,0.95,0.97), vec3(0.96), 0.5);
+const Material mBlack = Material(idBlackStone, vec3(1.0, 0.25, 0.15), vec3(28.0), vec3(0.08), vec3(0.04), vec3(0.10), 0.5);
 const Material mRed = Material(idLastBlackStone, vec3(0.3, 0.15, 0.25), vec3(4.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), vec3(0.5, 0.0, 0.0), 0.0);
 const Material mBack = Material(idBack, vec3(0.0, 1.0, 0.0), vec3(1.0), bgA, bgB, bgA, 0.0);
 const Material mGrid  = Material(idGrid, vec3(1.5, 0.15, 0.15), vec3(42.0), vec3(0.0),vec3(0.0), vec3(0.0), 0.0);
@@ -730,17 +731,17 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
             n1 = vec3(0.0, sign(ip0.y), 0.0);
             n0 = vec3(ip0.x, 0.0, ip0.z);
             //const float dw = 0.00075;
-            bool gridx = ip.x > -c.x + mw*ww - 0.5*ww && ip.x < c.x - mw*ww + 0.5*ww && ip.z > -c.z + mw*ww - dw && ip.z < c.z - mw*ww + dw;
-            bool gridz = ip.x > -c.x + mw*ww - dw && ip.x < c.x - mw*ww + dw && ip.z > -c.z + mw*ww - 0.5*ww && ip.z < c.z - mw*ww + 0.5*ww;
+            bool gridx = ip.x > -c.x + mw*wwx - 0.5*wwx && ip.x < c.x - mw*wwx + 0.5*wwx && ip.z > -c.z + mw*wwy - dw && ip.z < c.z - mw*wwy + dw;
+            bool gridz = ip.x > -c.x + mw*wwx - dw && ip.x < c.x - mw*wwx + dw && ip.z > -c.z + mw*wwy - 0.5*wwy && ip.z < c.z - mw*wwy + 0.5*wwy;
             float r = boardbb*distance(ro, ip);
             if (ip0.y > 0.0) {
                 isBoardTop = true;
-                bvec2 nearEnough = lessThan(abs(ip.xz - ww*round(ip.xz*iww)), vec2(dw + dw + r));
+                bvec2 nearEnough = lessThan(abs(ip.xz - vec2(wwx, wwy)*round(ip.xz/vec2(wwx, wwy))), vec2(dw + dw + r));
                 bvec2 farEnough = bvec2(true, true);// greaterThan(abs(ip.xz - ww*round(ip.xz*iww)), vec2(0.33*ww));
                 if (any(nearEnough) && any(farEnough)) {
                     vec3 dir = vec3(dw, -dw, 0.0);
                     if (nearEnough.x && gridx) {
-                        vec3 ccx = vec3(ww*round(iww*ip.x), ip.y, ip.z);
+                        vec3 ccx = vec3(wwx*round(ip.x/wwx), ip.y, ip.z);
                         mat3 ps = mat3(ccx + dir.yzx, ccx + dir.yzy, ccx + dir.yzz + dir.yzz);
                         mat3 cs = point32plane(ps, ip, rd);
                         float a1 = circleHalfPlaneIntersectionArea(ip, r, cs);
@@ -751,7 +752,7 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
                         //n1 = normalize(vec3(-0.01*sign(ip.x - ccx.x)*(1.0-abs(ip.x - (ccx.x + sign(ip.x - ccx.x)*dw))/dw), n1.y, n1.z));//mix(0.5*abs(ccx.x -ip.x)/dw, 0.0, 0.5*abs(ccx.x -ip.x)/dw)));
                     }
                     if (nearEnough.y && gridz) {
-                        vec3 ccz = vec3(ip.x, ip.y, ww*round(iww*ip.z));
+                        vec3 ccz = vec3(ip.x, ip.y, wwy*round(ip.z/wwy));
                         mat3 ps = mat3(ccz + dir.xzy, ccz + dir.yzy, ccz + dir.zzy + dir.zzy);
                         mat3 cs = point32plane(ps, ip, rd);
                         float a1 = circleHalfPlaneIntersectionArea(ip, r, cs);
@@ -762,8 +763,8 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
                         //n1 = normalize(vec3(n1.x,n1.y,-0.01*sign(ip.z - ccz.z)*(1.0-abs(ip.z - (ccz.z + sign(ip.z - ccz.z)*dw))/dw)));//mix(0.5*abs(ccz.z -ip.z)/dw, 0.0, 0.5*abs(ccz.z -ip.z)/dw)));
                     }
                 }
-                float rr = 0.1*ww;//8.0*dw;
-                nearEnough = lessThan(abs(ip.xz - ww*round(ip.xz*iww)), vec2(rr + rr + r));
+                float rr = 0.1*wwx;//8.0*dw;
+                nearEnough = lessThan(abs(ip.xz - vec2(wwx, wwy)*round(ip.xz/vec2(wwx, wwy))), vec2(rr + rr + r));
                 if (any(nearEnough)) {
                     vec3 ppos;
                     float mindist = distance(ip.xz, vec2(0.0));
@@ -772,7 +773,7 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
                         ppos = vec3(6.0, 0.0, 6.0);
                         for (int i = -1; i <= 1; i++) {
                             for (int j = -1; j <= 1; j++) {
-                                vec3 pos = ww*vec3(i, 0, j)*ppos.zyz;
+                                vec3 pos =vec3(wwx, 0.0, wwy)*vec3(i, 0, j)*ppos.zyz;
                                 float dst = distance(ip.xz, pos.xz);
                                 if (dst < mindist) {
                                     mindist = dst;
@@ -785,7 +786,7 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
                         ppos = vec3(3.0, 0.0, 3.0);
                         for (int i = -1; i <= 1; i += 2) {
                             for (int j = -1; j <= 1; j += 2) {
-                                vec3 pos = ww*vec3(i, 0, j)*ppos.zyz;
+                                vec3 pos = vec3(wwx, 0.0, wwy)*vec3(i, 0, j)*ppos.zyz;
                                 float dst = distance(ip.xz, pos.xz);
                                 if (dst < mindist) {
                                     mindist = dst;
@@ -850,9 +851,9 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
     float t1, t2;
     if (IntersectBox(ro, rd, minBound, maxBound, t1, t2)) {
         vec4 b12 = ro.xzxz + vec4(t1, t1, t2, t2)*rd.xzxz;
-        vec2 noise = vec2(ww*0.2);
+        vec2 noise = vec2(wwx*0.2);
         vec4 bmnx = vec4(min(b12.xy, b12.zw) - noise, max(b12.xy, b12.zw) + noise);
-        vec4 xz12 = floor(iww * bmnx + vec4(0.5*fNDIM));
+        vec4 xz12 = floor(bmnx/vec4(wwx, wwy, wwx, wwy) + vec4(0.5*fNDIM));
         ivec4 mnx = ivec4(clamp(xz12, 0.0, fNDIM - 1.0));
         for (int i = mnx.y; i <= mnx.w; i++){
             for (int j = mnx.x; j <= mnx.z; j++){
@@ -860,7 +861,7 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
                 int mm0 = idBack;
                 float m0 = stone0.z;
                 if (m0 >= cidBlackStone) {
-                    vec2 xz = ww*stone0.xy;
+                    vec2 xz = vec2(wwx, wwy)*stone0.xy;
                     vec3 dd = vec3(xz.x, 0.5*h, xz.y);
                     float tt2;
                     vec4 ret0;
@@ -897,8 +898,8 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
                     }
                 }
                 else if (isBoardTop && (m0 == cidWhiteArea || m0 == cidBlackArea)) {
-                    vec3 dd = vec3(vec2(j, i) - vec2(0.5*fNDIM - 0.5), 0.0)*ww;
-                    vec2 w25 = vec2(0.25*ww, dd.z);
+                    vec3 dd = vec3(vec2(j, i) - vec2(0.5*fNDIM - 0.5), 0.0)*vec3(wwx, wwy, 0.0);
+                    vec2 w25 = vec2(0.25*wwx, dd.z);
                     vec3 minb = dd.xzy - w25.xyx;
                     vec3 maxb = dd.xzy + w25.xyx;
                     vec3 ip = ro + rd*tb;
@@ -1121,7 +1122,7 @@ void castRay(in vec3 ro, in vec3 rd, inout Intersection result0, inout Intersect
     }
     for (int i = 0; i < 4; i++){
         const float r = legh;
-        vec3 cc = vec3(1 - 2 * (i & 1), 1, 1 - 2 * ((i >> 1) & 1))*(bnx.xyx + vec3(r, -0.5*r, r));
+        vec3 cc = vec3(1 - 2 * (i & 1), 1, 1 - 2 * ((i >> 1) & 1))*(bnx.xyz + vec3(r, -0.5*r, r));
         vec2 ts = intersectionRaySphereR(ro, rd, cc, r*r);
         if (ts.x > 0.0 && ts.x < farClip) {
             ret.d = distanceRaySphere(ro, rd, cc, r);
@@ -1149,7 +1150,7 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
         float res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
         vec3 ip = pos + res*ldir;
         //float d = length(ip - lig);
-        vec2 rr = vec2(abs(bnx.x)*length(ip - pos) / length(pos));
+        vec2 rr = vec2(abs(bnx.xz)*length(ip - pos) / length(pos));
         vec2 ll = vec2(ldia);
         vec4 xz = vec4(min(ip.xz + rr, lpos.xz + ll), max(ip.xz - rr, lpos.xz - ll));
         vec2 xz1 = max(vec2(0.0), xz.xy - xz.zw);
@@ -1158,7 +1159,7 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
         ldir = dd - pos;
         res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
         ip = pos + res*ldir;
-        rr = vec2(abs(bnx.x)*length(ip - pos) / length(dd - pos));
+        rr = vec2(abs(bnx.xz)*length(ip - pos) / length(dd - pos));
         xz = vec4(min(ip.xz + rr, lpos.xz + ll), max(ip.xz - rr, lpos.xz - ll));
         vec2 xz2 = max(vec2(0.0), xz.xy - xz.zw);
         float mx = mix(1.0, 1.0 - 0.5*((xz1.x*xz1.y) + (xz2.x*xz2.y)) / (4.0*ldia2), clamp(-pos.y / boardaa, 0.0, 1.0));
@@ -1205,7 +1206,7 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
         if(pid > 0) {
             cci = cc[pid - 1];
         }
-        vec2 xz = (m == idCupBlack || m == idCupWhite || m == idLidWhite || m == idLidBlack) ? cci.xz : m == idBoard ? vec2(0.0) : vec2(1 - 2 * (i & 1), 1 - 2 * ((i >> 1) & 1))*(bnx.xx + vec2(legh));
+        vec2 xz = (m == idCupBlack || m == idCupWhite || m == idLidWhite || m == idLidBlack) ? cci.xz : m == idBoard ? vec2(0.0) : vec2(1 - 2 * (i & 1), 1 - 2 * ((i >> 1) & 1))*(bnx.xz + vec2(legh));
         phi = PI - abs(acos(dot(v.xz, normalize(pos.xz - xz))));
         if (distance(pos.xz + nor.xz, xz) > distance(pos.xz - nor.xz, xz) || m == idBoard) {
             ret.y *= phi / PI;
@@ -1218,14 +1219,14 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
         if (IntersectBox(pos, rd, minBound, maxBound, t1, t2)) {
             vec4 b12 = pos.xzxz + vec4(t1, t1, t2, t2)*rd.xzxz;
             vec4 bmnx = vec4(min(b12.xy, b12.zw), max(b12.xy, b12.zw));
-            vec4 xz12 = floor(iww * bmnx + 0.5*vec4(vec2(fNDIM - 1.0), vec2(fNDIM + 1.0)));
+            vec4 xz12 = floor(bmnx/vec4(wwx, wwy, wwx, wwy) + 0.5*vec4(vec2(fNDIM - 1.0), vec2(fNDIM + 1.0)));
             ivec4 mnx = ivec4(clamp(xz12, 0.0, fNDIM - 1.0));
             for (int i = mnx.y; i <= mnx.w; i++){
                 for (int j = mnx.x; j <= mnx.z; j++){
                     int kk = NDIM*i + j;
                     float mm0 = iStones[kk].z;
                     if (mm0 >= cidBlackStone) {
-                        vec2 xz = ww*iStones[kk].xy;
+                        vec2 xz = vec2(wwx, wwy)*iStones[kk].xy;
                         if (distance(pos.xz, xz) <= r1 + 0.001) {
                             float ldia = 1000.0;
                             float phi = PI;
@@ -1239,12 +1240,12 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
 				if(length(diff) > 0.01) {
 	                               float acs = acos(dot(v, normalize(diff)));
                                        //ret.y *= min(1.0, acs / PI);
-				       ret.y *= mix(1.0,min(1.0, acs / PI),2.0*(length(diff)-0.01)/ww);
+				       ret.y *= mix(1.0,min(1.0, acs / PI),2.0*(length(diff)-0.01)/wwx);
 				}
-                            }
+                           }
                         }
                         if (isBoard && pos.y > -0.001){
-                            vec3 ddpos = vec3(ww*iStones[kk].xy, h).xzy - pos;
+                            vec3 ddpos = vec3(vec2(wwx, wwy)*iStones[kk].xy, h).xzy - pos;
                             float ln = length(ddpos);
                             vec3 ldir = ddpos;
                             float res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
@@ -1389,7 +1390,6 @@ Material getMaterialColor(in Intersection ip, out vec4 mcol, in vec3 rd, in vec3
     vec3 flr = ip.dummy.xyz;
     vec3 scrd2 = 64.0*(ip.p.xyz-flr);
     vec3 scrd = ip.p.xyz - flr;
-    float degrade = (1.0 + floor(length(ro) / 3.0));
     vec2 xz;
     xz = scrd.xz;
     if (mat.id == mBoard.id || mat.id == mCup.id) {
@@ -1485,9 +1485,28 @@ Material getMaterialColor(in Intersection ip, out vec4 mcol, in vec3 rd, in vec3
     vec3 grad = vec3(0.0, 1.0, 0.0);
     vec3 grad2 = vec3(0.0, 1.0, 0.0);
     //if (noisy) {
-        rnd = snoise(scrd, grad);
-        rnd2 = snoise(scrd2+mixmult*grad, grad2);
-    //}
+    if(mat.id == mBoard.id || mat.id == mCup.id) {
+        scrd2 = ip.p.xyz * fNDIM/19.0 *vec3(23.0, 23.5, 1.3);
+        if(mat.id == mCup.id) {
+            scrd2.z *= 21.0;
+        }
+    }
+    if(mat.id == mTable.id) {
+        scrd2 *=13.0;
+        scrd += mixmult *grad;
+    }
+    rnd2 = snoise(scrd2, grad);
+    if(mat.id == mBoard.id || mat.id == mCup.id) {
+        scrd = 2.2*vec3(length(scrd2.xy+0.03*grad.xz), length(scrd2.xy+0.03 * grad.zx), 1.0);
+        if(mat.id == mCup.id) {
+            float alpha = grad.y;
+            scrd.xz = 0.33*vec2(
+                    -cos(alpha) * scrd.x + sin(alpha)*scrd.z,
+                    sin(alpha) * scrd.x + cos(alpha)*scrd.z
+                    );
+        }
+    }
+     rnd = snoise(scrd, grad2);
     if (mat.id == mBoard.id || mat.id == mCup.id) {
         float w1 = 3.0*length(scoord.yx - 0.5*vec2(1.57 + 3.1415*rnd));
         float w2 = 0.1*(scoord.x + scoord.z);
@@ -1528,8 +1547,8 @@ vec3 shading(in vec3 ro, in vec3 rd, in Intersection ip, const Material mat, vec
         vec4 pws = clamp(vec4(dot(ref, lig), dot(ref, lig2), dot(ref, lig3), dot(ref, lig3)), 0.0, 1.0);
         vec3 cupsab = vec3(1.0);//ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? vec3(0.125,0.9,0.25) : vec3(0.125,1.0,0.5);
         vec3 pwr = pow(pws.xyz, col.w*cupsab);
-        vec3 score  = mat.diffuseAmbientSpecularWeight * vec3(adsy * shadow.x, shadow.y,shadow.x * shadow.y*(0.25*pwr.x + pwr.y + pwr.z));
-        ret = (score.x + score.y)*col.xyz + score.z;
+        vec3 score  = mat.diffuseAmbientSpecularWeight * vec3(adsy * shadow.x, 1.0,shadow.x * shadow.y*(0.25*pwr.x + pwr.y + pwr.z));
+        ret = (score.x+score.y)*col.xyz + score.z;
     }
     ret = pow(ret, gamma*exp(contrast*(vec3(0.5) - ret)));
     return ret;
@@ -1539,7 +1558,7 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
 {
     vec3 col0, col1, col2;
     col0 = col1 = col2 = vec3(0.0);
-
+    col0 = vec3(0.0);
     Intersection ret0;
     Intersection ret1;
     Intersection ret2;
@@ -1549,7 +1568,7 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
 
     vec3 col;
     vec4 mcol;
-    Material mat; 
+    Material mat;
     vec3 nn;
 
     gl_FragDepth = (ret0.m == mBlack.id || ret0.m == mWhite.id) ? 0.5 : (ret0.p.y < -0.001 ? 0.25 : 0.75);//; distance(ro, ret[0].p) / 100.0;
@@ -1601,5 +1620,7 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
 
 void main(void)
 {
+    c = vec3(1.0, 0.25, wwy/wwx);
+    bnx = vec4(-c.x, -0.2, -c.z, 0.0);
     glFragColor =  render(roo, normalize(rdb), bgA);//
 }
