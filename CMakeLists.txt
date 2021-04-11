@@ -18,7 +18,7 @@ foreach(var ${vars})
 endforeach()
 
 project(goban C CXX)
-project(goban VERSION 0.0.1.0)
+project(${PROJECT_NAME} VERSION 0.0.1.0)
 
 # paths
 include(GNUInstallDirs)
@@ -76,9 +76,10 @@ ExternalProject_Add(project_libsgfcplusplus
     SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
     BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
     STEP_TARGETS build
-    UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
-    COMMAND git fetch
-    COMMAND git checkout sgfc
+    UPDATE_COMMAND ""
+    #    UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
+    #COMMAND git fetch
+    #COMMAND git checkout sgfc
     INSTALL_COMMAND     echo Skipping install step for libsndfile
 )
 
@@ -318,7 +319,7 @@ endforeach()
 
 if (MSVC)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libcmtd.lib")
-  add_executable(goban WIN32
+  add_executable(${PROJECT_NAME} WIN32
     ${GOBAN_SRC_FILES}
     ${GOBAN_HDR_FILES}
     ${SHELL_SRC_FILES}
@@ -326,10 +327,10 @@ if (MSVC)
     ${PROJECT_SOURCE_DIR}/src/goban.rc
     ${PROJECT_SOURCE_DIR}/src/glad/src/glad_wgl.c
   )
-  set_property(TARGET goban PROPERTY CXX_STANDARD 17)
-  set_property(TARGET goban PROPERTY CXX_STANDARD_REQUIRED ON)
+  set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+  set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 else()
-  add_executable(goban
+  add_executable(${PROJECT_NAME}
     ${GOBAN_SRC_FILES}
     ${GOBAN_HDR_FILES}
     ${SHELL_SRC_FILES}
@@ -339,11 +340,11 @@ else()
   set(EXTRA_LIBS rt ${ALSA_LIBRARIES} pthread)
 endif()
 
-add_dependencies(goban project_portaudio project_libsndfile project_libsgfcplusplus)
+add_dependencies(${PROJECT_NAME} project_portaudio project_libsndfile project_libsgfcplusplus)
 
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
-target_link_libraries(goban
+target_link_libraries(${PROJECT_NAME}
     ${CMAKE_DL_LIBS}
     ${CMAKE_THREAD_LIBS_INIT}
     ${Boost_SYSTEM_LIBRARY}
@@ -371,6 +372,6 @@ file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
 file(COPY ${PROJECT_SOURCE_DIR}/engine DESTINATION ${RELEASE_DIR})
 
 install(DIRECTORY DESTINATION ${RELEASE_DIR})
-install(TARGETS goban
+install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${RELEASE_DIR}
     BUNDLE DESTINATION ${RELEASE_DIR})

@@ -17,7 +17,7 @@ git checkout rem-fix
 if defined CLEAN rmdir /s /q BuildDir
 if not exist BuildDir mkdir BuildDir
 cd BuildDir
-cmake -G%STUDIO% ../Build -DBUILD_SHARED_LIBS= -DFREETYPE_INCLUDE_DIRS=../../freetype2/include -DFREETYPE_LIBRARY=../../freetype2/build/Release/freetype
+cmake -G%STUDIO% ../Build -DBUILD_SHARED_LIBS= -DFREETYPE_INCLUDE_DIRS=../../freetype2/include -DFREETYPE_LIBRARY=../../freetype2/build/%BUILD_TYPE%/freetype
 MSBuild.exe libRocket.sln /t:Build /p:Configuration=%BUILD_TYPE% /p:PlatformToolset=%TOOLSET% /p:TargetPlatformVersion=%TARGET%
 
 cd ..\..
