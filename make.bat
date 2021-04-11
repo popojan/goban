@@ -12,20 +12,20 @@ set TOOLSET=v141
 REM set TARGET=10.0.17134.0
 set TARGET=10.0.17763.0
 set STUDIO="Visual Studio 15 2017 Win64"
-set DEBUG=
+set DEBUG=1
 
 set PROJECT_DIR=%~dp0
 set PROJECT_DIR=%PROJECT_DIR:~0,-1%
 
-if defined DEBUG (
-    set BUILD_TYPE=Debug
-    set BUILD_T=d
-    set BUILD_DIR=cmake-build-debug
-)
-else (
+if "%DEBUG%"=="" (
     set BUILD_TYPE=Release
     set BUILD_T=
     set BUILD_DIR=cmake-build-release
+)
+else (
+    set BUILD_TYPE=Debug
+    set BUILD_T=d
+    set BUILD_DIR=cmake-build-debug
 )
 
 REM build dependencies

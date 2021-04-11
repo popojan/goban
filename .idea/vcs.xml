@@ -11,18 +11,17 @@
     <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/clipp-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/json-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-release/_deps/spdlog-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/deps/boost-process" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/deps/clipp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/deps/freetype2" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/deps/glm" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/glyphy" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/libRocket" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus.bak" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus.bak.2" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus.bak.2/sgfc" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus.bak.2/test/Catch2" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus.bak/sgfc" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus.bak/test/Catch2" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus/sgfc" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/libsgfcplusplus/test/Catch2" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/libsndfile" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/portaudio" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/deps/spdlog" vcs="Git" />
   </component>
 </project>
