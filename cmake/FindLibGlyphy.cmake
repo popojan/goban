@@ -5,10 +5,11 @@
 #  LIBGLYPHY_LIBRARIES - The libraries needed to use libglyphy
 #  LIBGLYPHY_DEFINITIONS - Compiler switches required for using libglyphy
 
-find_path(LIBGLYPHY_INCLUDE_DIR NAMES glyphy.h HINTS deps/glyphy/src)
+find_path(LIBGLYPHY_INCLUDE_DIR NAMES glyphy.h HINTS  ${PROJECT_SOURCE_DIR}/deps/glyphy/src)
 
-find_library(LIBGLYPHY_LIBRARY NAMES libglyphy.a HINTS deps/glyphy/src/.libs)
+find_library(LIBGLYPHY_LIBRARY NAMES goban_glyphy.lib libglyphy.a HINTS ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/x64/${CMAKE_BUILD_TYPE})
 
+message(${PROJECT_SOURCE_DIR}/deps/glyphy/win32/x64/${CMAKE_BUILD_TYPE})
 set(LIBGLYPHY_LIBRARIES
     ${LIBGLYPHY_LIBRARY}
 )

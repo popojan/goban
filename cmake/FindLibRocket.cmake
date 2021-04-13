@@ -6,14 +6,15 @@
 #  LIBROCKET_DEFINITIONS - Compiler switches required for using LibRocket
 
 find_path(LIBROCKET_INCLUDE_DIR Rocket/Core.h
-        PATH_SUFFIXES Rocket HINTS deps/libRocket/Include)
+        PATH_SUFFIXES Rocket HINTS ${PROJECT_SOURCE_DIR}/deps/libRocket/Include)
 
+message(${PROJECT_BINARY_DIR}/deps/libRocket/build/${BUILD_TYPE})
 find_library(LIBROCKET_CORE_LIBRARY NAMES RocketCore
-	HINTS deps/libRocket/buildDir/ deps/libRocket/buildDir/${CMAKE_BUILD_TYPE})
+	HINTS ${PROJECT_BINARY_DIR}/deps/libRocket/build ${PROJECT_BINARY_DIR}/deps/libRocket/build/${CMAKE_BUILD_TYPE})
 find_library(LIBROCKET_CONTROLS_LIBRARY NAMES RocketControls
-	HINTS deps/libRocket/buildDir/ deps/libRocket/buildDir/${CMAKE_BUILD_TYPE})
+	HINTS ${PROJECT_BINARY_DIR}/deps/libRocket/build ${PROJECT_BINARY_DIR}/deps/libRocket/build/${CMAKE_BUILD_TYPE})
 find_library(LIBROCKET_DEBUGGER_LIBRARY NAMES RocketDebugger
-	HINTS deps/libRocket/buildDir/ deps/libRocket/buildDir/${CMAKE_BUILD_TYPE})
+	HINTS ${PROJECT_BINARY_DIR}/deps/libRocket/build ${PROJECT_BINARY_DIR}/deps/libRocket/build/${CMAKE_BUILD_TYPE})
 
 set(LIBROCKET_LIBRARIES
     ${LIBROCKET_CORE_LIBRARY}
