@@ -4,10 +4,9 @@
 
 cmake_minimum_required(VERSION 3.1)
 
-cmake_policy(SET CMP0048 NEW)
-cmake_policy(SET CMP0074 NEW)
+#cmake_policy(SET CMP0048 NEW)
+#cmake_policy(SET CMP0074 NEW)
 
-# MUST be done before call to 'project'
 get_cmake_property(vars CACHE_VARIABLES)
 foreach(var ${vars})
     get_property(currentHelpString CACHE "${var}" PROPERTY HELPSTRING)
@@ -18,6 +17,7 @@ foreach(var ${vars})
 endforeach()
 
 project(goban C CXX)
+
 project(${PROJECT_NAME} VERSION 0.0.1.0)
 
 # paths
@@ -25,10 +25,14 @@ include(GNUInstallDirs)
 
 set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 
+# Search in the 'cmake' directory for additional CMake modules.
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
 INCLUDE(ExternalProject)
 
 ExternalProject_Add(project_libsndfile
     GIT_REPOSITORY     https://github.com/erikd/libsndfile.git
+    GIT_TAG 1.0.31
     SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
     BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/libsndfile/build
     STEP_TARGETS build
@@ -38,7 +42,7 @@ ExternalProject_Add(project_libsndfile
 
 ExternalProject_Get_Property(project_libsndfile SOURCE_DIR)
 ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
-SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${BINARY_DIR}/src" "${PROJECT_BINARY_DIR}/deps/")
+SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${SOURCE_DIR}/include" "${BINARY_DIR}/include")
 SET(libsndfile_lib_dir "${BINARY_DIR}")
 
 ADD_LIBRARY(libsndfile STATIC IMPORTED)
@@ -47,6 +51,91 @@ ADD_LIBRARY(libsndfile STATIC IMPORTED)
 
 
 #SET(LIBSNDFILE_INCLUDE_PATH "${install_dir}/src/project_libsndfile-build/src/")
+
+ExternalProject_Add(project_freetype2
+        GIT_REPOSITORY  http://git.savannah.nongnu.org/r/freetype/freetype2.git/
+        SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/freetype2
+        BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/freetype2/build
+        INSTALL_COMMAND  echo Skipping install step for freetype2
+)
+
+ExternalProject_Get_Property(project_freetype2 SOURCE_DIR)
+ExternalProject_Get_Property(project_freetype2 BINARY_DIR)
+SET(freetype2_lib_dir "${BINARY_DIR}/${CMAKE_BUILD_TYPE}")
+SET(freetype2_inc_dir "${SOURCE_DIR}/include")
+
+ADD_LIBRARY(freetype2 STATIC IMPORTED)
+
+if(WIN32)
+    ExternalProject_Add(project_glyphy
+        GIT_REPOSITORY  https://github.com/behdad/glyphy.git
+        SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/glyphy
+        BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/glyphy/build
+        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy
+            ${PROJECT_SOURCE_DIR}/deps/_patches/goban_glyphy.vcxproj
+            ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/
+        BUILD_COMMAND ${CMAKE_VS_MSBUILD_COMMAND} ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/goban_glyphy.vcxproj
+            /t:Build /p:Configuration=${CMAKE_BUILD_TYPE}
+            /p:PlatformToolset=${CMAKE_VS_PLATFORM_TOOLSET}
+            /p:TargetPlatformVersion=${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}
+            /p:Platform=${CMAKE_VS_PLATFORM_NAME}
+            /p:AssemblySearchPaths=${PROJECT_SOURCE_DIR}/deps/glyphy/include;
+        INSTALL_COMMAND  echo Skipping install step for glyphy
+    )
+    SET(boost_archive boost_1_68_0-msvc-14.1-64.exe)
+    ExternalProject_Add( project_boost
+        PREFIX "boost"
+        DOWNLOAD_COMMAND
+            if not exist ${PROJECT_BINARY_DIR}/boost/src/${boost_archive}
+                wget --progress=dot:giga https://dl.bintray.com/boostorg/release/1.68.0/binaries/${boost_archive}
+        SOURCE_DIR ${PROJECT_BINARY_DIR}/boost/src/
+        BINARY_DIR ${PROJECT_BINARY_DIR}/boost/src/
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND
+            COMMAND if not exist ${PROJECT_BINARY_DIR}/boost/src/boost
+            innoextract ${PROJECT_BINARY_DIR}/boost/src/${boost_archive} #-I app\\boost
+                -I app\\lib64-msvc-14.1\\libboost_system-vc141-mt-x64-1_68.lib
+                -I app\\lib64-msvc-14.1\\libboost_system-vc141-mt-gd-x64-1_68.lib
+                -I app\\lib64-msvc-14.1\\libboost_filesystem-vc141-mt-x64-1_68.lib
+                -I app\\lib64-msvc-14.1\\libboost_filesystem-vc141-mt-gd-x64-1_68.lib
+                -I app\\lib64-msvc-14.1\\libboost_iostreams-vc141-mt-x64-1_68.lib
+                -I app\\lib64-msvc-14.1\\libboost_iostreams-vc141-mt-gd-x64-1_68.lib
+            COMMAND if not exist ${PROJECT_BINARY_DIR}/boost/src/boost ${CMAKE_COMMAND} -E rename ${PROJECT_BINARY_DIR}/boost/src/app ${PROJECT_BINARY_DIR}/boost/src/boost
+    )
+    SET(boost_lib_dir  ${PROJECT_BINARY_DIR}/boost/src/boost/lib64-msvc-14.1)
+else()
+    ExternalProject_Add(project_glyphy
+        GIT_REPOSITORY  https://github.com/behdad/glyphy.git
+        SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/glyphy
+        BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/glyphy/build
+        CONFIGURE_COMMAND COMMAND  ./autogen.sh COMMAND ./configure --enable-static
+        INSTALL_COMMAND  echo Skipping install step for glyphy
+    )
+endif()
+ExternalProject_Get_Property(project_glyphy SOURCE_DIR)
+ExternalProject_Get_Property(project_glyphy BINARY_DIR)
+SET(glyphy_lib_dir "${BINARY_DIR}")
+SET(glyphy_inc_dir "${SOURCE_DIR}/include")
+
+ExternalProject_Add(project_librocket
+    GIT_REPOSITORY      https://github.com/popojan/libRocket.git
+    SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/libRocket
+    BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/libRocket/build
+    SOURCE_SUBDIR Build
+    CMAKE_ARGS
+        -DBUILD_SHARED_LIBS=
+        -DFREETYPE_INCLUDE_DIRS=${PROJECT_SOURCE_DIR}/deps/freetype2/include
+        -DFREETYPE_LIBRARY=${freetype2_lib_dir}/freetype
+    INSTALL_COMMAND     echo Skipping install step for libRocket
+)
+ExternalProject_Get_Property(project_librocket SOURCE_DIR)
+ExternalProject_Get_Property(project_librocket BINARY_DIR)
+SET(librocket_lib_dir "${BINARY_DIR}")
+SET(librocket_inc_dir "${SOURCE_DIR}/include")
+
+ADD_LIBRARY(librocket STATIC IMPORTED)
+
 
 ExternalProject_Add(project_portaudio
     GIT_REPOSITORY      https://git.assembla.com/portaudio.git
@@ -60,9 +149,9 @@ ExternalProject_Add(project_portaudio
 
 ExternalProject_Get_Property(project_portaudio SOURCE_DIR)
 ExternalProject_Get_Property(project_portaudio BINARY_DIR)
+
 SET(portaudio_lib_dir "${BINARY_DIR}")
 SET(portaudio_inc_dir "${SOURCE_DIR}/include")
-
 
 ADD_LIBRARY(portaudio STATIC IMPORTED)
 
@@ -71,7 +160,9 @@ ExternalProject_Add(project_libsgfcplusplus
     GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
     GIT_TAG goban-build
     CMAKE_ARGS  ${CL_ARGS}
-    BUILD_COMMAND ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
+    BUILD_COMMAND
+        ${CMAKE_COMMAND} --config=${CMAKE_BUILD_TYPE}
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE}
     SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
     BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
@@ -80,7 +171,7 @@ ExternalProject_Add(project_libsgfcplusplus
     #    UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
     #COMMAND git fetch
     #COMMAND git checkout sgfc
-    INSTALL_COMMAND     echo Skipping install step for libsndfile
+    INSTALL_COMMAND     echo Skipping install step for libsgfcplusplus
 )
 
 ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)
@@ -90,34 +181,51 @@ SET(libsgfcplusplus_lib_dir "${BINARY_DIR}/src")
 
 ADD_LIBRARY(libsgfcplusplus STATIC IMPORTED)
 
+if(NOT EXISTS ${glyphy_lib_dir})
+    add_custom_target(Rescan ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR} DEPENDS project_glyphy)
+else()
+    add_custom_target(Rescan)
+    find_package(OpenGL REQUIRED)
+    #find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
+    if (NOT WIN32)
+        find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
+        find_package(Curses REQUIRED)
+        find_package(X11 REQUIRED)
+        find_package(ALSA REQUIRED)
+        find_package(Freetype REQUIRED)
+    endif (NOT WIN32)
+    find_package(LibGlyphy REQUIRED)
+    find_package(LibRocket REQUIRED)
 
 if(WIN32)
     IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
         SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION "${libsndfile_lib_dir}/Debug/sndfile.lib")
         SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Debug/portaudio_static_x64.lib")
         SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Debug/libsgfcplusplus_staticd.lib")
+        SET(Boost_SYSTEM_LIBRARY ${boost_lib_dir}/libboost_system-vc141-mt-gd-x64-1_68.lib)
+        SET(Boost_IOSTREAMS_LIBRARY ${boost_lib_dir}/libboost_iostreams-vc141-mt-gd-x64-1_68.lib)
+        SET(Boost_FILESYSTEM_LIBRARY ${boost_lib_dir}/libboost_filesystem-vc141-mt-gd-x64-1_68.lib)
     ELSE()
         SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/Release/sndfile.lib)
         SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/Release/portaudio_static_x64.lib")
         SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/Release/libsgfcplusplus_static.lib")
-  ENDIF()
+        SET(Boost_SYSTEM_LIBRARY ${boost_lib_dir}/libboost_system-vc141-mt-x64-1_68.lib)
+        SET(Boost_IOSTREAMS_LIBRARY ${boost_lib_dir}/libboost_iostreams-vc141-mt-x64-1_68.lib)
+        SET(Boost_FILESYSTEM_LIBRARY ${boost_lib_dir}/libboost_filesystem-vc141-mt-x64-1_68.lib)
+    ENDIF()
+  SET_PROPERTY(TARGET freetype2 PROPERTY IMPORTED_LOCATION "${freetype2_lib_dir}/freetype.lib")
+  SET(FREETYPE_INCLUDE_DIRS ${freetype2_inc_dir})
+  SET(FREETYPE_INCLUDE_DIRS ${freetype2_inc_dir})
+  SET(FREETYPE_LIBRARIES ${freetype2_lib_dir}/freetype.lib)
 else()
     SET_PROPERTY(TARGET libsndfile PROPERTY IMPORTED_LOCATION ${libsndfile_lib_dir}/libsndfile.a)
     SET_PROPERTY(TARGET portaudio PROPERTY IMPORTED_LOCATION "${portaudio_lib_dir}/libportaudio.a")
     SET_PROPERTY(TARGET libsgfcplusplus PROPERTY IMPORTED_LOCATION "${libsgfcplusplus_lib_dir}/liblibsgfcplusplus_static.a")
 endif()
-# Search in the 'cmake' directory for additional CMake modules.
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 #===================================
 # Build options ====================
 #===================================
-
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug CACHE STRING
-        "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-        FORCE)
-endif()
 
 if(NOT WIN32)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-builtin")
@@ -137,18 +245,6 @@ endif()
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 
-find_package(LibRocket REQUIRED)
-find_package(OpenGL REQUIRED)
-find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
-if (NOT WIN32)
-	find_package(Curses REQUIRED)
-	find_package(X11 REQUIRED)
-	find_package(ALSA REQUIRED)
-endif (NOT WIN32)
-find_package(LibGlyphy REQUIRED)
-find_package(Freetype REQUIRED)
-
-
 include(FetchContent)
 
 FetchContent_Declare(json
@@ -162,6 +258,15 @@ if(NOT json_POPULATED)
 endif()
 
 
+FetchContent_Declare(glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG 0.9.9.8)
+
+FetchContent_GetProperties(glm)
+if(NOT glm_POPULATED)
+    FetchContent_Populate(glm)
+    add_subdirectory(${glm_SOURCE_DIR} ${glm_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 FetchContent_Declare(spdlog
   GIT_REPOSITORY git://github.com/gabime/spdlog.git
@@ -340,7 +445,15 @@ else()
   set(EXTRA_LIBS rt ${ALSA_LIBRARIES} pthread)
 endif()
 
-add_dependencies(${PROJECT_NAME} project_portaudio project_libsndfile project_libsgfcplusplus)
+add_dependencies(${PROJECT_NAME}
+    project_boost
+    project_librocket
+    project_freetype2
+    project_glyphy
+    project_portaudio
+    project_libsndfile
+    project_libsgfcplusplus
+)
 
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 
@@ -349,7 +462,7 @@ target_link_libraries(${PROJECT_NAME}
     ${CMAKE_THREAD_LIBS_INIT}
     ${Boost_SYSTEM_LIBRARY}
     ${Boost_IOSTREAMS_LIBRARY}
-    ${Boost_THREAD_LIBRARY}
+    #${Boost_THREAD_LIBRARY}
     ${Boost_FILESYSTEM_LIBRARY}
     ${CURSES_LIBRARY}
     ${X11_LIBRARIES}
@@ -375,3 +488,5 @@ install(DIRECTORY DESTINATION ${RELEASE_DIR})
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${RELEASE_DIR}
     BUNDLE DESTINATION ${RELEASE_DIR})
+
+endif()
