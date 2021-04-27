@@ -8,7 +8,7 @@
 
 ElementGame::ElementGame(const Rocket::Core::String& tag)
         : Rocket::Core::Element(tag), model(this), view(model), engine(model),
-          control(this, model, view, engine), hasResults(false), calculatingScore(false)
+          control(this, model, view, engine)
 {
     engine.loadEngines(config);
     engine.addGameObserver(&model);

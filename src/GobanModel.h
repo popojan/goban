@@ -71,8 +71,8 @@ public:
     Board board;
 
     bool prevPass;
-    volatile bool over;
-    volatile bool started;
+    bool over;
+    bool started;
     GameState state;
 
     GameRecord game; //TODO find usage and create API including SGF generation
