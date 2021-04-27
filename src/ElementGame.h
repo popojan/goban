@@ -17,9 +17,6 @@ public:
 
     void OnChildAdd(Rocket::Core::Element* element);
 
-    bool needsRepaint() {
-        return view.needsRepaint();
-    }
     void requestRepaint() {
         view.requestRepaint();
     }
@@ -43,7 +40,6 @@ private:
     GameThread engine;
     GobanControl control;
     std::mutex mutex;
-    bool hasResults, calculatingScore;
 };
 
 #endif

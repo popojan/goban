@@ -194,9 +194,11 @@ bool GameThread::setFixedHandicap(int handicap) {
 	return success;
 }
 void GameThread::run() {
+    std::unique_lock<std::mutex> lock(playerMutex);
     model.start();
+    spdlog::warn("construct thread {}", (bool)model);
     thread = new std::thread(&GameThread::gameLoop, this);
-    while(!hasThreadRunning || !playerToMove);
+    engineStarted.wait(lock);
 }
 
 bool GameThread::isRunning() { return hasThreadRunning;}
@@ -226,12 +228,15 @@ bool GameThread::undo(Player * engine, bool doubleUndo) {
 }
 
 void GameThread::gameLoop() {
-    hasThreadRunning = true;
     interruptRequested = false;
     while (model && !interruptRequested) {
         Engine* coach = currentCoach();
         Engine* kibitz = currentKibitz();
         Player* player = currentPlayer();
+        if(!hasThreadRunning) {
+            hasThreadRunning = true;
+            engineStarted.notify_all();
+        }
         std::unique_lock<std::mutex> lock(playerMutex, std::defer_lock);
         bool locked = false;
         if(coach && player && !interruptRequested) {
@@ -325,9 +330,9 @@ void GameThread::gameLoop() {
                 );
             }
 
-            if(model.over)
+            if(model.over) {
                 break;
-
+            }
 
             if(success && move != Move::INTERRUPT)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));

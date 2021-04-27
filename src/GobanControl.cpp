@@ -7,7 +7,7 @@
 #include "GobanControl.h"
 
 bool GobanControl::newGame(int boardSize) {
-	engine.interrupt();
+    engine.interrupt();
     engine.reset();
 	if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         view.animateIntro();
@@ -34,6 +34,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
             else if(!engine.isRunning() && !model.over) {
                engine.run();
             }
+            spdlog::debug("engine.isRunning() = {}", engine.isRunning());
             if(playNow) {
                 bool humanMove = engine.humanToMove();
                 if(model.state.holdsStone || !humanMove) {
@@ -116,10 +117,10 @@ bool GobanControl::command(const std::string& cmd) {
             newGame(model.getBoardSize());
             playNow = false;
         }
-        else if(view.board.isEmpty()) {
+        /*else if(view.board.isEmpty()) {
             if(!engine.isRunning())
                 engine.run();
-        }
+        }*/
         if(playNow) {
             auto move = model.getPassMove();
             engine.playLocalMove(move);

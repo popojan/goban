@@ -28,11 +28,9 @@
 #include "EventManager.h"
 #include <Rocket/Core/Context.h>
 #include <Rocket/Core/ElementDocument.h>
-#include <Rocket/Core/ElementUtilities.h>
 #include <Shell.h>
 #include "EventHandler.h"
 #include <map>
-#include <iostream>
 
 // The game's element context (declared in main.cpp).
 extern Rocket::Core::Context* context;

@@ -16,6 +16,14 @@ find_library(LIBROCKET_CONTROLS_LIBRARY NAMES RocketControls
 find_library(LIBROCKET_DEBUGGER_LIBRARY NAMES RocketDebugger
 	HINTS ${PROJECT_BINARY_DIR}/deps/libRocket/build ${PROJECT_BINARY_DIR}/deps/libRocket/build/${CMAKE_BUILD_TYPE})
 
+add_library(LibRocket_Core STATIC IMPORTED)
+add_library(LibRocket_Controls STATIC IMPORTED)
+add_library(LibRocket_Debugger STATIC IMPORTED)
+
+set_target_properties(LibRocket_Core PROPERTIES IMPORTED_LOCATION ${LIBROCKET_CORE_LIBRARY})
+set_target_properties(LibRocket_Controls PROPERTIES IMPORTED_LOCATION ${LIBROCKET_CONTROLS_LIBRARY})
+set_target_properties(LibRocket_Debugger PROPERTIES IMPORTED_LOCATION ${LIBROCKET_DEBUGGER_LIBRARY})
+
 set(LIBROCKET_LIBRARIES
     ${LIBROCKET_CORE_LIBRARY}
     ${LIBROCKET_CONTROLS_LIBRARY}
@@ -24,10 +32,8 @@ set(LIBROCKET_LIBRARIES
 set(LIBROCKET_INCLUDE_DIRS ${LIBROCKET_INCLUDE_DIR} )
 
 include(FindPackageHandleStandardArgs)
-# handle the QUIETLY and REQUIRED arguments and set LIBROCKET_FOUND to TRUE
-# if all listed variables are TRUE
+
 find_package_handle_standard_args(LibRocket DEFAULT_MSG
                                   LIBROCKET_LIBRARIES LIBROCKET_INCLUDE_DIR)
 
 mark_as_advanced(LIBROCKET_INCLUDE_DIR LIBROCKET_LIBRARIES)
-

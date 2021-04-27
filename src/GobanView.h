@@ -115,8 +115,8 @@ public:
     glm::vec3 translate, newTranslate;
     glm::vec2 resolution;
     float lastTime, startTime;
-    volatile bool animationRunning;
-    volatile bool calculatingScore = false;
+    bool animationRunning;
+    bool calculatingScore = false;
     bool isPanning, isZooming, isRotating;
     int needsUpdate;
     DDG::Camera cam;

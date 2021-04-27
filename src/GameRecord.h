@@ -6,7 +6,7 @@
 #include <memory>
 #include "Board.h"
 
-#include "OpenGL.h"
+#include "SGF.h"
 
 class GameRecord {
 public:

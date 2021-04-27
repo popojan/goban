@@ -1,9 +1,8 @@
 #include "player.h"
-#include <sgf/sgf.hpp>
-
+#include "SGF.h"
 
     Move SgfPlayer::genmove(const Color& ) {
-        Move ret(move);
+/*        Move ret(move);
         if(move == Move::INVALID) {
             spdlog::debug("LOCK human genmove");
             std::unique_lock<std::mutex> lock(mut);
@@ -64,7 +63,8 @@
             ret = move;
         }
         move = Move();
-        return ret;
+        return ret;*/
+        return Move();
     }
 
     bool SgfPlayer::undo() {
@@ -80,7 +80,7 @@
     }
 
     void SgfPlayer::nextMove() {
-        auto& nodes = variation->nodes();
+/*        auto& nodes = variation->nodes();
         ni += 1;
         if(ni < nodes.size()) {
             node = &nodes[ni];
@@ -97,6 +97,7 @@
                 spdlog::debug("PREMATURE END");
             }
         }
+        */
     }
     void SgfPlayer::suggestMove(const Move& move) {
         if(move == Move::UNDO)
@@ -111,7 +112,8 @@
         cond.notify_one();
     }
     void SgfPlayer::parseSgf(const std::string& fname) {
-        spdlog::debug("Before parsing SGF");
+    /*
+    spdlog::debug("Before parsing SGF");
         auto problems(sgf::parse(fname));
         spdlog::debug("Parsed SGF");
         for(std::size_t i = 0; i < problems.size(); ++i) {
@@ -133,9 +135,10 @@
             ss << "sgf: " << node->get("PB")[0];
             names[0] = ss.str();
         }
+        */
     }
     bool SgfPlayer::clear() {
-        if(history.size() > 0) {
+        /*if(history.size() > 0) {
             node = history.front();
             variation = vhistory.front();
             ni = nhistory.front();
@@ -144,7 +147,7 @@
             nhistory.clear();
             colorToMove = chistory.front();
             chistory.clear();
-        }
+        }*/
         return true;
     }
 

@@ -55,7 +55,7 @@ public:
     void playLocalMove(const Move& move);
     void playKibitzMove();
 
-    void loadEngines(const std::shared_ptr<Configuration> config);
+    void loadEngines(std::shared_ptr<Configuration> config);
 
 	int activatePlayer(int which, int delta = 1);
 
@@ -63,7 +63,6 @@ public:
 
 	Move getLocalMove(const Position& coord);
 
-	void init();
 	void reset();
 
     void addGameObserver(GameObserver* pobserver) {
@@ -72,8 +71,8 @@ public:
 
     bool undo(Player * engine, bool doubleUndo);
 
-    const std::vector<Engine*> getEngines() { return engines;}
-    const std::vector<Player*> getPlayers() { return players;}
+    std::vector<Engine*> getEngines() { return engines;}
+    std::vector<Player*> getPlayers() { return players;}
 
 private:
     std::vector<GameObserver*> gameObservers;
@@ -82,13 +81,13 @@ private:
     std::vector<Player*> players; //all players including engines, humans, spectators
     std::thread* thread;
     std::mutex mutex2;
-    volatile bool interruptRequested, hasThreadRunning;
+    bool interruptRequested, hasThreadRunning;
     Player* playerToMove;
 	std::size_t human, sgf, coach, kibitz;
 	std::size_t numPlayers;
 	std::array<std::size_t, 2> activePlayer;
     std::mutex playerMutex;
-
+    std::condition_variable engineStarted;
     int komi;
     int boardSize;
     int handicap;
