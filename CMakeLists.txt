@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 cmake_policy(SET CMP0072 NEW)
 
-project(goban LANGUAGES C CXX VERSION  0.0.2.0)
+project(goban LANGUAGES C CXX VERSION  0.0.3.0)
 
 include(GNUInstallDirs)
 
@@ -85,6 +85,7 @@ function(build_glyphy)
                 /p:TargetPlatformVersion=${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}
                 /p:Platform=${CMAKE_VS_PLATFORM_NAME}
                 /p:AssemblySearchPaths=${PROJECT_SOURCE_DIR}/deps/glyphy/include;
+            UPDATE_COMMAND ""
             INSTALL_COMMAND  echo Skipping install step for glyphy
         )
     else()
@@ -97,6 +98,7 @@ function(build_glyphy)
             COMMAND ${PROJECT_SOURCE_DIR}/deps/glyphy/configure --enable-static
             --prefix  ${PROJECT_BINARY_DIR}/deps/glyphy/build
             #BUILD_COMMAND ${CMAKE_MAKE_PROGRAM} -C ${PROJECT_SOURCE_DIR}/deps/glyphy/
+            UPDATE_COMMAND ""
             INSTALL_COMMAND  echo Skipping install step for glyphy
         )
     endif()
@@ -160,14 +162,14 @@ function(build_libsgfcplusplus)
             GIT_TAG goban-build
             CMAKE_ARGS  ${CL_ARGS}
             BUILD_COMMAND
-            ${CMAKE_COMMAND} --config=${CMAKE_BUILD_TYPE}
+            ${CMAKE_COMMAND}
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
             COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE}
             SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
             STEP_TARGETS build
-            UPDATE_COMMAND ""
-            #    UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
+            #UPDATE_COMMAND ""
+            UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
             #COMMAND git fetch
             #COMMAND git checkout sgfc
             INSTALL_COMMAND     echo Skipping install step for libsgfcplusplus
@@ -502,8 +504,8 @@ else()
             ${PORTAUDIO_INCLUDE_DIRS}
             ${libsgfcplusplus_inc_dir}
     )
-    set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
-    set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD_REQUIRED ON)
+    target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
+
     add_dependencies(${PROJECT_NAME}
             project_librocket
             project_glyphy

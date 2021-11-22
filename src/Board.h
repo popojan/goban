@@ -70,7 +70,7 @@ public:
 
     std::string toSgf(int boardSize) const {
         std::ostringstream ss;
-        ss << static_cast<char>('a' + boardSize - c + 1) << static_cast<char>('a' + r);
+        ss << static_cast<char>('a' + c) << static_cast<char>('a' + boardSize - r - 1);
         return ss.str();
     }
 

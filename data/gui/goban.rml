@@ -12,8 +12,8 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">SGF</div>
-                            <div class="cmd" onmouseup="load">Load game...</div>
-                            <div class="cmd" onmouseup="save">Save game</div>
+                            <!--<div class="cmd" onmouseup="load">Load game...</div>-->
+                            <div class="cmd" onmouseup="save">Save all</div>
                         </div>
                         <div class="grp">
                             <div class="hr">System</div>
@@ -135,7 +135,7 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Version</div>
-                            <div class="cmd" onmouseup="about">Goban 0.0.1</div>
+                            <div class="cmd" onmouseup="about">Goban 0.0.3</div>
                         </div>
                     </div>
                 </div>

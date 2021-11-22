@@ -15,6 +15,11 @@
 #include <SgfcPropertyType.h>
 #include <SgfcPlusPlusExport.h>
 #include <ISgfcGoMovePropertyValue.h>
+#include <ISgfcBoardSizeProperty.h>
+#include <ISgfcNumberPropertyValue.h>
+#include <ISgfcRealPropertyValue.h>
+#include <ISgfcSimpleTextPropertyValue.h>
+#include <ISgfcTextPropertyValue.h>
 #include <SgfcGameType.h>
 #include <ISgfcGame.h>
 #include <ISgfcNode.h>

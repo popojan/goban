@@ -161,10 +161,10 @@ bool GameThread::setFixedHandicap(int handicap) {
         int lastSize = model.board.getSize();
         success = true;
 		Engine* coach = currentCoach();
+        std::vector<Position> stones;
 		if (handicap >= 2) {
             coach->boardsize(lastSize);
             coach->clear();
-            std::vector<Position> stones;
             if (coach != 0) {
                 success = coach->fixed_handicap(handicap, stones);
 				if (handicap > 0 && !success) {
@@ -188,10 +188,16 @@ bool GameThread::setFixedHandicap(int handicap) {
         else {
             success = true;
         }
+        if(success) {
+            std::for_each(
+                    gameObservers.begin(), gameObservers.end(),
+                    [stones](GameObserver* observer){observer->onHandicapChange(stones);}
+            );
+        }
         model.state.handicap = handicap;
 		model.board.copyStateFrom(coach->showboard());
 	}
-	return success;
+    return success;
 }
 void GameThread::run() {
     std::unique_lock<std::mutex> lock(playerMutex);
