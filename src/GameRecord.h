@@ -7,21 +7,12 @@
 #include "Board.h"
 
 #include "SGF.h"
+#include "GameState.h"
 
 class GameRecord {
 public:
 
-    GameRecord():
-        vF(F::CreatePropertyValueFactory()),
-        pF(F::CreatePropertyFactory()),
-        currentNode(F::CreateNode()),
-        game(F::CreateGame(currentNode)),
-        builder(game->GetTreeBuilder()),
-        doc(F::CreateDocument())
-        {
-            //clear();s
-        }
-
+    GameRecord();
     int moveCount() { return history.size(); }
 
     void undo();
@@ -35,10 +26,13 @@ public:
 
     void move(const Move& move);
 
-    void clear(int boardSize);
+    void initGame(int boardSize, float komi, int handicap, const std::string& blackPlayer, const std::string& whitePlayer);
 
     void saveAs(const std::string& fileName);
 
+    void setHandicapStones(const std::vector<Position>& stones);
+
+    void finalizeGame(const GameState::Result& result);
 private:
 
     typedef LibSgfcPlusPlus::SgfcPlusPlusFactory F;
@@ -48,13 +42,13 @@ private:
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF;
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF;
 
-    std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> currentNode;
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> currentNode, rootNode;
     std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game;
     std::shared_ptr<LibSgfcPlusPlus::ISgfcTreeBuilder> builder;
     std::shared_ptr<LibSgfcPlusPlus::ISgfcDocument> doc;
     LibSgfcPlusPlus::SgfcBoardSize boardSize;
     std::vector<Move> history;
-
+    std::string defaultFileName;
 
 };
 

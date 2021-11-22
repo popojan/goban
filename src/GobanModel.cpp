@@ -8,7 +8,7 @@
 
 void GobanModel::onBoardSized(int boardSize) {
 
-    game.clear(boardSize);
+    spdlog::info("{} {} {} {}", boardSize, state.komi, state.black, state.white);
 
 	board.clear(boardSize);
     board.clearTerritory(boardSize);
@@ -18,7 +18,12 @@ void GobanModel::onBoardSized(int boardSize) {
 	over    = false;
 	started = false;
 
+    auto black = state.black;
+    auto white = state.white;
+
 	state = GameState();
+    state.black = black;
+    state.white = white;
 
     state.reservoirBlack = state.reservoirWhite = (boardSize*boardSize - 1)/2 + 1;
 	calcCapturedBlack = 0;
@@ -218,12 +223,13 @@ Move GobanModel::getUndoMove() {
     return Move(Move::UNDO, state.colorToMove);
 }
 
+void GobanModel::onHandicapChange(const std::vector<Position>& stones) {
+    handicapStones = stones;
+}
+
 void GobanModel::onGameMove(const Move& move) {
     spdlog::debug("LOCK model");
     std::lock_guard<std::mutex> lock(mutex);
-
-    if(!(move == Move::UNDO))
-        game.move(move);
 
     if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
@@ -247,6 +253,9 @@ void GobanModel::onGameMove(const Move& move) {
                 state.reservoirWhite -= 1;
         }
     }
+    if(!(move == Move::UNDO))
+        game.move(move);
+
     state.holdsStone = false;
     changeTurn();
 }
@@ -265,6 +274,8 @@ void GobanModel::onBoardChange(const Board& result) {
 
     if(over && result.territoryReady) {
         this->result(game.lastMove(), state.adata);
+        game.finalizeGame(state.adata);
+        game.saveAs("");
     }
 }
 
@@ -273,11 +284,6 @@ void GobanModel::onKomiChange(float newKomi) {
         spdlog::debug("setting komi {}", newKomi);
         state.komi = newKomi;
     }
-}
-
-void GobanModel::onHandicapChange(int newHandicap) {
-
-
 }
 
 void GobanModel::onPlayerChange(int role, const std::string& name) {

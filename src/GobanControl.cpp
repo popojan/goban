@@ -84,6 +84,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
 bool GobanControl::command(const std::string& cmd) {
 
     if(cmd == "quit") {
+        model.game.saveAs("");
         exit = true;
         Shell::RequestExit();
     }
@@ -177,7 +178,7 @@ bool GobanControl::command(const std::string& cmd) {
     }
     else if(cmd == "save") {
         //dynamic_cast<GtpEngine*>(engine.currentCoach())->issueCommand("printsgf ./lastgame.sgf");
-        model.game.saveAs("./lastgame.sgf");
+        model.game.saveAs("");
     }
     else if(cmd == "msg") {
         auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");

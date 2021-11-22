@@ -26,7 +26,7 @@ public:
     ~GobanModel();
     virtual void onGameMove(const Move&);
     virtual void onKomiChange(float);
-    virtual void onHandicapChange(int);
+    virtual void onHandicapChange(const std::vector<Position>&);
     virtual void onPlayerChange(int, const std::string&);
 
     virtual void onBoardSized(int);
@@ -40,6 +40,8 @@ public:
     void start() {
         started = true;
         over = false;
+        game.initGame(board.getSize(), state.komi, handicapStones.size(), state.black, state.white);
+        game.setHandicapStones(handicapStones);
     }
 
     Color changeTurn() {
@@ -88,6 +90,7 @@ public:
 	std::mutex mutex;
 
     Position cursor;
+    std::vector<Position> handicapStones;
 };
 
 
