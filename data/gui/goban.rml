@@ -13,7 +13,7 @@
                         <div class="grp">
                             <div class="hr">SGF</div>
                             <!--<div class="cmd" onmouseup="load">Load game...</div>-->
-                            <div class="cmd" onmouseup="save">Save all</div>
+                            <div class="cmd" onmouseup="save">Save now</div>
                         </div>
                         <div class="grp">
                             <div class="hr">System</div>

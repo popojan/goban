@@ -1,13 +1,12 @@
 #ifndef GOBAN_GAMERECORD_H
 #define GOBAN_GAMERECORD_H
 
-#define LIBSGFCPLUSPLUS_STATIC_DEFINE
-
 #include <memory>
 #include "Board.h"
 
 #include "SGF.h"
 #include "GameState.h"
+#include <mutex>
 
 class GameRecord {
 public:
@@ -39,17 +38,18 @@ private:
     typedef LibSgfcPlusPlus::SgfcPropertyType T;
     typedef LibSgfcPlusPlus::SgfcPropertyValueType V;
     typedef LibSgfcPlusPlus::SgfcConstants C;
-    std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF;
-    std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF;
 
-    std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> currentNode, rootNode;
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> currentNode;
     std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game;
-    std::shared_ptr<LibSgfcPlusPlus::ISgfcTreeBuilder> builder;
     std::shared_ptr<LibSgfcPlusPlus::ISgfcDocument> doc;
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcTreeBuilder> builder;
     LibSgfcPlusPlus::SgfcBoardSize boardSize;
+
     std::vector<Move> history;
     std::string defaultFileName;
-
+    std::mutex mutex;
+    size_t numGames;
+    bool gameStarted;
 };
 
 #endif //GOBAN_GAMERECORD_H
