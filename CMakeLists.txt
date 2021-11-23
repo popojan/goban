@@ -29,8 +29,8 @@ function(build_portaudio)
     ExternalProject_Get_Property(project_portaudio SOURCE_DIR)
     ExternalProject_Get_Property(project_portaudio BINARY_DIR)
 
-    SET(portaudio_lib_dir "${BINARY_DIR}")
-    SET(portaudio_inc_dir "${SOURCE_DIR}/include")
+    SET(portaudio_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
+    SET(portaudio_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
 
     ADD_LIBRARY(portaudio STATIC IMPORTED)
 endfunction()
@@ -48,8 +48,8 @@ function(build_libsndfile)
 
     ExternalProject_Get_Property(project_libsndfile SOURCE_DIR)
     ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
-    SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${SOURCE_DIR}/include" "${BINARY_DIR}/include")
-    SET(libsndfile_lib_dir "${BINARY_DIR}")
+    SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${SOURCE_DIR}/include" "${BINARY_DIR}/include" PARENT_SCOPE)
+    SET(libsndfile_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
 
     ADD_LIBRARY(libsndfile STATIC IMPORTED)
 endfunction()
@@ -64,8 +64,8 @@ function(build_freetype2)
 
     ExternalProject_Get_Property(project_freetype2 SOURCE_DIR)
     ExternalProject_Get_Property(project_freetype2 BINARY_DIR)
-    SET(freetype2_lib_dir "${BINARY_DIR}/${CMAKE_BUILD_TYPE}")
-    SET(freetype2_inc_dir "${SOURCE_DIR}/include")
+    SET(freetype2_lib_dir "${BINARY_DIR}/${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
+    SET(freetype2_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
 
     ADD_LIBRARY(freetype2 STATIC IMPORTED)
 endfunction()
@@ -104,8 +104,8 @@ function(build_glyphy)
     endif()
     ExternalProject_Get_Property(project_glyphy SOURCE_DIR)
     ExternalProject_Get_Property(project_glyphy BINARY_DIR)
-    SET(glyphy_lib_dir "${BINARY_DIR}")
-    SET(glyphy_inc_dir "${SOURCE_DIR}/include")
+    SET(glyphy_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
+    SET(glyphy_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
 endfunction()
 
 function(download_boost)
@@ -130,7 +130,7 @@ function(download_boost)
                 -I app\\lib64-msvc-14.1\\libboost_iostreams-vc141-mt-gd-x64-1_68.lib
             COMMAND if not exist ${PROJECT_BINARY_DIR}/boost/src/boost ${CMAKE_COMMAND} -E rename ${PROJECT_BINARY_DIR}/boost/src/app ${PROJECT_BINARY_DIR}/boost/src/boost
     )
-    SET(boost_lib_dir  ${PROJECT_BINARY_DIR}/boost/src/boost/lib64-msvc-14.1)
+    SET(boost_lib_dir  ${PROJECT_BINARY_DIR}/boost/src/boost/lib64-msvc-14.1 PARENT_SCOPE)
     ADD_LIBRARY(boost_system STATIC IMPORTED)
     ADD_LIBRARY(boost_filesystem STATIC IMPORTED)
     ADD_LIBRARY(boost_iostreams STATIC IMPORTED)
@@ -150,16 +150,17 @@ function(build_librocket)
             )
     ExternalProject_Get_Property(project_librocket SOURCE_DIR)
     ExternalProject_Get_Property(project_librocket BINARY_DIR)
-    SET(librocket_lib_dir "${BINARY_DIR}")
-    SET(librocket_inc_dir "${SOURCE_DIR}/include")
+    SET(librocket_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
+    SET(librocket_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
     #ADD_LIBRARY(librocket STATIC IMPORTED)
 endfunction()
 
 function(build_libsgfcplusplus)
-    SET(SGFCPLUSPLUS_STATIC_DEFINE 1)
+    SET(SGFCPLUSPLUS_STATIC_DEFINE 1 PARENT_SCOPE)
+    MESSAGE("build type = ${CMAKE_BUILD_TYPE}")
     ExternalProject_Add(project_libsgfcplusplus
             GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
-            GIT_TAG goban-build
+            GIT_TAG master
             CMAKE_ARGS  ${CL_ARGS}
             BUILD_COMMAND
             ${CMAKE_COMMAND}
@@ -169,7 +170,7 @@ function(build_libsgfcplusplus)
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
             STEP_TARGETS build
             #UPDATE_COMMAND ""
-            UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
+            #UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
             #COMMAND git fetch
             #COMMAND git checkout sgfc
             INSTALL_COMMAND     echo Skipping install step for libsgfcplusplus
@@ -184,15 +185,15 @@ endfunction()
 function(find_libsgfcplusplus)
     find_library(libsgfcplusplus_DBG
             NAMES libsgfcplusplus_staticd
-            HINTS ${libsgfcplusplus_lib_dir})
+            HINTS ${libsgfcplusplus_lib_dir}/${CMAKE_BUILD_TYPE})
     find_library(libsgfcplusplus_REL
             NAMES libsgfcplusplus_static
-            HINTS ${libsgfcplusplus_lib_dir})
+            HINTS ${libsgfcplusplus_lib_dir}/${CMAKE_BUILD_TYPE})
     add_library(libsgfcplusplus STATIC IMPORTED)
 
     set_target_properties(libsgfcplusplus PROPERTIES
-            IMPORTED_LOCATION_DEBUG "${libsgfcplusplus_DBG}"
-            IMPORTED_LOCATION "${libsgfcplusplus_REL}")
+            IMPORTED_LOCATION_DEBUG ${libsgfcplusplus_DBG}
+            IMPORTED_LOCATION ${libsgfcplusplus_REL})
 endfunction()
 
 function(fetch_json)
@@ -256,21 +257,32 @@ function(find_libsndfile)
         HINTS "${libsndfile_lib_dir}"
         PATH_SUFFIXES Release
     )
+    find_path(SNDFILE_INCLUDE_DIR1 NAMES sndfile.h
+        HINTS ${PROJECT_BINARY_DIR}/deps/libsndfile/build/include
+    )
+    find_path(SNDFILE_INCLUDE_DIR2 NAMES sndfile.hh
+        HINTS
+        ${PROJECT_SOURCE_DIR}/deps/libsndfile/include
+    )
+    set(SNDFILE_INCLUDE_DIRS ${SNDFILE_INCLUDE_DIR1} ${SNDFILE_INCLUDE_DIR2} PARENT_SCOPE)
     set_target_properties(libsndfile PROPERTIES
-        IMPORTED_LOCATION_DEBUG "${libsndfile_DBG}"
-        IMPORTED_LOCATION "${libsndfile_REL}"
+        IMPORTED_LOCATION_DEBUG ${libsndfile_DBG}
+        IMPORTED_LOCATION ${libsndfile_REL}
     )
 endfunction()
 function(find_portaudio)
     find_library(portaudio_DBG
         NAMES portaudio_static_x64
-        HINTS "${portaudio_lib_dir}"
+        HINTS "${portaudio_lib_dir}/${CMAKE_BUILD_TYPE}"
         PATH_SUFFIXES Debug
     )
     find_library(portaudio_REL
         NAMES portaudio_static_x64
-        HINTS "${portaudio_lib_dir}"
+        HINTS "${portaudio_lib_dir}/${CMAKE_BUILD_TYPE}"
         PATH_SUFFIXES Release
+    )
+    find_path(PORTAUDIO_INCLUDE_DIRS NAMES portaudio.h
+        HINTS ${PROJECT_SOURCE_DIR}/deps/portaudio/include
     )
     set_target_properties(portaudio PROPERTIES
         IMPORTED_LOCATION_DEBUG "${portaudio_DBG}"
@@ -281,21 +293,23 @@ endfunction()
 function(find_freetype2)
     find_library(freetype_DBG
         NAMES freetyped
-        HINTS "${freetype2_lib_dir}"
+        HINTS ${freetype2_lib_dir}
     )
     find_library(freetype_REL
         NAMES freetype
-        HINTS "${freetype2_lib_dir}"
+        HINTS ${freetype2_lib_dir}
+    )
+    find_path(FREETYPE_INCLUDE_DIRS NAMES ft2build.h
+        HINTS ${PROJECT_SOURCE_DIR}/deps/freetype2/include
     )
     set_target_properties(freetype2 PROPERTIES
-        IMPORTED_LOCATION_DEBUG "${freetype2_lib_dir}/freetyped.lib"
-        IMPORTED_LOCATION "${freetype2_lib_dir}/freetype.lib"
+        IMPORTED_LOCATION_DEBUG ${freetype_DBG}
+        IMPORTED_LOCATION ${freetype_REL}
     )
-    set(FREETYPE_INCLUDE_DIRS ${freetype2_inc_dir} PARENT_SCOPE)
-    set(FREETYPE_INCLUDE_DIRS ${freetype2_inc_dir} PARENT_SCOPE)
 endfunction()
 
 function(find_boost)
+    SET(boost_lib_dir  ${PROJECT_BINARY_DIR}/boost/src/boost/lib64-msvc-14.1)
     find_library(boost_system_DBG NAMES libboost_system-vc141-mt-gd-x64-1_68 HINTS ${boost_lib_dir})
     find_library(boost_system_REL NAMES libboost_system-vc141-mt-x64-1_68    HINTS ${boost_lib_dir})
     find_library(boost_filesystem_DBG NAMES libboost_filesystem-vc141-mt-gd-x64-1_68 HINTS ${boost_lib_dir})
@@ -391,7 +405,7 @@ else()
                 project_libsndfile
                 )
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libcmtd.lib")
-        set_target_properties(${PROJECT_NAME} WIN32)
+        set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     else()
         set(PLATFORM_DEPENDENT_SRC_FILES
             src/shell/src/x11
@@ -521,12 +535,12 @@ else()
         boost_iostreams
         boost_filesystem
         libglyphy
-        freetype
+        freetype2
         LibRocket_Core
         LibRocket_Controls
         LibRocket_Debugger
         portaudio
-        sndfile
+        libsndfile
         libsgfcplusplus
         spdlog
         clipp
@@ -535,8 +549,8 @@ else()
     )
     set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/publish/Goban)
 
-    file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
-    file(COPY ${PROJECT_SOURCE_DIR}/engine DESTINATION ${RELEASE_DIR})
+    #file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
+    #file(COPY ${PROJECT_SOURCE_DIR}/engine DESTINATION ${RELEASE_DIR})
 
     install(DIRECTORY DESTINATION ${RELEASE_DIR})
     install(TARGETS ${PROJECT_NAME}

@@ -354,14 +354,15 @@ void GobanView::moveCursor(float x, float y) {
 int GobanView::updateCursor(const Position& lastCursor){
     Position cursor = model.cursor;
     int ret = 0;
-    auto& np = model.board[cursor];
 
     if(state.holdsStone != model.state.holdsStone) {
         board.setRandomStoneRotation();
         state.holdsStone = model.state.holdsStone;
     }
-    if(model.state.holdsStone && model.isPointOnBoard(cursor) && np.stone == Color::EMPTY){
-        board.placeCursor(cursor, state.colorToMove);
+    if(model.state.holdsStone && model.isPointOnBoard(cursor)){
+        auto& np = model.board[cursor];
+        if(np.stone == Color::EMPTY)
+            board.placeCursor(cursor, state.colorToMove);
     }
     return ret;
 }
