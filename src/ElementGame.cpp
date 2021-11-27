@@ -292,6 +292,7 @@ void ElementGame::OnUpdate()
         view.state.msg = model.state.msg;
     }
     if(view.state.msg == GameState::NONE) {
+        //compose move comment
         for(auto &p: engine.getPlayers()) {
             if(p->isTypeOf(Player::ENGINE)) {
                 std::string newMsg(dynamic_cast<GtpEngine*>(p)->lastError());

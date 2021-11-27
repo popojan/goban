@@ -10,6 +10,10 @@
 
 class GameRecord {
 public:
+    enum EventType { COMMENT = 0, PLAYER_SWITCHED, KIBITZ_MOVE, LAST_EVENT};
+    const static std::array<std::string, LAST_EVENT> eventNames;
+
+    typedef std::string EventValue;
 
     GameRecord();
     int moveCount() { return history.size(); }
@@ -24,6 +28,8 @@ public:
     const Move& lastMove() const  { return history.back(); }
 
     void move(const Move& move);
+
+    void annotate(const std::string& comment);
 
     void initGame(int boardSize, float komi, int handicap, const std::string& blackPlayer, const std::string& whitePlayer);
 

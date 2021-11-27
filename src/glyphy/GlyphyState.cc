@@ -44,7 +44,7 @@ void GlyphyState::set_uniform (GLuint program, const char *name, double *p, doub
 {
   *p = value;
   glUniform1f (glGetUniformLocation (program, name), value);
-  spdlog::debug("Setting {} to {}", name + 2, value);
+  //spdlog::debug("Setting {} to {}", name + 2, value);
 }
 
 #define SET_UNIFORM(name, value) set_uniform (program, #name, &name, value)
