@@ -51,7 +51,7 @@ function(build_libsndfile)
     SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${SOURCE_DIR}/include" "${BINARY_DIR}/include" PARENT_SCOPE)
     SET(libsndfile_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
 
-    ADD_LIBRARY(libsndfile STATIC IMPORTED)
+    ADD_LIBRARY(sndfile STATIC IMPORTED)
 endfunction()
 
 function(build_freetype2)
@@ -67,7 +67,7 @@ function(build_freetype2)
     SET(freetype2_lib_dir "${BINARY_DIR}/${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
     SET(freetype2_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
 
-    ADD_LIBRARY(freetype2 STATIC IMPORTED)
+    ADD_LIBRARY(freetype STATIC IMPORTED)
 endfunction()
 
 function(build_glyphy)
@@ -265,7 +265,7 @@ function(find_libsndfile)
         ${PROJECT_SOURCE_DIR}/deps/libsndfile/include
     )
     set(SNDFILE_INCLUDE_DIRS ${SNDFILE_INCLUDE_DIR1} ${SNDFILE_INCLUDE_DIR2} PARENT_SCOPE)
-    set_target_properties(libsndfile PROPERTIES
+    set_target_properties(sndfile PROPERTIES
         IMPORTED_LOCATION_DEBUG ${libsndfile_DBG}
         IMPORTED_LOCATION ${libsndfile_REL}
     )
@@ -302,7 +302,7 @@ function(find_freetype2)
     find_path(FREETYPE_INCLUDE_DIRS NAMES ft2build.h
         HINTS ${PROJECT_SOURCE_DIR}/deps/freetype2/include
     )
-    set_target_properties(freetype2 PROPERTIES
+    set_target_properties(freetype PROPERTIES
         IMPORTED_LOCATION_DEBUG ${freetype_DBG}
         IMPORTED_LOCATION ${freetype_REL}
     )
@@ -535,12 +535,12 @@ else()
         boost_iostreams
         boost_filesystem
         libglyphy
-        freetype2
+        freetype
         LibRocket_Core
         LibRocket_Controls
         LibRocket_Debugger
         portaudio
-        libsndfile
+        sndfile
         libsgfcplusplus
         spdlog
         clipp
