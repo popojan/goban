@@ -1,10 +1,13 @@
 {
+  "humans": [
+    "Human"
+  ],
   "bots": [
     {
       "name": "GNU Go 3.8",
       "path": "./engine/gnugo",
       "command": "gnugo",
-      "parameters": "--mode gtp",
+      "parameters": "--mode gtp --japanese-rules",
       "main": 1
     },
     {

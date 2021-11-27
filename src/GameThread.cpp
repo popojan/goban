@@ -72,12 +72,14 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
         if(!add && playerToMove != 0 && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
             playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
         }
-        std::for_each(
-            gameObservers.begin(), gameObservers.end(),
-            [player, role](GameObserver* observer){
-                observer->onPlayerChange(role, player->getName());
-            }
-        );
+        if(add) {
+            std::for_each(
+                    gameObservers.begin(), gameObservers.end(),
+                    [player, role](GameObserver *observer) {
+                        observer->onPlayerChange(role, player->getName());
+                    }
+            );
+        }
 
     }
 }
@@ -291,6 +293,7 @@ void GameThread::gameLoop() {
                           || move == Move::RESIGN
                           || coach->play(move);
             }
+            std::ostringstream comment;
             if(success) {
                 //other engines play
                 if (!(move == Move::RESIGN)) {
@@ -303,6 +306,12 @@ void GameThread::gameLoop() {
                             } else
                                 p->play(move);
                         }
+                        //compose move comment
+                        if(p->isTypeOf(Player::ENGINE)) {
+                            std::string engineMsg(dynamic_cast<GtpEngine*>(p)->lastError());
+                            if(!engineMsg.empty())
+                                comment << engineMsg << " (" << p->getName() << ") ";
+                        }
                     }
                 }
                 //update model
@@ -310,11 +319,13 @@ void GameThread::gameLoop() {
                 const Board& result(
                         coach->showboard()
                 );
+                if(kibitzed)
+                    comment << GameRecord::KIBITZ_MOVE << kibitz->getName();
 
                 std::for_each(
                     gameObservers.begin(), gameObservers.end(),
-                    [result, move](GameObserver* observer) {
-                        observer->onGameMove(move);
+                    [result, move, &comment](GameObserver* observer) {
+                        observer->onGameMove(move, comment.str());
                         observer->onBoardChange(result);
                     }
                 );
@@ -428,7 +439,14 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
 
     sgf = -1;
 
-    human = addPlayer(new LocalHumanPlayer("Human"));
+    auto humans = config->data.find("humans");
+    if(humans != config->data.end()) {
+        for(auto it = humans->begin(); it != humans->end(); ++it) {
+            human = addPlayer(new LocalHumanPlayer(*it));
+        }
+    } else {
+        human = addPlayer(new LocalHumanPlayer("Human"));
+    }
 
     numPlayers = human + 1;
     activePlayer[0] = human;

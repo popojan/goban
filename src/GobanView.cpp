@@ -368,7 +368,7 @@ int GobanView::updateCursor(const Position& lastCursor){
 }
 
 
-void GobanView::onGameMove(const Move& move) {
+void GobanView::onGameMove(const Move& move, const std::string& comment) {
     if(move == Move::NORMAL) {
         updateFlag |= UPDATE_SOUND_STONE;
         std::ostringstream ss;

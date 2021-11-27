@@ -4,6 +4,10 @@
 
 using namespace LibSgfcPlusPlus;
 
+const std::array<std::string, GameRecord::LAST_EVENT> GameRecord::eventNames = {
+        "", "switched_player:", "kibitz_move:"
+};
+
 GameRecord::GameRecord():
         currentNode(nullptr),
         game(nullptr),
@@ -60,6 +64,31 @@ void GameRecord::move(const Move& move)  {
         game->GetTreeBuilder()->InsertChild(currentNode, newNode, currentNode->GetFirstChild());
         currentNode = newNode;
     }
+}
+
+void GameRecord::annotate(const std::string& comment) {
+    if(currentNode == nullptr)
+        return;
+    auto properties = currentNode->GetProperties();
+    std::string appendTo("");
+    std::vector<std::shared_ptr<ISgfcProperty> > newProperties;
+
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
+    for(auto property: properties) {
+        if(property->GetPropertyType() == T::C) {
+            auto val = property->GetPropertyValue();
+            appendTo = val->ToSingleValue()->GetRawValue();
+        }
+        else {
+            newProperties.push_back(property);
+        }
+    }
+    std::ostringstream val;
+    val << appendTo << comment << " ";
+    auto property = pF->CreateProperty(T::C, vF->CreateSimpleTextPropertyValue(val.str()));
+    newProperties.push_back(property);
+    currentNode->SetProperties(newProperties);
 }
 
 void GameRecord::setHandicapStones(const std::vector<Position>& stones) {

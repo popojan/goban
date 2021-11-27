@@ -24,7 +24,7 @@ public:
         //newGame(boardSize, handicap, komi);
     }
     ~GobanModel();
-    virtual void onGameMove(const Move&);
+    virtual void onGameMove(const Move&, const std::string& comment);
     virtual void onKomiChange(float);
     virtual void onHandicapChange(const std::vector<Position>&);
     virtual void onPlayerChange(int, const std::string&);

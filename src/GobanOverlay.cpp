@@ -17,7 +17,7 @@
 
 //#define DEBUG_OVERLAY
 
-const char *font_path = NULL;
+const char *font_path = nullptr;
 
 static std::array<std::shared_ptr<GlyphyBuffer>, 3> buffer;
 
@@ -32,10 +32,16 @@ std::array<Layer, 3> GobanOverlay::layers = {
 bool GobanOverlay::init() {
 	st = std::shared_ptr<GlyphyState>(new GlyphyState());
 
-    FT_Init_FreeType(&ft_library);
-    ft_face = NULL;
+    if(FT_Init_FreeType(&ft_library) != 0) {
+        spdlog::warn("Failed to load freetype library.");
+        return false;
+    }
+    ft_face = nullptr;
     if (font_path) {
         FT_New_Face(ft_library, font_path, 0/*face_index*/, &ft_face);
+        if(ft_face) {
+            spdlog::info("Default font file loaded from {}", font_path);
+        }
     }
     else {
         using nlohmann::json;
@@ -43,6 +49,9 @@ bool GobanOverlay::init() {
                 .value("fonts", json({}))
                 .value("overlay", "./data/fonts/default-font.ttf");
         FT_New_Face(ft_library, font.c_str(), 0/*face_index*/, &ft_face);
+        if(ft_face) {
+            spdlog::info("Loading font file [{}]", font);
+        }
     }
     if (!ft_face) {
 		spdlog::error("Failed to open font file");

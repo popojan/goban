@@ -5,7 +5,7 @@
 class GameObserver {
 
 public:
-    virtual void onGameMove(const Move& move) {}
+    virtual void onGameMove(const Move& move, const std::string& comment) {}
     virtual void onKomiChange(float newKomi) {}
     virtual void onHandicapChange(const std::vector<Position>& newHandicapStones) {}
     virtual void onBoardSized(int newBoardSize) {}

@@ -37,6 +37,22 @@ void replaceAll(std::string& out, const std::string& what, const std::string& by
     }
 }
 
+std::string& ltrim(std::string & str)
+{
+    auto it2 = std::find_if(str.begin(), str.end(),
+        [](char ch){return !std::isspace<char>(ch , std::locale::classic());});
+    str.erase(str.begin(), it2);
+    return str;
+}
+
+std::string & rtrim(std::string & str)
+{
+    auto it1 = std::find_if(str.rbegin(), str.rend(),
+        [](char ch){ return !std::isspace<char>(ch , std::locale::classic());});
+    str.erase(it1.base(), str.end());
+    return str;
+}
+
 void GtpClient::operator()(const std::string& line) {
     //TODO
     spdlog::debug("gtp err = {}", line);
@@ -128,4 +144,5 @@ void GtpClient::interpolate(std::string& out) {
     for(auto it = vars.begin(); it != vars.end(); ++it) {
         replaceAll(out, it.key(), it.value());
     }
+    rtrim(ltrim(out));
 }

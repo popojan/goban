@@ -227,7 +227,7 @@ void GobanModel::onHandicapChange(const std::vector<Position>& stones) {
     handicapStones = stones;
 }
 
-void GobanModel::onGameMove(const Move& move) {
+void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     spdlog::debug("LOCK model");
     std::lock_guard<std::mutex> lock(mutex);
 
@@ -253,9 +253,12 @@ void GobanModel::onGameMove(const Move& move) {
                 state.reservoirWhite -= 1;
         }
     }
-    if(!(move == Move::UNDO))
+    if(!(move == Move::UNDO)) {
         game.move(move);
-
+        if(!comment.empty()) {
+            game.annotate(comment);
+        }
+    }
     state.holdsStone = false;
     changeTurn();
 }
@@ -287,10 +290,17 @@ void GobanModel::onKomiChange(float newKomi) {
 }
 
 void GobanModel::onPlayerChange(int role, const std::string& name) {
+    std::ostringstream val;
+    val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
     if(role & Player::BLACK) {
         state.black = name;
+        val << "black=" << name;
+
     }
     if(role & Player::WHITE) {
         state.white = name;
+        val << "white=" << name;
     }
+    val << " ";
+    game.annotate(val.str());
 }

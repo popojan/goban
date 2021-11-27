@@ -33,7 +33,7 @@ public:
 
 	GobanView(GobanModel& m);
 
-    virtual void onGameMove(const Move& move);
+    virtual void onGameMove(const Move& move, const std::string& comment);
 
     ~GobanView() {
         gobanShader.destroy();
