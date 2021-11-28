@@ -206,6 +206,9 @@ void GameRecord::finalizeGame(const GameState::Result& result) {
 void GameRecord::saveAs(const std::string& fileName) {
     std::lock_guard<std::mutex> lock(mutex);
 
+    if(doc == nullptr || doc->GetGames().empty())
+        return;
+
     std::string fn(fileName.length() > 0 ? fileName : defaultFileName);
 
     std::shared_ptr<LibSgfcPlusPlus::ISgfcDocumentWriter> writer(F::CreateDocumentWriter());
