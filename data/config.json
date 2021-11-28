@@ -11,18 +11,18 @@
       "main": 1
     },
     {
-      "name": "Pachi 10.00",
-      "path": "./engine/pachi",
-      "command": "pachi",
-      "parameters": "-t _120 threads=2,maximize_score",
+      "name": "Pachi 12.60",
+      "path": "./engine/Pachi-12.60",
+      "command": "pachi.exe",
+      "parameters": "-r japanese --smart-pass",
       "enabled": 0
     },
     {
-      "name": "Katago #170 b20",
+      "name": "Katago #kata1 b40",
       "path": "./engine/katago",
       "command": "katago",
-      "parameters": "gtp -model ./engine/katago/models/g170-b20c256x2-s4384473088-d968438914.bin.gz -config ./engine/katago/default_gtp.cfg",
-      "enabled": 1,
+      "parameters": "gtp -model ./engine/katago/models/kata1-b40c256-s10359230464-d2525387336.bin.gz -config ./engine/katago/default_gtp.cfg",
+      "enabled": 0,
       "kibitz": 0,
       "messages": [
           {
@@ -67,10 +67,8 @@
   },
   "fonts": {
     "gui": [
-      "./data/fonts/Delicious-Roman.otf",
-      "./data/fonts/Delicious-Bold.otf",
-      "./data/fonts/Delicious-Italic.otf",
-      "./data/fonts/Delicious-BoldItalic.otf"
+       "./data/fonts/Delicious-Roman.otf",
+       "./data/fonts/Delicious-Bold.otf"
     ],
     "overlay": "./data/fonts/default-font.ttf"
   },
@@ -93,5 +91,6 @@
       "fragment": "./data/shaders/legacy/fragment.25D.glsl",
       "height": 0.85
     }
-  ]
+  ],
+  "gui": "./data/gui"
 }

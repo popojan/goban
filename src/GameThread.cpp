@@ -204,7 +204,7 @@ bool GameThread::setFixedHandicap(int handicap) {
 void GameThread::run() {
     std::unique_lock<std::mutex> lock(playerMutex);
     model.start();
-    spdlog::warn("construct thread {}", (bool)model);
+    spdlog::debug("construct thread {}", (bool)model);
     thread = new std::thread(&GameThread::gameLoop, this);
     engineStarted.wait(lock);
 }

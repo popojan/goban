@@ -74,6 +74,7 @@
                             <div class="cmd">
                                 <select id="selBoard"
                                         onmousedown="nop" onchange="boardsize">
+                                    <!--better use × if font allows -->
                                     <option value="19" selected>19x19</option>
                                     <option value="17">17x17</option>
                                     <option value="15">15x15</option>

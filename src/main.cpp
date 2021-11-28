@@ -29,8 +29,14 @@
   #include <fcntl.h>
 #endif
 
+//#define SHOW_CONSOLE 1
+
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #include <memory>
+
 
 Rocket::Core::Context* context = NULL;
 std::shared_ptr<Configuration> config;
@@ -41,7 +47,6 @@ void GameLoop() {
 
 
 #if defined ROCKET_PLATFORM_WIN32
-
 void DoAllocConsole()
 {
     static const WORD MAX_CONSOLE_LINES = 500;
@@ -81,7 +86,7 @@ void DoAllocConsole()
     *stderr = *fp;
 
     setvbuf(stderr, NULL, _IONBF, 0);
-    ShowWindow(GetConsoleWindow(), SW_SHOW);
+    ShowWindow(GetConsoleWindow(), SW_HIDE);
 }
 
 int APIENTRY WinMain(HINSTANCE ROCKET_UNUSED_PARAMETER(instance_handle), HINSTANCE ROCKET_UNUSED_PARAMETER(previous_instance_handle), char* ROCKET_UNUSED_PARAMETER(command_line), int ROCKET_UNUSED_PARAMETER(command_show))
@@ -113,7 +118,13 @@ const char * WINDOW_NAME = "Goban";
 #ifdef ROCKET_PLATFORM_WIN32
         DoAllocConsole();
 #endif
-    spdlog::set_level(spdlog::level::from_str(logLevel));
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    console_sink->set_level(spdlog::level::from_str(logLevel));
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("last_run.log", true);
+    file_sink->set_level(spdlog::level::from_str(logLevel));
+    spdlog::sinks_init_list sink_list = { file_sink, console_sink };
+    auto logger = std::make_shared<spdlog::logger>("multi_sink", sink_list.begin(), sink_list.end());
+    spdlog::set_default_logger(logger);
 
     unsigned window_width = 1024;
     unsigned window_height = 768;
@@ -175,6 +186,7 @@ const char * WINDOW_NAME = "Goban";
     Rocket::Core::Factory::RegisterEventListenerInstancer(event_instancer);
     event_instancer->RemoveReference();
 
+    EventManager::SetPrefix(config->data.value("gui","./data/gui").c_str());
     EventManager::RegisterEventHandler("goban", new EventHandlerNewGame());
 
     //Shell::ToggleFullscreen();
