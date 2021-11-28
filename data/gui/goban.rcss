@@ -1,8 +1,29 @@
+/*
+    full unicode support in the GUI
+    simplified chinese example
+    download e.g. Noto Sans SC Regular from
+    https://fonts.google.com/noto/specimen/Noto+Sans+SC
+    and add ./data/fonts/NotoSansSC-Regular.otf" to config.json
+*/
+
+.sc {
+     //use a font family that contains all required glyphs
+     font-family: Noto Sans SC;
+
+     //cherry-pick ideograms used in the GUI
+     //see https://barotto.github.io/libRocketDoc/pages/rcss/fonts.html for syntax
+     font-charset: U+56f4,U+68cb,U+76e4,U+7070,U+7537,U+5B69;
+
+     //or include the whole range (slows down application load and wastes texture memory)
+     //font-charset: U+4E00-9FFF;
+}
+
 body, html
 {
   width: 100%;
   height: 100%;
   font-family: Delicious;
+  font-charset: U+0020-00FF;
   font-weight: normal;
   font-style: normal;
   font-size: 25pt;

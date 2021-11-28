@@ -54,7 +54,7 @@ public:
 	/// Loads a window and binds the event handler for it.
 	/// @param[in] window_name The name of the window to load.
 	static bool LoadWindow(const Rocket::Core::String& window_name);
-
+    static void SetPrefix(const Rocket::Core::String& prefix);
 private:
 	EventManager();
 	~EventManager();

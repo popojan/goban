@@ -41,6 +41,7 @@ static EventHandler* event_handler = NULL;
 // The event handlers registered with the manager.
 typedef std::map< Rocket::Core::String, EventHandler* > EventHandlerMap;
 EventHandlerMap event_handlers;
+Rocket::Core::String rml_data_prefix;
 
 EventManager::EventManager()
 {
@@ -127,7 +128,7 @@ bool EventManager::LoadWindow(const Rocket::Core::String& window_name)
 		event_handler = NULL;
 
 	// Attempt to load the referenced RML document.
-	Rocket::Core::String document_path = Rocket::Core::String("data/gui/") + window_name + Rocket::Core::String(".rml");
+	Rocket::Core::String document_path = rml_data_prefix + Rocket::Core::String("/") + window_name + Rocket::Core::String(".rml");
 	Rocket::Core::ElementDocument* document = context->LoadDocument(document_path.CString());
 	if (document == NULL)
 	{
@@ -150,4 +151,9 @@ bool EventManager::LoadWindow(const Rocket::Core::String& window_name)
 	gameElement->Focus();
 
 	return true;
+}
+
+void EventManager::SetPrefix(const Rocket::Core::String& prefix)
+{
+    rml_data_prefix = prefix;
 }
