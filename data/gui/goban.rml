@@ -33,11 +33,11 @@
                         </div>
                         <div class="grp">
                             <div class="hr">Window</div>
-                            <div class="cmd" id="cmdFullscreen" onmouseup="fullscreen">Fullscreen</div>
+                            <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">Fullscreen</div>
                         </div>
                         <div class="grp">
                             <div class="hr">Overlay</div>
-                            <div class="cmd" onmouseup="overlay">Last move</div>
+                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">Last move</div>
                         </div>
                         <!--
                         <div class="grp">
@@ -115,10 +115,15 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Game</div>
-                            <div class="cmd" id="cmdPass" onmouseup="play pass">Pass</div>
+                            <div class="cmd" id="cmdStart" onmouseup="start">Start</div>
+                            <div class="cmd" id="cmdClear" onmouseup="clear">Clear</div>
+                            <div id="grpMoves">
                             <div class="hr">Move</div>
+                            <div class="cmd" id="cmdPass" onmouseup="pass">Pass</div>
                             <div class="cmd" onmouseup="play once">Kibitz move</div>
                             <div class="cmd" onmouseup="undo move">Undo</div>
+                            <div class="cmd" id="cmdResign" onmouseup="resign">Resign</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -127,7 +132,7 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">GnuGo</div>
-                            <div class="cmd" onmouseup="territory">Territory</div>
+                            <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">Territory</div>
                         </div>
                     </div>
                 </div>

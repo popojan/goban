@@ -23,7 +23,7 @@ body, html
   width: 100%;
   height: 100%;
   font-family: Delicious;
-  font-charset: U+0020-00FF;
+  font-charset: U+0020-00FF,U+2014;
   font-weight: normal;
   font-style: normal;
   font-size: 25pt;
@@ -148,6 +148,8 @@ game {
   border-color:#ffff0000;
 }
 
+div.selected {  border-right:0.2rem; border-color:#ffffff80; }
+div.unselected {  border-right:0.2rem; border-color:#ffffff20; }
 
 div.hide,
 .show:hover,

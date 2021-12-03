@@ -62,7 +62,7 @@ public:
 	int getActivePlayer(int which);
 
 	Move getLocalMove(const Position& coord);
-
+    Move getLocalMove(const Move::Special move);
 	void reset();
 
     void addGameObserver(GameObserver* pobserver) {

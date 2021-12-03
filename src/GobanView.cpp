@@ -11,7 +11,7 @@ GobanView::GobanView(GobanModel& m)
 translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f),
 startTime(0.0f), animationRunning(false), isPanning(false), isZooming(false), isRotating(false),
 needsUpdate(0), cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
-currentProgram(-1),	showOverlay(true),  lastCursor(-1,-1)
+currentProgram(-1),	showOverlay(true)
 {
     player.preload(config);
     player.init();
@@ -218,7 +218,6 @@ void GobanView::Render(int w, int h)
 	    board.updateStones(model.board, model.board.showTerritory);
         updateCursor(model.cursor);
 
-        lastCursor = model.cursor;
         double vol = board.collision;
         if(vol > 0) {
             updateFlag |= UPDATE_OVERLAY;
@@ -263,11 +262,12 @@ void GobanView::Render(int w, int h)
 	updateFlag = UPDATE_NONE | (UPDATE_SOUND_STONE & updateFlag);
 }
 
-void GobanView::toggleOverlay() {
+bool GobanView::toggleOverlay() {
 	showOverlay = !showOverlay;
 	if (showOverlay) {
 		updateFlag |= UPDATE_OVERLAY;
 	}
+    return showOverlay;
 }
 void GobanView::updateTranslation() {
     glm::vec4 ro(0.0f,0.0f,-3.0f,0.0f);

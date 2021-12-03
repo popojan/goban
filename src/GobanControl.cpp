@@ -42,7 +42,6 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     //model.playMove(move);
                     engine.playLocalMove(move);
                     view.requestRepaint();
-                    firstGame = false;
                 }
                 else {
                     model.state.holdsStone = true;
@@ -83,16 +82,19 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
 
 bool GobanControl::command(const std::string& cmd) {
 
+    bool checked = false;
     if(cmd == "quit") {
         model.game.saveAs("");
         exit = true;
         Shell::RequestExit();
     }
-    else if (cmd == "fullscreen") {
+    else if (cmd == "toggle_fullscreen") {
+        fullscreen = !fullscreen;
         Shell::ToggleFullscreen();
+        checked = fullscreen;
     }
     else if (cmd == "fps") {
-        view.toggleFpsLimit();
+        checked = view.toggleFpsLimit();
     }
     else if (cmd == "animate") {
         view.lastTime = 0.0;
@@ -100,33 +102,39 @@ bool GobanControl::command(const std::string& cmd) {
         view.animationRunning = true;
         view.requestRepaint();
     }
-    else if (cmd == "territory") {
-        model.board.toggleTerritory();
+    else if (cmd == "toggle_territory") {
+        checked = model.board.toggleTerritory();
         view.requestRepaint();
     }
-    else if (cmd == "overlay") {
-        view.toggleOverlay();
+    else if (cmd == "toggle_overlay") {
+        checked = view.toggleOverlay();
         view.requestRepaint();
+
     }
     else if (cmd == "play once") {
         engine.playKibitzMove();
         view.requestRepaint();
     }
-    else if (cmd == "play pass") {
-        bool playNow = !firstGame;
+    else if(cmd == "resign") {
+        if(engine.humanToMove()) {
+            auto move = engine.getLocalMove(Move::RESIGN);
+            engine.playLocalMove(move);
+        }
+    }
+    else if (cmd == "pass") {
+        if(engine.humanToMove()) {
+            auto move = engine.getLocalMove(Move::PASS);
+            engine.playLocalMove(move);
+        }
+    }
+    else if (cmd == "clear") {
         if (model.isGameOver()) {
             newGame(model.getBoardSize());
-            playNow = false;
         }
-        /*else if(view.board.isEmpty()) {
-            if(!engine.isRunning())
-                engine.run();
-        }*/
-        if(playNow) {
-            auto move = model.getPassMove();
-            engine.playLocalMove(move);
-            view.requestRepaint();
-            firstGame = false;
+    }
+    else if (cmd == "start") {
+        if(!engine.isRunning() && !model.over) {
+            engine.run();
         }
     }
     else if (cmd == "reset camera") {
@@ -186,6 +194,7 @@ bool GobanControl::command(const std::string& cmd) {
             msg->SetInnerRML("");
         }
     }
+    parent->OnMenuToggle(cmd, checked);
     return true;
 }
 
