@@ -12,12 +12,9 @@ const float cidWhiteStone         = 6.0;
 const float cidCapturedWhiteStone = 6.5;
 const float cidLastWhiteStone     = 6.75;
 
- in vec3 rdb;
+in vec3 rdb;
 flat in vec3 roo;
- in float noise;
-out vec3 glFragColor;
-
-
+in float noise;
 
 uniform int NDIM;
 uniform vec2 iResolution;
@@ -263,10 +260,10 @@ float circleHalfPlaneIntersectionArea(vec3 c, float r, mat3 cs) {
 }
 
 vec3 distanceRayStoneSphere(in vec3 ro, in vec3 rd, in vec3 dd, float radius2){
-		vec3 p = ro + dot(dd - ro, rd) * rd;
-		float dist = length(p - dd) - radius2;
-		vec3 q = dd + radius2*normalize(p - dd);
-		float d = length(p.xz - dd.xz);
+        vec3 p = ro + dot(dd - ro, rd) * rd;
+        float dist = length(p - dd) - radius2;
+        vec3 q = dd + radius2*normalize(p - dd);
+        float d = length(p.xz - dd.xz);
     return vec3(d - abs(p.y - dd.y)*px/abs(radius2 - 0.5*h + 0.5*b), dist, distance(p, ro));
 }
 
@@ -396,7 +393,7 @@ bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out ve
         tn1 = tn2;
     }
     res = noIntersection4;
-    if (found) { 
+    if (found) {
         vec3 ip = ro+rd*tn2;
        res = vec4(normalize(vec3(2.0*ip.x+8.0*ip.x*ip.y*ip.y,8.0*(1.0+dot(ip.xz, ip.xz))*ip.y, 2.0*ip.z+8.0*ip.z*ip.y*ip.y)), tn2);
     }
@@ -404,7 +401,7 @@ bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out ve
 }*/
 
 bool intersectionRayStone(in vec3 ro, in vec3 rd, in vec3 dd, float mint, out vec4 res, out float t2){
-    
+
     bool rval = false;
     float t = dot(-ro,nBoard)/dot(rd, nBoard);
     if(t < farClip  && length(ro.xz + t*rd.xz - dd.xz) < r1) {
@@ -465,12 +462,12 @@ float floatConstruct( uint m ) {
 
 
 void updateResult(inout Intersection result[2], Intersection ret) {
-/*	float phi = 2.0*3.14*surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
-	float len = surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
-	vec3 u = ret.n;
-	vec3 v = cross(u, vec3(1.0));
-	vec3 w = cross(v, u);
-	ret.nn = normalize(mix(normalize(ret.n), normalize((cos(phi)*v - sin(phi)*w)), sqrt(0.05*len)));
+/*    float phi = 2.0*3.14*surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
+    float len = surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
+    vec3 u = ret.n;
+    vec3 v = cross(u, vec3(1.0));
+    vec3 w = cross(v, u);
+    ret.nn = normalize(mix(normalize(ret.n), normalize((cos(phi)*v - sin(phi)*w)), sqrt(0.05*len)));
 */
     if(ret.t.x <= result[0].t.x) {
         result[1] = result[0];
@@ -481,7 +478,6 @@ void updateResult(inout Intersection result[2], Intersection ret) {
     }
 }
 
-
 void finalizeStoneIntersection(in vec3 ro, in vec3 rd, inout Intersection ret[2], const int i) {
     vec3 dd = ret[i].dummy.xyz;
     bvec3 isStone = bvec3(ret[i].m == idBlackStone || ret[i].m == idWhiteStone || ret[i].m == idBowlBlackStone || ret[i].m == idBowlWhiteStone,
@@ -491,19 +487,19 @@ void finalizeStoneIntersection(in vec3 ro, in vec3 rd, inout Intersection ret[2]
     Intersection r2 = ret[i];
     if(any(isStone)) {
         vec3 q2;
-	ret[i].d = -distanceRayCircle(ro, rd, ret[i].p, vec2(farClip), vec3(dd.x, 0.0, dd.z), r1, q2).y;
+    ret[i].d = -distanceRayCircle(ro, rd, ret[i].p, vec2(farClip), vec3(dd.x, 0.0, dd.z), r1, q2).y;
     }
     if(isStone.y) {
       if(ret[i].m == idCapturedBlackStone || ret[i].m == idCapturedWhiteStone) {
-	Intersection r2 = ret[i];	
-        vec3 q2;	
+        Intersection r2 = ret[i];
+        vec3 q2;
         ret[i].m = ret[i].m == idCapturedWhiteStone ? idWhiteStone :idBlackStone;
         if(length(ret[i].p.xz - dd.xz) < 0.66*r1) {
           r2.m = ret[i].m == idBlackStone ? idWhiteStone :idBlackStone;
           r2.d = max(ret[i].d, -distanceRayCircle(ro, rd, ret[i].p, vec2(farClip), vec3(dd.x, 0.0, dd.z), 0.66*r1, q2).y);
           updateResult(ret, r2);
-	}
-	else {
+    }
+    else {
           ret[i].d = -distanceRayCircle(ro, rd, ret[i].p, vec2(farClip), vec3(dd.x, 0.0, dd.z), r1, q2).y;
         }
       }
@@ -544,7 +540,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
            bool gridz = ip.x > -c.x + mw*wwx - dw && ip.x < c.x - mw*wwx + dw && ip.z > -c.z + mw*wwy - 0.5*wwy && ip.z < c.z - mw*wwy + 0.5*wwy;
            float r = boardbb*distance(ro, ip);
            if(ip0.y > 0.0) {
-    			isBoardTop = true;
+                isBoardTop = true;
                 bvec2 nearEnough =  lessThan(abs(ip.xz -vec2(wwx, wwy)*round(ip.xz/vec2(wwx, wwy))), vec2(dw + dw + r));
                 if(any(nearEnough)) {
                     vec3 dir = vec3(dw, -dw, 0.0);
@@ -591,7 +587,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                      }
                    }
                    else if (NDIM == 13){
-                   		ppos = vec3(3.0, 0.0, 3.0);
+                           ppos = vec3(3.0, 0.0, 3.0);
                       for(int i = -1; i <= 1; i+=2) {
                         for(int j = -1; j <= 1; j+=2) {
                             vec3 pos = vec3(wwx, 0.0, wwy)*vec3(i, 0, j)*ppos.zyz;
@@ -611,7 +607,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                         }
                     }
                 }
-           	}
+               }
         ret.t = vec2(tb, tb);
         ret.m = idBoard;
         ret.d = -farClip;
@@ -619,15 +615,15 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
         ret.isBoard = isBoardTop;
 
         if(dist0 > -boardaa) {
-	        float tc, tc2;
+            float tc, tc2;
             IntersectBox(ro, q2 - ro, bnx.xyz, -bnx.xwz, tc, tc2);
             if(tc2 - tc > 0.001) {
-	            n0 = normalize(n0);
-	            vec3 cdist = abs(abs(ip0) - abs(bn0));
-	        	vec2 ab = clamp(vec2(abs(dist0), min(cdist.z, min(cdist.x, cdist.y)))/boardcc, 0.0, 1.0);
-	            n0 = normalize(mix(normalize(ip0), n0, ab.y));
-	            n0 = normalize(mix(n0, n1, ab.x)); 
-	            ret.n = n0;
+                n0 = normalize(n0);
+                vec3 cdist = abs(abs(ip0) - abs(bn0));
+                vec2 ab = clamp(vec2(abs(dist0), min(cdist.z, min(cdist.x, cdist.y)))/boardcc, 0.0, 1.0);
+                n0 = normalize(mix(normalize(ip0), n0, ab.y));
+                n0 = normalize(mix(n0, n1, ab.x));
+                ret.n = n0;
                 ret.d = -farClip;
                 ret.p = q2;
                 updateResult(result, ret);
@@ -635,13 +631,13 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
         }
         ret.n = n1;
     }
-	/*float phi = 2.0*3.14*surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
-	float len = surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
-	vec3 u = ret.n;
-	vec3 v = cross(u, vec3(1.0));
-	vec3 w = cross(v, u);
-	ret.nn = normalize(mix(normalize(ret.n), normalize((cos(phi)*v - sin(phi)*w)), sqrt(0.15*len)));
-	*/
+    /*float phi = 2.0*3.14*surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
+    float len = surface3(vec3(10.0)+1117.0*ret.p.xyz,1.0);
+    vec3 u = ret.n;
+    vec3 v = cross(u, vec3(1.0));
+    vec3 w = cross(v, u);
+    ret.nn = normalize(mix(normalize(ret.n), normalize((cos(phi)*v - sin(phi)*w)), sqrt(0.15*len)));
+    */
 
         if(dd < 1.0 && dist0 < -dd*boardaa) {
             ret.d = dist0;
@@ -649,12 +645,12 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
             ret.p = ip;
             updateResult(result, ret);
         }
-	    if(dd > 0.0) {
-	        ret.m = idBoard;
-	       	dist0 = max(dist0, -dd*boardaa);
-	        ret.p = ip;
-	        ret.d = dist0;
-        	updateResult(result, ret);
+        if(dd > 0.0) {
+            ret.m = idBoard;
+               dist0 = max(dist0, -dd*boardaa);
+            ret.p = ip;
+            ret.d = dist0;
+            updateResult(result, ret);
         }
         ret.isBoard = false;
     }
@@ -708,7 +704,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                     vec3 ip = ro + rd*tb;
                     if(all(equal(clamp(ip.xz, minb.xz, maxb.xz), ip.xz))) {
                         mm0 = stone0.z == cidBlackArea ? idBlackArea : idWhiteArea;
-						ret.m = idBoard;// mm0;
+                        ret.m = mm0;
                         ret.t = vec2(tb);
                         ret.d = distanceRaySquare(ro, rd, ip, minb, maxb, q2);
                         ret.n = nBoard;
@@ -718,7 +714,7 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
                 }
 
                 if(mm0 > idBack) {
-		//updateResult(result, ret);
+                    //updateResult(result, ret);
                     if(ret.t.x <= result[0].t.x) {
                         result[1] = result[0];
                         result[0] = ret;
@@ -736,11 +732,11 @@ void castRay(in vec3 ro, in vec3 rd, out Intersection result[2]) {
         ret.m = idTable;
         ret.t = vec2(t);
         ret.p = ro + t*rd;
- 		    //float alpha = iTime;
+        //float alpha = iTime;
         //float cosa = cos(alpha);
         //float sina = sin(alpha);
         //vec2 xz = mat2(cosa,sina, -sina, cosa)*ret.p.xz;
-				//vec3 retp = vec3(xz, ret.p.y).xzy;
+        //vec3 retp = vec3(xz, ret.p.y).xzy;
         ret.n = nBoard;
         ret.d = -farClip;
         updateResult(result, ret);
@@ -770,7 +766,7 @@ Material getMaterial(int m) {
         ret = mBlack;
     }
     else if(m == idLastBlackStone || m == idLastWhiteStone) {
-    		ret = mRed;
+        ret = mRed;
     }
     else if(m == idGrid) {
         ret = mGrid;
@@ -798,7 +794,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
     vec3 mcolc = mat.clrC;
     vec3 scrd;
     float degrade = (1.0+floor(length(ro)/3.0));
-		    //float alpha = iTime;
+        //float alpha = iTime;
         //float cosa = cos(alpha);
         //float sina = sin(alpha);
         //vec2 xz = mat2(cosa,sina, -sina, cosa)*ip.p.xz;
@@ -831,39 +827,39 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
         scrd = 1117.0*scoord;
     }
     else if (mat.id == mTable.id) {
-			/*vec3 color;// = mix(mTable.clrA,mTable.clrB,density);
-		    vec2 xz = ip.p.xz;
-		    const float DT = 2.0*3.1415926/8.0;
-		    float fa =  atan(xz.y, xz.x);
-		    float iord = floor((fa+0.5*DT)/DT);
-		    float far = iord*DT;
-		    float fb =  cos(abs(fa - far))*length(xz);
-				fa = mod(fa, DT);
+        /*vec3 color;// = mix(mTable.clrA,mTable.clrB,density);
+        vec2 xz = ip.p.xz;
+        const float DT = 2.0*3.1415926/8.0;
+        float fa =  atan(xz.y, xz.x);
+        float iord = floor((fa+0.5*DT)/DT);
+        float far = iord*DT;
+        float fb =  cos(abs(fa - far))*length(xz);
+        fa = mod(fa, DT);
 
-						bool a = fa < DT;
-		        bool b = fb < 0.5;
-		        float c05a = abs(0.5*DT - mod(fa+0.5*DT,DT))/DT;
-		        float c05b = abs(0.25-mod(fb,0.5))/0.5;
-		        bool third = fb < 1.5 || fb > 3.0 || c05a > 0.4 || c05b  > 0.45;// ? 0.5 : 0.0;
-		        float jord = fb;
-		        bool ab =  (iord == -2.0) || (iord == -1.0 && mod(jord, 1.5) < 1.0)  || (iord == 3.0 && mod(jord, 1.5) >= 1.0)
-		        ||  (iord == 0.0 && mod(jord+0.5, 1.5) < 1.0)  || ((iord == 4.0 || iord==-4.0) && mod(jord+0.5, 1.5) >= 1.0)
-		        ||  (iord == -1.0 && mod(jord, 1.5) < 1.0)  || (iord == 3.0 && mod(jord, 1.5) >= 1.0)
-		        ||  (iord == 1.0 && mod(jord, 1.5) >= 0.5)  || (iord == -3.0 && mod(jord, 1.5) < 0.5);
-		        c05a = smoothstep(0.395, 0.4, c05a);
-		        c05b = smoothstep(0.44, 0.45, c05b);
-		        float w1 = 0.0;
-		        if(!third && ab) //;(a &&!b) || (!a && b))
-		        {
-		            mcol = mix(mTable.clrA, mTable.clrC, max(c05b,c05a));
-		        }
-		        else if (!third){
-		            mcol = mix(mTable.clrB, mTable.clrC, max(c05b,c05a));
-		        }
-		        else {*/
-        			mcol = mat.clrC;
-		        /*}
-		    noisy = false;*/
+        bool a = fa < DT;
+        bool b = fb < 0.5;
+        float c05a = abs(0.5*DT - mod(fa+0.5*DT,DT))/DT;
+        float c05b = abs(0.25-mod(fb,0.5))/0.5;
+        bool third = fb < 1.5 || fb > 3.0 || c05a > 0.4 || c05b  > 0.45;// ? 0.5 : 0.0;
+        float jord = fb;
+        bool ab =  (iord == -2.0) || (iord == -1.0 && mod(jord, 1.5) < 1.0)  || (iord == 3.0 && mod(jord, 1.5) >= 1.0)
+        ||  (iord == 0.0 && mod(jord+0.5, 1.5) < 1.0)  || ((iord == 4.0 || iord==-4.0) && mod(jord+0.5, 1.5) >= 1.0)
+        ||  (iord == -1.0 && mod(jord, 1.5) < 1.0)  || (iord == 3.0 && mod(jord, 1.5) >= 1.0)
+        ||  (iord == 1.0 && mod(jord, 1.5) >= 0.5)  || (iord == -3.0 && mod(jord, 1.5) < 0.5);
+        c05a = smoothstep(0.395, 0.4, c05a);
+        c05b = smoothstep(0.44, 0.45, c05b);
+        float w1 = 0.0;
+        if(!third && ab) //;(a &&!b) || (!a && b))
+        {
+            mcol = mix(mTable.clrA, mTable.clrC, max(c05b,c05a));
+        }
+        else if (!third){
+            mcol = mix(mTable.clrB, mTable.clrC, max(c05b,c05a));
+        }
+        else {
+            mcol = mat.clrC;
+        }
+        noisy = false;*/
     }
     float rnd = 0.0;
     if(mat.id == mBoard.id || mat.id == mCupBlack.id || mat.id == mCupWhite.id) {
@@ -879,7 +875,7 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
             smult3 = 1.0 - smult2;
             mixmult = 1.0;
     }
-    else if(mat.id == mWhite.id) { 
+    else if(mat.id == mWhite.id) {
        //scoord.x = length(scoord.xy);
        smult1 = abs(sin(11.0+131.0*scoord.x));
        smult2 = abs(sin(1.3-101.0*scoord.x)+sin(1.3-121.0*scoord.x));
@@ -897,60 +893,59 @@ Material getMaterialColor(in Intersection ip, out vec3 mcol, in vec3 rd, in vec3
 vec3 shading(in vec3 ro, in Intersection ip, const Material mat, vec3 col){
     vec3 ret;
     if(mat.id == mBack.id) {
-    	ret = mat.clrA;
+       ret = mat.clrA;
     }
     else {
-	    vec3 rd = normalize(ip.p - ro);
-	    vec3 smult0 = vec3(0.01);
-	    smult0 = clamp(abs(col - mat.clrB)/abs(mat.clrA.x - mat.clrB),0.0,1.0);
-	    float smult = (smult0.x + smult0.y + smult0.z)/3.0;
-	    vec3 nn = ip.n;//ip.isBoard ? ip.nn : ip.n;// mat.id != mWhite.id && mat.id != mBlack.id ? ip.nn : ip.n;//normalize(mix(ip.n, ip.nn, 0.15));
-	    vec3 ref = reflect(rd, nn);
-	    //max4x3 ligs = mat4x3(lig,lig2,lig3,lig);
-	    //mat4x4 ress = ligs*ligs;
- 		    float alpha = 0.0; //2.1*iTime;
-        float cosa = cos(alpha);
-        float sina = sin(alpha);
-        mat2 mm = mat2(cosa,sina, -sina, cosa);
+      vec3 rd = normalize(ip.p - ro);
+      vec3 smult0 = vec3(0.01);
+      smult0 = clamp(abs(col - mat.clrB)/abs(mat.clrA.x - mat.clrB),0.0,1.0);
+      float smult = (smult0.x + smult0.y + smult0.z)/3.0;
+      vec3 nn = ip.n;//ip.isBoard ? ip.nn : ip.n;// mat.id != mWhite.id && mat.id != mBlack.id ? ip.nn : ip.n;//normalize(mix(ip.n, ip.nn, 0.15));
+      vec3 ref = reflect(rd, nn);
+      //max4x3 ligs = mat4x3(lig,lig2,lig3,lig);
+      //mat4x4 ress = ligs*ligs;
+      float alpha = 0.0; //2.1*iTime;
+      float cosa = cos(alpha);
+      float sina = sin(alpha);
+      mat2 mm = mat2(cosa,sina, -sina, cosa);
 
-			vec3 lpos =vec3(mm * lpos.xz, lpos.y).xzy;
-			vec3 lpos2 =vec3(mm * lpos2.xz, lpos2.y).xzy;
-			vec3 lpos3 =vec3(mm * lpos3.xz, lpos3.y).xzy;
-	    vec3 lig = normalize(lpos - ip.p);
-	    vec3 lig2 = normalize(lpos2 - ip.p);
-	    vec3 lig3 = normalize(lpos3 - ip.p);
-	    //vec3 lig4 = normalize(lpos4 - ip.p);
-	    //vec3 ligA = normalize(lposA - ip.p);
-	    //vec3 ligB = normalize(lposB - ip.p);
-	    //vec3 ligC = normalize(lposC - ip.p);
-	    //vec3 ligD = normalize(lposD - ip.p);
-	    
-		float nny = 0.5+0.5*nn.y;
-	    vec2 ads = 
-		0.6*clamp(vec2(nny, dot(nn, lig)), 0.0,1.0) +
-  		0.3*clamp(vec2(nny, dot(nn, lig2)),0.0,1.0) +
-  		0.3*clamp(vec2(nny, dot(nn, lig3)),0.0,1.0);
-  		//0.2*clamp(vec2(nny, dot(nn, lig4)),0.0,1.0);
+      vec3 lpos =vec3(mm * lpos.xz, lpos.y).xzy;
+      vec3 lpos2 =vec3(mm * lpos2.xz, lpos2.y).xzy;
+      vec3 lpos3 =vec3(mm * lpos3.xz, lpos3.y).xzy;
+      vec3 lig = normalize(lpos - ip.p);
+      vec3 lig2 = normalize(lpos2 - ip.p);
+      vec3 lig3 = normalize(lpos3 - ip.p);
+      //vec3 lig4 = normalize(lpos4 - ip.p);
+      //vec3 ligA = normalize(lposA - ip.p);
+      //vec3 ligB = normalize(lposB - ip.p);
+      //vec3 ligC = normalize(lposC - ip.p);
+      //vec3 ligD = normalize(lposD - ip.p);
+        float nny = 0.5+0.5*nn.y;
+        vec2 ads =
+        0.6*clamp(vec2(nny, dot(nn, lig)), 0.0,1.0) +
+          0.3*clamp(vec2(nny, dot(nn, lig2)),0.0,1.0) +
+          0.3*clamp(vec2(nny, dot(nn, lig3)),0.0,1.0);
+          //0.2*clamp(vec2(nny, dot(nn, lig4)),0.0,1.0);
 
             vec4 pws = clamp(vec4(dot(ref, lig), dot(ref, lig2), dot(ref, lig3), dot(ref, lig3)), 0.0,1.0);
-	    //ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligA), 0.0), 0.0,1.0);
-	    //ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligB), 0.0), 0.0,1.0);
-	    //ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligC), 0.0), 0.0,1.0);
-	    //ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligD), 0.0), 0.0,1.0);
-	    float pw = exp(mat.refl*(-0.5-smult)); 
-			float cupsa = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? 0.9 : 1.0;
-			float cupsb = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? 0.5 : 1.0;
-	    ret = dot(
+        //ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligA), 0.0), 0.0,1.0);
+        //ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligB), 0.0), 0.0,1.0);
+        //ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligC), 0.0), 0.0,1.0);
+        //ads += 0.15*clamp(vec3(0.5+0.5*ip.n.y, dot(ip.n, ligD), 0.0), 0.0,1.0);
+        float pw = exp(mat.refl*(-0.5-smult));
+            float cupsa = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? 0.9 : 1.0;
+            float cupsb = ip.m == idBowlBlackStone || ip.m == idBowlWhiteStone ? 0.5 : 1.0;
+        ret = dot(
             vec2(mat.diffuseWeight, mat.ambientWeight),
             vec2(ads.y,1.0)
         )*col + cupsb*mat.specularWeight*(0.25*pow(pws.x, 0.125*mat.specularPower)+pow(pws.y, cupsb*pw*mat.specularPower)
-		+pow(pws.z, cupsb*0.5*pw*mat.specularPower));
-//		+pow(pws.w, pw*mat.specularPower));
-	    if(ip.m == idTable) {
-	       ret = mix(mBack.clrA, ret, exp(-0.35*max(0.0,length(ip.p))));
-	   }
-	  }
-	  ret = pow(ret, gamma*exp(contrast*(vec3(0.5)-ret)));
+        +pow(pws.z, cupsb*0.5*pw*mat.specularPower));
+//        +pow(pws.w, pw*mat.specularPower));
+        if(ip.m == idTable) {
+           ret = mix(mBack.clrA, ret, exp(-0.35*max(0.0,length(ip.p))));
+       }
+      }
+      ret = pow(ret, gamma*exp(contrast*(vec3(0.5)-ret)));
     return ret;
 }
 
@@ -988,68 +983,76 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
 
     Intersection ret[2];
 
-		castRay(ro, rd, ret);
+    float dist = dot(-ro, nBoard)/length(ro);
+    if(dist > 0.0) {
+        ro.y = -ro.y;
+        rd.y = -rd.y;
+    }
+    castRay(ro, rd, ret);
+
+    gl_FragDepth = (ret[0].m == mBlack.id || ret[0].m == mWhite.id) ? 0.5 : (dist > 0.0 ? 0.25 : 0.75);
 
     float alpha1 = smoothstep(boardaa, 0.0, -ret[0].d);
 
     vec3 col, mcol;
-		Material mat;
-/*if(ret[0].m == idTable) {
-    	vec4 c = vec4(0.0);
-			mat = getMaterialColor(ret[0], mcol, rd, ro);
-			
-			vec3 pos = ret[0].p;
-			vec3 col8 = shading(ro, ret[0], mTable, mcol);;
-			for(int i=0; i<furLayers; i++) {
-        vec3 Pi0;
-				vec4 sampleCol;
-				sampleCol.a = furDensity(pos, Pi0);
-				if (sampleCol.a > 0.0) {
-					sampleCol.rgb = furShade(pos, ro, sampleCol.a, col8, Pi0);
-					// pre-multiply alpha
-					sampleCol.rgb *= sampleCol.a;
-					if (c.a > 0.95) break;
-					c = c + sampleCol*(1.0 - c.a);
-				}
-        float t = dot(vec3(0.0,bnx.y-legh-float(i+1)*rayStep,0.0)-ro,nBoard)/dot(rd,nBoard);
-				pos = ro + t*rd;
-			}
-			col = mix(c.rgb, col8, 0.75);
-      
-      //col = col8; 
-			alpha1 = 0.0;
-		}
-else {*/
-			mat = getMaterialColor(ret[0], mcol, rd, ro);
-      col0 = shading(ro, ret[0], mat, mcol);
-	    /*if(ret[0].m != idCup && (ret[0].isBoard || ret[0].m != idBoard)) {
-		    vec3 rd = reflect(rd, ret[0].n);
-		    ro = ret[0].p + 0.0001*ret[0].n;
-		    Intersection ret[2];
-		    castRay(ro, rd, ret);
-		    Material mat = getMaterialColor(ret[0], mcol, rd, ro);
-		    col0 += (vec3(1.0) - col0)*0.25*shading(ro, ret[0], mat, mcol);
-	    }*/
-	    if(alpha1 > 0.05) {
-                mat = getMaterialColor(ret[1],mcol,rd, ro);
-	        //mcol = 0.5*(mat.clrA+mat.clrB);
-	            
-	            col1 = shading(ro, ret[1], mat, mcol);
-			   	float alpha2 = smoothstep(boardaa, 0.0, -ret[1].d);
-	        if(ret[1].m == idBoard && alpha2 > 0.0) {
-	            col2 = shading(ro, ret[1], mGrid, mGrid.clrA);
-	            col = mix(col0, mix(col1, col2, alpha2), alpha1);
-	        }
-	        else {
-	            alpha2 = 0.0;
-	            col = mix(col0, col1, alpha1);
-	        }
-	    }
-	    else {
-	    		alpha1 = 0.0;
-	        col = col0;
-	    }
-//}
+    Material mat;
+    /*if(ret[0].m == idTable) {
+        vec4 c = vec4(0.0);
+        mat = getMaterialColor(ret[0], mcol, rd, ro);
+
+        vec3 pos = ret[0].p;
+        vec3 col8 = shading(ro, ret[0], mTable, mcol);;
+        for(int i=0; i<furLayers; i++) {
+            vec3 Pi0;
+            vec4 sampleCol;
+            sampleCol.a = furDensity(pos, Pi0);
+            if (sampleCol.a > 0.0) {
+                sampleCol.rgb = furShade(pos, ro, sampleCol.a, col8, Pi0);
+                // pre-multiply alpha
+                sampleCol.rgb *= sampleCol.a;
+                if (c.a > 0.95) break;
+                c = c + sampleCol*(1.0 - c.a);
+            }
+            float t = dot(vec3(0.0,bnx.y-legh-float(i+1)*rayStep,0.0)-ro,nBoard)/dot(rd,nBoard);
+            pos = ro + t*rd;
+        }
+        col = mix(c.rgb, col8, 0.75);
+
+        //col = col8;
+        alpha1 = 0.0;
+    }
+    else*/
+    {
+        mat = getMaterialColor(ret[0], mcol, rd, ro);
+        col0 = shading(ro, ret[0], mat, mcol);
+        /*if(ret[0].m != idCup && (ret[0].isBoard || ret[0].m != idBoard)) {
+            vec3 rd = reflect(rd, ret[0].n);
+            ro = ret[0].p + 0.0001*ret[0].n;
+            Intersection ret[2];
+            castRay(ro, rd, ret);
+            Material mat = getMaterialColor(ret[0], mcol, rd, ro);
+            col0 += (vec3(1.0) - col0)*0.25*shading(ro, ret[0], mat, mcol);
+        }*/
+        if(alpha1 > 0.05) {
+            mat = getMaterialColor(ret[1],mcol,rd, ro);
+            //mcol = 0.5*(mat.clrA+mat.clrB);
+
+            col1 = shading(ro, ret[1], mat, mcol);
+            float alpha2 = smoothstep(boardaa, 0.0, -ret[1].d);
+            if(ret[1].m == idBoard && alpha2 > 0.0) {
+                col2 = shading(ro, ret[1], mGrid, mGrid.clrA);
+                col = mix(col0, mix(col1, col2, alpha2), alpha1);
+            }
+            else {
+                alpha2 = 0.0;
+                col = mix(col0, col1, alpha1);
+            }
+        }
+        else {
+            alpha1 = 0.0;
+            col = col0;
+        }
+    }
     return col;
 }
 
@@ -1057,6 +1060,7 @@ else {*/
 void main( void )
 {
     c = vec3(1.0, 0.25, wwy/wwx);
-    bnx = vec4(-c.x, -0.2, -c.z, 0.0);
-    glFragColor  = render(roo, normalize(rdb), bgA);
+    bnx = vec4(-c.x, -0.002, -c.z, 0.0);
+    gl_FragColor  = vec4(render(roo, normalize(rdb), bgA), 1.0);
+
 }
