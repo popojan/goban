@@ -171,8 +171,32 @@ void ElementGame::OnUpdate()
         //    ->SetInnerRML(model.state.white.c_str());
     }
 
-
-	std::string cmd(isOver ? "Clear" : !isRunning ? "Start" : "Pass");
+	//Pass ... game started not over, human player
+    //Start ... game not started not over
+    //Clear ... game over
+    //Resign ... game started not over, human player
+    std::string gameState(!isOver && isRunning ? "1" : (isOver ? "2" : "4"));
+    model.state.cmd = gameState;
+    if(model.state.cmd != view.state.cmd) {
+        auto cmdStart = context->GetDocument("game_window")->GetElementById("cmdStart");
+        auto cmdClear = context->GetDocument("game_window")->GetElementById("cmdClear");
+        auto grpMoves = context->GetDocument("game_window")->GetElementById("grpMoves");
+        const Rocket::Core::String DISPLAY("display");
+        bool gameInProgress = !isOver && isRunning;
+        grpMoves->SetProperty(DISPLAY, gameInProgress ? "block" : "none");
+        if (!gameInProgress) {
+            if (!isOver) {
+                cmdClear->SetProperty(DISPLAY, "none");
+                cmdStart->SetProperty(DISPLAY, "block");
+            } else {
+                cmdClear->SetProperty(DISPLAY, "block");
+                cmdStart->SetProperty(DISPLAY, "none");
+            }
+        }
+        requestRepaint();
+        view.state.cmd = gameState;
+    }
+    /*std::string cmd(isOver ? "Clear" : !isRunning ? "Start" : "Pass");
 	model.state.cmd = cmd;
 	if (view.state.cmd != model.state.cmd) {
 		Rocket::Core::Element* cmdPass = context->GetDocument("game_window")->GetElementById("cmdPass");
@@ -181,7 +205,7 @@ void ElementGame::OnUpdate()
 			requestRepaint();
 			view.state.cmd = cmd;
 		}
-	}
+	}*/
 	//Color colorToMove = engine.getCurrentColor();
 	//model.state.colorToMove = colorToMove;
 	if (view.state.colorToMove != model.state.colorToMove) {
@@ -326,6 +350,19 @@ void ElementGame::Reshape() {
     }
 
 }
+
+void ElementGame::OnMenuToggle(const std::string &cmd, bool checked) {
+    if(cmd.substr(0, 7) == "toggle_") {
+        std::vector<Rocket::Core::Element*> elements;
+        GetContext()->GetDocument("game_window")->GetElementsByClassName(elements, cmd.c_str());
+        for(auto el: elements) {
+            el->SetClass("selected", checked);
+            el->SetClass("unselected", !checked);
+        }
+    }
+
+}
+
 void ElementGame::OnRender()
 {
     glPushAttrib(GL_ALL_ATTRIB_BITS);

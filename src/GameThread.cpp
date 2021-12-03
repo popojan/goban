@@ -320,7 +320,7 @@ void GameThread::gameLoop() {
                         coach->showboard()
                 );
                 if(kibitzed)
-                    comment << GameRecord::KIBITZ_MOVE << kibitz->getName();
+                    comment << GameRecord::eventNames[GameRecord::KIBITZ_MOVE] << kibitz->getName();
 
                 std::for_each(
                     gameObservers.begin(), gameObservers.end(),
@@ -455,4 +455,8 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
 
 Move GameThread::getLocalMove(const Position& coord) {
     return Move(coord, model.state.colorToMove);
+}
+
+Move GameThread::getLocalMove(const Move::Special move) {
+    return Move(move, model.state.colorToMove);
 }

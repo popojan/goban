@@ -78,7 +78,7 @@ public:
 		return gobanShader.getContrast();
     }
 
-    void toggleFpsLimit() {MAX_FPS = !MAX_FPS; }
+    bool toggleFpsLimit() {MAX_FPS = !MAX_FPS; return MAX_FPS;}
 
     int cycleShaders();
 
@@ -99,7 +99,8 @@ public:
 
     bool needsRepaint();
     void requestRepaint(int what = UPDATE_SOME);
-	void toggleOverlay();
+	bool toggleOverlay();
+
 	void Update();
 	void moveCursor(float, float);
     int updateCursor(const Position& last);
@@ -123,12 +124,12 @@ public:
     float startX, startY, lastX, lastY;
 
     Board board;
+
     GameState state;
 
     int updateFlag;
     int currentProgram;
 	bool showOverlay;
-    Position lastCursor;
     Position lastMove;
     AudioPlayer player;
 };
