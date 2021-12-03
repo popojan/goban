@@ -1,9 +1,17 @@
+# GTP Engines
+
+See [GoAIRatings](https://github.com/breakwa11/GoAIRatings) for inspiration.
+
+## GnuGo 3.8
+Please install GnuGo 3.8 from the official package.
+
+It is required as the coach engine enforcing game rules.
+
+## KataGo
+
+Set `logToStderr = true` and goban will display katago's internal scoring after opponent moves. 
+```
 #!/bin/bash
-
-echo GnuGO 3.8
-echo -- please install system package --
-
-
 echo KataGo v1.4.2 opencl linux x64
 
 src=https://github.com/lightvector/KataGo/releases/download/v1.4.2
@@ -25,5 +33,12 @@ dir=models
 mkdir models
 cd models
 wget "$src/$file"
+```
 
-cd ../..
+## Pachi
+
+
+
+## Zenith Go
+
+Time to try gtp4zen wrapper.
