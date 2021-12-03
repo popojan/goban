@@ -327,6 +327,12 @@ function(find_boost)
             IMPORTED_LOCATION ${boost_iostreams_REL})
 endfunction()
 
+function(generate_glad_headers)
+    #glad --out-path src/glad --profile="compatibility" --api="gl=3.1" --generator="c" --spec="gl" --extensions="" --reproducible
+    #glad --out-path src/glad --api="wgl=1.0" --generator="c" --spec="wgl" --extensions="WGL_ARB_extensions_string,WGL_EXT_extensions_string" --reproducible
+    #glad --out-path src/glad --api="glx=1.4" --generator="c" --spec="glx" --extensions="GLX_ARB_create_context,GLX_EXT_visual_info" --reproducible
+endfunction()
+
 cmake_language(CALL build_glyphy)
 cmake_language(CALL build_librocket)
 cmake_language(CALL build_libsgfcplusplus)
@@ -549,8 +555,8 @@ else()
     )
     set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/publish/Goban)
 
-    #file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
-    #file(COPY ${PROJECT_SOURCE_DIR}/engine DESTINATION ${RELEASE_DIR})
+    file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
+    file(COPY ${PROJECT_SOURCE_DIR}/engine DESTINATION ${RELEASE_DIR})
 
     install(DIRECTORY DESTINATION ${RELEASE_DIR})
     install(TARGETS ${PROJECT_NAME}
