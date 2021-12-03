@@ -1560,8 +1560,13 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 bg)
     Intersection ret1;
     Intersection ret2;
 
-    castRay(ro, rd, ret0, ret1, ret2);
+    float dist = dot(vec3(0.0,0.85*h,0.0)-ro, nBoard)/length(ro);
+    if(dist > 0.0) {
+        ro.y = 0.85*h-(ro.y-0.85*h);
+        rd.y = -rd.y;
+    }
 
+    castRay(ro, rd, ret0, ret1, ret2);
 
     vec3 col;
     vec4 mcol;
