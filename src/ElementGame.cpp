@@ -153,37 +153,24 @@ void ElementGame::OnUpdate()
     if(!view.gobanShader.isReady())
         return;
 
-    //model.update();
     view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSizeX);
-    //view.board.updateStones(model.board, model.territory, view.showTerritory);
-    //nstate = state;
+
     bool isOver = model.state.reason != GameState::NOREASON;
     bool isRunning = engine.isRunning();
 
     Rocket::Core::Context* context = GetContext();
 
-	if (view.state.black != model.state.black) {
-        //context->GetDocument("game_window")->GetElementById("lblBlack")
-        //    ->SetInnerRML(model.state.black.c_str());
-    }
-    if (view.state.white != model.state.white) {
-        //context->GetDocument("game_window")->GetElementById("lblWhite")
-        //    ->SetInnerRML(model.state.white.c_str());
-    }
-
-	//Pass ... game started not over, human player
-    //Start ... game not started not over
-    //Clear ... game over
-    //Resign ... game started not over, human player
     std::string gameState(!isOver && isRunning ? "1" : (isOver ? "2" : "4"));
     model.state.cmd = gameState;
     if(model.state.cmd != view.state.cmd) {
         auto cmdStart = context->GetDocument("game_window")->GetElementById("cmdStart");
         auto cmdClear = context->GetDocument("game_window")->GetElementById("cmdClear");
         auto grpMoves = context->GetDocument("game_window")->GetElementById("grpMoves");
+        auto grpGame  = context->GetDocument("game_window")->GetElementById("grpGame");
         const Rocket::Core::String DISPLAY("display");
         bool gameInProgress = !isOver && isRunning;
         grpMoves->SetProperty(DISPLAY, gameInProgress ? "block" : "none");
+        grpGame->SetProperty(DISPLAY, gameInProgress ? "none" : "block");
         if (!gameInProgress) {
             if (!isOver) {
                 cmdClear->SetProperty(DISPLAY, "none");
@@ -196,19 +183,8 @@ void ElementGame::OnUpdate()
         requestRepaint();
         view.state.cmd = gameState;
     }
-    /*std::string cmd(isOver ? "Clear" : !isRunning ? "Start" : "Pass");
-	model.state.cmd = cmd;
-	if (view.state.cmd != model.state.cmd) {
-		Rocket::Core::Element* cmdPass = context->GetDocument("game_window")->GetElementById("cmdPass");
-		if (cmdPass != 0) {
-			cmdPass->SetInnerRML(cmd.c_str());
-			requestRepaint();
-			view.state.cmd = cmd;
-		}
-	}*/
-	//Color colorToMove = engine.getCurrentColor();
-	//model.state.colorToMove = colorToMove;
-	if (view.state.colorToMove != model.state.colorToMove) {
+
+    if (view.state.colorToMove != model.state.colorToMove) {
 		bool blackMove = model.state.colorToMove == Color::BLACK;
 		Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("blackMoves");
 		Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("whiteMoves");
@@ -305,7 +281,6 @@ void ElementGame::OnUpdate()
             else
                 msg->SetInnerRML(
                         Rocket::Core::String(128, "Black wins by %.1f", -model.state.adata.delta).CString());
-            //engine.showTerritory = model.board.toggleTerritoryAuto(true);
             view.state.reason = model.state.reason;
         }
 			break;

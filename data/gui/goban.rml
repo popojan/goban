@@ -114,9 +114,11 @@
                     <span>Move</span>
                     <div class="menuitem show">
                         <div class="grp">
+                            <div id="grpGame">
                             <div class="hr">Game</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">Start</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">Clear</div>
+                            </div>
                             <div id="grpMoves">
                             <div class="hr">Move</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">Pass</div>
