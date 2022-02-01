@@ -15,6 +15,7 @@ const float cidLastWhiteStone = 6.75;
 in vec3 rdb;
 flat in vec3 roo;
 in float noise;
+out vec3 glFragColor;
 
 uniform int NDIM;
 uniform vec2 iResolution;
@@ -1624,5 +1625,5 @@ void main(void)
 {
     c = vec3(1.0, 0.25, wwy/wwx);
     bnx = vec4(-c.x, -0.2, -c.z, 0.0);
-    gl_FragColor =  vec4(render(roo, normalize(rdb), bgA), 1.0);//
+    glFragColor =  render(roo, normalize(rdb), bgA);
 }
