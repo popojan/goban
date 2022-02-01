@@ -164,7 +164,7 @@ function(build_libsgfcplusplus)
             CMAKE_ARGS  ${CL_ARGS}
             BUILD_COMMAND
             ${CMAKE_COMMAND}
-            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
+            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus -DENABLE_TESTS=0
             COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE}
             SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
@@ -185,10 +185,10 @@ endfunction()
 function(find_libsgfcplusplus)
     find_library(libsgfcplusplus_DBG
             NAMES libsgfcplusplus_staticd
-            HINTS ${libsgfcplusplus_lib_dir}/${CMAKE_BUILD_TYPE})
+            HINTS ${libsgfcplusplus_lib_dir})
     find_library(libsgfcplusplus_REL
             NAMES libsgfcplusplus_static
-            HINTS ${libsgfcplusplus_lib_dir}/${CMAKE_BUILD_TYPE})
+            HINTS ${libsgfcplusplus_lib_dir})
     add_library(libsgfcplusplus STATIC IMPORTED)
 
     set_target_properties(libsgfcplusplus PROPERTIES
