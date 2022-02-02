@@ -17,21 +17,26 @@ void Metrics::calc(unsigned NDIM) {
     dbr = - sqrtf(0.15f) + br2;
     stoneRadius = r1;
     innerBowlRadius = br;
+
+    //left lid
     bowlsCenters[0] = -1.5f - dbr;
     bowlsCenters[1] = -0.35f;
-    bowlsCenters[2] = 1.0f - br2;
+    bowlsCenters[2] = 1.0f - 2.7f * br2;
 
+    //right lid
     bowlsCenters[3] = 1.5f + dbr;
     bowlsCenters[4] = -0.35f;
-    bowlsCenters[5] = -1.0f + br2;
+    bowlsCenters[5] = -1.0f + 2.7f * br2;
 
+    //left bowl
     bowlsCenters[6] = -1.5f - dbr;
     bowlsCenters[7] = 0.35f;
-    bowlsCenters[8] = 1.0f - 3.2*br2;
+    bowlsCenters[8] = 1.0f - 0.5f * br2;
 
+    //right bowl
     bowlsCenters[9] = 1.5f + dbr;
     bowlsCenters[10] = 0.35f;
-    bowlsCenters[11] = -1.0f + 3.2*br2;
+    bowlsCenters[11] = -1.0f + 0.5f * br2;
 
     squareSizeX = ww;
     squareSizeY = 13.0f * ww / 12.0f;
