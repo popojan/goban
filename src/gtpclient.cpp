@@ -1,13 +1,14 @@
 #include "gtpclient.h"
 #include <string>
 
-GtpClient::GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path)
+GtpClient::GtpClient(const std::string& exe, const std::string& cmdline,
+                     const std::string& path, const nlohmann::json& messages)
  : exe(exe), vars({})
 {
     spdlog::info("Starting GTP client [{}/{}]", path, exe);
 
     std::vector<boost::filesystem::path> where(::boost::this_process::path());
-    where.push_back(path);
+    where.emplace_back(path);
 
     boost::filesystem::path file(boost::process::search_path(exe, where));
     spdlog::info("About to run GTP engine [{}]", file.generic_path().string());
@@ -17,36 +18,52 @@ GtpClient::GtpClient(const std::string& exe, const std::string& cmdline, const s
                                     std::istream_iterator<std::string>());
 
     spdlog::info("running child [{} {}]", file.generic_path().string(), cmdline);
-    c = boost::process::child(file, params,
-                              boost::process::std_out > pos,
-                              boost::process::std_in < pis,
-                              boost::process::std_err > pes);
 
-    reader = new InputThread<GtpClient, boost::process::ipstream>(pes);
-    reader->bind(*this);
-}
+    initFilters(messages);
 
-void replaceAll(std::string& out, const std::string& what, const std::string& by) {
-    size_t index(0);
-    while (true) {
-        spdlog::trace("replace [{}] by [{}] in [{}]", what, by, out);
-        index = out.find(what, index);
-        if (index == std::string::npos) break;
-        out.replace(index, what.size(), by);
-        index += what.size();
+    if(outputFilters.empty()) { // do not capture stderr if not needed
+        c = boost::process::child(file, params,
+                                  boost::process::std_out > pos,
+                                  boost::process::std_in < pis);
+        reader = nullptr;
+    } else {
+        c = boost::process::child(file, params,
+                                  boost::process::std_out > pos,
+                                  boost::process::std_in < pis,
+                                  boost::process::std_err > pes);
+        reader = new InputThread<GtpClient, boost::process::ipstream>(pes);
+        reader->bind(*this);
     }
 }
 
-std::string& ltrim(std::string & str)
-{
+void GtpClient::initFilters(const nlohmann::json& messages) {
+    for(auto &&msg: messages) {
+        addOutputFilter(
+            msg.value("regex", ""),
+            msg.value("output", ""),
+            msg.value("var", ""));
+    }
+}
+void replaceAll(std::string& out, const std::string& what, const std::string& by) {
+    size_t index(0);
+    while (index != std::string::npos) {
+        spdlog::trace("replace [{}] by [{}] in [{}]", what, by, out);
+        index = out.find(what, index);
+        if (index != std::string::npos) {
+            out.replace(index, what.size(), by);
+            index += what.size();
+        }
+    }
+}
+
+std::string& ltrim(std::string & str) {
     auto it2 = std::find_if(str.begin(), str.end(),
         [](char ch){return !std::isspace<char>(ch , std::locale::classic());});
     str.erase(str.begin(), it2);
     return str;
 }
 
-std::string & rtrim(std::string & str)
-{
+std::string & rtrim(std::string & str) {
     auto it1 = std::find_if(str.rbegin(), str.rend(),
         [](char ch){ return !std::isspace<char>(ch , std::locale::classic());});
     str.erase(it1.base(), str.end());
@@ -54,7 +71,6 @@ std::string & rtrim(std::string & str)
 }
 
 void GtpClient::operator()(const std::string& line) {
-    //TODO
     spdlog::debug("gtp err = {}", line);
     for (auto &re: outputFilters) {
         std::smatch m;

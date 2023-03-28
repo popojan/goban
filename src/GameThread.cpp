@@ -390,13 +390,7 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
                 int role = Player::SPECTATOR;
 
                 if(!command.empty()) {
-                    auto engine = new GtpEngine(command, parameters, path, name);
-                    for(auto &&msg: messages) {
-                        engine->addOutputFilter(
-                                msg.value("regex", ""),
-                                msg.value("output", ""),
-                                msg.value("var", ""));
-                    }
+                    auto engine = new GtpEngine(command, parameters, path, name, messages);
                     std::size_t id = addEngine(engine);
 
                     if (main) {

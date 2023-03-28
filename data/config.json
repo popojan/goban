@@ -12,8 +12,8 @@
     },
     {
       "name": "Pachi 12.60",
-      "path": "./engine/Pachi-12.60",
-      "command": "pachi.exe",
+      "path": "./engine/pachi",
+      "command": "pachi-12.60-amd64",
       "parameters": "-r japanese --smart-pass",
       "enabled": 0
     },
@@ -21,7 +21,7 @@
       "name": "Katago #kata1 b40",
       "path": "./engine/katago",
       "command": "katago",
-      "parameters": "gtp -model ./engine/katago/models/kata1-b40c256-s10359230464-d2525387336.bin.gz -config ./engine/katago/default_gtp.cfg",
+      "parameters": "gtp -model ./engine/katago/kata1-b40c256-s11101799168-d2715431527.bin.gz -config ./engine/katago/default_gtp.cfg",
       "enabled": 0,
       "kibitz": 0,
       "messages": [
@@ -39,9 +39,28 @@
             "output": " "
           }
       ]
+    },
+    {
+      "name": "Zen 6",
+      "path": "./engine/zen",
+      "command": "wine",
+      "parameters": "./engine/zen/gtp4zen.exe -z 6 -t 2 -T 120 -s 2147483647 -r 25",
+      "enabled": 0,
+      "kibitz": 0,
+      "main": 0
+    },
+    {
+      "name": "Zen 7",
+      "path": "./engine/zen",
+      "command": "wine",
+      "parameters": "./engine/zen/gtp4zen.exe -z 7 -t 2 -T 120 -s 2147483647 -r 25",
+      "enabled": 0,
+      "kibitz": 0,
+      "main": 0
     }
   ],
   "controls" : [
+    {"key": 1, "command": "play once"},
     {"key": 81, "command": "quit"},
     {"key": 17, "command": "toggle_fullscreen"},
     {"key": 35, "command": "fps"},

@@ -162,9 +162,7 @@ function(build_libsgfcplusplus)
             GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
             GIT_TAG master
             CMAKE_ARGS  ${CL_ARGS}
-            BUILD_COMMAND
-            ${CMAKE_COMMAND}
-            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus -DENABLE_TESTS=0
+            BUILD_COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus -DENABLE_TESTS=0
             COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE}
             SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
@@ -175,7 +173,6 @@ function(build_libsgfcplusplus)
             #COMMAND git checkout sgfc
             INSTALL_COMMAND     echo Skipping install step for libsgfcplusplus
             )
-
     ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)
     ExternalProject_Get_Property(project_libsgfcplusplus BINARY_DIR)
     set(libsgfcplusplus_inc_dir "${SOURCE_DIR}/include" "${BINARY_DIR}/src" PARENT_SCOPE)
@@ -200,7 +197,7 @@ function(fetch_json)
     include(FetchContent)
 
     FetchContent_Declare(json
-            GIT_REPOSITORY git://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent.git
+            GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent.git
             GIT_TAG v3.7.3)
 
     FetchContent_GetProperties(json)
@@ -224,7 +221,7 @@ endfunction()
 
 function(fetch_spdlog)
     FetchContent_Declare(spdlog
-            GIT_REPOSITORY git://github.com/gabime/spdlog.git
+            GIT_REPOSITORY https://github.com/gabime/spdlog.git
             GIT_TAG v1.6.0)
 
     FetchContent_GetProperties(spdlog)
@@ -236,7 +233,7 @@ endfunction()
 
 function(fetch_clipp)
     FetchContent_Declare(clipp
-            GIT_REPOSITORY git://github.com/muellan/clipp.git
+            GIT_REPOSITORY https://github.com/muellan/clipp.git
             GIT_TAG 2c32b2f1f7cc530b1ec1f62c92f698643bb368db)
 
     FetchContent_GetProperties(clipp)

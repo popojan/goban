@@ -37,13 +37,16 @@ private:
 
 public:
     typedef std::vector<std::string> CommandOutput;
-    GtpClient(const std::string& exe, const std::string& cmdline, const std::string& path);
+    GtpClient(const std::string& exe, const std::string& cmdline,
+              const std::string& path, const nlohmann::json& messages);
 
     ~GtpClient();
 
     void interpolate(std::string& out);
 
     void operator()(const std::string& line);
+
+    void initFilters(const nlohmann::json& messages);
 
     void compileFilters();
 

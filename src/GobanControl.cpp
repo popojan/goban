@@ -86,6 +86,7 @@ bool GobanControl::command(const std::string& cmd) {
     if(cmd == "quit") {
         model.game.saveAs("");
         exit = true;
+        engine.unloadEngines();
         Shell::RequestExit();
     }
     else if (cmd == "toggle_fullscreen") {

@@ -98,8 +98,8 @@ class GtpEngine : public Engine, public GtpClient {
 public:
 
     GtpEngine(const std::string& exe, const std::string& cmdline, const std::string& path = "",
-        const std::string& nameExtra = "")
-    : Engine(nameExtra), GtpClient(exe, cmdline, path)
+        const std::string& nameExtra = "", const nlohmann::json& messages = {})
+    : Engine(nameExtra), GtpClient(exe, cmdline, path, messages)
     {
         //setEngineName(nameExtra);
     }

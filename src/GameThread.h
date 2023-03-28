@@ -62,7 +62,7 @@ public:
 	int getActivePlayer(int which);
 
 	Move getLocalMove(const Position& coord);
-    Move getLocalMove(const Move::Special move);
+    Move getLocalMove(Move::Special move);
 	void reset();
 
     void addGameObserver(GameObserver* pobserver) {
@@ -73,6 +73,12 @@ public:
 
     std::vector<Engine*> getEngines() { return engines;}
     std::vector<Player*> getPlayers() { return players;}
+
+    void unloadEngines() {
+        for(auto& engine: engines) {
+            dynamic_cast<GtpEngine*>(engine)->issueCommand("quit");
+        }
+    }
 
 private:
     std::vector<GameObserver*> gameObservers;
