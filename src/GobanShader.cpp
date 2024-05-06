@@ -5,13 +5,10 @@
 #include "GobanShader.h"
 
 #include <iostream>
-#include <sstream>
 #include <fstream>
 #include "GobanView.h"
 #include "Shadinclude.hpp"
 #include <Shell.h>
-
-extern std::shared_ptr<Configuration> config;
 
 const GLushort GobanShader::elementBufferData[] = {0, 1, 2, 3};
 const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
@@ -114,12 +111,10 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     uBlockIndex = glGetUniformBlockIndex(gobanProgram, "iStoneBlock");
     glGenBuffers(1, &bufStones);
     glBindBuffer(GL_UNIFORM_BUFFER, bufStones);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * (Board::MAXBOARD*Board::MAXBOARD << 2), 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * (Board::MAX_BOARD * Board::MAX_BOARD << 2), nullptr, GL_DYNAMIC_DRAW);
     glUniformBlockBinding(gobanProgram, uBlockIndex, blockBindingPoint);
-    glBindBufferRange(GL_UNIFORM_BUFFER, blockBindingPoint, bufStones, 0, 4 * sizeof(float)* Board::BOARDSIZE);
+    glBindBufferRange(GL_UNIFORM_BUFFER, blockBindingPoint, bufStones, 0, 4 * sizeof(float)* Board::BOARD_SIZE);
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    iStone = glGetUniformLocation(gobanProgram, "iStone");
-    iMouse = glGetUniformLocation(gobanProgram, "iMouse");
     iDim = glGetUniformLocation(gobanProgram, "NDIM");
     iTranslate = glGetUniformLocation(gobanProgram, "iTranslate");
     iTime = glGetUniformLocation(gobanProgram, "iTime");
@@ -167,20 +162,19 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
     glUseProgram(0);
-    shaderChanged = true;
 }
 
-void GobanShader::setGamma(float gamma) {
-    spdlog::debug("setting gamma = {0}", gamma);
-    this->gamma = gamma;
+void GobanShader::setGamma(float value) {
+    spdlog::debug("setting gamma = {0}", value);
+    this->gamma = value;
 }
 
-void GobanShader::setContrast(float contrast) {
-    spdlog::debug("setting contrast = {0}", contrast);
-    this->contrast = contrast;
+void GobanShader::setContrast(float value) {
+    spdlog::debug("setting contrast = {0}", value);
+    this->contrast = value;
 }
 
-void GobanShader::setMetrics(const Metrics &m) {
+void GobanShader::setMetrics(const Metrics &m) const {
 
     if(!shadersReady || m.fNDIM <= 0)
         return;
@@ -245,7 +239,7 @@ void GobanShader::setMetrics(const Metrics &m) {
     glUniform3fv(fsu_cc, 4, m.bowlsCenters);
 }
 
-void GobanShader::destroy(void) {
+void GobanShader::destroy() const {
     glDeleteProgram(gobanProgram);
 }
 
@@ -261,7 +255,7 @@ void GobanShader::init() {
     glEnable(GL_BLEND);
 }
 
-void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int updateFlag, float time) {
+void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
     if(!shadersReady)
         return;
 #ifndef DEBUG_NVIDIA
@@ -270,7 +264,7 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
 #endif
 	//glUseProgram(gobanProgram);
 	if (updateFlag & GobanView::UPDATE_BOARD) {
-		unsigned size = view.board.getSize();
+		int size = view.board.getSize();
 		glUniform1i(iDim, size);
 		setMetrics(model.metrics);
 	}
@@ -282,8 +276,7 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
 
     if (view.animationRunning) {
         glUniform1f(iTime, view.lastTime + time - view.startTime);
-    }
-	else {
+    } else {
 		glUniform1f(iTime, animT);
 	}
     glUniform2fv(iResolution, 1, glm::value_ptr(view.resolution));
@@ -301,8 +294,8 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
         Position coord = view.getBoardCoordinate(view.lastX, view.lastY);
         float cur[2];
         int size = view.board.getSize();
-        cur[0] = coord.x - size/2;
-        cur[1] = coord.y - size/2;
+        cur[0] = (float)(coord.x - (float)size/2.0);
+        cur[1] = (float)(coord.y - (float)size/2.0);
         glUniform2fv(fsu_cursor, 1, cur);
         //if (boardChanged > 1) { //TODO sound
             //stoneSound();
@@ -312,10 +305,10 @@ void GobanShader::draw(const GobanModel& model, const DDG::Camera& cam, int upda
     glUniform3fv(iTranslate, 1, glm::value_ptr(view.newTranslate));
 
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, (void*)0);
+	glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, (void*)nullptr);
 	glEnableVertexAttribArray(iVertex);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
-	glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, (void*)0);
+	glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, (void*)nullptr);
     glDisableVertexAttribArray(iVertex);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -338,12 +331,12 @@ int GobanShader::choose(int idx) {
     using nlohmann::json;
     json shaders(config->data.value("shaders", json::array()));
 
-    if(shaders.size() < 1) {
+    if(shaders.empty()) {
         spdlog::critical("No shader definition found.");
         return -1;
     }
 
-    int newProgram = idx % shaders.size();
+    int newProgram = (int)(idx % shaders.size());
 
     json shader(shaders[newProgram]);
 
@@ -360,7 +353,7 @@ int GobanShader::choose(int idx) {
     return currentProgram;
 }
 
-void GobanShader::use() {
+void GobanShader::use() const {
     glUseProgram(gobanProgram);
 }
 
@@ -368,15 +361,15 @@ void GobanShader::unuse() {
     glUseProgram(0);
 }
 
-void GobanShader::setTime(float time) {
+void GobanShader::setTime(float time) const {
     glUniform1f(iTime, time);
 }
 
-void GobanShader::setPan(glm::vec3 pan) {
+void GobanShader::setPan(glm::vec3 pan) const {
     glUniform3fv(iTranslate, 1, glm::value_ptr(pan));
 }
 
-void GobanShader::setRotation(glm::mat4x4 m) {
+void GobanShader::setRotation(glm::mat4x4 m) const {
     glUniformMatrix4fv(iModelView, 1, 0, glm::value_ptr(m));
 }
 

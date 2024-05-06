@@ -10,18 +10,15 @@
 #include "glyphy/GlyphyState.h"
 
 #include <glm/vec3.hpp>
-#include <glm/geometric.hpp>
-#include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <memory>
 
 //#define DEBUG_OVERLAY
 
 const char *font_path = nullptr;
 
 static std::array<std::shared_ptr<GlyphyBuffer>, 3> buffer;
-
-extern std::shared_ptr<Configuration> config;
 
 std::array<Layer, 3> GobanOverlay::layers = {
 	{ { 0.0f, glm::vec4(0.0,0.0,0.0, 1.0) },
@@ -30,7 +27,7 @@ std::array<Layer, 3> GobanOverlay::layers = {
 };
 
 bool GobanOverlay::init() {
-	st = std::shared_ptr<GlyphyState>(new GlyphyState());
+	st = std::make_shared<GlyphyState>();
 
     if(FT_Init_FreeType(&ft_library) != 0) {
         spdlog::warn("Failed to load freetype library.");
@@ -45,12 +42,12 @@ bool GobanOverlay::init() {
     }
     else {
         using nlohmann::json;
-        std::string font = config->data
+        std::string overlay_font = config->data
                 .value("fonts", json({}))
                 .value("overlay", "./data/fonts/default-font.ttf");
-        FT_New_Face(ft_library, font.c_str(), 0/*face_index*/, &ft_face);
+        FT_New_Face(ft_library, overlay_font.c_str(), 0/*face_index*/, &ft_face);
         if(ft_face) {
-            spdlog::info("Loading font file [{}]", font);
+            spdlog::info("Loading font file [{}]", overlay_font);
         }
     }
     if (!ft_face) {
@@ -58,11 +55,11 @@ bool GobanOverlay::init() {
 	}
     st->setup();
 
-    font = std::shared_ptr<GlyphyFont>(new GlyphyFont(ft_face, st->get_atlas()));
+    font = std::make_shared<GlyphyFont>(ft_face, st->get_atlas());
 
 	for (std::size_t i = 0; i < layers.size(); ++i) {
 		spdlog::debug("Creating overlay buffer[{0}]", i);
-	    auto b = std::shared_ptr<GlyphyBuffer>(new GlyphyBuffer());
+	    auto b = std::make_shared<GlyphyBuffer>();
         glyphy_point_t p = {.0, .0};
         b->move_to(&p);
         spdlog::debug("Adding text glyphs[{0}]", i);
@@ -84,11 +81,11 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 	for (std::size_t layer = 0; layer < layers.size(); ++layer) {
 		int cnt = 0;
 		buffer[layer]->clear();
-		for (auto oit = points.begin(); oit != points.end(); ++oit) {
-			if (!oit->overlay.text.empty() && oit->overlay.layer == layer) {
-                glyphy_point_t pos = { model.metrics.squareSizeX * oit->x, -model.metrics.squareSizeY * oit->y };
+		for (const auto & point : points) {
+			if (!point.overlay.text.empty() && point.overlay.layer == layer) {
+                glyphy_point_t pos = { model.metrics.squareSizeX * point.x, -model.metrics.squareSizeY * point.y };
 				buffer[layer]->move_to(&pos);
-				buffer[layer]->add_text(oit->overlay.text.c_str(), font, font_size);
+				buffer[layer]->add_text(point.overlay.text.c_str(), font, font_size);
 				cnt += 1;
 			}
 		}
@@ -96,14 +93,13 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 	}
 
 }
-void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int updateFlag, float time, unsigned which) {
+void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigned which) {
 	if (!overlayReady
 		|| std::all_of(layers.begin(), layers.end(), [](const Layer& x){return x.empty; }))
 			return;
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-    //rewrite using glm
 	glm::mat4 mat(1.0);
 
 	glMatrixMode(GL_PROJECTION);
@@ -134,25 +130,27 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, int upd
 
 		using namespace glm;
 		vec4 ta = vec4(.0f, -layers[layer].height*model.metrics.h*view.gobanShader.getStoneHeight(), .0f, 0.0f);//-0.5*stoneh
-		vec4 up = vec4(.0f, .1f, .0f, 0.0f);
 		vec4 tt = vec4(view.newTranslate[0], view.newTranslate[1], view.newTranslate[2], 0.0f);
 		ta += tt;
-		up = normalize(m*up);
 
 		glyphy_extents_t extents;
-		buffer[layer]->extents(NULL, &extents);
-		float content_scale = std::min(height / 2.0f, 10000.0f);
+		buffer[layer]->extents(nullptr, &extents);
+		float content_scale = std::min((float)height / 2.0f, 10000.0f);
 		float text_scale = content_scale;
 		float x = -content_scale * (glm::transpose(m) * ta).x;//(extents.max_x + extents.min_x) / 2.;
 		float y = -content_scale * (glm::transpose(m)* ta).y;//(extents.max_y + extents.min_y) / 2.;
 		float z = content_scale * (glm::transpose(m) * ta).z;
 		{
 
-			float d = height;
+			auto d = (float)height;
 			float near = d;
 			float factor = 0.01f * near / (2 * near + d);
 			float far = near + 10.0f * d;
-			mat = glm::frustum(-width * factor, width * factor, -height * factor, height * factor, 0.01f * near, far);
+			mat = glm::frustum(
+                -(float)width * factor, (float)width * factor,
+                -(float)height * factor, (float)height * factor,
+                0.01f * near, far
+            );
 			mat = glm::translate(mat, glm::vec3(x, y, -0.5f*d - near + z));
 		}
 		mat = glm::scale(mat, glm::vec3(1, 1, -1));

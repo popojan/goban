@@ -10,7 +10,6 @@
  */
 
 #include <clipp.h>
-#include "OpenGL.h"
 
 #include "ElementGame.h"
 #include <Rocket/Core.h>
@@ -21,7 +20,6 @@
 #include "EventHandlerNewGame.h"
 #include <Input.h>
 #include <Shell.h>
-#include <locale>
 
 #if defined ROCKET_PLATFORM_WIN32
   #undef __GNUC__
@@ -38,7 +36,7 @@
 #include <memory>
 
 
-Rocket::Core::Context* context = NULL;
+Rocket::Core::Context* context = nullptr;
 std::shared_ptr<Configuration> config;
 
 void GameLoop() {
@@ -119,15 +117,14 @@ const char * WINDOW_NAME = "Goban";
         DoAllocConsole();
 #endif
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    console_sink->set_level(spdlog::level::from_str(logLevel));
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("last_run.log", true);
-    file_sink->set_level(spdlog::level::from_str(logLevel));
     spdlog::sinks_init_list sink_list = { file_sink, console_sink };
     auto logger = std::make_shared<spdlog::logger>("multi_sink", sink_list.begin(), sink_list.end());
     spdlog::set_default_logger(logger);
+    logger->set_level(spdlog::level::from_str(logLevel));
 
-    unsigned window_width = 1024;
-    unsigned window_height = 768;
+    int window_width = 1024;
+    int window_height = 768;
 
     std::shared_ptr<ShellRenderInterfaceOpenGL> popengl_renderer(new ShellRenderInterfaceOpenGL());
     ShellRenderInterfaceOpenGL *shell_renderer = popengl_renderer.get();
@@ -154,12 +151,12 @@ const char * WINDOW_NAME = "Goban";
     Rocket::Core::Initialise();
     Rocket::Controls::Initialise();
 
-    config.reset(new Configuration(configurationFile));
+    config = std::make_shared<Configuration>(configurationFile);
 
     // Create the main Rocket context and set it on the shell's input layer.
     context = Rocket::Core::CreateContext("main",
             Rocket::Core::Vector2i(window_width, window_height));
-    if (context == NULL)
+    if (context == nullptr)
     {
         Rocket::Core::Shutdown();
         Shell::Shutdown();
@@ -182,7 +179,7 @@ const char * WINDOW_NAME = "Goban";
     Rocket::Core::Factory::RegisterElementInstancer("game", element_instancer);
     element_instancer->RemoveReference();
 
-    EventInstancer* event_instancer = new EventInstancer();
+    auto event_instancer = new EventInstancer();
     Rocket::Core::Factory::RegisterEventListenerInstancer(event_instancer);
     event_instancer->RemoveReference();
 
@@ -200,12 +197,13 @@ const char * WINDOW_NAME = "Goban";
         spdlog::critical("cannot create window, exiting immediately");
         return 13;
     }
+
     EventManager::Shutdown();
 
     spdlog::debug("Before context destroy");;
 
     context->RemoveReference();
-    context = 0;
+    context = nullptr;
 
     spdlog::debug("Before Rocket shutdown");
 

@@ -17,7 +17,7 @@ class ElementGame;
 
 class GobanModel: public GameObserver {
 public:
-    GobanModel(ElementGame *p, int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f)
+    GobanModel(ElementGame *p, int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
             : parent(p), prevPass(false), over(false), invalidated(false),
             calcCapturedBlack(0), calcCapturedWhite(0), cursor({0,0}) {
         spdlog::info("Preloading sounds...");
@@ -33,9 +33,9 @@ public:
 
     virtual void onBoardChange(const Board&);
 
-	//void newGame(int boardSize = Board::DEFAULTSIZE, int handicap = 0, float komi = 0.0f);
+	//void newGame(int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f);
 
-    bool isPointOnBoard(const Position& coord);
+    bool isPointOnBoard(const Position& coord) const;
 
     void start() {
         started = true;
@@ -50,12 +50,11 @@ public:
         return state.colorToMove;
     }
 
-    bool isGameOver() { return state.adata.reason != GameState::NOREASON;}
+    bool isGameOver() { return state.adata.reason != GameState::NO_REASON;}
 
     unsigned getBoardSize() const;
 
-    Move getPassMove();
-    Move getUndoMove();
+    Move getUndoMove() const;
 
     float result(const Move& lastMove, GameState::Result& ret);
 

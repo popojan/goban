@@ -8,23 +8,18 @@ const float Board::mEmpty = 0.0f;
 const float Board::mBlack = 5.0f;
 const float Board::mWhite = 6.0f;
 const float Board::mDeltaCaptured = 0.5f;
-const float Board::safedist = 1.01f;
+const float Board::safeDist = 1.01f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
-    dist(0.0f, 0.05f), invalidated(false), showTerritory(false), showTerritoryAuto(false),
-    territoryReady(false), lastPlayed_i(-1), lastPlayed_j(-1), cursor({0, 0}), moveNumber(0),
-    collision(0.0)
+    dist(0.0f, 0.05f), invalidated(false), squareYtoXRatio(1.0), showTerritory(false), showTerritoryAuto(false),
+    territoryReady(false), cursor({0, 0}), moveNumber(0),
+    collision(0.0), generator(std::random_device()())
 {
     clear(size);
-    positionNumber = generator();;
+    positionNumber = generator();
 }
 
-bool Board::isEmpty() const {
-    return std::all_of(points.begin(), points.end(), [](const Point& p){return p.stone == Color::EMPTY;});
-}
-
-const float* Board::getStones() const { return &glstones[0]; }
-float* Board::getStones() { return &glstones[0]; }
+const float* Board::getStones() const { return &glStones[0]; }
 
 std::ostream& operator<< (std::ostream& stream, const Color& color) {
     if (color == Color::BLACK)
@@ -52,14 +47,14 @@ std::istream& operator>> (std::istream& stream, Position& pos) {
     int i, j;
     if(d < 0)
         return stream;
-    if (c >= 'I') j = 7u + c - 'I'; else j = c - 'A';
+    if (c >= 'I') j = 7 + c - 'I'; else j = c - 'A';
     i = d - 1;
     pos = Position(j, i);
     return stream;
 }
 
 std::ostream& operator<< (std::ostream& stream, const Position& pos) {
-    char c = pos.c < 8 ? 'A' + (char)pos.c : 'I' + (char)pos.c - (char)7;
+    char c = pos.c < 8 ? (char)('A' + pos.c) : (char)('I' + pos.c - 7);
     unsigned d = pos.r + 1u;
     stream << c << d;
     return stream;
@@ -97,10 +92,10 @@ std::istream& operator>> (std::istream& stream, Move& move) {
     if(c == '=') {
         std::string s;
         stream >> s;
-        if (s.substr(0, 4).compare("PASS") == 0 || s.substr(0, 4).compare("pass") == 0) {
+        if (s.substr(0, 4) == "PASS" || s.substr(0, 4) == "pass") {
             move.spec = Move::PASS;
         }
-        else if (s.substr(0, 6).compare("resign") == 0 || s.substr(0, 6).compare("RESIGN") == 0) {
+        else if (s.substr(0, 6) == "resign" || s.substr(0, 6) == "RESIGN") {
             move.spec = Move::RESIGN;
         }
         else {
@@ -118,46 +113,44 @@ std::istream& operator>> (std::istream& stream, Move& move) {
 bool Board::collides(int i, int j, int i0, int j0) {
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
-    float x0 = glstones[idx0 - 2];
-    float y0 = glstones[idx0 - 1];
-    float x = glstones[idx - 2];
-    float y = glstones[idx - 1];
-    glm::vec2 v(x0-x,y0-y);
-    return glm::length(v) <= safedist*rStone;
+    float x0 = glStones[idx0 - 2];
+    float y0 = glStones[idx0 - 1];
+    float x = glStones[idx - 2];
+    float y = glStones[idx - 1];
+    glm::vec2 v(x0-x,(y0-y) * squareYtoXRatio);
+    return glm::length(v) <= safeDist * rStone;
 }
 
 double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
-    const double MAX_FIX = 100;
+    const size_t MAX_FIX = 100;
 
     spdlog::debug("fixStone ({},{})/({},{})", i, j, i0, j0);
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
-    float mValue = glstones[idx0];
+    float mValue = glStones[idx0];
     double ret = 0.0;
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
-        spdlog::debug("1st IF");
         bool fixNeeded = collides(i, j, i0, j0);
         if(fixNeeded) {
-            float x0 = glstones[idx0 - 2];
-            float y0 = glstones[idx0 - 1];
-            float x = glstones[idx - 2];
-            float y = glstones[idx - 1];
+            float x0 = glStones[idx0 - 2];
+            float y0 = glStones[idx0 - 1];
+            float x = glStones[idx - 2];
+            float y = glStones[idx - 1];
             Position p(i0, j0);
             glm::vec2 v(x0-x,y0-y);
-            v = glm::vec2(x, y) + 1.01f*safedist * rStone * glm::normalize(v);
+            v = glm::vec2(x, y) + glm::vec2(1.0, squareYtoXRatio) * safeDist * rStone * glm::normalize(v);
             p.x = v.x;
             p.y = v.y;
             spdlog::debug("2nd IF [{},{}]->[{},{}]", x0,y0, p.x,p.y);
-            unsigned idx = ((boardSize  * i0 + j0) << 2u) + 2u;
-	    x = glstones[idx - 2];
-	    y = glstones[idx - 1];
-            glstones[idx0 - 2] = p.x;
-            glstones[idx0 - 1] = p.y;
+            x = glStones[idx0 - 2];
+            y = glStones[idx0 - 1];
+            glStones[idx0 - 2] = p.x;
+            glStones[idx0 - 1] = p.y;
             Point& pt = (*this)[Position(j0, i0)];
             pt.x = p.x;
             pt.y = p.y;
             (*this)[Position(j0, i0)].y = p.y;
-            ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/boardSize);
+            ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/(float)boardSize);
             if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0) && rep < MAX_FIX)
                 ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0, rep + 1));
             if (i0 - 1 >= 0 &&  collides(i0, j0, i0 - 1, j0) && rep < MAX_FIX)
@@ -166,25 +159,22 @@ double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
                 ret = std::max(ret, fixStone(i0, j0, i0, j0 + 1, rep + 1));
             if (j0 - 1 >= 0 &&  collides(i0, j0, i0, j0 - 1) && rep < MAX_FIX)
                 ret = std::max(ret, fixStone(i0, j0, i0, j0 - 1, rep + 1));
-        } else if (fixNeeded) {
-            //TODO dump stone positions
-            spdlog::error("Cannot fix overlapping fuzzy-placed stones.");
         }
         return ret;
     }
     return ret;
 }
 
-double Board::placeFuzzy(const Position& p, bool nofix){
+double Board::placeFuzzy(const Position& p, bool noFix){
     int j = p.col();
     int i = p.row();
-    const float halfN = 0.5f * boardSize - 0.5f;
+    const float halfN = 0.5f * (float)boardSize - 0.5f;
     float x = p.x;
     float y = p.y;
     double ret = 0.0;
     if(p.x == 0 && p.y == 0) {
-        x = j - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
-        y = i - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
+        x = (float)j - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
+        y = (float)i - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
     }
     else {
         x = x - halfN;
@@ -193,19 +183,19 @@ double Board::placeFuzzy(const Position& p, bool nofix){
 
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
 
-    glstones[idx - 2] = x;
-    glstones[idx - 1] = y;
+    glStones[idx - 2] = x;
+    glStones[idx - 1] = y;
 
     (*this)[p].x = x;
     (*this)[p].y = y;
 
     //random rotation for the first time
-    glstones[idx + 1] = randomStoneRotation;
-    if(nofix == false) {
+    glStones[idx + 1] = (float)randomStoneRotation;
+    if(noFix == false) {
         if (i + 1 < boardSize)
-            ret = std::max(ret, fixStone(i, j, i + 1u, j));
+            ret = std::max(ret, fixStone(i, j, i + 1, j));
         if(i -  1 >= 0)
-            ret = std::max(ret, fixStone(i, j, i -  1u, j));
+            ret = std::max(ret, fixStone(i, j, i -  1, j));
         if (j + 1 < boardSize)
             ret = std::max(ret, fixStone(i, j, i, j + 1));
         if(j -  1 >= 0)
@@ -226,9 +216,9 @@ void Board::setOverlay(const Position& p, const std::string& text, const Color& 
     overlay.layer = c == Color::BLACK ? 1 : 2;
 }
 
-int Board::stoneChanged(const Position& p, const Color& c) {
+int Board::updateStone(const Position& p, const Color& c) {
     float mValue = mEmpty;
-    int ret = NO_CHANGE;
+    int ret;
     int i = p.row();
     int j = p.col();
     unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
@@ -245,13 +235,13 @@ int Board::stoneChanged(const Position& p, const Color& c) {
         removeOverlay(p);
     }
     //TODO refactor arrays and indexing to simplify
-    glstones[idx + 0] = mValue;
+    glStones[idx + 0] = mValue;
     (*this)[p].stone = c;
     return ret;
 }
 
 
-int Board::areaChanged(const Position& p, const Color& area) {
+int Board::updateArea(const Position& p, const Color& col) {
     Color stone = (*this)[p].stone;
     int i = p.row();
     int j = p.col();
@@ -259,20 +249,23 @@ int Board::areaChanged(const Position& p, const Color& area) {
 	float mValue = mEmpty;
     if(stone != Color::EMPTY) {
         mValue = stone == Color::BLACK ? mBlack : mWhite;
-        if (area != stone && area != Color::EMPTY && showTerritory) {
+        if (col != stone && col != Color::EMPTY && showTerritory) {
             mValue += mDeltaCaptured;
         }
     }
-    else if(showTerritory && area != Color::EMPTY) {
-        mValue = area == Color::BLACK ? mBlackArea : mWhiteArea;
+    else if(showTerritory && col != Color::EMPTY) {
+        mValue = col == Color::BLACK ? mBlackArea : mWhiteArea;
         placeFuzzy(p, true);
     }
-    else if(area == Color::EMPTY || !showTerritory) {
+    else if(col == Color::EMPTY || !showTerritory) {
         mValue = mEmpty;
     }
-    glstones[idx + 0] = mValue;
-    (*this)[p].influence = area;
-    return TERRITORY_CHANGED;
+    if ((*this)[p].influence != col) {
+        glStones[idx + 0] = mValue;
+        (*this)[p].influence = col;
+        return TERRITORY_CHANGED;
+    }
+    return NO_CHANGE;
 }
 
 int Board::sizeChanged(int newSize) {
@@ -280,7 +273,7 @@ int Board::sizeChanged(int newSize) {
     return SIZE_CHANGED;
 }
 
-int Board::updateStones(const Board& board, bool showTerritory) {
+int Board::updateStones(const Board& board) {
     int newSize = board.getSize();
     int changed = 0;
 
@@ -289,32 +282,33 @@ int Board::updateStones(const Board& board, bool showTerritory) {
 
     if(newSize != boardSize) {
         sizeChanged(newSize);
-        this->clearTerritory(newSize);
+        this->clearTerritory();
         this->clear(newSize);
         changed = 1;
         return changed;
     }
-    for(int col = 0; col < MAXBOARD; ++col) {
-        for(int row = 0; row < MAXBOARD; ++row) {
+    for(int col = 0; col < MAX_BOARD; ++col) {
+        for(int row = 0; row < MAX_BOARD; ++row) {
             Position pos(row, col);
 
             const Point& np = board[pos];
             Color newStone(np.stone);
             Color newArea(np.influence);
 
-            if(!this->showTerritory) {
-                // || !board.territoryReady) ugly flashing
-                newArea = Color::EMPTY;
+            if(!this->showTerritory
+                // || !board.territoryReady //ugly flashing
+            ) {
+                newArea = Color();
             }
 
             Point& p = (*this)[pos];
             if(newStone != p.stone) {
                 spdlog::trace("stone changed [{},{}]", p.x, p.y);
-                changed |= stoneChanged(pos, newStone);
+                changed |= updateStone(pos, newStone);
             }
             if(newArea != p.influence) {
                 spdlog::trace("area changed [{},{}]", p.x, p.y);
-                changed |= areaChanged(pos, newArea);
+                changed |= updateArea(pos, newArea);
             }
         }
     }
@@ -409,7 +403,7 @@ int Board::updateStones(const Board& board, bool showTerritory) {
     return changed;*/
 //}
 
-int Board::capturedCount(const Color& whose) const {
+int Board::capturedCount(const Color::Value& whose) const {
     return whose == Color::WHITE ? capturedWhite : capturedBlack;
 }
 
@@ -417,10 +411,10 @@ void Board::clear(int boardsize) {
 
     this->boardSize = boardsize;
 
-    glstones.fill(mEmpty);
+    glStones.fill(mEmpty);
     points.fill({
-        Color::EMPTY,
-        Color::EMPTY,
+        Color(),
+        Color(),
         {"", -1u},
         0, 0
     });
@@ -431,7 +425,7 @@ void Board::clear(int boardsize) {
 }
 
 void Board::copyStateFrom(const Board& b) {
-    glstones = b.glstones;
+    glStones = b.glStones;
     points = b.points;
     boardSize = b.boardSize;
     capturedBlack = b.capturedBlack;
@@ -449,8 +443,8 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
             int size = 0;
             ssin >> size;
             spdlog::debug("Size: {}", size);
-            if(size >= MINBOARD && size <= MAXBOARD) {
-                unsigned bcaptured = 0u, wcaptured = 0u;
+            if(size >= MIN_BOARD && size <= MAX_BOARD) {
+                int bcaptured = 0, wcaptured = 0;
                 spdlog::debug(lines.at(1));
 			    bool white = true;
                 for(int i = 2; i < 2 + size; ++i) {
@@ -460,10 +454,10 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                         Position p((j - 3) >> 1, size - i + 1);
                         Color color;
                         if(c == 'X') {
-                            color = Color::BLACK;
+                            color = Color(Color::BLACK);
                         }
                         else if(c == 'O') {
-                            color = Color::WHITE;
+                            color = Color(Color::WHITE);
                         }
                         (*this)[p].stone = color;
                     }
@@ -473,7 +467,7 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                         while((ssline >> s) && s != "captured") {
                           ssline >> s;
                         }
-                        unsigned count = 0;
+                        int count = 0;
                         ssline >> count;
 						if (white) {
 							bcaptured = count;
@@ -518,9 +512,9 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
                 ssin >> val;
                 Color c;
                 if (val > 2)
-                    c = Color::WHITE;
+                    c = Color(Color::WHITE);
                 else if (val < -2)
-                    c = Color::BLACK;
+                    c = Color(Color::BLACK);
                 (*this)[Position(j, boardSize - i - 1)].influence = c;
             }
         }
@@ -560,18 +554,18 @@ bool Board::toggleTerritory() {
 	return showTerritory;
 }
 
-double Board::placeCursor(const Position& coord, const Color& col) {
+int Board::placeCursor(const Position& coord, const Color& col) {
 
     glm::vec2 v(
-        coord.x - coord.col() - 0.5f,
-        coord.y - coord.row() - 0.5f
+        coord.x - (float)coord.col() - 0.5f,
+        coord.y - (float)coord.row() - 0.5f
     );
 
     glm::vec2 add(6.0f * r1 * v);
 
     Position pos(coord);
-    pos.x = coord.col() + add.x;
-    pos.y = coord.row() + add.y;
+    pos.x = (float)coord.col() + add.x;
+    pos.y = (float)coord.row() + add.y;
 
-    return stoneChanged(pos, col);
+    return updateStone(pos, col);
 }

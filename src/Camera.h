@@ -23,11 +23,11 @@ namespace DDG
 
          void setHorizontalLock(bool newLock);
 
-         Quaternion clickToSphere( float x, float y, float w, float h );
+         static Quaternion clickToSphere( float x, float y, float w, float h );
          // projects a mouse click onto the unit sphere
 
-         glm::mat4 getView( bool reverse = false) const;
-         glm::mat4 setView(  ) const;
+         glm::dmat4 getView( bool reverse = false) const;
+         glm::dmat4 setView(  ) const;
          // applies the camera transformation to the OpenGL modelview stack
 
          void mouse( int state, float x, float y, float w, float h );
@@ -35,15 +35,6 @@ namespace DDG
 
          void motion( float x, float y, float w, float h );
          // handles mouse drags
-
-         void idle( void );
-         // handles camera momentum
-
-         void zoomIn( void );
-         // moves viewer toward object
-
-         void zoomOut( void );
-         // moves viewer away from object
 
          Quaternion currentRotation( void ) const;
          // returns the rotation corresponding to the current mouse state

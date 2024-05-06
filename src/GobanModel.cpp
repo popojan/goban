@@ -11,7 +11,7 @@ void GobanModel::onBoardSized(int boardSize) {
     spdlog::info("{} {} {} {}", boardSize, state.komi, state.black, state.white);
 
 	board.clear(boardSize);
-    board.clearTerritory(boardSize);
+    board.clearTerritory();
 	board.toggleTerritoryAuto(false);
     board.positionNumber += 1;
 
@@ -36,9 +36,7 @@ void GobanModel::onBoardSized(int boardSize) {
     }
 
 }
-GobanModel::~GobanModel() {
-    //parent->RemoveReference();
-}
+GobanModel::~GobanModel() = default;
 
 float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
     if (state.reason == GameState::DOUBLE_PASS) {
@@ -47,9 +45,9 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
         ret.black_captured = board.capturedCount(Color::BLACK);
         ret.white_captured = board.capturedCount(Color::WHITE);
         auto& points = board.get();
-        for (auto pit = points.begin(); pit != points.end(); ++pit) {
-            const Color& stone = pit->stone;
-            const Color& area = pit->influence;
+        for (auto & point : points) {
+            const Color& stone = point.stone;
+            const Color& area = point.influence;
             if (stone == Color::EMPTY) {
                 if (area == Color::WHITE) {
                     ret.white_territory++;
@@ -77,14 +75,13 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
                     ret.black_area++;
             }
         }
-        ret.delta =
-                +ret.white_territory
+        ret.delta = (float)(
+                  ret.white_territory
                 + ret.black_captured
                 + ret.black_prisoners
                 - ret.black_territory
                 - ret.white_captured
-                - ret.white_prisoners
-                + state.komi;
+                - ret.white_prisoners) + state.komi;
     }
     else {
         ret.delta = lastMove == Color::BLACK ? 1.0f : -1.0f;
@@ -104,19 +101,18 @@ unsigned GobanModel::getBoardSize() const {
     return board.getSize();
 }
 
-bool GobanModel::isPointOnBoard(const Position& p) {
+bool GobanModel::isPointOnBoard(const Position& p) const {
     const int N = board.getSize();
     return p.col() >= 0 && p.col() < N && p.row() >= 0 && p.row() < N;
 }
 
 void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) {
     using namespace glm;
-    capturedBlack = capturedWhite = m.maxc;
-    //if (capturedBlack != calcCapturedBlack || capturedWhite != calcCapturedWhite) {
-    float cc0x = 0.0f;//m.bowlsCenters[0];
-    float cc0z = 0.0f;//m.bowlsCenters[2];
-    float cc1x = 0.0f;//m.bowlsCenters[3];
-    float cc1z = 0.0f;//m.bowlsCenters[5];
+    capturedBlack = capturedWhite = Metrics::maxc;
+    float cc0x = 0.0f;
+    float cc0z = 0.0f;
+    float cc1x = 0.0f;
+    float cc1z = 0.0f;
     float magic = 0.0f;
     float factor = 1.00f;
     float ddcy = 0.5f * m.h - factor * m.innerBowlRadius - magic;
@@ -132,39 +128,26 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         float ccx = cc0x;
         float ccz = cc0z;
         float rr = factor * m.innerBowlRadius;
-        float ccy = 0.0f;//0.1f - rr;
-        vec3 s1 = s1a;
-        vec3 s0 = s0a;
+        float ccy = 0.0f;
         int di = calcCapturedBlack;
         bool white = false;
 
-        /*if (i + calcCapturedWhite >= maxCaptured + capturedWhite
-            || (i + calcCapturedBlack >= capturedBlack && i <maxCaptured)) {
-            continue;
-        }*/
         if (i + calcCapturedBlack >= capturedBlack) {
             ccx = cc1x;
             ccz = cc1z;
-            s1 = s1b;
-            s0 = s0b;
             di = calcCapturedWhite;
             white = true;
         }
 
-        float randx = (float(rand()) / RAND_MAX - 0.5f);
-        float randz = (float(rand()) / RAND_MAX - 0.5f);
         float mindy = 1e6, mindx = 0, mindz = 0;
         const int ITERS = 500;
         for (int k = 0; k < ITERS; ++k) {
             const int turns = int(sqrt(ITERS));
-            const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * turns);
-            const float phi = turns * 2.0f * 3.1415926f * k / float(ITERS);
+            const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * (float)turns);
+            const float phi = (float)turns * 2.0f * 3.1415926f * (float)k / float(ITERS);
             const float r = a * phi;
-            const float alpha = (rand() < (RAND_MAX >> 10)) ? 0.9 : 0.0;
-            float nrandx = cos(phi) * r; //;alpha * randx + (1.0 - alpha) * (float(rand()) / RAND_MAX - 0.5f);
-            float nrandz = sin(phi) * r;//;alpha * randz + (1.0 - alpha) * (float(rand()) / RAND_MAX - 0.5f);
-            float dx = nrandx;
-            float dz = nrandz;
+            float dx = cos(phi) * r;
+            float dz = sin(phi) * r;
             float d = rr * rr - dx * dx - dz * dz;
             if (d < 0) continue;
             float dy = rr - sqrt(d) + 0.5f * m.h;
@@ -189,38 +172,33 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
                 mindy = dy;
                 mindx = dx;
                 mindz = dz;
-                randx = nrandx;
-                randz = nrandz;
             }
         }
         ddc[4 * (i + di) + 0] = ccx + mindx;
         ddc[4 * (i + di) + 1] = ccy + mindy;
         ddc[4 * (i + di) + 2] = ccz + mindz;
-        ddc[4 * (i + di) + 3] = board.getRandomStoneRotation();
+        ddc[4 * (i + di) + 3] = (float)board.getRandomStoneRotation();
     }
     calcCapturedBlack = capturedBlack;
     calcCapturedWhite = capturedWhite;
     //}
-    int dBlack = max(capturedBlack - m.maxc, 0);
-    int dWhite = max(capturedWhite - m.maxc, 0);
-    for (int i = 0; i < m.maxc; ++i) {
+    int dBlack = max(capturedBlack - Metrics::maxc, 0);
+    int dWhite = max(capturedWhite - Metrics::maxc, 0);
+    for (int i = 0; i < Metrics::maxc; ++i) {
         m.tmpc[4 * i + 0] = ddc[4 * (i + dBlack) + 0];
         m.tmpc[4 * i + 1] = ddc[4 * (i + dBlack) + 1];
         m.tmpc[4 * i + 2] = ddc[4 * (i + dBlack) + 2];
         m.tmpc[4 * i + 3] = ddc[4 * (i + dBlack) + 3];
-        m.tmpc[4 * m.maxc + 4 * i + 0] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 0];
-        m.tmpc[4 * m.maxc + 4 * i + 1] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 1];
-        m.tmpc[4 * m.maxc + 4 * i + 2] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 2];
-        m.tmpc[4 * m.maxc + 4 * i + 3] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 3];
+        m.tmpc[4 * Metrics::maxc + 4 * i + 0] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 0];
+        m.tmpc[4 * Metrics::maxc + 4 * i + 1] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 1];
+        m.tmpc[4 * Metrics::maxc + 4 * i + 2] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 2];
+        m.tmpc[4 * Metrics::maxc + 4 * i + 3] = ddc[4 * maxCaptured + 4 * (i + dWhite) + 3];
     }
 
 }
 
-Move GobanModel::getPassMove() {
-    return Move(Move::PASS, state.colorToMove);
-}
-Move GobanModel::getUndoMove() {
-    return Move(Move::UNDO, state.colorToMove);
+Move GobanModel::getUndoMove() const {
+    return {Move::UNDO, state.colorToMove};
 }
 
 void GobanModel::onHandicapChange(const std::vector<Position>& stones) {

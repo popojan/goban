@@ -30,17 +30,12 @@
 
 #include <Rocket/Core/String.h>
 
-namespace Rocket {
-namespace Core {
+namespace Rocket::Core {
 
 class Event;
 
 }
-}
 
-/**
-	@author Peter Curry
- */
 
 class EventHandler
 {

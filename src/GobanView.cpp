@@ -7,11 +7,12 @@
 #include <iostream>
 
 GobanView::GobanView(GobanModel& m)
-: gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),
-translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f),
-startTime(0.0f), animationRunning(false), isPanning(false), isZooming(false), isRotating(false),
-needsUpdate(0), cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
-currentProgram(-1),	showOverlay(true)
+    :
+    gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),
+    translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f),
+    startTime(0.0f), animationRunning(false), isPanning(false), isZooming(false), isRotating(false),
+    cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
+    currentProgram(-1),	showOverlay(true)
 {
     player.preload(config);
     player.init();
@@ -21,6 +22,7 @@ currentProgram(-1),	showOverlay(true)
     translate[0] = newTranslate[0];
     translate[1] = newTranslate[1];
     translate[2] = newTranslate[2];
+    resetView();
     updateFlag |= GobanView::UPDATE_SHADER;
     gobanShader.setReady();
     gobanOverlay.setReady();
@@ -74,18 +76,51 @@ void GobanView::endZoom() {
     translate[2] = newTranslate[2];
 }
 
-int GobanView::cycleShaders(){
-    updateFlag |= GobanView::UPDATE_ALL;
-    int currentProgram = gobanShader.getCurrentProgram();
-    currentProgram = gobanShader.choose(currentProgram + 1);
-    state.metricsReady = false;
-    return currentProgram;
-}
 void GobanView::resetView() {
-    initCam();
+    try {
+        std::ifstream fin("data/view.txt");
+        fin >> cam.rLast.re();
+        fin >> cam.rLast[0];
+        fin >> cam.rLast[1];
+        fin >> cam.rLast[2];
+        fin >> newTranslate[0];
+        fin >> newTranslate[1];
+        fin >> newTranslate[2];
+        translate[0] = newTranslate[0];
+        translate[1] = newTranslate[1];
+        translate[2] = newTranslate[2];
+        fin.close();
+    } catch (std::exception &ex) {
+        std::cout << ex.what() << std::endl;
+        //initCam();
+    }
     lastTime = 0.0;
     startTime = Shell::GetElapsedTime();
-	animationRunning = true;
+    animationRunning = true;
+}
+
+void GobanView::saveView() {
+    std::ofstream fout("data/view.txt");
+    fout
+            << cam.rLast.re() << std::endl
+            << cam.rLast[0] << std::endl
+            << cam.rLast[1] << std::endl
+            << cam.rLast[2]  << std::endl
+            << newTranslate[0]  << std::endl
+            << newTranslate[1]  << std::endl
+            << newTranslate[2] << std::endl;
+    fout.close();
+}
+
+void GobanView::clearView() {
+    std::remove("data/view.txt");
+    initCam();
+    updateTranslation();
+    translate[0] = newTranslate[0];
+    translate[1] = newTranslate[1];
+    translate[2] = newTranslate[2];
+    saveView();
+    requestRepaint();
 }
 
 void GobanView::zoomRelative(float percentage) {
@@ -115,7 +150,7 @@ void GobanView::mouseMoved(float x, float y) {
         requestRepaint();
     }
     else if (isZooming) {
-        glm::vec4 a(0.0f, 0.0f, -6.0f * (y - startY)/WINDOW_HEIGHT, 1.0);
+        glm::vec4 a(0.0f, 0.0f, -6.0f * (y - startY)/(float)WINDOW_HEIGHT, 1.0);
         a = cam.getView(true) * a;
         newTranslate[0] = translate[0] + a.x;
         newTranslate[1] = translate[1] + a.y;
@@ -131,7 +166,10 @@ void GobanView::mouseMoved(float x, float y) {
         float t = glm::dot(-tt - ro, nBoard) / glm::dot(dir, nBoard);//<float, glm::precision::defaultp, glm::tvec4>
         float scale = 2.0f*(3.0f - t) / 3.0f;
         glm::vec4 a0(translate[0], translate[1], translate[2], 1.0);
-        glm::vec4 a(-scale * (x - startX) / WINDOW_HEIGHT, scale * (y - startY) / WINDOW_HEIGHT, 0.0, 1.0);
+        glm::vec4 a(
+                -scale * (x - startX) / (float)WINDOW_HEIGHT,
+                 scale * (y - startY) / (float)WINDOW_HEIGHT,
+                 0.0, 1.0);
         a = cam.getView(true) * a;
         newTranslate[0] = translate[0] + a.x;
         newTranslate[1] = translate[1] + a.y;
@@ -160,34 +198,30 @@ void GobanView::reshape(int width, int height) {
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
 
-	VIEWPORT_WIDTH = viewport[2];
-	VIEWPORT_HEIGHT = viewport[3];
+	VIEWPORT_WIDTH = (float)viewport[2];
+	VIEWPORT_HEIGHT = (float)viewport[3];
 
 	gobanShader.setResolution(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
-}
-
-bool GobanView::needsRepaint() {
-    return updateFlag != UPDATE_NONE || MAX_FPS;
 }
 
 void GobanView::requestRepaint(int what) {
     updateFlag |= what;
 }
 
-void GobanView::shadeit(float time, GobanShader& gobanShader) {
-	gobanShader.use();
+void GobanView::shadeIt(float time, GobanShader& shader) const {
+	shader.use();
 
-	gobanShader.setTime(lastTime);
-	gobanShader.setRotation(cam.setView());
-	gobanShader.setPan(newTranslate);
+	shader.setTime(lastTime);
+	shader.setRotation(cam.setView());
+	shader.setPan(newTranslate);
 
 	if (updateFlag & UPDATE_SHADER) {
 		spdlog::debug("setMetrics");
-		gobanShader.setMetrics(model.metrics);
+		shader.setMetrics(model.metrics);
 	}
 
-	gobanShader.draw(model, cam, updateFlag, time);
-	gobanShader.unuse();
+	shader.draw(model, updateFlag, time);
+	shader.unuse();
 }
 
 void GobanView::Render(int w, int h)
@@ -215,8 +249,8 @@ void GobanView::Render(int w, int h)
     }
 
 	if (updateFlag & UPDATE_STONES) {
-	    board.updateStones(model.board, model.board.showTerritory);
-        updateCursor(model.cursor);
+	    board.updateStones(model.board);
+        updateCursor();
 
         double vol = board.collision;
         if(vol > 0) {
@@ -228,7 +262,7 @@ void GobanView::Render(int w, int h)
 	    }
 	}
 
-	shadeit(time, gobanShader);
+    shadeIt(time, gobanShader);
 
    	glEnable(GL_BLEND);
 
@@ -240,7 +274,7 @@ void GobanView::Render(int w, int h)
 	if (time - startTime >= gobanShader.animT) {
 		if (showOverlay) {
 			gobanOverlay.use();
-			gobanOverlay.draw(model, cam, updateFlag & UPDATE_OVERLAY, time, 0);
+			gobanOverlay.draw(model, cam, 0);
 			gobanOverlay.unuse();
 		}
 		animationRunning = false;
@@ -251,7 +285,7 @@ void GobanView::Render(int w, int h)
 	if (time - startTime >= gobanShader.animT) {
 		if (showOverlay) {
 			gobanOverlay.use();
-			gobanOverlay.draw(model, cam, updateFlag & UPDATE_OVERLAY, time, 1);
+			gobanOverlay.draw(model, cam, 1);
 			gobanOverlay.unuse();
 		}
 		animationRunning = false;
@@ -264,9 +298,7 @@ void GobanView::Render(int w, int h)
 
 bool GobanView::toggleOverlay() {
 	showOverlay = !showOverlay;
-	if (showOverlay) {
-		updateFlag |= UPDATE_OVERLAY;
-	}
+    updateFlag |= UPDATE_OVERLAY;
     return showOverlay;
 }
 void GobanView::updateTranslation() {
@@ -318,7 +350,7 @@ glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     vec3 nBoard = vec3(.0f,1.0f,.0f);
     auto t = dot(-vec3(roo), nBoard)/dot(rdb, nBoard);
     vec3 ip = vec3(roo) + vec3(rdb)*t;
-    return vec2(ip.x, ip.z);
+    return {ip.x, ip.z};
 }
 
 void GobanView::animateIntro() {
@@ -351,9 +383,8 @@ void GobanView::moveCursor(float x, float y) {
     }
 }
 
-int GobanView::updateCursor(const Position& lastCursor){
+void GobanView::updateCursor(){
     Position cursor = model.cursor;
-    int ret = 0;
 
     if(state.holdsStone != model.state.holdsStone) {
         board.setRandomStoneRotation();
@@ -364,7 +395,6 @@ int GobanView::updateCursor(const Position& lastCursor){
         if(np.stone == Color::EMPTY)
             board.placeCursor(cursor, state.colorToMove);
     }
-    return ret;
 }
 
 

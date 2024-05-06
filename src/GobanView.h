@@ -25,15 +25,20 @@ extern std::shared_ptr<Configuration> config;
 class GobanView: public GameObserver {
 public:
     enum {
-        UPDATE_NONE   =  0,  UPDATE_BOARD       =  1, UPDATE_STONES =  2,
-        UPDATE_GUI    =  4,  UPDATE_OVERLAY     =  8, UPDATE_SOME   = 16,
-        UPDATE_SHADER = 32,  UPDATE_SOUND_STONE = 64,
+        UPDATE_NONE = 0,
+        UPDATE_BOARD = 1,
+        UPDATE_STONES = 2,
+        UPDATE_GUI [[maybe_unused]] = 4,
+        UPDATE_OVERLAY = 8,
+        UPDATE_SOME = 16,
+        UPDATE_SHADER = 32,
+        UPDATE_SOUND_STONE = 64,
         UPDATE_ALL = (1|2|3|4|8|16|32)
     };
 
-	GobanView(GobanModel& m);
+	explicit GobanView(GobanModel& m);
 
-    virtual void onGameMove(const Move& move, const std::string& comment);
+    void onGameMove(const Move& move, const std::string& comment) override;
 
     ~GobanView() {
         gobanShader.destroy();
@@ -64,7 +69,7 @@ public:
         updateFlag |= UPDATE_SHADER;
     }
 
-    float getGamma() {
+    float getGamma() const {
 		return gobanShader.getGamma();
     }
 
@@ -74,13 +79,11 @@ public:
         updateFlag |= UPDATE_SHADER;
     }
 
-    float getContrast() {
+    float getContrast() const {
 		return gobanShader.getContrast();
     }
 
     bool toggleFpsLimit() {MAX_FPS = !MAX_FPS; return MAX_FPS;}
-
-    int cycleShaders();
 
     void switchShader(int idx)  {
         updateFlag |= GobanView::UPDATE_ALL;
@@ -89,21 +92,21 @@ public:
         gobanShader.setReady();
     }
 
-    Position getBoardCoordinate(float x, float y)const ;
-    glm::vec2 boardCoordinate(float x, float y) const;
+    [[nodiscard]] Position getBoardCoordinate(float x, float y)const ;
+    [[nodiscard]] glm::vec2 boardCoordinate(float x, float y) const;
 
     void resetView();
-	void shadeit(float, GobanShader&);
+    void saveView();
+	void shadeIt(float time, GobanShader &shader) const;
 
 	void animateIntro();
 
-    bool needsRepaint();
     void requestRepaint(int what = UPDATE_SOME);
 	bool toggleOverlay();
 
 	void Update();
 	void moveCursor(float, float);
-    int updateCursor(const Position& last);
+    void updateCursor();
 
 public:
     GobanShader gobanShader;
@@ -117,9 +120,7 @@ public:
     glm::vec2 resolution;
     float lastTime, startTime;
     bool animationRunning;
-    bool calculatingScore = false;
     bool isPanning, isZooming, isRotating;
-    int needsUpdate;
     DDG::Camera cam;
     float startX, startY, lastX, lastY;
 
@@ -132,6 +133,8 @@ public:
 	bool showOverlay;
     Position lastMove;
     AudioPlayer player;
+
+    void clearView();
 };
 
 

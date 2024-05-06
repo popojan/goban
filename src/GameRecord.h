@@ -10,13 +10,11 @@
 
 class GameRecord {
 public:
-    enum EventType { COMMENT = 0, PLAYER_SWITCHED, KIBITZ_MOVE, LAST_EVENT};
+    enum EventType { PLAYER_SWITCHED, KIBITZ_MOVE, LAST_EVENT};
     const static std::array<std::string, LAST_EVENT> eventNames;
 
-    typedef std::string EventValue;
-
     GameRecord();
-    int moveCount() { return history.size(); }
+    size_t moveCount() { return history.size(); }
 
     void undo();
 
@@ -25,7 +23,7 @@ public:
         std::for_each(history.begin(), history.end(), fMove);
     }
 
-    const Move& lastMove() const  { return history.back(); }
+    [[nodiscard]] const Move& lastMove() const  { return history.back(); }
 
     void move(const Move& move);
 

@@ -8,18 +8,15 @@ namespace DDG
 {
    // CONSTRUCTORS ----------------------------------------------------------
    
-   Quaternion :: Quaternion( void )
+   Quaternion :: Quaternion( )
    // initializes all components to zero
    : s( 0. ),
      v( 0., 0., 0. )
    {}
-   
-   Quaternion :: Quaternion( const Quaternion& q )
-   // initializes from existing quaternion
-   : s( q.s ),
-     v( q.v )
-   {}
-   
+
+    // initializes from existing quaternion
+   Quaternion :: Quaternion( const Quaternion& q ) = default;
+
    Quaternion :: Quaternion( double s_, double vi, double vj, double vk )
    // initializes with specified double (s) and imaginary (v) components
    : s( s_ ),
@@ -38,22 +35,9 @@ namespace DDG
      v( 0., 0., 0. )
    {}
    
-   Quaternion :: Quaternion( const Vector& v_ )
-   // initializes purely imaginary quaternion with specified imaginary (v) component (real part is zero)
-   : s( 0. ),
-     v( v_ )
-   {}
-
-   Quaternion :: Quaternion( const MyComplex& z )
-   // for a complex number z=a+bi, initializes quaternion to a+bi+0j+0k
-   : s( z.re ),
-     v( z.im, 0., 0. )
-   {}
-   
-   
    // ASSIGNMENT OPERATORS --------------------------------------------------
    
-   const Quaternion& Quaternion :: operator=( double _s )
+   Quaternion& Quaternion :: operator=( double _s )
    // assigns a purely real quaternion with real value s
    {
       s = _s;
@@ -62,7 +46,7 @@ namespace DDG
       return *this;
    }
    
-   const Quaternion& Quaternion :: operator=( const Vector& _v )
+   Quaternion& Quaternion :: operator=( const Vector& _v )
    // assigns a purely real quaternion with imaginary value v
    {
       s = 0.;
@@ -85,7 +69,7 @@ namespace DDG
    {
       return ( &s )[ index ];
    }
-   
+
    void Quaternion::toMatrix( double Q[4][4] ) const
    // returns 4x4 matrix representation
    {
@@ -95,25 +79,25 @@ namespace DDG
       Q[3][0] = v.z; Q[3][1] = -v.y; Q[3][2] =  v.x; Q[3][3] =    s;
    }
    
-   double& Quaternion::re( void )
+   double& Quaternion::re( )
    // returns reference to double part
    {
       return s;
    }
    
-   const double& Quaternion::re( void ) const
+   const double& Quaternion::re( ) const
    // returns const reference to double part
    {
       return s;
    }
    
-   Vector& Quaternion::im( void )
+   Vector& Quaternion::im( )
    // returns reference to imaginary part
    {
       return v;
    }
    
-   const Vector& Quaternion::im( void ) const
+   const Vector& Quaternion::im( ) const
    // returns const reference to imaginary part
    {
       return v;
@@ -125,25 +109,25 @@ namespace DDG
    Quaternion Quaternion::operator+( const Quaternion& q ) const
    // addition
    {
-      return Quaternion( s+q.s, v+q.v );
+      return { s+q.s, v+q.v };
    }
    
    Quaternion Quaternion::operator-( const Quaternion& q ) const
    // subtraction
    {
-      return Quaternion( s-q.s, v-q.v );
+      return { s-q.s, v-q.v };
    }
    
-   Quaternion Quaternion::operator-( void ) const
+   Quaternion Quaternion::operator-( ) const
    // negation
    {
-      return Quaternion( -s, -v );
+      return { -s, -v };
    }
    
    Quaternion Quaternion::operator*( double c ) const
    // scalar multiplication
    {
-      return Quaternion( s*c, v*c );
+      return { s*c, v*c };
    }
    
    Quaternion operator*( double c, const Quaternion& q )
@@ -155,7 +139,7 @@ namespace DDG
    Quaternion Quaternion::operator/( double c ) const
    // scalar division
    {
-      return Quaternion( s/c, v/c );
+      return { s/c, v/c };
    }
    
    void Quaternion::operator+=( const Quaternion& q )
@@ -209,7 +193,7 @@ namespace DDG
       const Vector& v1( v );
       const Vector& v2( q.v );
    
-      return Quaternion( s1*s2 - dot(v1,v2), s1*v2 + s2*v1 + cross(v1,v2) );
+      return { s1*s2 - dot(v1,v2), s1*v2 + s2*v1 + cross(v1,v2) };
    }
    
    void Quaternion::operator*=( const Quaternion& q )
@@ -218,13 +202,13 @@ namespace DDG
       *this = ( *this * q );
    }
    
-   Quaternion Quaternion::conj( void ) const
+   Quaternion Quaternion::conj( ) const
    // conjugation
    {
-      return Quaternion( s, -v );
+      return { s, -v };
    }
    
-   Quaternion Quaternion::inv( void ) const
+   Quaternion Quaternion::inv( ) const
    {
       return ( this->conj() ) / this->norm2();
    }
@@ -232,31 +216,30 @@ namespace DDG
    
    // NORMS -----------------------------------------------------------------
    
-   double Quaternion::norm( void ) const
+   double Quaternion::norm( ) const
    // returns Euclidean length
    {
       return sqrt( s*s + v.x*v.x + v.y*v.y + v.z*v.z );
    }
    
-   double Quaternion::norm2( void ) const
+   double Quaternion::norm2( ) const
    // returns Euclidean length squared
    {
       return s*s + dot(v,v);
    }
    
-   Quaternion Quaternion::unit( void ) const
+   Quaternion Quaternion::unit( ) const
    // returns unit quaternion
    {
       return *this / norm();
    }
    
-   void Quaternion::normalize( void )
+   void Quaternion::normalize( )
    // divides by Euclidean length
    {
       *this /= norm();
    }
-   
-   
+
    // GEOMETRIC OPERATIONS --------------------------------------------------
    
    Quaternion slerp( const Quaternion& q0, const Quaternion& q1, double t )

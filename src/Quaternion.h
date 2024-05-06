@@ -34,7 +34,6 @@
 #define DDG_QUATERNION_H
 
 #include "Vector.h"
-#include "Complex.h"
 #include <ostream>
 
 namespace DDG
@@ -42,7 +41,7 @@ namespace DDG
    class Quaternion
    {
       public:
-         Quaternion( void );
+         Quaternion( );
          // initializes all components to zero
 
          Quaternion( const Quaternion& q );
@@ -54,19 +53,13 @@ namespace DDG
          Quaternion( double s, const Vector& v );
          // initializes with specified real (s) and imaginary (v) components
 
-         Quaternion( double s );
+         explicit Quaternion( double s );
          // initializes purely real quaternion with specified real (s) component (imaginary part is zero)
 
-         Quaternion( const Vector& v );
-         // initializes purely imaginary quaternion with specified imaginary (v) component (real part is zero)
-
-         Quaternion( const MyComplex& z );
-         // for a complex number z=a+bi, initializes quaternion to a+bi+0j+0k
-
-         const Quaternion& operator=( double s );
+         Quaternion& operator=( double s );
          // assigns a purely real quaternion with real value s
 
-         const Quaternion& operator=( const Vector& v );
+         Quaternion& operator=( const Vector& v );
          // assigns a purely real quaternion with imaginary value v
 
          double& operator[]( int index );
@@ -78,16 +71,16 @@ namespace DDG
          void toMatrix( double Q[4][4] ) const;
          // builds 4x4 matrix Q representing (left) quaternion multiplication
 
-         double& re( void );
+         double& re( );
          // returns reference to double part
 
-         const double& re( void ) const;
+         [[nodiscard]] const double& re( ) const;
          // returns const reference to double part
 
-         Vector& im( void );
+         Vector& im( );
          // returns reference to imaginary part
 
-         const Vector& im( void ) const;
+         [[nodiscard]] const Vector& im( ) const;
          // returns const reference to imaginary part
 
          Quaternion operator+( const Quaternion& q ) const;
@@ -96,7 +89,7 @@ namespace DDG
          Quaternion operator-( const Quaternion& q ) const;
          // subtraction
 
-         Quaternion operator-( void ) const;
+         Quaternion operator-( ) const;
          // negation
 
          Quaternion operator*( double c ) const;

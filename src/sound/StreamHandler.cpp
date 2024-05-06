@@ -191,6 +191,5 @@ StreamHandler::~StreamHandler()
         {
                 delete wrapper;
         }
-        Pa_Sleep(1000);
         Pa_Terminate();
 }

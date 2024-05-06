@@ -8,7 +8,7 @@
 
 struct Configuration {
 
-    Configuration(const std::string& fileName) {
+    explicit Configuration(const std::string& fileName) {
         load(fileName);
     }
     void load(const std::string& fileName);

@@ -37,7 +37,7 @@
 class Event : public Rocket::Core::EventListener
 {
 public:
-	Event(const Rocket::Core::String& value);
+	explicit Event(const Rocket::Core::String& value);
 	virtual ~Event();
 
 	/// Sends the event value through to Invader's event processing system.

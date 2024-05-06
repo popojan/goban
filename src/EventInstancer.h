@@ -38,13 +38,14 @@ class EventInstancer : public Rocket::Core::EventListenerInstancer
 {
 public:
 	EventInstancer();
-	virtual ~EventInstancer();
+	~EventInstancer() override;
 
 	/// Instances a new event handle for Invaders.
-	virtual Rocket::Core::EventListener* InstanceEventListener(const Rocket::Core::String& value, Rocket::Core::Element* element);
+	Rocket::Core::EventListener* InstanceEventListener(
+            const Rocket::Core::String& value, Rocket::Core::Element* element) override;
 
 	/// Destroys the instancer.
-	virtual void Release();
+	void Release() override;
 };
 
 #endif

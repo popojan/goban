@@ -20,7 +20,7 @@ class GameThread
 {
 public:
 
-    GameThread(GobanModel &model);
+    explicit GameThread(GobanModel &model);
     ~GameThread();
 
     size_t addEngine(Engine* engine);
@@ -34,7 +34,7 @@ public:
 
     void setRole(size_t playerIndex, int role, bool add = false);
 
-    std::string& getName(size_t id, Color whose) { return players[id]->getName(whose); }
+    std::string getName(size_t id) { return players[id]->getName(); }
 
     void interrupt();
 
@@ -46,7 +46,7 @@ public:
 
     void run();
 
-    bool isRunning();
+    bool isRunning() const;
 
     void gameLoop();
 
@@ -57,12 +57,12 @@ public:
 
     void loadEngines(std::shared_ptr<Configuration> config);
 
-	int activatePlayer(int which, int delta = 1);
+	size_t activatePlayer(int which, int delta = 1);
 
-	int getActivePlayer(int which);
+	size_t getActivePlayer(int which);
 
-	Move getLocalMove(const Position& coord);
-    Move getLocalMove(Move::Special move);
+	[[nodiscard]] Move getLocalMove(const Position& coord) const;
+    [[nodiscard]] Move getLocalMove(Move::Special move) const;
 	void reset();
 
     void addGameObserver(GameObserver* pobserver) {
@@ -71,14 +71,7 @@ public:
 
     bool undo(Player * engine, bool doubleUndo);
 
-    std::vector<Engine*> getEngines() { return engines;}
     std::vector<Player*> getPlayers() { return players;}
-
-    void unloadEngines() {
-        for(auto& engine: engines) {
-            dynamic_cast<GtpEngine*>(engine)->issueCommand("quit");
-        }
-    }
 
 private:
     std::vector<GameObserver*> gameObservers;
@@ -87,18 +80,13 @@ private:
     std::vector<Player*> players; //all players including engines, humans, spectators
     std::thread* thread;
     std::mutex mutex2;
-    bool interruptRequested, hasThreadRunning;
+    volatile bool interruptRequested, hasThreadRunning;
     Player* playerToMove;
 	std::size_t human, sgf, coach, kibitz;
 	std::size_t numPlayers;
 	std::array<std::size_t, 2> activePlayer;
     std::mutex playerMutex;
     std::condition_variable engineStarted;
-    int komi;
-    int boardSize;
-    int handicap;
- //public:
-//	bool showTerritory;
 };
 
 #endif // GAMETHREAD_H

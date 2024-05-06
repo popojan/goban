@@ -52,8 +52,11 @@
                         <div class="grp">
                             <div class="hr">Camera</div>
                             <!--<div class="cmd" onmouseup="free camera toggle">Toggle free</div>-->
-                            <div class="cmd" onmouseup="reset camera">Reset camera</div>
+                            <div class="cmd" onmouseup="reset camera">Reset</div>
                             <div class="cmd" onmouseup="animate">Animate</div>
+                            <div class="hr">Camera Preset</div>
+                            <div class="cmd" onmouseup="save camera">Save</div>
+                            <div class="cmd" onmouseup="delete camera">Clear</div>
                         </div>
                     </div>
                 </div>

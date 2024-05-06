@@ -10,8 +10,8 @@ class ElementGame : public Rocket::Core::Element,
     public Rocket::Core::EventListener
 {
 public:
-    ElementGame(const Rocket::Core::String& tag);
-    virtual ~ElementGame();
+    explicit ElementGame(const Rocket::Core::String& tag);
+    ~ElementGame() override;
 
     void ProcessEvent(Rocket::Core::Event& event);
 

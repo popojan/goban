@@ -3,7 +3,7 @@
 
 namespace DDG
 {
-   Vector :: Vector( void )
+   Vector :: Vector( )
    : x( 0. ),
      y( 0. ),
      z( 0. )
@@ -17,11 +17,7 @@ namespace DDG
      z( z0 )
    {}
    
-   Vector :: Vector( const Vector& v )
-   : x( v.x ),
-     y( v.y ),
-     z( v.z )
-   {}
+   Vector :: Vector( const Vector& v ) = default;
 
    double& Vector :: operator[]( const int& index )
    {
@@ -35,30 +31,30 @@ namespace DDG
    
    Vector Vector :: operator+( const Vector& v ) const
    {
-      return Vector( x + v.x,
-                     y + v.y,
-                     z + v.z );
+      return { x + v.x,
+               y + v.y,
+               z + v.z };
    }
    
    Vector Vector :: operator-( const Vector& v ) const
    {
-      return Vector( x - v.x,
-                     y - v.y,
-                     z - v.z );
+      return { x - v.x,
+               y - v.y,
+               z - v.z };
    }
    
-   Vector Vector :: operator-( void ) const
+   Vector Vector :: operator-( ) const
    {
-      return Vector( -x,
-                     -y,
-                     -z );
+      return { -x,
+               -y,
+               -z };
    }
    
    Vector Vector :: operator*( const double& c ) const
    {
-      return Vector( x*c,
-                     y*c,
-                     z*c );
+      return { x*c,
+               y*c,
+               z*c };
    }
    
    Vector operator*( const double& c, const Vector& v )
@@ -97,31 +93,31 @@ namespace DDG
       (*this) *= ( 1./c );
    }
    
-   double Vector :: norm( void ) const
+   double Vector :: norm( ) const
    {
       return std::sqrt( norm2());
    }
    
-   double Vector :: norm2( void ) const
+   double Vector :: norm2( ) const
    {
       return dot( *this, *this );
    }
    
-   void Vector :: normalize( void )
+   void Vector :: normalize( )
    {
       (*this) /= norm();
    }
    
-   Vector Vector :: unit( void ) const
+   Vector Vector :: unit( ) const
    {
       return (*this) / norm();
    }
    
-   Vector Vector :: abs( void ) const
+   Vector Vector :: abs( ) const
    {
-      return Vector( std::abs( x ),
-                     std::abs( y ),
-                     std::abs( z ) );
+      return { std::abs( x ),
+               std::abs( y ),
+               std::abs( z ) };
    }
 
    double dot( const Vector& u, const Vector& v )
@@ -133,9 +129,9 @@ namespace DDG
    
    Vector cross( const Vector& u, const Vector& v )
    {
-      return Vector( u.y*v.z - u.z*v.y,
-                     u.z*v.x - u.x*v.z,
-                     u.x*v.y - u.y*v.x );
+      return { u.y*v.z - u.z*v.y,
+               u.z*v.x - u.x*v.z,
+               u.x*v.y - u.y*v.x };
    }
    
    std::ostream& operator << (std::ostream& os, const Vector& o)
