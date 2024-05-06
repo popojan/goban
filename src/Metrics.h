@@ -2,7 +2,7 @@
 #define GOBAN_METRICS_H
 
 class Metrics {
-
+// cpp >> gsls parameters
 public:
     float fNDIM;
     float w;
@@ -19,13 +19,10 @@ public:
     float bowlsCenters[12];
     float squareSizeX;
     float squareSizeY;
-    float stoneHeight;
 
     static const int maxc = 91;
     float tmpc[8 * maxc];
-    float resolution[2];
     float translate[3];
-    float cur[2];
 
 public:
     void calc(unsigned);

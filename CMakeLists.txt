@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 
 cmake_policy(SET CMP0072 NEW)
 
@@ -17,11 +17,11 @@ INCLUDE(ExternalProject)
 
 function(build_portaudio)
     ExternalProject_Add(project_portaudio
-            GIT_REPOSITORY      https://git.assembla.com/portaudio.git
+            GIT_REPOSITORY      https://github.com/PortAudio/portaudio
             SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
             BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/portaudio/build
             CMAKE_ARGS  -DPA_USE_JACK=0 -DPA_USE_ALSA=1 -DPA_USE_ASIO=0 -DPA_USE_WASAPI=1
-            GIT_TAG ticket_263_alsa_uninitialized_var_2
+            GIT_TAG v19.7.0
             STEP_TARGETS build
             INSTALL_COMMAND     echo Skipping install step for portaudio
             )
@@ -156,7 +156,7 @@ function(build_librocket)
 endfunction()
 
 function(build_libsgfcplusplus)
-    SET(SGFCPLUSPLUS_STATIC_DEFINE 1 PARENT_SCOPE)
+    SET(SGFCPLUSPLUS_STATIC_DEFINE 1)
     MESSAGE("build type = ${CMAKE_BUILD_TYPE}")
     ExternalProject_Add(project_libsgfcplusplus
             GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
@@ -168,9 +168,9 @@ function(build_libsgfcplusplus)
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
             STEP_TARGETS build
             #UPDATE_COMMAND ""
-            #UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
-            #COMMAND git fetch
-            #COMMAND git checkout sgfc
+            UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
+            COMMAND git fetch
+            COMMAND git checkout sgfc
             INSTALL_COMMAND     echo Skipping install step for libsgfcplusplus
             )
     ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)
@@ -437,7 +437,6 @@ else()
     set(GOBAN_HDR_FILES
         src/Board.h
         src/Camera.h
-        src/Complex.h
         src/ElementGame.h
         src/Event.h
         src/EventHandler.h
@@ -467,7 +466,6 @@ else()
     set(GOBAN_SRC_FILES
         src/Board.cpp
         src/Camera.cpp
-        src/Complex.cpp
         src/ElementGame.cpp
         src/Event.cpp
         src/EventHandler.cpp
@@ -485,7 +483,6 @@ else()
         src/GobanControl.cpp
         src/GobanShader.cpp
         src/Metrics.cpp
-        src/GameState.cpp
         src/GobanOverlay.cpp
         src/sound/AudioFile.cpp
         src/sound/AudioPlayer.cpp
@@ -493,7 +490,6 @@ else()
         src/sound/StreamHandler.cpp
         src/sound/util.cpp src/Configuration.cpp
         src/glad/src/glad.c
-        src/InputThread.cpp
         src/GameRecord.cpp
     )
 

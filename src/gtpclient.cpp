@@ -135,12 +135,17 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
     bool error = true;
     while (std::getline(pos, line)) {
         line.erase(line.find_last_not_of(" \n\r\t") + 1);
-        if(ret.empty())
+        if(ret.empty()) {
             error = *line.c_str() != '=';
-        if(!error)
+            if (line.empty()) {
+                error = false;
+            }
+        }
+        if(!error) {
             spdlog::info("{1} >> {0}", line, exe);
-        else
+        } else {
             spdlog::error("{1} >> {0}", line, exe);
+        }
         if (line.empty()) break;
         ret.push_back(line);
     }
@@ -148,11 +153,12 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
 }
 
 bool GtpClient::success(const CommandOutput& ret) {
-    return ret.size() > 0 && ret.at(0).front() == '=';
+    return !ret.empty() && ret.at(0).front() == '=';
 };
 
 GtpClient::~GtpClient() {
-    c.wait();
+    issueCommand("quit");
+    c.join();
     delete reader;
 }
 

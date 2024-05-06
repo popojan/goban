@@ -23,19 +23,13 @@ public:
     void mouseClick(int button, int state, int x, int y);
     void mouseMove(int x, int y);
     void keyPress(int key, int x, int y, bool downNotUp = false);
-    bool isExiting() {
+    [[nodiscard]] bool isExiting() const {
         return exit;
     }
-    bool requestExit() {
-        exit = true;
-        Shell::RequestExit();
-        return true;
-    }
-    bool newGame(int boardSize);
+    bool newGame(unsigned boardSize);
     void togglePlayer(int which, int delta = 1);
     void switchPlayer(int which, int idx);
     void switchShader(int idx);
-    void increaseHandicap();
     bool setHandicap(int);
     bool setKomi(float);
     bool command(const std::string& cmd);

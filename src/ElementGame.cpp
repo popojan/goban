@@ -42,7 +42,7 @@ void ElementGame::populateEngines() {
             selectBlack->Add(playerName.c_str(), playerIndex.c_str());
             selectWhite->Add(playerName.c_str(), playerIndex.c_str());
         }
-        selectBlack->SetSelection(players.size() - 1);
+        selectBlack->SetSelection((int)players.size() - 1);
         selectWhite->SetSelection(0);
     }
 
@@ -51,6 +51,7 @@ void ElementGame::populateEngines() {
 
     if(!selectShader) {
         spdlog::warn("missing GUI element [selectShader]");
+        return;
     }
 
     using nlohmann::json;
@@ -76,19 +77,19 @@ void ElementGame::gameLoop() {
 	if (currentTime - lastTime >= 1.0) {
 	    static int frames = 1;
         auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
-        const Rocket::Core::String sfps(128, "FPS: %.1f", cnt / (currentTime - lastTime));
-        if (debugElement != 0) {
-            debugElement->SetInnerRML(sfps.CString());
+        const Rocket::Core::String sFps(128, "FPS: %.1f", (float)cnt / (currentTime - lastTime));
+        if (debugElement != nullptr) {
+            debugElement->SetInnerRML(sFps.CString());
             view.requestRepaint();
         }
-        spdlog::debug(sfps.CString());
+        spdlog::debug(sFps.CString());
         //if(frames % 10 == 0)
         frames += 1;
 		lastTime = currentTime;
 		cnt = 0;
 	}
 	ElementGame* game = dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"));
-	if (game != 0 && game->isExiting()) {
+	if (game != nullptr && game->isExiting()) {
         return;
     }
 	context->Update();
@@ -96,8 +97,8 @@ void ElementGame::gameLoop() {
 		view.requestRepaint();
 	}
 	if (view.updateFlag) {
-		auto shell_renderer = static_cast<ShellRenderInterfaceOpenGL*>(Rocket::Core::GetRenderInterface());
-		if (shell_renderer != 0) {
+		auto shell_renderer = dynamic_cast<ShellRenderInterfaceOpenGL*>(Rocket::Core::GetRenderInterface());
+		if (shell_renderer != nullptr) {
 			shell_renderer->PrepareRenderBuffer();
 			glPushAttrib(GL_ALL_ATTRIB_BITS);
 			context->Render();
@@ -110,9 +111,7 @@ void ElementGame::gameLoop() {
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 }
-ElementGame::~ElementGame() {
-
-}
+ElementGame::~ElementGame() = default;
 
 void ElementGame::ProcessEvent(Rocket::Core::Event& event)
 {
@@ -153,9 +152,10 @@ void ElementGame::OnUpdate()
     if(!view.gobanShader.isReady())
         return;
 
-    view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSizeX);
+    //view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSizeX);
+    view.board.updateMetrics(model.metrics);
 
-    bool isOver = model.state.reason != GameState::NOREASON;
+    bool isOver = model.state.reason != GameState::NO_REASON;
     bool isRunning = engine.isRunning();
 
     Rocket::Core::Context* context = GetContext();
@@ -188,12 +188,12 @@ void ElementGame::OnUpdate()
 		bool blackMove = model.state.colorToMove == Color::BLACK;
 		Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("blackMoves");
 		Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("whiteMoves");
-		if (elBlack != NULL) {
+		if (elBlack != nullptr) {
 			elBlack->SetClass("active", blackMove);
 			view.state.colorToMove = model.state.colorToMove;
 			requestRepaint();
 		}
-		if (elWhite != NULL) {
+		if (elWhite != nullptr) {
 			elWhite->SetClass("active", !blackMove);
 			view.state.colorToMove = model.state.colorToMove;
 			requestRepaint();
@@ -201,15 +201,15 @@ void ElementGame::OnUpdate()
 	}
 	if ((view.state.capturedBlack != model.state.capturedBlack)
 	    || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */
-		|| (view.state.reason != GameState::NOREASON && model.state.reason == GameState::NOREASON) /* new game */)
+		|| (view.state.reason != GameState::NO_REASON && model.state.reason == GameState::NO_REASON) /* new game */)
 	{
 		Rocket::Core::Element* elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
 		Rocket::Core::Element* elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
-		if (elWhiteCnt != NULL) {
+		if (elWhiteCnt != nullptr) {
 			elWhiteCnt->SetInnerRML(Rocket::Core::String(128, "White: %d", model.state.capturedBlack).CString());
 			requestRepaint();
 		}
-		if (elBlackCnt != NULL) {
+		if (elBlackCnt != nullptr) {
 			elBlackCnt->SetInnerRML(Rocket::Core::String(128, "Black: %d", model.state.capturedWhite).CString());
 			requestRepaint();
 		}
@@ -225,7 +225,7 @@ void ElementGame::OnUpdate()
 	}
 	if (view.state.handicap != model.state.handicap) {
 		Rocket::Core::Element* hand = context->GetDocument("game_window")->GetElementById("lblHandicap");
-		if (hand != NULL) {
+		if (hand != nullptr) {
 			hand->SetInnerRML(Rocket::Core::String(128, "Handicap: %d", model.state.handicap).CString());
 			requestRepaint();
 			view.state.handicap = model.state.handicap;
@@ -233,7 +233,7 @@ void ElementGame::OnUpdate()
 	}
 	if (view.state.komi != model.state.komi) {
 		Rocket::Core::Element* elKomi = context->GetDocument("game_window")->GetElementById("lblKomi");
-		if (elKomi != NULL) {
+		if (elKomi != nullptr) {
 			elKomi->SetInnerRML(Rocket::Core::String(128, "Komi: %.1f", model.state.komi).CString());
 			view.state.komi = model.state.komi;
 			requestRepaint();

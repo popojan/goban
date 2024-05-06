@@ -40,5 +40,5 @@ void Metrics::calc(unsigned NDIM) {
 
     squareSizeX = ww;
     squareSizeY = 13.0f * ww / 12.0f;
-    stoneHeight = 0.5f*h;
+
 }

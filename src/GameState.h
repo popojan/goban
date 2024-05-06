@@ -24,14 +24,14 @@ public:
 
     Message msg;
 
-    GameState(): colorToMove(Color::BLACK), black(""), white(""), capturedBlack(0), capturedWhite(0),
-            reservoirBlack(32), reservoirWhite(32),
-            komi(0.5f), handicap(0), result(0.0f), cmd("xxx"), msg(PAUSED),
-            reason(NOREASON), adata(), metricsReady(false), showTerritory(false), showOverlay(false),
-            holdsStone(false), dirty(true)
+    GameState(): colorToMove(Color::BLACK), black(), white(), capturedBlack(0), capturedWhite(0),
+                 reservoirBlack(32), reservoirWhite(32),
+                 komi(0.5f), handicap(0), result(0.0f), cmd("xxx"), msg(PAUSED),
+                 reason(NO_REASON), adata(), metricsReady(false),
+                 holdsStone(false)
     { }
 
-    enum Reason { NOREASON, DOUBLE_PASS, RESIGNATION, INVALID_MOVE } reason;
+    enum Reason { NO_REASON, DOUBLE_PASS, RESIGNATION } reason;
     struct Result {
         int black_territory;
         int white_territory;
@@ -53,13 +53,11 @@ public:
                 black_area(0),
                 white_area(0),
                 delta(0.0),
-                reason(NOREASON)
+                reason(NO_REASON)
         { }
     } adata;
     bool metricsReady;
-	bool showTerritory, showOverlay, holdsStone;
-	volatile bool dirty;
-
+	bool holdsStone;
 };
 
 

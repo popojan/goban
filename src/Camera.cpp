@@ -1,23 +1,21 @@
 #include <cmath>
-#include <ctime>
-#include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 using namespace std;
 
 #include "Camera.h"
 
-glm::mat4x4 getMatrix(const DDG::Quaternion& r) {
-    float w = (float)r[0];
-    float x = (float)r[1];
-    float y = (float)r[2];
-    float z = (float)r[3];
-    return  glm::mat4x4(
-      1.f-2.f*y*y-2.f*z*z, 2.f*x*y+2.f*w*z, 2.f*x*z-2.f*w*y, 0.f,
-      2.f*x*y-2.f*w*z, 1.f-2.f*x*x-2.f*z*z, 2.f*y*z+2.f*w*x, 0.f,
-      2.f*x*z+2.f*w*y, 2.f*y*z-2.f*w*x, 1.f-2.f*x*x-2.f*y*y, 0.f,
-      0.f, 0.f, 0.f, 1.f);
+glm::dmat4x4 getMatrix(const DDG::Quaternion& r) {
+    auto w = (float)r[0];
+    auto x = (float)r[1];
+    auto y = (float)r[2];
+    auto z = (float)r[3];
+    return  {
+        1.f-2.f*y*y-2.f*z*z, 2.f*x*y+2.f*w*z, 2.f*x*z-2.f*w*y, 0.f,
+        2.f*x*y-2.f*w*z, 1.f-2.f*x*x-2.f*z*z, 2.f*y*z+2.f*w*x, 0.f,
+        2.f*x*z+2.f*w*y, 2.f*y*z-2.f*w*x, 1.f-2.f*x*x-2.f*y*y, 0.f,
+        0.f, 0.f, 0.f, 1.f
+    };
 }
 
 static DDG::Quaternion toQuaternion(double pitch, double roll, double yaw)
@@ -37,27 +35,6 @@ static DDG::Quaternion toQuaternion(double pitch, double roll, double yaw)
 	return q;
 }
 
-[[maybe_unused]] static void toEulerianAngle(const DDG::Quaternion& q, double& roll, double& pitch, double& yaw)
-{
-	double ysqr = q.im().y * q.im().y;
-
-	// roll (x-axis rotation)
-	double t0 = +2.0 * (q.re() * q.im().x + q.im().y * q.im().z);
-	double t1 = +1.0 - 2.0 * (q.im().x * q.im().x + ysqr);
-	roll = std::atan2(t0, t1);
-
-	// pitch (y-axis rotation)
-	double t2 = +2.0 * (q.re() * q.im().y - q.im().z * q.im().x);
-	t2 = ((t2 > 1.0) ? 1.0 : t2);
-	t2 = ((t2 < -1.0) ? -1.0 : t2);
-	pitch = std::asin(t2);
-
-	// yaw (z-axis rotation)
-	double t3 = +2.0 * (q.re() * q.im().z + q.im().x * q.im().y);
-	double t4 = +1.0 - 2.0 * (ysqr + q.im().z * q.im().z);
-	yaw = std::atan2(t3, t4);
-}
-
 namespace DDG {
     Camera::Camera(float x, float y, float z, float w)
             : pClick(1.),
@@ -67,6 +44,8 @@ namespace DDG {
               momentum(1.),
               tLast(0),
               zoom(1.),
+              vZoom(1.),
+              axis(Y_AXIS),
               lock(true) {}
 
     void Camera::setHorizontalLock(bool newLock) {
@@ -89,17 +68,16 @@ namespace DDG {
         return p;
     }
 
-    Quaternion Camera::currentRotation(void) const {
-        auto ret = pDrag * pClick.conj() * rLast;
-        return ret;
+    Quaternion Camera::currentRotation() const {
+        return pDrag * pClick.conj() * rLast;
     }
 
-    glm::mat4 Camera::getView(bool reverse) const {
+    glm::dmat4 Camera::getView(bool reverse) const {
         return getMatrix(reverse ? rLast.conj() : rLast);
     }
 
 
-    glm::mat4 Camera::setView() const {
+    glm::dmat4 Camera::setView() const {
         return getMatrix(currentRotation().conj());
     }
 
@@ -121,22 +99,13 @@ namespace DDG {
             momentum = 1.;
         }
         if (state == 0) {
-            double timeSinceDrag = (clock() - tLast) / (double) CLOCKS_PER_SEC;
-
-            if (timeSinceDrag < .1) {
-                momentum = pDrag * pLast.conj();
-                momentum = (.03 * momentum + .97).unit();
-            } else {
-                momentum = 1.;
-            }
+            momentum = 1.;
             rLast = currentRotation();
             pClick = pDrag = 1.;
         }
     }
 
     void Camera::motion(float x, float y, float w, float h) {
-        tLast = clock();
-        //pLast = pDrag;
         if (axis == Y_AXIS) {
             pDrag = clickToSphere(w / 2, y, w, h);
         } else if (axis == X_AXIS) {
@@ -146,26 +115,4 @@ namespace DDG {
         }
     }
 
-    void Camera::idle(void) {
-        // get time since last idle event
-        static int t0 = clock();
-        int t1 = clock();
-        double dt = (t1 - t0) / (double) CLOCKS_PER_SEC;
-
-        rLast = momentum * rLast;
-        momentum = ((1. - .5 * dt) * momentum + .5 * dt).unit();
-
-        zoom += vZoom * dt;
-        vZoom *= max(0., 1. - 5. * dt);
-
-        t0 = t1;
-    }
-
-    void Camera::zoomIn(void) {
-        vZoom -= 0.5;
-    }
-
-    void Camera::zoomOut(void) {
-        vZoom += 0.5;
-    }
 }

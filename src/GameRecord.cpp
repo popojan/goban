@@ -5,7 +5,7 @@
 using namespace LibSgfcPlusPlus;
 
 const std::array<std::string, GameRecord::LAST_EVENT> GameRecord::eventNames = {
-        "", "switched_player:", "kibitz_move:"
+        "switched_player:", "kibitz_move:"
 };
 
 GameRecord::GameRecord():

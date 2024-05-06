@@ -7,10 +7,10 @@ void Configuration::load(const std::string& fileName) {
     fin >> data;
     auto controls = data.find("controls");
     if(controls != data.end()) {
-        for(auto it = controls->begin(); it != controls->end(); ++it) {
-            auto key = it->find("key");
-            auto command = it->find("command");
-            if (key != it->end() && command != it->end()) {
+        for(auto & it : *controls) {
+            auto key = it.find("key");
+            auto command = it.find("command");
+            if (key != it.end() && command != it.end()) {
                 addKey(static_cast<Rocket::Core::Input::KeyIdentifier>(*key), *command);
             }
         }

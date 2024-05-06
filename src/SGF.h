@@ -1,7 +1,3 @@
-//
-// Created by jan on 4/18/21.
-//
-
 #ifndef GOBAN_SGF_H
 #define GOBAN_SGF_H
 

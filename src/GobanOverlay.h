@@ -24,13 +24,15 @@ struct Layer {
 
 class GobanOverlay {
 public:
-    GobanOverlay(const GobanView& view): view(view), overlayReady(false) {
+    GobanOverlay(const GobanView& view): view(view), overlayReady(false),
+        ft_library(nullptr), ft_face(nullptr), font_size(.0)
+    {
         init();
     }
     bool init();
     void use();
     void unuse();
-    void draw(const GobanModel&, const DDG::Camera&, int updateFlag, float time, unsigned);
+    void draw(const GobanModel&, const DDG::Camera&, unsigned);
     ~GobanOverlay();
     void setReady() { overlayReady = true; }
 	void Update(const Board& board, const GobanModel& model);

@@ -6,7 +6,7 @@
 #include <Shell.h>
 #include "GobanControl.h"
 
-bool GobanControl::newGame(int boardSize) {
+bool GobanControl::newGame(unsigned boardSize) {
     engine.interrupt();
     engine.reset();
 	if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
@@ -22,7 +22,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     mouseY = static_cast<float>(y);
     view.mouseMoved(mouseX, mouseY);
 
-    Position coord = view.getBoardCoordinate(x, y);
+    Position coord = view.getBoardCoordinate((float)x, (float)y);
     spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
@@ -86,7 +86,6 @@ bool GobanControl::command(const std::string& cmd) {
     if(cmd == "quit") {
         model.game.saveAs("");
         exit = true;
-        engine.unloadEngines();
         Shell::RequestExit();
     }
     else if (cmd == "toggle_fullscreen") {
@@ -141,6 +140,12 @@ bool GobanControl::command(const std::string& cmd) {
     else if (cmd == "reset camera") {
         view.resetView();
         view.requestRepaint();
+    }
+    else if (cmd == "save camera") {
+        view.saveView();
+    }
+    else if (cmd == "delete camera") {
+        view.clearView();
     }
     else if (cmd == "undo move") {
         engine.playLocalMove(model.getUndoMove());
@@ -247,20 +252,8 @@ bool GobanControl::setKomi(float komi) {
     return false;
 }
 
-void GobanControl::increaseHandicap(){
-    bool isOver = model.state.adata.reason != GameState::NOREASON;
-    bool isRunning = engine.isRunning();
-    if(!isRunning && !isOver) {
-        int nextHandicap = model.state.handicap + 1;
-		if (engine.setFixedHandicap(nextHandicap)) {
-      //komi configurable independent of handicap
-    }
-	    view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
-    }
-}
-
 bool GobanControl::setHandicap(int handicap){
-    bool isOver = model.state.adata.reason != GameState::NOREASON;
+    bool isOver = model.state.adata.reason != GameState::NO_REASON;
     bool isRunning = engine.isRunning();
     bool success = false;
     if(!isRunning && !isOver) {

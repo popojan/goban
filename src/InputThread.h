@@ -16,7 +16,7 @@ template <class C, class T>
 class InputThread {
 public:
 
-    InputThread(T &fin) : io(0) {
+    explicit InputThread(T &fin) : io(0) {
         io = new std::thread([&]() {
             std::string tmp;
             bool good = true;
@@ -75,7 +75,7 @@ private:
     std::deque<std::string> lines;
 
     std::thread* io;
-    std::thread* consumer;
+    std::thread* consumer{};
 
     std::deque<std::string> toProcess;
 

@@ -37,20 +37,21 @@ private:
 
 public:
     typedef std::vector<std::string> CommandOutput;
-    GtpClient(const std::string& exe, const std::string& cmdline,
-              const std::string& path, const nlohmann::json& messages);
+
+    GtpClient(const std::string &exe, const std::string &cmdline,
+              const std::string &path, const nlohmann::json &messages);
 
     ~GtpClient();
 
-    void interpolate(std::string& out);
+    void interpolate(std::string &out);
 
-    void operator()(const std::string& line);
+    void operator()(const std::string &line);
 
-    void initFilters(const nlohmann::json& messages);
+    void initFilters(const nlohmann::json &messages);
 
     void compileFilters();
 
-    void addOutputFilter(const std::string& msg, const std::string& format, const std::string& var);
+    void addOutputFilter(const std::string &msg, const std::string &format, const std::string &var);
 
     std::string lastError();
 
@@ -60,9 +61,9 @@ public:
 
     CommandOutput version();
 
-    CommandOutput issueCommand(const std::string& command);
+    CommandOutput issueCommand(const std::string &command);
 
-    static bool success(const CommandOutput& ret);
+    static bool success(const CommandOutput &ret);
 
 };
 

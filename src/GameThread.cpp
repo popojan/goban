@@ -4,7 +4,7 @@
 
 GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr), interruptRequested(false), hasThreadRunning(false),
-        playerToMove(0), human(0), sgf(0), coach(0), kibitz(0), numPlayers(0), activePlayer({0, 0})
+        playerToMove(nullptr), human(0), sgf(0), coach(0), kibitz(0), numPlayers(0), activePlayer({0, 0})
 {
 
 }
@@ -12,14 +12,14 @@ GameThread::GameThread(GobanModel &m) :
 void GameThread::reset() {
     interruptRequested = false;
     hasThreadRunning = false;
-    playerToMove = 0;
+    playerToMove = nullptr;
 }
 
 GameThread::~GameThread() {
     std::unique_lock<std::mutex> lock(mutex2);
     interrupt();
-    for(auto it = players.begin(); it != players.end(); ++it) {
-        delete *it;
+    for(auto & player : players) {
+        delete player;
     }
     players.clear();
 }
@@ -36,25 +36,25 @@ size_t GameThread::addPlayer(Player* player) {
 }
 
 Engine* GameThread::currentCoach() {
-    for(auto eit = engines.begin(); eit != engines.end(); ++eit) {
-        if((*eit)->hasRole(Player::COACH)) return *eit;
+    for(auto & engine : engines) {
+        if(engine->hasRole(Player::COACH)) return engine;
     }
-    return 0;
+    return nullptr;
 }
 
 Engine* GameThread::currentKibitz() {
-    for(auto eit = engines.begin(); eit != engines.end(); ++eit) {
-        if((*eit)->hasRole(Player::KIBITZ)) return *eit;
+    for(auto & engine : engines) {
+        if(engine->hasRole(Player::KIBITZ)) return engine;
     }
-    return 0;
+    return nullptr;
 }
 
 Player* GameThread::currentPlayer() {
     int roleToMove = model.state.colorToMove == Color::BLACK ? Player::BLACK : Player::WHITE;
-    for(auto pit = players.begin(); pit != players.end(); ++pit) {
-        if((*pit)->hasRole(roleToMove)) return *pit;
+    for(auto & player : players) {
+        if(player->hasRole(roleToMove)) return player;
     }
-    return 0;
+    return nullptr;
 }
 
 void GameThread::setRole(size_t playerIndex, int role, bool add) {
@@ -69,7 +69,7 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
             player->hasRole(Player::BLACK),
             player->hasRole(Player::WHITE)
         );
-        if(!add && playerToMove != 0 && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+        if(!add && playerToMove != nullptr && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
             playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
         }
         if(add) {
@@ -85,12 +85,12 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
 }
 
 void GameThread::interrupt() {
-    if(thread != 0) {
+    if(thread != nullptr) {
         interruptRequested = true;
         playLocalMove(Move(Move::INTERRUPT, model.state.colorToMove));
         thread->join();
         delete thread;
-        thread = 0;
+        thread = nullptr;
     }
 }
 
@@ -106,8 +106,7 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
     bool success = true;
 
-    for (auto pit = players.begin(); pit != players.end(); ++pit) {
-        Player* player = *pit;
+    for (auto player : players) {
         success &= player->boardsize(boardSize);
         success &= player->clear();
     }
@@ -131,17 +130,16 @@ void GameThread::setKomi(float komi) {
         gameObservers.begin(), gameObservers.end(),
         [komi](GameObserver* observer){observer->onKomiChange(komi);}
     );
-    for (auto pit = players.begin(); pit != players.end(); ++pit) {
-        Player* player = *pit;
+    for (auto player : players) {
         player->komi(komi);
     }
 }
 
-int GameThread::getActivePlayer(int which) {
+size_t GameThread::getActivePlayer(int which) {
     return activePlayer[which];
 }
 
-int GameThread::activatePlayer(int which, int delta) {
+size_t GameThread::activatePlayer(int which, int delta) {
     std::lock_guard<std::mutex> lock(playerMutex);
 
     std::size_t oldp = activePlayer[which];
@@ -161,33 +159,25 @@ bool GameThread::setFixedHandicap(int handicap) {
     bool success = false;
     if (!model.started) {
         int lastSize = model.board.getSize();
-        success = true;
 		Engine* coach = currentCoach();
         std::vector<Position> stones;
 		if (handicap >= 2) {
             coach->boardsize(lastSize);
             coach->clear();
-            if (coach != 0) {
-                success = coach->fixed_handicap(handicap, stones);
-				if (handicap > 0 && !success) {
-					return setFixedHandicap(0);
-				}
+            success = coach->fixed_handicap(handicap, stones);
+            if (!success) {
+                return setFixedHandicap(0);
             }
-            if (success) {
-                for (auto pit = players.begin(); pit != players.end(); ++pit) {
-                    Player* player = *pit;
-                    if (player != coach && player->getRole() != Player::NONE) {
-                        player->boardsize(lastSize);
-                        player->clear();
-                        for (auto pit = stones.begin(); pit != stones.end(); ++pit)
-                            success &= player->play(Move(*pit, Color::BLACK));
-                    }
-
+            for (auto player : players) {
+                if (player != coach && player->getRole() != Player::NONE) {
+                    player->boardsize(lastSize);
+                    player->clear();
+                    for (auto & stone : stones)
+                        success &= player->play(Move(stone, Color(Color::BLACK)));
                 }
-                model.state.colorToMove = Color::WHITE;
+                model.state.colorToMove = Color(Color::WHITE);
             }
-        }
-        else {
+        } else {
             success = true;
         }
         if(success) {
@@ -209,7 +199,7 @@ void GameThread::run() {
     engineStarted.wait(lock);
 }
 
-bool GameThread::isRunning() { return hasThreadRunning;}
+bool GameThread::isRunning() const { return hasThreadRunning;}
 
 bool GameThread::humanToMove() {
     std::unique_lock<std::mutex> lock(playerMutex);
@@ -264,8 +254,8 @@ void GameThread::gameLoop() {
                 move = kibitz->genmove(model.state.colorToMove);
                 kibitzed = true;
             }
-            spdlog::debug("MOVE to {}, valid = {}", move.toString(), move);
-            playerToMove = 0;
+            spdlog::debug("MOVE to {}, valid = {}", move.toString(), (bool)move);
+            playerToMove = nullptr;
             if(player->isTypeOf(Player::HUMAN)){
                 lock.lock();
                 locked = true;
@@ -297,8 +287,7 @@ void GameThread::gameLoop() {
             if(success) {
                 //other engines play
                 if (!(move == Move::RESIGN)) {
-                    for (auto pit = players.begin(); pit != players.end(); ++pit) {
-                        Player *p = *pit;
+                    for (auto p : players) {
                         if (p != reinterpret_cast<Player *>(coach) && p != player && (!kibitzed || p != kibitz)) {
                             spdlog::debug("DEBUG play iter");
                             if (move == Move::UNDO) {
@@ -435,8 +424,8 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
 
     auto humans = config->data.find("humans");
     if(humans != config->data.end()) {
-        for(auto it = humans->begin(); it != humans->end(); ++it) {
-            human = addPlayer(new LocalHumanPlayer(*it));
+        for(auto & it : *humans) {
+            human = addPlayer(new LocalHumanPlayer(it));
         }
     } else {
         human = addPlayer(new LocalHumanPlayer("Human"));
@@ -447,10 +436,10 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
     activePlayer[1] = coach;
 }
 
-Move GameThread::getLocalMove(const Position& coord) {
-    return Move(coord, model.state.colorToMove);
+Move GameThread::getLocalMove(const Position& coord) const {
+    return {coord, model.state.colorToMove};
 }
 
-Move GameThread::getLocalMove(const Move::Special move) {
-    return Move(move, model.state.colorToMove);
+Move GameThread::getLocalMove(const Move::Special move) const {
+    return {move, model.state.colorToMove};
 }

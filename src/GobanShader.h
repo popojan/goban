@@ -28,104 +28,95 @@ std::string createShaderFromFile(const std::string& filename);
 
 class GobanShader {
 public:
-    GobanShader(const GobanView& view): shadersReady(false), shaderChanged(false),
-        currentProgram(-1), ww(-1.0f), stoneh(-1.0f),
-        width(0), height(0), gamma(1.0f), contrast(0.0f),
-	view(view), animT(0.5f)
+    explicit GobanShader(const GobanView& view): shadersReady(false), currentProgram(-1),
+        width(0), height(0), gamma(1.0f), contrast(0.0f), view(view), animT(0.5f),
+        currentProgramH(.0)
     {
         init();
     }
     void initProgram(const std::string& vprogram, const std::string& fprogram);
-    void setMetrics(const Metrics &);
+    void setMetrics(const Metrics &) const;
     void init();
-    void destroy();
-    void draw(const GobanModel&, const DDG::Camera&, int, float);
+    void destroy() const;
+    void draw(const GobanModel&, int, float);
     int choose(int idx);
-    void use();
-    void unuse();
-    void setTime(float);
-    void setPan(glm::vec3);
-    void setRotation(glm::mat4x4);
+    void use() const;
+    static void unuse() ;
+    void setTime(float) const;
+    void setPan(glm::vec3) const;
+    void setRotation(glm::mat4x4) const;
     void setResolution(float, float);
     void setGamma(float);
     void setContrast(float);
-    float getGamma(){ return gamma;}
-    float getContrast(){ return contrast;}
-    bool isReady() { return shadersReady;}
-    float getStoneHeight() const { return currentProgramH; }
+    [[nodiscard]] float getGamma() const { return gamma;}
+    [[nodiscard]] float getContrast() const { return contrast;}
+    [[nodiscard]] bool isReady() const { return shadersReady;}
+    [[nodiscard]] float getStoneHeight() const { return currentProgramH; }
     void setReady() { shadersReady = true; }
-    int getCurrentProgram() const {return currentProgram;}
+    [[nodiscard]] int getCurrentProgram() const {return currentProgram;}
     bool shaderAttachFromString(GLuint program, GLenum type, const std::string& source);
 private:
     GLuint gobanProgram = 0;
     GLuint iVertex = 0;
-    GLint iMouse;
-    GLint iDim;
-    GLint iModelView;
-	GLint iStone;
-    GLint iResolution;
-    GLint iStones;
-    GLuint bufStones;
-    GLuint uBlockIndex;
+    GLint iDim = -1;
+    GLint iModelView = -1;
+    GLint iResolution = -1;
+    GLuint bufStones = 0;
+    GLuint uBlockIndex = 0;
     GLuint blockBindingPoint = 1;
-    GLuint vertexBuffer, elementBuffer;
-    GLint iGamma;
-    GLint iContrast;
-    GLint fsu_fNDIM;
-    GLint fsu_boardaa;
-    GLint fsu_boardbb;
-    GLint fsu_boardcc;
-    GLint fsu_wwx;
-    GLint fsu_wwy;
-    GLint fsu_w;
-    GLint fsu_h;
-    GLint fsu_stoneRadius;
-    GLint fsu_d;
-    GLint fsu_stoneradius2;
-    GLint fsu_dn;
-    GLint fsu_b;
-    GLint fsu_y;
-    GLint fsu_px;
-    GLint fsu_pxs;
-    GLint fsu_r1;
-    GLint fsu_r2;
-    GLint fsu_r123r123;
-    GLint fsu_rrr;
-    GLint fsu_r1r1ir2ir2;
-    GLint fsu_maxBound;
-    GLint fsu_dw;
-    GLint fsu_iscale;
-    GLint fsu_bowlRadius;
-    GLint fsu_bowlRadius2;
-    GLint fsu_cc;
+    GLuint vertexBuffer = 0, elementBuffer = 0;
+    GLint iGamma = -1;
+    GLint iContrast = -1;
+    GLint fsu_fNDIM = -1;
+    GLint fsu_boardaa = -1;
+    GLint fsu_boardbb = -1;
+    GLint fsu_boardcc = -1;
+    GLint fsu_wwx = -1;
+    GLint fsu_wwy = -1;
+    GLint fsu_w = -1;
+    GLint fsu_h = -1;
+    GLint fsu_stoneRadius = -1;
+    GLint fsu_d = -1;
+    GLint fsu_stoneradius2 = -1;
+    GLint fsu_dn = -1;
+    GLint fsu_b = -1;
+    GLint fsu_y = -1;
+    GLint fsu_px = -1;
+    GLint fsu_pxs = -1;
+    GLint fsu_r1 = -1;
+    GLint fsu_r2 = -1;
+    GLint fsu_r123r123 = -1;
+    GLint fsu_rrr = -1;
+    GLint fsu_r1r1ir2ir2 = -1;
+    GLint fsu_maxBound = -1;
+    GLint fsu_dw = -1;
+    GLint fsu_iscale = -1;
+    GLint fsu_bowlRadius = -1;
+    GLint fsu_bowlRadius2 = -1;
+    GLint fsu_cc = -1;
 
-    GLint iWhiteCapturedCount;
-    GLint iBlackCapturedCount;
-    GLint iWhiteReservoirCount;
-    GLint iBlackReservoirCount;
-    GLint iddc;
-    GLint fsu_cursor;
-
-    int AA;
+    GLint iWhiteCapturedCount = -1;
+    GLint iBlackCapturedCount = -1;
+    GLint iWhiteReservoirCount = -1;
+    GLint iBlackReservoirCount = -1;
+    GLint iddc = -1;
+    GLint fsu_cursor = -1;
 
     static const std::array<GLfloat, 16> vertexBufferData;
     static const GLushort elementBufferData[];
 
-    GLint iTranslate;
-    GLint iTime;
-    GLint iAnimT;
-    GLint iAA;
+    GLint iTranslate = -1;
+    GLint iTime = -1;
+    GLint iAnimT = -1;
 
-    GLuint vertexShader;
-    GLuint fragmentShader;
+    GLuint vertexShader = 0;
+    GLuint fragmentShader = 0;
 
     bool shadersReady;
-    bool shaderChanged;
 
     int currentProgram;
-    float currentProgramH;
+    float currentProgramH{};
 
-    float ww, stoneh;
     float width, height;
     float gamma, contrast;
 
