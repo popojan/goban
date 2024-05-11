@@ -1,6 +1,5 @@
 #include "GobanView.h"
 #include "Shell.h"
-#include <Rocket/Core/StyleSheet.h>
 #include "AudioPlayer.hpp"
 #include "ElementGame.h"
 
@@ -86,10 +85,22 @@ void GobanView::resetView() {
         fin >> newTranslate[0];
         fin >> newTranslate[1];
         fin >> newTranslate[2];
+        float val;
+        fin >> val;
+        gobanShader.setEof(val);
+        fin >> val;
+        gobanShader.setDof(val);
+        fin >> val;
+        gobanShader.setGamma(val);
+        fin >> val;
+        gobanShader.setContrast(val);
+        fin >> showOverlay;
         translate[0] = newTranslate[0];
         translate[1] = newTranslate[1];
         translate[2] = newTranslate[2];
         fin.close();
+        updateFlag |= UPDATE_OVERLAY;
+        updateFlag |= UPDATE_SHADER;
     } catch (std::exception &ex) {
         std::cout << ex.what() << std::endl;
         //initCam();
@@ -108,7 +119,12 @@ void GobanView::saveView() {
             << cam.rLast[2]  << std::endl
             << newTranslate[0]  << std::endl
             << newTranslate[1]  << std::endl
-            << newTranslate[2] << std::endl;
+            << newTranslate[2] << std::endl
+            << gobanShader.getEof() << std::endl
+            << gobanShader.getDof() << std::endl
+            << gobanShader.getGamma() << std::endl
+            << gobanShader.getContrast() << std::endl
+            << showOverlay;
     fout.close();
 }
 
@@ -119,6 +135,13 @@ void GobanView::clearView() {
     translate[0] = newTranslate[0];
     translate[1] = newTranslate[1];
     translate[2] = newTranslate[2];
+    showOverlay = true;
+    gobanShader.setGamma(1.0);
+    gobanShader.setContrast(0.0);
+    gobanShader.setEof(0.0775);
+    gobanShader.setDof(-0.0875);
+    updateFlag |= UPDATE_OVERLAY;
+    updateFlag |= UPDATE_SHADER;
     saveView();
     requestRepaint();
 }

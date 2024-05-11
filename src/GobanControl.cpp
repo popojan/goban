@@ -176,6 +176,23 @@ bool GobanControl::command(const std::string& cmd) {
         spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() - 0.025f);
     }
+    else if (cmd == "increase eof") {
+        view.setEof(view.getEof() + 0.0025f);
+        spdlog::debug("new eof = {0}", view.getEof());
+    }
+    else if (cmd == "decrease eof") {
+        view.setEof(view.getEof() - 0.0025f);
+        spdlog::debug("new eof = {0}", view.getEof());
+    }
+    else if (cmd == "increase dof") {
+        view.setDof(view.getDof() + 0.0025f);
+        spdlog::debug("new dof = {0}", view.getDof());
+    }
+    else if (cmd == "decrease dof") {
+        view.setDof(view.getDof() - 0.0025f);
+        spdlog::debug("new dof = {0}", view.getDof());
+    }
+
     else if (cmd == "increase contrast") {
         spdlog::debug("new contrast = {0}", view.getContrast() + 0.025f);
         view.setContrast(view.getContrast() + 0.025f);

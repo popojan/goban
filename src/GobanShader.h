@@ -30,7 +30,7 @@ class GobanShader {
 public:
     explicit GobanShader(const GobanView& view): shadersReady(false), currentProgram(-1),
         width(0), height(0), gamma(1.0f), contrast(0.0f), view(view), animT(0.5f),
-        currentProgramH(.0)
+        currentProgramH(.0), eof(0.0775), dof(-0.0875)
     {
         init();
     }
@@ -48,6 +48,10 @@ public:
     void setResolution(float, float);
     void setGamma(float);
     void setContrast(float);
+    void setEof(float);
+    void setDof(float);
+    float getEof();
+    float getDof();
     [[nodiscard]] float getGamma() const { return gamma;}
     [[nodiscard]] float getContrast() const { return contrast;}
     [[nodiscard]] bool isReady() const { return shadersReady;}
@@ -95,6 +99,9 @@ private:
     GLint fsu_bowlRadius2 = -1;
     GLint fsu_cc = -1;
 
+    GLint vsu_eof = -1;
+    GLint vsu_dof = -1;
+
     GLint iWhiteCapturedCount = -1;
     GLint iBlackCapturedCount = -1;
     GLint iWhiteReservoirCount = -1;
@@ -119,6 +126,7 @@ private:
 
     float width, height;
     float gamma, contrast;
+    float eof, dof;
 
     const GobanView& view;
 

@@ -69,6 +69,24 @@ public:
         updateFlag |= UPDATE_SHADER;
     }
 
+    void setEof(float eof) {
+        gobanShader.setEof(eof);
+        updateFlag |= UPDATE_SHADER;
+    };
+
+    void setDof(float dof) {
+        gobanShader.setDof(dof);
+        updateFlag |= UPDATE_SHADER;
+    }
+    float getEof() {
+        return gobanShader.getEof();
+    };
+
+    float getDof() {
+        return gobanShader.getDof();
+    };
+
+
     float getGamma() const {
 		return gobanShader.getGamma();
     }

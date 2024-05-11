@@ -56,7 +56,7 @@ endfunction()
 
 function(build_freetype2)
     ExternalProject_Add(project_freetype2
-            GIT_REPOSITORY  http://git.savannah.nongnu.org/r/freetype/freetype2.git/
+            GIT_REPOSITORY  https://git.savannah.gnu.org/git/freetype/freetype2.git
             SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/freetype2
             BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/freetype2/build
             INSTALL_COMMAND  echo Skipping install step for freetype2
@@ -152,11 +152,12 @@ function(build_librocket)
     ExternalProject_Get_Property(project_librocket BINARY_DIR)
     SET(librocket_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
     SET(librocket_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
+
     #ADD_LIBRARY(librocket STATIC IMPORTED)
 endfunction()
 
 function(build_libsgfcplusplus)
-    SET(SGFCPLUSPLUS_STATIC_DEFINE 1)
+    SET(SGFCPLUSPLUS_STATIC_DEFINE 1 PARENT_SCOPE)
     MESSAGE("build type = ${CMAKE_BUILD_TYPE}")
     ExternalProject_Add(project_libsgfcplusplus
             GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
@@ -173,10 +174,11 @@ function(build_libsgfcplusplus)
             COMMAND git checkout sgfc
             INSTALL_COMMAND     echo Skipping install step for libsgfcplusplus
             )
+
     ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)
     ExternalProject_Get_Property(project_libsgfcplusplus BINARY_DIR)
     set(libsgfcplusplus_inc_dir "${SOURCE_DIR}/include" "${BINARY_DIR}/src" PARENT_SCOPE)
-    set(libsgfcplusplus_lib_dir "${BINARY_DIR}/src" PARENT_SCOPE)
+    set(libsgfcplusplus_lib_dir "${BINARY_DIR}/src/${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
 endfunction()
 
 function(find_libsgfcplusplus)
@@ -196,10 +198,11 @@ endfunction()
 function(fetch_json)
     include(FetchContent)
 
-    FetchContent_Declare(json
-            GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent.git
-            GIT_TAG v3.7.3)
+    FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
 
+    FetchContent_MakeAvailable(json)
     FetchContent_GetProperties(json)
     if(NOT json_POPULATED)
         FetchContent_Populate(json)
@@ -380,7 +383,7 @@ else()
         cmake_language(CALL find_boost)
 
         add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00)
-        option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
+        #option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
         set(Boost_USE_STATIC_LIBS ON)
         add_definitions(-DROCKET_STATIC_LIB)
     endif()
@@ -492,6 +495,7 @@ else()
         src/glad/src/glad.c
         src/GameRecord.cpp
     )
+    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
     target_sources(${PROJECT_NAME} PRIVATE
         ${GOBAN_SRC_FILES}
@@ -517,7 +521,6 @@ else()
             ${PORTAUDIO_INCLUDE_DIRS}
             ${libsgfcplusplus_inc_dir}
     )
-    target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
     add_dependencies(${PROJECT_NAME}
             project_librocket

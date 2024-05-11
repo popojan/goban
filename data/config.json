@@ -12,8 +12,8 @@
     },
     {
       "name": "Pachi 12.60",
-      "path": "./engine/pachi",
-      "command": "pachi-12.60-amd64",
+      "path": "./engine/Pachi-12.60",
+      "command": "pachi.exe",
       "parameters": "-r japanese --smart-pass",
       "enabled": 0
     },
@@ -21,7 +21,7 @@
       "name": "Katago #kata1 b40",
       "path": "./engine/katago",
       "command": "katago",
-      "parameters": "gtp -model ./engine/katago/kata1-b40c256-s11101799168-d2715431527.bin.gz -config ./engine/katago/default_gtp.cfg",
+      "parameters": "gtp -model ./engine/katago/models/kata1-b40c256-s10359230464-d2525387336.bin.gz -config ./engine/katago/default_gtp.cfg",
       "enabled": 0,
       "kibitz": 0,
       "messages": [
@@ -39,6 +39,13 @@
             "output": " "
           }
       ]
+    },
+    {
+       "name": "Zen 7",
+       "path": "./engine/zen",
+       "command": "gtp4zen.exe",
+       "parameters": "-z7",
+       "enabled": 1
     },
     {
       "name": "Zen 6",
@@ -79,7 +86,11 @@
     {"key": 90, "command": "decrease gamma"},
     {"key": 91, "command": "increase contrast"},
     {"key": 93, "command": "decrease contrast"},
-    {"key": 89, "command": "reset contrast and gamma"}
+    {"key": 89, "command": "reset contrast and gamma"},
+    {"key": 19, "command": "increase eof"},
+    {"key": 23, "command": "decrease eof"},
+    {"key": 21, "command": "increase dof"},
+    {"key": 22, "command": "decrease dof"}
   ],
   "sounds": {
     "move":  "./data/sound/stone.wav",
@@ -109,6 +120,12 @@
       "name": "Minimalistic Thin",
       "vertex": "./data/shaders/common/vertex.glsl",
       "fragment": "./data/shaders/legacy/fragment.25D.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Anaglyphic Red Blue",
+      "vertex": "./data/shaders/legacy/vertex.anaglyph.glsl",
+      "fragment": "./data/shaders/legacy/fragment.anaglyph.glsl",
       "height": 0.85
     }
   ],
