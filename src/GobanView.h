@@ -36,7 +36,7 @@ public:
         UPDATE_ALL = (1|2|3|4|8|16|32)
     };
 
-	explicit GobanView(GobanModel& m);
+    explicit GobanView(GobanModel& m);
 
     void onGameMove(const Move& move, const std::string& comment) override;
 
@@ -115,15 +115,15 @@ public:
 
     void resetView();
     void saveView();
-	void shadeIt(float time, GobanShader &shader) const;
+    void shadeIt(float time, GobanShader &shader) const;
 
-	void animateIntro();
+    void animateIntro();
 
     void requestRepaint(int what = UPDATE_SOME);
-	bool toggleOverlay();
+    bool toggleOverlay();
 
-	void Update();
-	void moveCursor(float, float);
+    void Update();
+    void moveCursor(float, float);
     void updateCursor();
 
 public:
@@ -148,7 +148,7 @@ public:
 
     int updateFlag;
     int currentProgram;
-	bool showOverlay;
+    bool showOverlay;
     Position lastMove;
     AudioPlayer player;
 

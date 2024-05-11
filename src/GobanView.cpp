@@ -76,8 +76,8 @@ void GobanView::endZoom() {
 }
 
 void GobanView::resetView() {
-    try {
-        std::ifstream fin("data/view.txt");
+    std::ifstream fin("data/view.txt");
+    if(fin) {
         fin >> cam.rLast.re();
         fin >> cam.rLast[0];
         fin >> cam.rLast[1];
@@ -94,16 +94,13 @@ void GobanView::resetView() {
         gobanShader.setGamma(val);
         fin >> val;
         gobanShader.setContrast(val);
-        fin >> showOverlay;
         translate[0] = newTranslate[0];
         translate[1] = newTranslate[1];
         translate[2] = newTranslate[2];
         fin.close();
-        updateFlag |= UPDATE_OVERLAY;
         updateFlag |= UPDATE_SHADER;
-    } catch (std::exception &ex) {
-        std::cout << ex.what() << std::endl;
-        //initCam();
+    } else {
+		    spdlog::debug("no saved view found");
     }
     lastTime = 0.0;
     startTime = Shell::GetElapsedTime();
@@ -123,8 +120,7 @@ void GobanView::saveView() {
             << gobanShader.getEof() << std::endl
             << gobanShader.getDof() << std::endl
             << gobanShader.getGamma() << std::endl
-            << gobanShader.getContrast() << std::endl
-            << showOverlay;
+            << gobanShader.getContrast() << std::endl;
     fout.close();
 }
 
@@ -135,12 +131,10 @@ void GobanView::clearView() {
     translate[0] = newTranslate[0];
     translate[1] = newTranslate[1];
     translate[2] = newTranslate[2];
-    showOverlay = true;
     gobanShader.setGamma(1.0);
     gobanShader.setContrast(0.0);
     gobanShader.setEof(0.0775);
     gobanShader.setDof(-0.0875);
-    updateFlag |= UPDATE_OVERLAY;
     updateFlag |= UPDATE_SHADER;
     saveView();
     requestRepaint();
@@ -320,7 +314,7 @@ void GobanView::Render(int w, int h)
 }
 
 bool GobanView::toggleOverlay() {
-	showOverlay = !showOverlay;
+    showOverlay = !showOverlay;
     updateFlag |= UPDATE_OVERLAY;
     return showOverlay;
 }
