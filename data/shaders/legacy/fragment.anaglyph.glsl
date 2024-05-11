@@ -14,8 +14,8 @@ const float cidLastWhiteStone = 6.75;
 
 in vec3 rdbl;
 in vec3 rdbr;
-in vec3 rool;
-in vec3 roor;
+flat in vec3 rool;
+flat in vec3 roor;
 in float noise;
 out vec3 glFragColor;
 

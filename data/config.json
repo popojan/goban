@@ -41,11 +41,27 @@
       ]
     },
     {
-       "name": "Zen 7",
-       "path": "./engine/zen",
-       "command": "gtp4zen.exe",
-       "parameters": "-z7",
-       "enabled": 1
+      "name": "Katago #kata9x9 b18",
+      "path": "./engine/katago",
+      "command": "katago",
+      "parameters": "gtp -model ./engine/katago/kata9x9-b18c384nbt-20231025.bin.gz -config ./engine/katago/default_gtp.cfg",
+      "enabled": 1,
+      "kibitz": 0,
+      "messages": [
+          {
+            "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
+            "output": "$1",
+            "var": "$primaryMove"
+	        },
+          {
+            "regex": "^$primaryMove.*(W\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+L)",
+            "output": "$1 $2"
+          },
+          {
+            "regex": "Controller:",
+            "output": " "
+          }
+      ]
     },
     {
       "name": "Zen 6",

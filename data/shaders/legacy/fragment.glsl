@@ -1234,12 +1234,12 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
                             else {
                                 vec3 u = normalize(cross(nor, nBoard));
                                 vec3 v = cross(u, nor);
-				vec3 diff = vec3(pos.x, 0.000, pos.z) - vec3(xz.x, 0.0, xz.y);
-				if(length(diff) > 0.01) {
-	                               float acs = acos(dot(v, normalize(diff)));
-                                       //ret.y *= min(1.0, acs / PI);
-				       ret.y *= mix(1.0,min(1.0, acs / PI),2.0*(length(diff)-0.01)/wwx);
-				}
+				                vec3 diff = vec3(pos.x, 0.000, pos.z) - vec3(xz.x, 0.0, xz.y);
+				                if(length(diff) > -0.01) {
+	                                float acs = acos(dot(v, normalize(diff)));
+                                    //ret.y *= min(1.0, acs / PI);
+				                    ret.y *= mix(1.0,min(1.0, acs / PI),2.0*(length(diff)-0.01)/wwx);
+				                }
                            }
                         }
                         if (isBoard && pos.y > -0.001){
@@ -1300,7 +1300,7 @@ vec2 softshadow(in vec3 pos, in vec3 nor, const vec3 lig, const float ldia, int 
                     vec3 ddpos = ddcj.xyz - pos;
                     float avoid = smoothstep(ddcj.y-0.01, ddcj.y, 0.99*pos.y);
                     float ln = length(ddpos);
-                    vec3 ldir = ddpos;
+                    vec3 ldir = ddpos;;
                     float res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
                     vec3 ip = pos + res*ldir;
                     vec2 rR = vec2(r1*length(ip - pos) / ln, ldia);
@@ -1537,8 +1537,7 @@ vec3 shading(in vec3 ro, in vec3 rd, in Intersection ip, const Material mat, vec
         vec3 lig = normalize(lpos - ip.p);
         vec3 lig2 = normalize(lpos2 - ip.p);
         vec3 lig3 = normalize(lpos3 - ip.p);
-        vec2 shadow = pow(softshadow(ip.p, ip.n, lpos, ldia, ip.m, false, ip.uid, ip.pid), vec2(1.0, 0.25));//0.6
-        //shadow += 0.4*pow(softshadow(ip.p, ip.n, lpos2, ldia, ip.m, false, ip.uid), vec2(1.0,0.25));
+        vec2 shadow = softshadow(ip.p, ip.n, lpos, ldia, ip.m, false, ip.uid, ip.pid);
 
         float nny = 0.5 + 0.5*nn.y;
         float adsy = dot(vec3(0.6,0.3,0.3), clamp(vec3(dot(nn, lig), dot(nn, lig2), dot(nn, lig3)),0.0,1.0));
