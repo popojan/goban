@@ -4,10 +4,6 @@ precision highp float;
 layout(location = 0) in vec4 vertex;
 out vec3 rdbl;
 out vec3 rdbr;
-out vec3 rdb1;
-out vec3 rdb2;
-out vec3 rdb3;
-out vec3 rdb4;
 flat out vec3 rool;
 flat out vec3 roor;
 
@@ -17,10 +13,13 @@ uniform mat4 glModelViewMatrix;
 uniform vec3 iTranslate;
 uniform float iAnimT;
 
+uniform float eof;
+uniform float dof;
+
 void main() {
 	gl_Position = vertex; //gl_Vertex;
-    vec3 eoff = vec3(0.01,0.0,0.0);
-    vec2 doff = vec2(-0.25,0.0);
+    vec3 eoff = vec3(eof,0.0,0.0);
+    vec3 doff = vec3(dof,0.0, 0.0);
 
     vec3 ta = vec3(0.0,0.0,0.0);
     vec3 ro = vec3(0.0,0.0,-3.0-100.0*max(0.0,iAnimT-iTime));
@@ -35,25 +34,18 @@ void main() {
     ta = ta + tt;
     up = normalize((m*vec4(up, 1.0)).xyz);
 
-    vec3 cw = normalize(ta - roo);
+    rool = roo - (m*vec4(eoff,1.0)).xyz;
+    roor = roo + (m*vec4(eoff,1.0)).xyz;
+
+    vec3 cw = normalize(ta - (rool + roor)*0.5);
     vec3 cu = normalize(cross(up,cw));
     vec3 cv = cross(cw, cu);
 
     vec2 ratio = vec2(iResolution.x/iResolution.y, 1.0);
 
-    vec2 q0l = (vertex.xy + (vec2(0.5,0.5)-doff)/iResolution) * ratio;
-    vec2 q0r = (vertex.xy + (vec2(0.5,0.5)+doff)/iResolution) * ratio;
+    vec2 q0 = (vertex.xy + (vec2(0.5,0.5))/iResolution) * ratio;
 
-	rdbl = normalize(q0l.x*cu + q0l.y*cv + 3.0*cw);
-	rdbr = normalize(q0r.x*cu + q0r.y*cv + 3.0*cw);
-    rool = roo - (m*vec4(eoff,1.0)).xyz;
-    roor = roo + (m*vec4(eoff,1.0)).xyz;
-    vec2 q0 = q0l;
-	rdb1 = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
-	q0 = (vertex.xy + vec2(-0.5, 0.5) / iResolution) * ratio;
-	rdb2 = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
-	q0 = (vertex.xy + vec2(-0.5, -0.5) / iResolution) * ratio;
-	rdb3 = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
-	q0 = (vertex.xy + vec2(0.5, -0.5) / iResolution) * ratio;
-	rdb4 = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
+	rdbl = normalize((q0.x*cu + q0.y*cv + 3.0*cw - dof*cu));
+	rdbr = normalize((q0.x*cu + q0.y*cv + 3.0*cw + dof*cu));
+
 }

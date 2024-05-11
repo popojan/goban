@@ -8,7 +8,7 @@
 find_path(LIBROCKET_INCLUDE_DIR Rocket/Core.h
         PATH_SUFFIXES Rocket HINTS ${PROJECT_SOURCE_DIR}/deps/libRocket/Include)
 
-message(${PROJECT_BINARY_DIR}/deps/libRocket/build/${BUILD_TYPE})
+message(${PROJECT_BINARY_DIR}/deps/libRocket/build/${CMAKE_BUILD_TYPE})
 find_library(LIBROCKET_CORE_LIBRARY NAMES RocketCore
 	HINTS ${PROJECT_BINARY_DIR}/deps/libRocket/build ${PROJECT_BINARY_DIR}/deps/libRocket/build/${CMAKE_BUILD_TYPE})
 find_library(LIBROCKET_CONTROLS_LIBRARY NAMES RocketControls

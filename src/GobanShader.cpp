@@ -75,9 +75,11 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     const std::string sVertexShader = createShaderFromFile(vertexProgram);
     const std::string sFragmentShader = createShaderFromFile(fragmentProgram);
 
+    /*
     std::ofstream fout("./debug_fragment_shader.glsl");
     fout << sFragmentShader << std::endl;
     fout.close();
+    */
 
     if(!shaderAttachFromString(gobanProgram, GL_VERTEX_SHADER, sVertexShader))
         spdlog::error("Vertex shader [{}] failed to compile. Err {}", vertexProgram, glGetError());
@@ -159,6 +161,9 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     iddc = glGetUniformLocation(gobanProgram, "ddc");
     fsu_cursor = glGetUniformLocation(gobanProgram, "cursor");
 
+    vsu_eof = glGetUniformLocation(gobanProgram, "eof");
+    vsu_dof = glGetUniformLocation(gobanProgram, "dof");
+
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
     glUseProgram(0);
@@ -237,6 +242,8 @@ void GobanShader::setMetrics(const Metrics &m) const {
     glUniform1f(fsu_bowlRadius, br);
     glUniform1f(fsu_bowlRadius2, br2);
     glUniform3fv(fsu_cc, 4, m.bowlsCenters);
+    glUniform1f(vsu_dof, dof);
+    glUniform1f(vsu_eof, eof);
 }
 
 void GobanShader::destroy() const {
@@ -376,4 +383,20 @@ void GobanShader::setRotation(glm::mat4x4 m) const {
 void GobanShader::setResolution(float w, float h) {
     width = w;
     height = h;
+}
+
+void GobanShader::setEof(float val) {
+    eof = val;
+}
+
+void GobanShader::setDof(float val) {
+    dof = val;
+}
+
+float GobanShader::getEof() {
+    return eof;
+}
+
+float GobanShader::getDof() {
+    return dof;
 }
