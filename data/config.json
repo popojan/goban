@@ -143,6 +143,12 @@
       "vertex": "./data/shaders/legacy/vertex.anaglyph.glsl",
       "fragment": "./data/shaders/legacy/fragment.anaglyph.glsl",
       "height": 0.85
+    },
+    {
+      "name": "Red Carpet Refactored",
+      "vertex": "./data/shaders/common/vertex.glsl",
+      "fragment": "./data/shaders/red_carpet.glsl",
+      "height": 0.85
     }
   ],
   "gui": "./data/gui"

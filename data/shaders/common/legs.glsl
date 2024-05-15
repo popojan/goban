@@ -1,7 +1,7 @@
 int rLegs(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
     for (int i = 0; i < 4; i++){
         const float r = legh;
-        vec3 cc = vec3(1 - 2 * (i & 1), 1, 1 - 2 * ((i >> 1) & 1))*(bnx.xyx + vec3(1.05*r, -0.5*r, 1.05*r));
+        vec3 cc = vec3(1 - 2 * (i & 1), 1, 1 - 2 * ((i >> 1) & 1))*(bnx.xyz + vec3(r, -0.5*r, r));
         vec3 delta = vec3(0.0,0.0*0.45*r, 0.0);
         vec2 tt = intersectionRaySphereR(ro, rd, cc+delta, r*r);
 

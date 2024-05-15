@@ -87,8 +87,8 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
 
                     n1 = vec3(0.0, 1.0, 0.0);
                     n0 = vec3(ip0.x, 0.0, ip0.z);
-                    bool gridx = ip.x > -c.x + mw*ww - 0.5*ww && ip.x < c.x - mw*ww + 0.5*ww && ip.z > -c.z + mw*ww - dw && ip.z < c.z - mw*ww + dw;
-                    bool gridz = ip.x > -c.x + mw*ww - dw && ip.x < c.x - mw*ww + dw && ip.z > -c.z + mw*ww - 0.5*ww && ip.z < c.z - mw*ww + 0.5*ww;
+                    bool gridx = ip.x > -c.x + mw*wwx - 0.5*wwx && ip.x < c.x - mw*wwx + 0.5*wwx && ip.z > -c.z + mw*wwy - dw && ip.z < c.z - mw*wwy + dw;
+                    bool gridz = ip.x > -c.x + mw*wwx - dw && ip.x < c.x - mw*wwx + dw && ip.z > -c.z + mw*wwy - 0.5*wwy && ip.z < c.z - mw*wwy + 0.5*wwy;
                     float r = boardbb*distance(ro, ip);
 
                     if (ip0.y > -0.1) {
@@ -99,7 +99,7 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                         if (any(nearEnough) && any(farEnough)) {
                             vec3 dir = vec3(dw, -dw, 0.0);
                             if (nearEnough.x && gridx) {
-                                vec3 ccx = vec3(ww*round(iww*ip.x), ip.y, ip.z);
+                                vec3 ccx = vec3(wwx*round(ip.x/wwx), ip.y, ip.z);
                                 mat3 ps = mat3(ccx + dir.yzx, ccx + dir.yzy, ccx + dir.yzz + dir.yzz);
                                 mat3 cs = point32plane(ps, ip, rd);
                                 float a1 = circleHalfPlaneIntersectionArea(ip, r, cs);
@@ -109,7 +109,7 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                                 dd = a1 + a2;
                             }
                             if (nearEnough.y && gridz) {
-                                vec3 ccz = vec3(ip.x, ip.y, ww*round(iww*ip.z));
+                                vec3 ccz = vec3(ip.x, ip.y, wwy*round(ip.z/wwy));
                                 mat3 ps = mat3(ccz + dir.xzy, ccz + dir.yzy, ccz + dir.zzy + dir.zzy);
                                 mat3 cs = point32plane(ps, ip, rd);
                                 float a1 = circleHalfPlaneIntersectionArea(ip, r, cs);
@@ -119,7 +119,7 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                                 dd = min(a1 + a2, dd);
                             }
                         }
-                        float rr = 0.1*ww;
+                        float rr = 0.1*wwx;
                         //const bvec2 nearEnough = bvec2(true);
                         //lessThan(abs(ip.xz - ww*round(ip.xz*iww)), vec2(rr + rr + r));
                         if (any(nearEnough)) {
@@ -130,7 +130,7 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                                 ppos = vec3(6.0, 0.0, 6.0);
                                 for (int i = -1; i <= 1; i++) {
                                     for (int j = -1; j <= 1; j++) {
-                                        vec3 pos = ww*vec3(i, 0, j)*ppos.zyz;
+                                        vec3 pos =vec3(wwx, 0.0, wwy)*vec3(i, 0, j)*ppos.zyz;
                                         float dst = distance(ip.xz, pos.xz);
                                         if (dst < mindist) {
                                             mindist = dst;
@@ -143,7 +143,7 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                                 ppos = vec3(3.0, 0.0, 3.0);
                                 for (int i = -1; i <= 1; i += 2) {
                                     for (int j = -1; j <= 1; j += 2) {
-                                        vec3 pos = ww*vec3(i, 0, j)*ppos.zyz;
+                                        vec3 pos = vec3(wwx, 0.0, wwy)*vec3(i, 0, j)*ppos.zyz;
                                         float dst = distance(ip.xz, pos.xz);
                                         if (dst < mindist) {
                                             mindist = dst;
@@ -177,7 +177,7 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 ret.ip[i].a = vec2(clamp(1.0-dd, 0.0, 1.0),1.0-xxx);
 
                 ret.ip[i].d = -xxx*boardaa;
-                ret.ip[i].pid = all( lessThan(abs(ip.xz), vec2(0.95))) ? idBlackStone : idBoard;
+                ret.ip[i].pid = all( lessThan(abs(ip.xz), vec2(0.95, wwy/wwx * 0.95) )) ? idBlackStone : idBoard;
                 ret.ip[i].oid = idBoard;
                 ret.ip[i].n = n0;
                 ret.ip[i].uvw = uvw;
