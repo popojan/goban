@@ -3,10 +3,6 @@ precision highp float;
 
 layout(location = 0) in vec4 vertex;
 out vec3 rdb;
-out vec3 rdb1;
-out vec3 rdb2;
-out vec3 rdb3;
-out vec3 rdb4;
 flat out vec3 roo;
 
 uniform vec2 iResolution;
@@ -38,11 +34,4 @@ void main() {
     vec2 ratio = vec2(iResolution.x/iResolution.y, 1.0);
     vec2 q0 = (vertex.xy + vec2(0.5,0.5)/iResolution) * ratio;
 	rdb = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
-	rdb1 = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
-	q0 = (vertex.xy + vec2(-0.5, 0.5) / iResolution) * ratio;
-	rdb2 = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
-	q0 = (vertex.xy + vec2(-0.5, -0.5) / iResolution) * ratio;
-	rdb3 = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
-	q0 = (vertex.xy + vec2(0.5, -0.5) / iResolution) * ratio;
-	rdb4 = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
 }

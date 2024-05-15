@@ -91,9 +91,9 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
     float t1, t2;
     if (IntersectBox(ro, rd, minBound, maxBound, t1, t2)) {
         vec4 b12 = ro.xzxz + vec4(t1, t1, t2, t2)*rd.xzxz;
-        vec2 noise = vec2(ww*0.2);
+        vec2 noise = vec2(wwx*0.2);
         vec4 bmnx = vec4(min(b12.xy, b12.zw) - noise, max(b12.xy, b12.zw) + noise);
-        vec4 xz12 = floor(iww * bmnx + vec4(0.5*fNDIM));
+        vec4 xz12 = floor(bmnx/vec4(wwx, wwy, wwx, wwy) + vec4(0.5*fNDIM));
         ivec4 mnx = ivec4(clamp(xz12, 0.0, fNDIM - 1.0));
         int off = shadow ? 0 : 0;
         for (int i = mnx.y - off; i <= mnx.w+off; i++){
@@ -102,7 +102,7 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 ivec2 mm0 = ivec2(idBlackStone, idWhiteStone);
                 float m0 = stone0.z;
                 if (m0 >= cidBlackStone) {
-                    vec2 xz = ww*stone0.xy;
+                    vec2 xz = vec2(wwx, wwy)*stone0.xy;
                     vec3 dd = vec3(xz.x, 0.5*h, xz.y);
                     float tt2;
                     vec4 ret0;
@@ -122,8 +122,8 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                     }
                 }
                 else if (!shadow && (m0 == cidWhiteArea || m0 == cidBlackArea)) {
-                    vec3 dd = vec3(vec2(j, i) - vec2(0.5*fNDIM - 0.5), 0.0)*ww;
-                    vec2 w25 = vec2(0.25*ww, dd.z);
+                    vec3 dd = vec3(vec2(j, i) - vec2(0.5*fNDIM - 0.5), 0.0)*vec3(wwx, wwy, 0.0);
+                    vec2 w25 = vec2(0.25*wwx, dd.z);
                     vec3 minb = dd.xzy - w25.xyx;
                     vec3 maxb = dd.xzy + w25.xyx;
                     IP ipp;
@@ -189,9 +189,9 @@ vec2 sStones(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
         vec3 ld = lig - pos;
         if (IntersectBox(pos, ld, minBound, maxBound, t1, t2)) {
             vec4 b12 = pos.xzxz + vec4(t1, t1, t2, t2)*ld.xzxz;
-            vec2 noise = vec2(ww*0.2);
+            vec2 noise = vec2(wwx*0.2);
             vec4 bmnx = vec4(min(b12.xy, b12.zw) - noise, max(b12.xy, b12.zw) + noise);
-            vec4 xz12 = floor(iww * bmnx + vec4(0.5*fNDIM));
+            vec4 xz12 = floor(bmnx/vec4(wwx, wwy, wwx, wwy) + 0.5*vec4(vec2(fNDIM - 1.0), vec2(fNDIM + 1.0)));
             ivec4 mnx = ivec4(clamp(xz12, 0.0, fNDIM - 1.0));
             for (int i = mnx.y; i <= mnx.w; i++){
                 for (int j = mnx.x; j <= mnx.z; j++){
@@ -199,7 +199,7 @@ vec2 sStones(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
                     int kk = NDIM*i + j;
                     float mm0 = iStones[kk].z;
                     if (mm0 >= cidBlackStone) {
-                        vec2 xz = ww*iStones[kk].xy;
+                        vec2 xz = vec2(wwx, wwy)*iStones[kk].xy;
                         ret *= sCircle(vec3(xz, 0.5*h).xzy, r1, pos, lig, ldia2, ipp);
                     }
                 }

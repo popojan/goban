@@ -14,8 +14,8 @@ const float ldia = 3.5;
 const vec3 nBoard = vec3(0.0, 1.0, 0.0);
 const vec3 minBound = vec3(-1.2, -0.02, -1.2);
 const vec3 p = vec3(0.0, -0.25, 0.0);
-const vec3 c = vec3(1.0, 0.25, 1.0);
-const vec4 bnx = vec4(-c.x, -0.2, -c.x, 0.0);
+vec3 c;
+vec4 bnx;
 const float mw = 0.85;
 const float legh = 0.15;
 
@@ -116,7 +116,7 @@ vec4 getTextureCoordinates(vec4 coord, int algo, float scale) {
     bool noisy = false;
     switch(algo) {
         case texWood:
-            uvw = vec4(2.0*uvw.x/ww + ww*uvw.z, uvw.y, uvw.z, 1.0);
+            uvw = vec4(2.0*uvw.x/wwx + wwx*uvw.z, uvw.y, uvw.z, 1.0);
             uvw = vec4(length(uvw.xy+0.78*sin(0.4+1.8*uvw.z)), uvw.y,  length(uvw.xy), 1.0);
             noisy = true;
             break;
