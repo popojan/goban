@@ -53,8 +53,8 @@ float dBox(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 minimum, in vec3 maximum,
     return xxx;
 }
 
-int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
-    if(shadow) return N;
+void rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
+    if(shadow) return;
     float tb, tb2;
     vec3 q2;
     bool isBoard = IntersectBox(ro, rd, bnx.xyz, -bnx.xwz, tb, tb2);
@@ -69,8 +69,7 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
 
         vec4 uvw = vec4(ip.xyz, 1.0);
         if(ipp.t.x > 0.0) {
-            int i = insert(ret, ipp);
-            if(i < N) {
+            if(try_insert(ret, ipp)) {
                 vec3 n0, n1;
                 vec3 cc = vec3(0.0, 0.5*bnx.y, 0.0);
                 vec3 ip0 = ip - cc;
@@ -174,18 +173,18 @@ int rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 vec3 ip2 = ro + tb2*rd;
                 float xxx = dBox(ro, rd, ip, bnx.xyz, -bnx.xwz, n0);
 
-                ret.ip[i].a = vec2(clamp(1.0-dd, 0.0, 1.0),1.0-xxx);
+                ipp.a = vec2(clamp(1.0-dd, 0.0, 1.0),1.0-xxx);
 
-                ret.ip[i].d = -xxx*boardaa;
-                ret.ip[i].pid = all( lessThan(abs(ip.xz), vec2(0.95, wwy/wwx * 0.95) )) ? idBlackStone : idBoard;
-                ret.ip[i].oid = idBoard;
-                ret.ip[i].n = n0;
-                ret.ip[i].uvw = uvw;
+                ipp.d = -xxx*boardaa;
+                ipp.pid = all( lessThan(abs(ip.xz), vec2(0.95, wwy/wwx * 0.95) )) ? idBlackStone : idBoard;
+                ipp.oid = idBoard;
+                ipp.n = n0;
+                ipp.uvw = uvw;
+                ipp.fog = 1.0;
+                insert(ret, ipp);
             }
-            return i;
         }
     }
-    return N;
 }
 
 vec2 sBoard(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {

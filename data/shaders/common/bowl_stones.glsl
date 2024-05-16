@@ -19,7 +19,7 @@ void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow
             si = 0;
             if (isInCup == 2) {
                 ei = min(maxCaptured, iWhiteCapturedCount);
-                mm0 = ivec2(idBowlBlackStone);
+                mm0 = ivec2(idBowlWhiteStone);
             }
             else {
                 ei = min(maxCaptured, iBlackReservoirCount);
@@ -30,7 +30,7 @@ void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow
             si = maxCaptured;
             if (isInCup == 1) {
                 ei = maxCaptured + min(maxCaptured, iBlackCapturedCount);
-                mm0 = ivec2(idBowlWhiteStone);
+                mm0 = ivec2(idBowlBlackStone);
             }
             else {
                 ei = maxCaptured + min(maxCaptured, iWhiteReservoirCount);
@@ -43,11 +43,9 @@ void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow
             ddcj.y += bnx.y - legh + bowlRadius2 - bowlRadius - 0.5 * (bowlRadius2 - bowlRadius);
             vec4 ret0;
             float tt2;
-            int j = rStoneY(ro, rd, ddcj.xyz, ret, mm0, false, shadow, i);
-            if(!shadow && j < N) {
-                finalizeStone(ro, rd, ddcj.xyz, ret.ip[j], 0.0, false);
-                ret.ip[j].isInCup = isInCup;
-            }
+            IP rip;
+            rip.isInCup = isInCup;
+            rStoneY(ro, rd, ddcj.xyz, ret, rip, mm0, false, shadow, i);
         }
     }
 }

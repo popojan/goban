@@ -1,6 +1,6 @@
-int rPlaneY(in vec3 ro, in vec3 rd, in vec3 p0, in vec3 n, inout SortedLinkedList ret, int oid, bool shadow) {
+void rPlaneY(in vec3 ro, in vec3 rd, in vec3 p0, in vec3 n, inout SortedLinkedList ret, int oid, bool shadow) {
 
-    if(shadow) return N;
+    if(shadow) return;
     float denom = dot(rd, n);
     if (abs(denom) > 1e-6) {
         float t = dot(p0 - ro, n) / denom;
@@ -8,14 +8,13 @@ int rPlaneY(in vec3 ro, in vec3 rd, in vec3 p0, in vec3 n, inout SortedLinkedLis
             IP ip;
             ip.t = vec3(t, t, 1.0);
 
-            int i = insert(ret, ip);
-            if (i < N) {
-                ret.ip[i].n = n;
-                ret.ip[i].d = -1.0;
-                ret.ip[i].oid = idTable;
-                ret.ip[i].pid = idTable;
-                ret.ip[i].a = vec2(1.0);
-                ret.ip[i].uid = idTable;
+            if (try_insert(ret, ip)) {
+                ip.n = n;
+                ip.d = -1.0;
+                ip.oid = idTable;
+                ip.pid = idTable;
+                ip.a = vec2(1.0);
+                ip.uid = idTable;
 
                 vec3 ipp = ro + rd*ip.t.x;
                 vec2 xz = ipp.xz;
@@ -51,28 +50,27 @@ int rPlaneY(in vec3 ro, in vec3 rd, in vec3 p0, in vec3 n, inout SortedLinkedLis
                 float alpha = 3.1415926/4.0;
                 float al = 0.0;
                 if (!third && ab) {
-                    ret.ip[i].oid = idYin;
+                    ip.oid = idYin;
                     al = max(c05b, c05a);
                 }
                 else if (!third){
-                    ret.ip[i].oid = idYang;
+                    ip.oid = idYang;
                     al = max(c05b, c05a);
                 }
                 else {
                     alpha = 0.0;
                 }
-                ret.ip[i].uvw = 73.0*ipp.xyzx;
+                ip.uvw = 73.0*ipp.xyzx;
 
                 float cosa = cos(alpha);
                 float sina = sin(alpha);
                 xz = mat2(cosa, sina, -sina, cosa)*ipp.xz;
                 vec3 scoord = ipp;
 
-                ret.ip[i].a = vec2(al, 0.0);
-                ret.ip[i].fog = exp(-0.35*max(0.0,length(ipp)));
+                ip.a = vec2(al, 0.0);
+                ip.fog = exp(-0.35*max(0.0,length(ipp)));
+                insert(ret, ip);
             }
-            return i;
         }
     }
-    return N;
 }
