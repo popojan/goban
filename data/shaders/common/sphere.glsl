@@ -6,7 +6,7 @@ float dSphere(in vec3 ro, in vec3 rd, in vec3 dd, float radius2){
     return dist / distance(x0, ro);
 }
 
-int rSphere(in vec3 ro, in vec3 rd, in vec3 center, const float radius2, inout SortedLinkedList ret, int oid){
+void rSphere(in vec3 ro, in vec3 rd, in vec3 center, const float radius2, inout SortedLinkedList ret, int oid){
     vec3 vdif = ro - center;
     float dt = dot(rd, vdif);
     float x = dt*dt - dot(vdif, vdif) + radius2;
@@ -16,16 +16,15 @@ int rSphere(in vec3 ro, in vec3 rd, in vec3 center, const float radius2, inout S
         vec3 t = vec3(-dt-sqt, -dt+sqt, 0.0);
         if(t.x > 0.0) {
             ip.t = t;
-            int i = insert(ret, ip);
-            if(i < N) {
-                ret.ip[i].n = normalize(ro + t.x * rd - center);
-                ret.ip[i].d = dSphere(ro, rd, center, sqrt(radius2));
-                ret.ip[i].oid = oid;
+            if(try_insert(ret, ip)) {
+                ip.n = normalize(ro + t.x * rd - center);
+                ip.d = dSphere(ro, rd, center, sqrt(radius2));
+                ip.oid = oid;
+                ip.fog = 1.0;
+                insert(ret, ip);
             }
-            return i;
         }
     }
-    return N;
 }
 vec2 sCircle(in vec3 center, float r1, in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
     vec3 nor = ipp.n;

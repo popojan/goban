@@ -1,4 +1,4 @@
-int rLegs(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
+void rLegs(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
     for (int i = 0; i < 4; i++){
         const float r = legh;
         vec3 cc = vec3(1 - 2 * (i & 1), 1, 1 - 2 * ((i >> 1) & 1))*(bnx.xyz + vec3(r, -0.5*r, r));
@@ -10,22 +10,20 @@ int rLegs(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
         if (tt.x > 0.0 && tt.x < farClip) {
             IP ipp;
             ipp.t = vec3(tt, 0.0);
-            int j = insert(ret, ipp);
-            if(j < N) {
-                ret.ip[j].d = distanceRaySphere(ro, rd, rcc, r);
+            if(try_insert(ret, ipp)) {
+                ipp.d = distanceRaySphere(ro, rd, rcc, r);
                 cc.y = bnx.y - legh;
                 vec3 ip = ro + tt.x * rd;
-                ret.ip[j].n = normalize(ip - cc);
-                ret.ip[j].oid = idLeg1+i;
-                ret.ip[j].uid = idLeg1+i;
-                ret.ip[j].pid = idBoard;
-                ret.ip[j].a = vec2(0.0);
+                ipp.n = normalize(ip - cc);
+                ipp.oid = idLeg1+i;
+                ipp.uid = idLeg1+i;
+                ipp.pid = idBoard;
+                ipp.a = vec2(0.0);
                 vec4 uvw = vec4(ip, 1.0);
-
-                ret.ip[j].uvw = uvw;
+                ipp.uvw = uvw;
+                ipp.fog = 1.0;
+                insert(ret, ipp);
             }
-            return j;
         }
     }
-    return N;
 }

@@ -1,4 +1,4 @@
-int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
+void rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
     int isInCup = 0;
 
     for (int i = 0; i < 4; i++) {
@@ -58,25 +58,25 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
             if(rett.x > 0.0) {
                 IP ipp;
                 ipp.t = vec3(rett, 0.0);
-                int j = insert(ret, ipp);
-                if(j < N) {
-                    ret.ip[j].n = nn;
-                    ret.ip[j].oid = i < 2 ? (i == 0 ? idCupBlack :idCupWhite) : (i == 2 ? idLidBlack : idLidWhite) ;
-                    ret.ip[j].pid = idBlackStone;
-                    ret.ip[j].isInCup = isInCup;
-                    ret.ip[j].uid = idCupBlack + i;
-                    ret.ip[j].d = xxx;
-                    ret.ip[j].a = vec2(0.0);
-
-                    ret.ip[j].uvw = uvw;
-
+                if(try_insert(ret, ipp)) {
+                    ipp.n = nn;
+                    ipp.oid = i < 2 ? (i == 0 ? idCupBlack :idCupWhite) : (i == 2 ? idLidBlack : idLidWhite) ;
+                    ipp.pid = idBlackStone;
+                    ipp.isInCup = isInCup;
+                    ipp.uid = idCupBlack + i;
+                    ipp.d = xxx;
+                    ipp.a = vec2(0.0);
+                    ipp.uvw = uvw;
+                    ipp.fog = 1.0;
+                    insert(ret, ipp);
                 }
+
                 vec3 retn = nBoard;
 
                 float retd = farClip;
                 vec2 rett = vec2(0.0);
                 vec3 retp;
-                if (d1 < 0.0 && ret.ip[j].d < 0.0 && ro.y > bnx.y - legh) {
+                if (d1 < 0.0 && xxx < 0.0 && ro.y > bnx.y - legh) {
                     if (!exter) {
                        retd = -farClip;
                        rett = vec2(ts2.x < farClip && ts2.y > tc.x ? ts2.y : tc.x + 0.001);
@@ -106,22 +106,21 @@ int rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 }
                 if(retd < farClip && rett.x > 0.0) {
                     ipp.t = vec3(rett, 0.0);
-                    j = insert(ret, ipp);
-                    if (j < N) {
-                       ret.ip[j].n = retn;
-                       ret.ip[j].oid = i < 2 ? (i == 0 ? idCupBlack :idCupWhite) : (i == 2 ? idLidBlack : idLidWhite);
-                       ret.ip[j].pid = idBlackStone;
-                       ret.ip[j].isInCup = isInCup;
-                       ret.ip[j].uid = idCupBlack + i;
-                       ret.ip[j].d = retd;
-                       ret.ip[j].a = vec2(0.0);
-                       ret.ip[j].uvw = uvw;
+                    if (try_insert(ret, ipp)) {
+                       ipp.n = retn;
+                       ipp.oid = i < 2 ? (i == 0 ? idCupBlack :idCupWhite) : (i == 2 ? idLidBlack : idLidWhite);
+                       ipp.pid = idBlackStone;
+                       ipp.isInCup = isInCup;
+                       ipp.uid = idCupBlack + i;
+                       ipp.d = retd;
+                       ipp.a = vec2(0.0);
+                       ipp.uvw = uvw;
+                       insert(ret, ipp);
                     }
                 }
             }
         }
     }
-    return N;
 }
 
 vec2 sBowls(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {

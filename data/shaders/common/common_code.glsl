@@ -19,6 +19,7 @@ vec4 bnx;
 const float mw = 0.85;
 const float legh = 0.15;
 
+const int idNone = -2;
 const int idBack = -1;
 const int idTable = 0;
 const int idBoard = 1;
@@ -134,44 +135,33 @@ const int DIFFERENCE = 2;
 
 const int N = 3;
 struct SortedLinkedList {
-    IP ip[N]; // intersections as they come
-    int idx[N]; // indices of the sorted intersection
-    int size;
+    IP ip0;
+    IP ip1;
+    IP ip2;
 };
 
 void init(inout SortedLinkedList x) {
-    x.size = 0;
+    x.ip0.oid = idNone;
+    x.ip1.oid = idNone;
+    x.ip2.oid = idNone;
+    x.ip0.t = vec3(farClip);
+    x.ip1.t = vec3(farClip);
+    x.ip2.t = vec3(farClip);
 }
 
-int insert(inout SortedLinkedList ret, in IP ip) {
-    int i = N;
-    int atj = ret.size;
-    for (int i = ret.size - 1; i >= 0; --i) {
-        int j = ret.idx[i];
-        if (ip.t.z < ret.ip[j].t.z || ip.t.x < ret.ip[j].t.x) {
-            atj = i;
-        } else {
-            break;
-        }
+bool try_insert(inout SortedLinkedList ret, in IP ip) {
+   return ip.t.z < ret.ip2.t.z || ip.t.x < ret.ip2.t.x;
+}
+
+void insert(inout SortedLinkedList ret, in IP ip) {
+    if (ip.t.z < ret.ip0.t.z || ip.t.x < ret.ip0.t.x) {
+        ret.ip2 = ret.ip1;
+        ret.ip1 = ret.ip0;
+        ret.ip0 = ip;
+    } else if (ip.t.z < ret.ip1.t.z || ip.t.x < ret.ip1.t.x) {
+        ret.ip2 = ret.ip1;
+        ret.ip1 = ip;
+    } else if (ip.t.z < ret.ip2.t.z || ip.t.x < ret.ip2.t.x) {
+        ret.ip2 = ip;
     }
-    if (atj < N) {
-        int ati;
-        if(ret.size >= N) {
-            ati = ret.idx[N - 1];
-        } else {
-            ati = ret.size;
-        }
-        ret.ip[ati].t = ip.t;
-        ret.ip[ati].isInCup = 0;
-        ret.ip[ati].fog = 1.0;
-        for(int i = min(ret.size, N-1); i > atj; --i) {
-            ret.idx[i] = ret.idx[i-1];
-        }
-        ret.idx[atj] = ati;
-        if(ret.size < N) {
-            ret.size += 1;
-        }
-        return ati;
-    }
-    return N;
 }
