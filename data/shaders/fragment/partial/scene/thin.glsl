@@ -7,8 +7,8 @@ void rScene(vec3 ro, vec3 rd, inout SortedLinkedList ret) {
     c = vec3(1.0, 0.25, wwy/wwx);
     bnx = vec4(-c.x, -0.15, -c.z, 0.0);
 
-    rStones(ro, rd, ret);
     rBoard(ro, rd, ret);
+    rStones(ro, rd, ret);
     rPlaneY(ro, rd, vec3(0.0, bnx.y-legh, 0.0), nBoard, ret, idTable);
 }
 
