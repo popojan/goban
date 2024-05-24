@@ -43,18 +43,20 @@ float dBox(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 minimum, in vec3 maximum,
     float xxx = circleHalfPlaneIntersectionArea(ip, r, cs);
     ps = mat3(rect[1], rect[2], ccc);
     cs = point32plane(ps, ip, rd);
-    xxx = min(xxx, circleHalfPlaneIntersectionArea(ip, r, cs));
+    float up = circleHalfPlaneIntersectionArea(ip, r, cs);
+    xxx = min(xxx,up);
     ps = mat3(rect[2], rect[3], ccc);
     cs = point32plane(ps, ip, rd);
-    xxx = min(xxx, circleHalfPlaneIntersectionArea(ip, r, cs));
+    up = circleHalfPlaneIntersectionArea(ip, r, cs);
+    xxx = min(xxx,up);
     ps = mat3(rect[3], rect[0], ccc);
     cs = point32plane(ps, ip, rd);
-    xxx = min(xxx, circleHalfPlaneIntersectionArea(ip, r, cs));
+    up = circleHalfPlaneIntersectionArea(ip, r, cs);
+    xxx = min(xxx,up);
     return xxx;
 }
 
-void rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
-    if(shadow) return;
+void rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
     float tb, tb2;
     vec3 q2;
     bool isBoard = IntersectBox(ro, rd, bnx.xyz, -bnx.xwz, tb, tb2);
@@ -78,13 +80,15 @@ void rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                 float dd = farClip;
                 bool extremeTilt = false;
 
+                float dist0 = distanceRaySquare(ro, rd, ip, bnx.xyz, -bnx.xwz, q2);
+
                 if (all(lessThan(dif.xx, dif.yz))) {
-                    n1 = vec3(1.0, 0.0, 0.0);
+                    n1 = vec3(sign(ip0.x) * 1.0, 0.0, 0.0);
                     n0 = vec3(0.0, ip0.y, ip0.z);
                 }
                 else if (all(lessThan(dif.yy, dif.xz))){
 
-                    n1 = vec3(0.0, 1.0, 0.0);
+                    n1 = vec3(0.0, sign(ip0.y) * 1.0, 0.0);
                     n0 = vec3(ip0.x, 0.0, ip0.z);
                     bool gridx = ip.x > -c.x + mw*wwx - 0.5*wwx && ip.x < c.x - mw*wwx + 0.5*wwx && ip.z > -c.z + mw*wwy - dw && ip.z < c.z - mw*wwy + dw;
                     bool gridz = ip.x > -c.x + mw*wwx - dw && ip.x < c.x - mw*wwx + dw && ip.z > -c.z + mw*wwy - 0.5*wwy && ip.z < c.z - mw*wwy + 0.5*wwy;
@@ -162,26 +166,45 @@ void rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                     }
                 }
                 else {
-                    n1 = vec3(0.0, 0.0, 1.0);
+                    n1 = vec3(0.0, 0.0, sign(ip0.z) * 1.0);
                     n0 = vec3(ip0.x, ip0.y, 0.0);
                 }
-                float dist0 = -dd*boardaa;
 
-                bool edge = false;
-                float tc = 0.0, tc2 = 0.0;
-
-                vec3 ip2 = ro + tb2*rd;
-                float xxx = dBox(ro, rd, ip, bnx.xyz, -bnx.xwz, n0);
-
-                ipp.a = vec2(clamp(1.0-dd, 0.0, 1.0),1.0-xxx);
-
-                ipp.d = -xxx*boardaa;
-                ipp.pid = all( lessThan(abs(ip.xz), vec2(0.95, wwy/wwx * 0.95) )) ? idBlackStone : idBoard;
-                ipp.oid = idBoard;
-                ipp.n = n0;
+                ipp.a = vec2(clamp(1.0-dd, 0.0, 1.0),0.0);
                 ipp.uvw = uvw;
                 ipp.fog = 1.0;
-                insert(ret, ipp);
+                ipp.t = vec3(tb, tb, 0.0);
+                ipp.oid = idBoard;
+                ipp.pid = idBoard;
+                ipp.d = -farClip;
+
+                if(dist0 > -boardaa) {
+                    float tc, tc2;
+                    IntersectBox(ro, q2 - ro, bnx.xyz, -bnx.xwz, tc, tc2);
+                    if(tc2 - tc > 0.001) {
+                        n0 = normalize(n0);
+                        vec3 cdist = abs(abs(ip0) - abs(bn0));
+                        vec2 ab = clamp(vec2(abs(dist0), min(cdist.z, min(cdist.x, cdist.y)))/boardcc, 0.0, 1.0);
+                        n0 = normalize(mix(normalize(ip0), n0, ab.y));
+                        n0 = normalize(mix(n0, n1, ab.x));
+                        ipp.n = n0;
+                        ipp.d = -farClip;
+                        insert(ret, ipp);
+                    }
+                }
+                ipp.n = n1;
+
+                if(dd > 0.0) {
+                    ipp.pid = idBoard;
+                    ipp.d = max(dist0, -dd*boardaa);
+                    insert(ret, ipp);
+                }
+
+                if(dd < 1.0 && dist0 < -dd*boardaa) {
+                    ipp.d = dist0;
+                    ipp.pid = idBlackStone;
+                    insert(ret, ipp);
+                }
             }
         }
     }
@@ -189,27 +212,27 @@ void rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
 
 vec2 sBoard(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
     vec2 ret = vec2(1.0);
-    vec3 nor = ipp.n;
+    if (ipp.oid != idBoard) {
+        vec3 nor = ipp.n;
 
-    vec3 ldir = -pos;
-    float res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
-    vec3 ip = pos + res*ldir;
+        vec3 ldir = -pos;
+        float res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
+        vec3 ip = pos + res*ldir;
 
-    vec2 rr = vec2(abs(bnx.x)*length(ip - pos) / length(pos));
-    vec2 ll = vec2(ldia);
-    vec4 xz = vec4(min(ip.xz + rr, lpos.xz + ll), max(ip.xz - rr, lpos.xz - ll));
-    vec2 xz1 = max(vec2(0.0), xz.xy - xz.zw);
+        vec2 rr = vec2(abs(bnx.x)*length(ip - pos) / length(pos));
+        vec2 ll = vec2(ldia);
+        vec4 xz = vec4(min(ip.xz + rr, lig.xz + ll), max(ip.xz - rr, lig.xz - ll));
+        vec2 xz1 = max(vec2(0.0), xz.xy - xz.zw);
 
-    vec3 dd = vec3(0.0, bnx.y, 0.0);
-    ldir = dd - pos;
-    res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
-    ip = pos + res*ldir;
-    rr = vec2(abs(bnx.x)*length(ip - pos) / length(dd - pos));
-    xz = vec4(min(ip.xz + rr, lpos.xz + ll), max(ip.xz - rr, lpos.xz - ll));
-    vec2 xz2 = max(vec2(0.0), xz.xy - xz.zw);
-    float mx = mix(1.0, 1.0 - 0.5*((xz1.x*xz1.y) + (xz2.x*xz2.y)) / (4.0*ldia2), clamp(-pos.y / boardaa, 0.0, 1.0));
-
-    ret.x *= mx;
-
+        vec3 dd = vec3(0.0, bnx.y, 0.0);
+        ldir = dd - pos;
+        res = dot(lig - pos, nBoard) / dot(ldir, nBoard);
+        ip = pos + res * ldir;
+        rr = vec2(abs(bnx.x) * length(ip - pos) / length(dd - pos));
+        xz = vec4(min(ip.xz + rr, lig.xz + ll), max(ip.xz - rr, lig.xz - ll));
+        vec2 xz2 = max(vec2(0.0), xz.xy - xz.zw);
+        float mx = mix(1.0, 1.0 - 0.5 * ((xz1.x * xz1.y) + (xz2.x * xz2.y)) / (4.0 * ldia2), clamp(-pos.y / boardaa, 0.0, 1.0));
+        ret.x *= mx;
+    }
     return ret;
 }

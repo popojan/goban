@@ -24,7 +24,8 @@ void finalizeStone(vec3 ro, vec3 rd, vec3 dd, inout IP ipp, float rot, bool mark
                 ipp.a = vec2(max(d/boardaa, ipp.d));
             }
             else {
-                ipp.a = vec2(1.0);
+                ipp.a = vec2(0.0);
+                ipp.oid = ipp.pid;
             }
         }
     }
@@ -33,7 +34,7 @@ void finalizeStone(vec3 ro, vec3 rd, vec3 dd, inout IP ipp, float rot, bool mark
 void rStoneY(
     in vec3 ro, in vec3 rd, vec3 dd,
     inout SortedLinkedList ret, inout IP rip, ivec2 oid, bool marked,
-    bool shadow, int uid
+    int uid
 ) {
     vec2 dpre = intersectionRaySphereR(ro, rd, dd, r1*r1);
     bool rval = false;
@@ -64,7 +65,7 @@ void rStoneY(
             }
         }
     }
-    if((shadow)|| (rval && rip.t.x > 0.0) ){
+    if(rval && rip.t.x > 0.0){
         if(!(rval && rip.t.x > 0.0)) {
             rip.t = vec3(distance(ro, dd), farClip, -2.0);
         }
@@ -80,15 +81,13 @@ void rStoneY(
             rip.n = normalize(n);
             rip.uid = uid;
             rip.fog = 1.0;
-            if(!shadow) {
-                finalizeStone(ro, rd, dd, rip, iStones[uid].w, marked);
-            }
+            finalizeStone(ro, rd, dd, rip, iStones[uid].w, marked);
             insert(ret, rip);
         }
     }
 }
 
-void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
+void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
     float t1, t2;
     if (IntersectBox(ro, rd, minBound, maxBound, t1, t2)) {
         vec4 b12 = ro.xzxz + vec4(t1, t1, t2, t2)*rd.xzxz;
@@ -96,7 +95,7 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
         vec4 bmnx = vec4(min(b12.xy, b12.zw) - noise, max(b12.xy, b12.zw) + noise);
         vec4 xz12 = floor(bmnx/vec4(wwx, wwy, wwx, wwy) + vec4(0.5*fNDIM));
         ivec4 mnx = ivec4(clamp(xz12, 0.0, fNDIM - 1.0));
-        int off = shadow ? 0 : 0;
+        const int off = 0;
         for (int i = mnx.y - off; i <= mnx.w+off; i++){
             for (int j = mnx.x-off; j <= mnx.z+off; j++){
                 vec4 stone0 = iStones[NDIM*i + j];
@@ -111,15 +110,15 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
                     bool captured = m0 == cidCapturedBlackStone || m0 == cidCapturedWhiteStone;
                     bool last = m0 == cidLastBlackStone || m0 == cidLastWhiteStone;
                     if ((captured || last)) {
-                        mm0 = m0 == cidCapturedWhiteStone ? mm0.xy : mm0.yx;
+                        mm0 = m0 == cidCapturedBlackStone ? mm0.yx : mm0.xy;
                     }
                     else {
                         mm0 = m0 == cidBlackStone ? mm0.xy : mm0.yx;
                     }
                     IP rip;
-                    rStoneY(ro, rd, dd, ret, rip, mm0, captured||last, shadow, NDIM*i+j);
+                    rStoneY(ro, rd, dd, ret, rip, mm0, captured||last, NDIM*i+j);
                 }
-                else if (!shadow && (m0 == cidWhiteArea || m0 == cidBlackArea)) {
+                else if (m0 == cidWhiteArea || m0 == cidBlackArea) {
                     vec3 dd = vec3(vec2(j, i) - vec2(0.5*fNDIM - 0.5), 0.0)*vec3(wwx, wwy, 0.0);
                     vec2 w25 = vec2(0.25*wwx, dd.z);
                     vec3 minb = dd.xzy - w25.xyx;

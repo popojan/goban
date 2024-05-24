@@ -13,8 +13,6 @@ const float cidWhiteStone = 6.0;
 const float cidCapturedWhiteStone = 6.5;
 const float cidLastWhiteStone = 6.75;
 
-in vec3 rdb;
-flat in vec3 roo;
 in float noise;
 out vec3 glFragColor;
 

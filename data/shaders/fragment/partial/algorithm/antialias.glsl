@@ -85,6 +85,7 @@ vec2 distanceRayStone(in vec3 ro, in vec3 rd, in vec3 dd){
     return vec2(dd0, distance(ro, X0 + dd));
 }
 
+/*
 float distanceRaySquare(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 bmin, in vec3 bmax, out vec3 q2) {
     float t; vec3 tt;
     vec3 a = vec3(bmin.x, bmax.y, bmin.z);
@@ -130,4 +131,56 @@ float distanceRaySquare(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 bmin, in vec
     if(t >= 0.0 &&  t <= 1.0 ) ret = min(ret, -d1);
 
     return ret2;
+}*/
+
+float distanceRaySquare(in vec3 ro, in vec3 rd, in vec3 ip, in vec3 bmin, in vec3 bmax, out vec3 q2) {
+    vec3 c = 0.5*(bmin + bmax);
+    vec3 r = 0.5*abs(bmax - bmin);
+    vec3 aip = abs(abs(ip - c)-r);
+    if(r.y == 0.0) aip.y = 1.0;
+    vec3 p[4];
+    float mmin = min(aip.x, min(aip.y, aip.z));
+    if(r.y > 0.0 && mmin == aip.z) {
+        p[0] = vec3(c.x - r.x, c.y - r.y, ip.z);
+        p[1] = vec3(c.x - r.x, c.y + r.y, ip.z);
+        p[2] = vec3(c.x + r.x, c.y + r.y, ip.z);
+        p[3] = vec3(c.x + r.x, c.y - r.y, ip.z);
+    }
+    else if(r.y == 0.0 || mmin == aip.y) {
+        p[0] = vec3(c.x - r.x, ip.y, c.z - r.z);
+        p[1] = vec3(c.x - r.x, ip.y, c.z + r.z);
+        p[2] = vec3(c.x + r.x, ip.y, c.z + r.z);
+        p[3] = vec3(c.x + r.x, ip.y, c.z - r.z);
+    }
+    else {
+        p[0] = vec3(ip.x, c.y - r.y, c.z - r.z);
+        p[1] = vec3(ip.x, c.y - r.y, c.z + r.z);
+        p[2] = vec3(ip.x, c.y + r.y, c.z + r.z);
+        p[3] = vec3(ip.x, c.y + r.y, c.z - r.z);
+    }
+
+    float dist = farClip;
+    vec3 lastp = p[3];
+    vec3 p0, v;
+    float ret;
+    for(int i = 0; i < 4; i++){
+        vec3 cc = cross(rd, p[i] - lastp);
+        float dist0 = length(dot(ro-lastp,cc))/length(cc);
+        if(dist0 < dist) {
+            p0 = lastp;
+            v = p[i] - lastp;
+            dist = dist0;
+        }
+        lastp = p[i];
+    }
+    vec3 p21 = p0 - ro;
+    vec3 m = cross(v, rd);
+    float m2 = dot(m, m);
+    vec3 rr = cross(p21, m/m2);
+    float s = dot(rr, v);
+    float t = dot(rr, rd);
+    vec3 q1 = ro + s * rd;
+    q2 = p0 + t * v;
+    ret = -distance(q1, q2)/distance(ro, q1);
+    return ret;
 }

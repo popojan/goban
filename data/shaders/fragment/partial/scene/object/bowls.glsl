@@ -1,4 +1,4 @@
-void rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
+void rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
     int isInCup = 0;
 
     for (int i = 0; i < 4; i++) {
@@ -136,12 +136,12 @@ vec2 sBowls(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
             float r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
             ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
 
-            cci.y = cci.y + 0.5 * (bnx.y- legh + cci.y);
+            cci.y = cci.y + 0.5 * (bnx.y - legh + cci.y);
             ln = yy - cci.y;
             r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
             ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
 
-            cci.y = 0.5 * (bnx.y- legh + cci.y);
+            cci.y = 0.5 * (bnx.y - legh + cci.y);
             ln = yy - cci.y;
             r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
             ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);

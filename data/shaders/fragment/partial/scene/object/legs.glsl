@@ -1,4 +1,4 @@
-void rLegs(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
+void rLegs(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
     for (int i = 0; i < 4; i++){
         const float r = legh;
         vec3 cc = vec3(1 - 2 * (i & 1), 1, 1 - 2 * ((i >> 1) & 1))*(bnx.xyz + vec3(r, -0.5*r, r));

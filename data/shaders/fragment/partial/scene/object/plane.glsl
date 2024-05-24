@@ -1,6 +1,26 @@
-void rPlaneY(in vec3 ro, in vec3 rd, in vec3 p0, in vec3 n, inout SortedLinkedList ret, int oid, bool shadow) {
+void rPlaneY(in vec3 ro, in vec3 rd, in vec3 p0, in vec3 n, inout SortedLinkedList ret, int oid) {
 
-    if(shadow) return;
+    float denom = dot(rd, n);
+    float t = dot(p0 - ro, n) / denom;
+    if (t >= 0.0) {
+        IP ip;
+        ip.t = vec3(t, t, 1.0);
+
+        if (try_insert(ret, ip)) {
+            ip.n = n;
+            ip.d = -1.0;
+            ip.oid = idTable;
+            ip.pid = idTable;
+            ip.uid = idTable;
+            ip.a = vec2(1.0, 1.0);
+            ip.fog = exp(-0.35*max(0.0,length(ro + rd*ip.t.x)));
+            insert(ret, ip);
+        }
+    }
+}
+
+void rPlaneYTextured(in vec3 ro, in vec3 rd, in vec3 p0, in vec3 n, inout SortedLinkedList ret, int oid) {
+
     float denom = dot(rd, n);
     if (abs(denom) > 1e-6) {
         float t = dot(p0 - ro, n) / denom;
