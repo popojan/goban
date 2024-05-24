@@ -4,6 +4,7 @@
 #include "ElementGame.h"
 
 #include <iostream>
+#include <fstream>
 
 GobanView::GobanView(GobanModel& m)
     :
@@ -78,10 +79,10 @@ void GobanView::endZoom() {
 void GobanView::resetView() {
     std::ifstream fin("data/view.txt");
     if(fin) {
-        fin >> cam.rLast.re();
         fin >> cam.rLast[0];
         fin >> cam.rLast[1];
         fin >> cam.rLast[2];
+        fin >> cam.rLast[3];
         fin >> newTranslate[0];
         fin >> newTranslate[1];
         fin >> newTranslate[2];
@@ -105,15 +106,16 @@ void GobanView::resetView() {
     lastTime = 0.0;
     startTime = Shell::GetElapsedTime();
     animationRunning = true;
+    requestRepaint();
 }
 
 void GobanView::saveView() {
     std::ofstream fout("data/view.txt");
     fout
-            << cam.rLast.re() << std::endl
             << cam.rLast[0] << std::endl
             << cam.rLast[1] << std::endl
-            << cam.rLast[2]  << std::endl
+            << cam.rLast[2] << std::endl
+            << cam.rLast[3] << std::endl
             << newTranslate[0]  << std::endl
             << newTranslate[1]  << std::endl
             << newTranslate[2] << std::endl
