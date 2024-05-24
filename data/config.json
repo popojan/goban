@@ -121,33 +121,39 @@
   },
   "shaders": [
     {
-      "name": "Red Carpet Goban",
-      "vertex": "./data/shaders/common/vertex.glsl",
-      "fragment": "./data/shaders/legacy/fragment.glsl",
+      "name": "Red Carpet",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/fragment/red_carpet.glsl",
       "height": 0.85
     },
     {
-      "name": "Minimalistic Flat",
-      "vertex": "./data/shaders/common/vertex.glsl",
-      "fragment": "./data/shaders/legacy/fragment.2D.glsl",
-      "height": 0.0
+      "name": "Minimal Thin",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/fragment/thin.glsl",
+      "height": 0.85
     },
     {
-      "name": "Minimalistic Thin",
-      "vertex": "./data/shaders/common/vertex.glsl",
+      "name": "Minimal Thin [legacy]",
+      "vertex": "./data/shaders/vertex/mono.glsl",
       "fragment": "./data/shaders/legacy/fragment.25D.glsl",
       "height": 0.85
     },
     {
-      "name": "Anaglyphic Red Blue",
-      "vertex": "./data/shaders/legacy/vertex.anaglyph.glsl",
-      "fragment": "./data/shaders/legacy/fragment.anaglyph.glsl",
+      "name": "Red Carpet [legacy]",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/legacy/fragment.glsl",
       "height": 0.85
     },
     {
-      "name": "Red Carpet Refactored",
-      "vertex": "./data/shaders/common/vertex.glsl",
-      "fragment": "./data/shaders/red_carpet.glsl",
+      "name": "Red Carpet [stereo]",
+      "vertex": "./data/shaders/vertex/stereo.glsl",
+      "fragment": "./data/shaders/fragment/red_carpet_stereo.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Minimal Thin [stereo]",
+      "vertex": "./data/shaders/vertex/stereo.glsl",
+      "fragment": "./data/shaders/fragment/thin_stereo.glsl",
       "height": 0.85
     }
   ],

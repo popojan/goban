@@ -1,4 +1,4 @@
-void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow) {
+void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
 
     int si = 0;
     int ei = 0;
@@ -45,7 +45,7 @@ void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret, bool shadow
             float tt2;
             IP rip;
             rip.isInCup = isInCup;
-            rStoneY(ro, rd, ddcj.xyz, ret, rip, mm0, false, shadow, i);
+            rStoneY(ro, rd, ddcj.xyz, ret, rip, mm0, false, i);
         }
     }
 }
