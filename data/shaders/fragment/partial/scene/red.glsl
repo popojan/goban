@@ -2,6 +2,7 @@
 #include object/sphere.glsl
 #include object/board.glsl
 #include object/legs.glsl
+#include object/stone_3d.glsl
 #include object/stones.glsl
 #include object/bowls.glsl
 #include object/bowl_stones.glsl

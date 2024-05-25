@@ -236,3 +236,35 @@ vec2 sBoard(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
     }
     return ret;
 }
+
+void finalizeStone(vec3 ro, vec3 rd, vec3 dd, inout IP ipp, float rot, bool marked) {
+    mat4 rmat = mat4(
+        cos(rot),0.0,sin(rot),0.0,
+        0.0,1.0,0.0,0.0,
+        -sin(rot),0.0,cos(rot),0.0,
+        0.0,0.0,0.0,1.0
+    );
+    vec3 ip = (ro + ipp.t.x * rd);
+    vec3 add = 4.0*(ip.xyz - vec3(13.0+dd.x,dd.y-13.0, dd.z));
+    ipp.uvw = rmat * vec4(add, 1.0);
+
+    if(marked) {
+        vec3 cc = dd;
+        vec3 ip0 = ro + rd*dot(cc - ro, nBoard) / dot(rd, nBoard);
+        vec3 q2;
+
+        ipp.a = vec2(0.0);
+        bool isNotArea = length(ip.xz - cc.xz) > 0.5*r1 || ip.y < dd.y - 0.00001;
+        if (isNotArea) {
+            vec2 rr = distanceRayCircle(ro, rd, ip0, ipp.t.xy, cc, 0.5*r1, q2);
+            float d = abs(rr.y);
+            if (sign(ro.y - dd.y) * rr.x <= 0.0 && d < boardaa){
+                ipp.a = vec2(max(d/boardaa, ipp.d));
+            }
+            else {
+                ipp.a = vec2(0.0);
+                ipp.oid = ipp.pid;
+            }
+        }
+    }
+}

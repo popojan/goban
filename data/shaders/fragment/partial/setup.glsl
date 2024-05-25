@@ -74,7 +74,7 @@ void init(inout SortedLinkedList x) {
 }
 
 bool try_insert(inout SortedLinkedList ret, in IP ip) {
-    return ip.t.z < ret.ip2.t.z || ip.t.x < ret.ip2.t.x;
+    return ip.t.z < ret.ip2.t.z || ip.t.x <= ret.ip2.t.x;
 }
 
 void insert(inout SortedLinkedList ret, in IP ip) {
