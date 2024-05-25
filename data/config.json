@@ -133,28 +133,46 @@
       "height": 0.85
     },
     {
-      "name": "Minimal Thin [legacy]",
+      "name": "Minimal Flat",
       "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/legacy/fragment.25D.glsl",
+      "fragment": "./data/shaders/fragment/flat.glsl",
       "height": 0.85
     },
     {
-      "name": "Red Carpet [legacy]",
+      "name": "Minimal 2D",
       "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/legacy/fragment.glsl",
-      "height": 0.85
+      "fragment": "./data/shaders/fragment/2d.glsl",
+      "height": 0.0
     },
     {
-      "name": "Red Carpet [stereo]",
+      "name": "[stereo] Red Carpet",
       "vertex": "./data/shaders/vertex/stereo.glsl",
       "fragment": "./data/shaders/fragment/red_carpet_stereo.glsl",
       "height": 0.85
     },
     {
-      "name": "Minimal Thin [stereo]",
+      "name": "[stereo] Minimal Thin",
       "vertex": "./data/shaders/vertex/stereo.glsl",
       "fragment": "./data/shaders/fragment/thin_stereo.glsl",
       "height": 0.85
+    },
+    {
+      "name": "(legacy) Red Carpet",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/legacy/fragment.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "(legacy) Minimal Thin",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/legacy/fragment.25D.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "(legacy) Minimal Flat",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/legacy/fragment.2D.glsl",
+      "height": 0.0
     }
   ],
   "gui": "./data/gui"

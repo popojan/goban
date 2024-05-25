@@ -1,12 +1,12 @@
 #include object/plane.glsl
 #include object/sphere.glsl
 #include object/board.glsl
-#include object/stone_3d.glsl
+#include object/stone_2d.glsl
 #include object/stones.glsl
 
 void rScene(vec3 ro, vec3 rd, inout SortedLinkedList ret) {
     c = vec3(1.0, 0.25, wwy/wwx);
-    bnx = vec4(-c.x, -0.15, -c.z, 0.0);
+    bnx = vec4(-c.x, -0.002, -c.z, 0.0);
 
     rBoard(ro, rd, ret);
     rStones(ro, rd, ret);
@@ -14,7 +14,5 @@ void rScene(vec3 ro, vec3 rd, inout SortedLinkedList ret) {
 }
 
 vec2 sScene(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
-    vec2 shadow1 = sStones(pos, lig, ldia2, ipp);
-    vec2 shadow2 = sBoard(pos, lig, ldia2, ipp);
-    return shadow1 * shadow2;
+    return vec2(1.0);
 }

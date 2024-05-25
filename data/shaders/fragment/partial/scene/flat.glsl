@@ -6,7 +6,7 @@
 
 void rScene(vec3 ro, vec3 rd, inout SortedLinkedList ret) {
     c = vec3(1.0, 0.25, wwy/wwx);
-    bnx = vec4(-c.x, -0.15, -c.z, 0.0);
+    bnx = vec4(-c.x, -0.002, -c.z, 0.0);
 
     rBoard(ro, rd, ret);
     rStones(ro, rd, ret);
