@@ -45,7 +45,7 @@
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./engine/katago/kata9x9-b18c384nbt-20231025.bin.gz -config ./engine/katago/default_gtp.cfg",
-      "enabled": 1,
+      "enabled": 0,
       "kibitz": 0,
       "messages": [
           {
