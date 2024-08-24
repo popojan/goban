@@ -27,3 +27,18 @@ void rLegs(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
         }
     }
 }
+
+
+vec2 sLegs(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
+    vec2 ret = vec2(1.0);
+    if (ipp.oid == idTable) {
+        for (int i = 0; i < 4; i++){
+            const float r = legh;
+            vec3 cc = vec3(1 - 2 * (i & 1), 1, 1 - 2 * ((i >> 1) & 1))*(bnx.xyz + vec3(r, -0.5*r, r));
+            float t1, t2;
+            vec3 ld = lig - pos;
+            ret *= sCircle(cc, r, pos, lig, ldia2, ipp);
+        }
+    }
+    return ret;
+}

@@ -25,5 +25,6 @@ vec2 sScene(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
     vec2 shadow2 = sStones(pos, lig, ldia2, ipp);
     vec2 shadow3 = sBowls(pos, lig, ldia2, ipp);
     vec2 shadow4 = sBoard(pos, lig, ldia2, ipp);
-    return shadow1 * shadow2 * shadow3 * shadow4;
+    vec2 shadow5 = sLegs(pos, lig, ldia2, ipp);
+    return shadow1 * shadow2 * shadow3 * shadow4 * shadow5;
 }

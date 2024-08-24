@@ -18,7 +18,7 @@ void aamix(in vec3 ro, in vec3 rd, vec3 bg, in IP ip, inout vec3 col) {
     rnd =  smoothstep(-2.0, 2.0, rnd/max(1.5, 0.5*distance(ipp, ro)));
 
     vec3 c = mix(mix(mix(mcola1, mcolb1, rnd), bg, ip.a.y), mcolc1, ip.a.x);
-    vec3 nn = getAlteredNormal(ip.uvw, ip.n, materials[midxo].tid, 0.2, grad);
+    vec3 nn = getAlteredNormal(uvw, ip.n, materials[midxo].tid, 0.1, grad);
     vec3 diffuse = (clamp(dot(nn, lig2), 0.0, 1.0)) * c;
     vec4 das = materials[midxo].das;
     float ambientLevel = das.y;
