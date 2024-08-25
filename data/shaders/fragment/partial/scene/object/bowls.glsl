@@ -46,10 +46,8 @@ void rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
                 if(rett.x == ts2.y) { //inside sphere
                     nn = -normalize(retp - cc2);
                     isInCup = i+1;
-                    //xxx = -farClip;
                 } else { //outside sphere
                     nn = normalize(retp - cc1);
-                    //xxx = d1;
                 }
             }
 
@@ -76,7 +74,7 @@ void rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
                 float retd = farClip;
                 vec2 rett = vec2(0.0);
                 vec3 retp;
-                if (d1 < 0.0 && xxx < 0.0 && ro.y > bnx.y - legh) {
+                if (d1 < 0.0 && xxx < boardaa && ro.y > bnx.y - legh) {
                     if (!exter) {
                        retd = -farClip;
                        rett = vec2(ts2.x < farClip && ts2.y > tc.x ? ts2.y : tc.x + 0.001);
@@ -137,14 +135,18 @@ vec2 sBowls(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
             ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
 
             cci.y = cci.y + 0.5 * (bnx.y - legh + cci.y);
-            ln = yy - cci.y;
-            r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
-            ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
+            if (pos.y < cci.y) {
+                ln = yy - cci.y;
+                r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
+                ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
+            }
 
             cci.y = 0.5 * (bnx.y - legh + cci.y);
-            ln = yy - cci.y;
-            r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
-            ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
+            if (pos.y < cci.y) {
+                ln = yy - cci.y;
+                r2 = sqrt(bowlRadius2*bowlRadius2 - ln*ln);
+                ret *= sCircle(cci, r2, pos, lig, ldia2, ipp);
+            }
         }
     }
     return ret;
