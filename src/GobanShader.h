@@ -30,7 +30,7 @@ class GobanShader {
 public:
     explicit GobanShader(const GobanView& view): shadersReady(false), currentProgram(-1),
         width(0), height(0), gamma(1.0f), contrast(0.0f), view(view), animT(0.5f),
-        currentProgramH(.0), eof(0.0775), dof(-0.0875)
+        currentProgramH(.0), eof(0.0775), dof(-0.0025)
     {
         init();
     }
