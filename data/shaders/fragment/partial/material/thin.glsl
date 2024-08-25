@@ -18,7 +18,7 @@ const MAT materials[5] = MAT[5](
     MAT(das0, mat3(vec3(0.45), vec3(0.45), vec3(0.45)), texSolidColor),
     MAT(das1, mat3(vec3(0.05), vec3(0.15), vec3(0.1)), texSolidColor),
     MAT(das, mat3(vec3(0.92), vec3(0.95), vec3(0.99)), texSolidColor),
-    MAT(das1, mat3(vec3(0.862745, 0.717647, 0.443137), vec3(0.862745, 0.717647, 0.443137), vec3(0.0)), texSolidColor)
+    MAT(das1, mat3(vec3(0.824,0.635,0.282), vec3(0.824,0.635,0.282), vec3(0.0)), texSolidColor)
 );
 
 void initMaterials() {
