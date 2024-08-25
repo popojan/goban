@@ -49,7 +49,7 @@ inout SortedLinkedList ret, inout IP rip, ivec2 oid, bool marked,
             rip.uid = uid;
             rip.fog = 1.0;
             dd.y -= dn.y - sqrt(stoneRadius2 - 0.25*r1*r1);
-            finalizeStone(ro, rd, dd, rip, iStones[uid].w, marked);
+            finalizeStone(ro, rd, dd, rip, rip.isInCup > 0 ? ddc[uid].w : iStones[uid].w, marked);
             insert(ret, rip);
         }
     }
