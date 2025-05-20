@@ -69,15 +69,16 @@ void ElementGame::populateEngines() {
 }
 
 void ElementGame::gameLoop() {
-	static int cnt = 0;
-	static float lastTime = -1;
-	auto context = GetContext();
+    static int cnt = 0;
+    static float lastTime = -1;
+    auto context = GetContext();
 
-	float currentTime = Shell::GetElapsedTime();
-	if (currentTime - lastTime >= 1.0) {
-	    static int frames = 1;
+    float currentTime = Shell::GetElapsedTime();
+    if (currentTime - lastTime >= 1.0) {
+        static int frames = 1;
         auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
-        const Rocket::Core::String sFps(128, "FPS: %.1f", (float)cnt / (currentTime - lastTime));
+        auto fpsTemplate = context->GetDocument("game_window")->GetElementById("templateFPS");
+        const Rocket::Core::String sFps(128, fpsTemplate->GetInnerRML().CString(), (float)cnt / (currentTime - lastTime));
         if (debugElement != nullptr) {
             debugElement->SetInnerRML(sFps.CString());
             view.requestRepaint();
@@ -85,31 +86,31 @@ void ElementGame::gameLoop() {
         spdlog::debug(sFps.CString());
         //if(frames % 10 == 0)
         frames += 1;
-		lastTime = currentTime;
-		cnt = 0;
-	}
-	ElementGame* game = dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"));
-	if (game != nullptr && game->isExiting()) {
+        lastTime = currentTime;
+        cnt = 0;
+    }
+    ElementGame* game = dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"));
+    if (game != nullptr && game->isExiting()) {
         return;
     }
-	context->Update();
-	if (view.animationRunning || view.MAX_FPS) {
-		view.requestRepaint();
-	}
-	if (view.updateFlag) {
-		auto shell_renderer = dynamic_cast<ShellRenderInterfaceOpenGL*>(Rocket::Core::GetRenderInterface());
-		if (shell_renderer != nullptr) {
-			shell_renderer->PrepareRenderBuffer();
-			glPushAttrib(GL_ALL_ATTRIB_BITS);
-			context->Render();
-			glPopAttrib();
-			shell_renderer->PresentRenderBuffer();
-			cnt++;
-		}
-	}
-	if (!view.MAX_FPS){
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	}
+    context->Update();
+    if (view.animationRunning || view.MAX_FPS) {
+        view.requestRepaint();
+    }
+    if (view.updateFlag) {
+        auto shell_renderer = dynamic_cast<ShellRenderInterfaceOpenGL*>(Rocket::Core::GetRenderInterface());
+        if (shell_renderer != nullptr) {
+            shell_renderer->PrepareRenderBuffer();
+            glPushAttrib(GL_ALL_ATTRIB_BITS);
+            context->Render();
+            glPopAttrib();
+            shell_renderer->PresentRenderBuffer();
+            cnt++;
+        }
+    }
+    if (!view.MAX_FPS){
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 }
 ElementGame::~ElementGame() = default;
 
@@ -185,86 +186,113 @@ void ElementGame::OnUpdate()
     }
 
     if (view.state.colorToMove != model.state.colorToMove) {
-		bool blackMove = model.state.colorToMove == Color::BLACK;
-		Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("blackMoves");
-		Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("whiteMoves");
-		if (elBlack != nullptr) {
-			elBlack->SetClass("active", blackMove);
-			view.state.colorToMove = model.state.colorToMove;
-			requestRepaint();
-		}
-		if (elWhite != nullptr) {
-			elWhite->SetClass("active", !blackMove);
-			view.state.colorToMove = model.state.colorToMove;
-			requestRepaint();
-		}
-	}
-	if ((view.state.capturedBlack != model.state.capturedBlack)
-	    || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */
-		|| (view.state.reason != GameState::NO_REASON && model.state.reason == GameState::NO_REASON) /* new game */)
-	{
-		Rocket::Core::Element* elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
-		Rocket::Core::Element* elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
-		if (elWhiteCnt != nullptr) {
-			elWhiteCnt->SetInnerRML(Rocket::Core::String(128, "White: %d", model.state.capturedBlack).CString());
-			requestRepaint();
-		}
-		if (elBlackCnt != nullptr) {
-			elBlackCnt->SetInnerRML(Rocket::Core::String(128, "Black: %d", model.state.capturedWhite).CString());
-			requestRepaint();
-		}
-		view.state.capturedBlack = model.state.capturedBlack;
-		view.state.capturedWhite = model.state.capturedWhite;
+        bool blackMove = model.state.colorToMove == Color::BLACK;
+        Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("blackMoves");
+        Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("whiteMoves");
+        if (elBlack != nullptr) {
+            elBlack->SetClass("active", blackMove);
+            view.state.colorToMove = model.state.colorToMove;
+            requestRepaint();
+        }
+        if (elWhite != nullptr) {
+            elWhite->SetClass("active", !blackMove);
+            view.state.colorToMove = model.state.colorToMove;
+            requestRepaint();
+        }
+    }
+    if ((view.state.capturedBlack != model.state.capturedBlack)
+        || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */
+        || (view.state.reason != GameState::NO_REASON && model.state.reason == GameState::NO_REASON) /* new game */)
+    {
+        Rocket::Core::Element* elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
+        Rocket::Core::Element* elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
+        if (elWhiteCnt != nullptr) {
+            elWhiteCnt->SetInnerRML(Rocket::Core::String(128, "White: %d", model.state.capturedBlack).CString());
+            requestRepaint();
+        }
+        if (elBlackCnt != nullptr) {
+            elBlackCnt->SetInnerRML(Rocket::Core::String(128, "Black: %d", model.state.capturedWhite).CString());
+            requestRepaint();
+        }
+        view.state.capturedBlack = model.state.capturedBlack;
+        view.state.capturedWhite = model.state.capturedWhite;
         view.state.reason = model.state.reason;
-	}
-	if(view.state.reservoirBlack != model.state.reservoirBlack
-	    || view.state.reservoirWhite != model.state.reservoirWhite) {
-	    view.state.reservoirBlack = model.state.reservoirBlack;
+    }
+    if(view.state.reservoirBlack != model.state.reservoirBlack
+        || view.state.reservoirWhite != model.state.reservoirWhite) {
+        view.state.reservoirBlack = model.state.reservoirBlack;
         view.state.reservoirWhite = model.state.reservoirWhite;
         requestRepaint();
-	}
-	if (view.state.handicap != model.state.handicap) {
-		Rocket::Core::Element* hand = context->GetDocument("game_window")->GetElementById("lblHandicap");
-		if (hand != nullptr) {
-			hand->SetInnerRML(Rocket::Core::String(128, "Handicap: %d", model.state.handicap).CString());
-			requestRepaint();
-			view.state.handicap = model.state.handicap;
-		}
-	}
-	if (view.state.komi != model.state.komi) {
-		Rocket::Core::Element* elKomi = context->GetDocument("game_window")->GetElementById("lblKomi");
-		if (elKomi != nullptr) {
-			elKomi->SetInnerRML(Rocket::Core::String(128, "Komi: %.1f", model.state.komi).CString());
-			view.state.komi = model.state.komi;
-			requestRepaint();
-		}
-	}
+    }
+    if (view.state.handicap != model.state.handicap) {
+        Rocket::Core::Element* hand = context->GetDocument("game_window")->GetElementById("lblHandicap");
+        if (hand != nullptr) {
+            hand->SetInnerRML(Rocket::Core::String(128, "Handicap: %d", model.state.handicap).CString());
+            requestRepaint();
+            view.state.handicap = model.state.handicap;
+        }
+    }
+    if (view.state.komi != model.state.komi) {
+        Rocket::Core::Element* elKomi = context->GetDocument("game_window")->GetElementById("lblKomi");
+        if (elKomi != nullptr) {
+            elKomi->SetInnerRML(Rocket::Core::String(128, "Komi: %.1f", model.state.komi).CString());
+            view.state.komi = model.state.komi;
+            requestRepaint();
+        }
+    }
     Rocket::Core::Element* msg = context->GetDocument("game_window")->GetElementById("lblMessage");
-	if (view.state.msg != model.state.msg) {
-		switch (model.state.msg) {
-		case GameState::CALCULATING_SCORE:
-			msg->SetInnerRML("Calculating score...");
-			break;
-		case GameState::BLACK_RESIGNS:
-			msg->SetInnerRML("Black resigns");
-			break;
-		case GameState::WHITE_RESIGNS:
-			msg->SetInnerRML("White resigns");
-			break;
-		case GameState::BLACK_RESIGNED:
-			msg->SetInnerRML("White wins by resignation.");
-			break;
-		case GameState::WHITE_RESIGNED:
-			msg->SetInnerRML("Black wins by resignation.");
-			break;
-		case GameState::BLACK_PASS:
-			msg->SetInnerRML("Black passes");
-			break;
-		case GameState::WHITE_PASS:
-			msg->SetInnerRML("White passes");
-			break;
-		case GameState::BLACK_WON:
-		case GameState::WHITE_WON: {
+    if (view.state.msg != model.state.msg) {
+        switch (model.state.msg) {
+        case GameState::CALCULATING_SCORE:
+            msg->SetInnerRML(
+                context->GetDocument("game_window")
+                    ->GetElementById("templateCalculatingScore")
+                    ->GetInnerRML()
+            );
+            break;
+        case GameState::BLACK_RESIGNS:
+            msg->SetInnerRML(
+                context->GetDocument("game_window")
+                    ->GetElementById("templateBlackResigns")
+                    ->GetInnerRML()
+            );
+            break;
+        case GameState::WHITE_RESIGNS:
+            msg->SetInnerRML(
+                context->GetDocument("game_window")
+                    ->GetElementById("templateWhiteReigns")
+                    ->GetInnerRML()
+            );
+            break;
+        case GameState::BLACK_RESIGNED:
+            msg->SetInnerRML(
+                      context->GetDocument("game_window")
+                        ->GetElementById("templateResignWhiteWon")
+                        ->GetInnerRML()
+            );
+            break;
+        case GameState::WHITE_RESIGNED:
+            msg->SetInnerRML(
+                      context->GetDocument("game_window")
+                        ->GetElementById("templateResignBlackWon")
+                        ->GetInnerRML());
+            break;
+        case GameState::BLACK_PASS:
+            msg->SetInnerRML(
+                context->GetDocument("game_window")
+                    ->GetElementById("templateBlackPasses")
+                    ->GetInnerRML()
+            );
+            break;
+        case GameState::WHITE_PASS:
+            msg->SetInnerRML(
+                context->GetDocument("game_window")
+                    ->GetElementById("templateWhitePasses")
+                    ->GetInnerRML()
+            );
+            break;
+        case GameState::BLACK_WON:
+        case GameState::WHITE_WON: {
             Rocket::Core::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
             Rocket::Core::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
             elWhiteCnt->SetInnerRML(
@@ -277,16 +305,26 @@ void ElementGame::OnUpdate()
                                          model.state.adata.black_territory).CString());
             if (model.state.msg == GameState::WHITE_WON)
                 msg->SetInnerRML(
-                        Rocket::Core::String(128, "White wins by %.1f", model.state.adata.delta).CString());
+                    Rocket::Core::String(128,
+                        context->GetDocument("game_window")
+                        ->GetElementById("templateWhiteWon")
+                        ->GetInnerRML().CString(),
+                    model.state.adata.delta).CString()
+                );
             else
                 msg->SetInnerRML(
-                        Rocket::Core::String(128, "Black wins by %.1f", -model.state.adata.delta).CString());
+                    Rocket::Core::String(128,
+                        context->GetDocument("game_window")
+                        ->GetElementById("templateBlackWon")
+                        ->GetInnerRML().CString(),
+                    -model.state.adata.delta).CString()
+                );
             view.state.reason = model.state.reason;
         }
-			break;
-		default:
+            break;
+        default:
             msg->SetInnerRML("");
-		}
+        }
         requestRepaint();
         view.state.msg = model.state.msg;
     }
@@ -306,7 +344,7 @@ void ElementGame::OnUpdate()
             requestRepaint();
         }
     }
-	view.Update();
+    view.Update();
 }
 
 void ElementGame::Reshape() {

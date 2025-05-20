@@ -121,6 +121,15 @@
                             <div class="hr">Game</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">Start</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">Clear</div>
+                            <div class="template" id="templateResignWhiteWon">White wins by resignation.</div>
+                            <div class="template" id="templateResignBlackWon">Black wins by resignation.</div>
+                            <div class="template" id="templateWhiteWon">White wins by %.1f</div>
+                            <div class="template" id="templateBlackWon">Black wins by %.1f</div>
+                            <div class="template" id="templateWhiteResigns">White resigns</div>
+                            <div class="template" id="templateBlackResigns">Black resigns</div>
+                            <div class="template" id="templateWhitePasses">White passes</div>
+                            <div class="template" id="templateBlackPasses">Black passes</div>
+                            <div class="template" id="templateCalculatingScore">Calculating score...</div>
                             </div>
                             <div id="grpMoves">
                             <div class="hr">Move</div>
@@ -155,7 +164,8 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Framerate</div>
-                            <div class="cmd" id="lblFPS" onmouseup="fps">fps</div>
+                            <div class="template" id="templateFPS">%.1f fps</div>
+                            <div class="cmd" id="lblFPS" onmouseup="fps"></div>
                         </div>
                     </div>
                 </div>
