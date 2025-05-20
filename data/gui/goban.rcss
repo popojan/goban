@@ -188,6 +188,10 @@ div.hr
   font-size: 0.6rem;
 }
 
+div.template {
+    display:none;
+}
+
 #blackMoves {
   border-color: #ffffff00;
   border-right: 0.05rem;
