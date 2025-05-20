@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 cmake_policy(SET CMP0072 NEW)
+cmake_policy(SET CMP0167 OLD)
 
 project(goban LANGUAGES C CXX VERSION  0.0.3.0)
 
@@ -209,8 +210,7 @@ function(fetch_json)
     FetchContent_MakeAvailable(json)
     FetchContent_GetProperties(json)
     if(NOT json_POPULATED)
-        FetchContent_Populate(json)
-        add_subdirectory(${json_SOURCE_DIR} ${json_BINARY_DIR} EXCLUDE_FROM_ALL)
+        FetchContent_MakeAvailable(json)
     endif()
 endfunction()
 
@@ -221,8 +221,7 @@ function(fetch_glm)
 
     FetchContent_GetProperties(glm)
     if(NOT glm_POPULATED)
-        FetchContent_Populate(glm)
-        add_subdirectory(${glm_SOURCE_DIR} ${glm_BINARY_DIR} EXCLUDE_FROM_ALL)
+        FetchContent_MakeAvailable(glm)
     endif()
 endfunction()
 
@@ -233,8 +232,7 @@ function(fetch_spdlog)
 
     FetchContent_GetProperties(spdlog)
     if(NOT spdlog_POPULATED)
-        FetchContent_Populate(spdlog)
-        add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR} EXCLUDE_FROM_ALL)
+        FetchContent_MakeAvailable(spdlog)
     endif()
 endfunction()
 
@@ -245,8 +243,7 @@ function(fetch_clipp)
 
     FetchContent_GetProperties(clipp)
     if(NOT clipp_POPULATED)
-        FetchContent_Populate(clipp)
-        add_subdirectory(${clipp_SOURCE_DIR} ${clipp_BINARY_DIR} EXCLUDE_FROM_ALL)
+        FetchContent_MakeAvailable(clipp)
     endif()
 endfunction()
 
