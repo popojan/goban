@@ -1,0 +1,178 @@
+{
+  "humans": [
+    "人类"
+  ],
+  "bots": [
+    {
+      "name": "GNU Go 3.8",
+      "path": "./engine/gnugo",
+      "command": "gnugo",
+      "parameters": "--mode gtp --japanese-rules",
+      "main": 1
+    },
+    {
+      "name": "Pachi 12.60",
+      "path": "./engine/Pachi-12.60",
+      "command": "pachi.exe",
+      "parameters": "-r japanese --smart-pass",
+      "enabled": 0
+    },
+    {
+      "name": "Katago #kata1 b40",
+      "path": "./engine/katago",
+      "command": "katago",
+      "parameters": "gtp -model ./engine/katago/models/kata1-b40c256-s10359230464-d2525387336.bin.gz -config ./engine/katago/default_gtp.cfg",
+      "enabled": 0,
+      "kibitz": 0,
+      "messages": [
+          {
+            "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
+            "output": "$1",
+            "var": "$primaryMove"
+	        },
+          {
+            "regex": "^$primaryMove.*(W\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+L)",
+            "output": "$1 $2"
+          },
+          {
+            "regex": "Controller:",
+            "output": " "
+          }
+      ]
+    },
+    {
+      "name": "Katago #kata9x9 b18",
+      "path": "./engine/katago",
+      "command": "katago",
+      "parameters": "gtp -model ./engine/katago/kata9x9-b18c384nbt-20231025.bin.gz -config ./engine/katago/default_gtp.cfg",
+      "enabled": 0,
+      "kibitz": 0,
+      "messages": [
+          {
+            "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
+            "output": "$1",
+            "var": "$primaryMove"
+	        },
+          {
+            "regex": "^$primaryMove.*(W\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+L)",
+            "output": "$1 $2"
+          },
+          {
+            "regex": "Controller:",
+            "output": " "
+          }
+      ]
+    },
+    {
+      "name": "Zen 6",
+      "path": "./engine/zen",
+      "command": "wine",
+      "parameters": "./engine/zen/gtp4zen.exe -z 6 -t 2 -T 120 -s 2147483647 -r 25",
+      "enabled": 0,
+      "kibitz": 0,
+      "main": 0
+    },
+    {
+      "name": "Zen 7",
+      "path": "./engine/zen",
+      "command": "wine",
+      "parameters": "./engine/zen/gtp4zen.exe -z 7 -t 2 -T 120 -s 2147483647 -r 25",
+      "enabled": 0,
+      "kibitz": 0,
+      "main": 0
+    }
+  ],
+  "controls" : [
+    {"key": 1, "command": "play once"},
+    {"key": 81, "command": "quit"},
+    {"key": 17, "command": "toggle_fullscreen"},
+    {"key": 35, "command": "fps"},
+    {"key": 26, "command": "animate"},
+    {"key": 31, "command": "toggle_territory"},
+    {"key": 25, "command": "toggle_overlay"},
+    {"key": 29, "command": "resign"},
+    {"key": 27, "command": "pass"},
+    {"key": 14, "command": "reset camera"},
+    {"key": 32, "command": "undo move"},
+    {"key": 15, "command": "pan camera"},
+    {"key": 12, "command": "rotate camera"},
+    {"key": 30, "command": "zoom camera"},
+    {"key": 33, "command": "cycle shaders"},
+    {"key": 92, "command": "increase gamma"},
+    {"key": 90, "command": "decrease gamma"},
+    {"key": 91, "command": "increase contrast"},
+    {"key": 93, "command": "decrease contrast"},
+    {"key": 89, "command": "reset contrast and gamma"},
+    {"key": 19, "command": "increase eof"},
+    {"key": 23, "command": "decrease eof"},
+    {"key": 21, "command": "increase dof"},
+    {"key": 22, "command": "decrease dof"}
+  ],
+  "sounds": {
+    "move":  "./data/sound/stone.wav",
+    "clash": "./data/sound/collision.wav"
+  },
+  "fonts": {
+    "gui": [
+       "./data/fonts/NotoSansSC-Regular.otf"
+    ],
+    "overlay": "./data/fonts/default-font.ttf"
+  },
+  "shaders": [
+    {
+      "name": "Red Carpet",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/fragment/red_carpet.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Minimal Thin",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/fragment/thin.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Minimal Flat",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/fragment/flat.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "Minimal 2D",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/fragment/2d.glsl",
+      "height": 0.0
+    },
+    {
+      "name": "[stereo] Red Carpet",
+      "vertex": "./data/shaders/vertex/stereo.glsl",
+      "fragment": "./data/shaders/fragment/red_carpet_stereo.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "[stereo] Minimal Thin",
+      "vertex": "./data/shaders/vertex/stereo.glsl",
+      "fragment": "./data/shaders/fragment/thin_stereo.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "(legacy) Red Carpet",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/legacy/fragment.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "(legacy) Minimal Thin",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/legacy/fragment.25D.glsl",
+      "height": 0.85
+    },
+    {
+      "name": "(legacy) Minimal Flat",
+      "vertex": "./data/shaders/vertex/mono.glsl",
+      "fragment": "./data/shaders/legacy/fragment.2D.glsl",
+      "height": 0.0
+    }
+  ],
+  "gui": "./data/gui/zh"
+}

@@ -1,0 +1,192 @@
+<rml>
+<head>
+	<link type="text/css" href="goban.rcss"/>
+	<title>Window</title>
+</head>
+<body id="game_window">
+    <game id="game" onmousedown="mdown" onmouseup="mup">
+        <div class="menu hoverable top right">
+            <div class="menu show">
+                <div class="menuitem hoverable left">
+                    <span>文件</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">SGF</div>
+                            <!--<div class="cmd" onmouseup="load">Load game...</div>-->
+                            <div class="cmd" onmouseup="save">保存棋谱</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">系统</div>
+                            <div class="cmd" onmouseup="quit">退出</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>显示方式</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">外观</div>
+                            <div class="cmd">
+                                <select id="selectShader"
+                                        onchange="shader" onmousedown="nop"/>
+                            </div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">窗口</div>
+                            <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">全屏</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">显示手数</div>
+                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">最后一手</div>
+                        </div>
+                        <!--
+                        <div class="grp">
+                            <div class="hr">Gamma correction</div>
+                            <div class="cmd" onmouseup="reset gamma and contrast">Reset gamma</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">Contrast</div>
+                            <div class="cmd" onmouseup="reset gamma and contrast">Reset contrast</div>
+                        </div>
+                        -->
+                        <div class="grp">
+                            <div class="hr">视角</div>
+                            <!--<div class="cmd" onmouseup="free camera toggle">Toggle free</div>-->
+                            <div class="cmd" onmouseup="reset camera">复位</div>
+                            <div class="cmd" onmouseup="animate">播放动画</div>
+                            <div class="hr">视角预设</div>
+                            <div class="cmd" onmouseup="save camera">保存</div>
+                            <div class="cmd" onmouseup="delete camera">还原</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>游戏</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr" id="blackMoves">黑棋</div>
+                            <div class="cmd">
+                                <select id="selectBlack"
+                                        onchange="engine" onmousedown="nop"/>
+                            </div>
+                            <div class="hr"  id="whiteMoves">白棋</div>
+                            <div class="cmd">
+                                <select id="selectWhite" onchange="engine" onmousedown="nop"/>
+                            </div>
+                            <div class="hr">棋盘大小</div>
+                            <div class="cmd">
+                                <select id="selBoard"
+                                        onmousedown="nop" onchange="boardsize">
+                                    <!--better use × if font allows -->
+                                    <option value="19" selected>19×19</option>
+                                    <option value="17">17×17</option>
+                                    <option value="15">15×15</option>
+                                    <option value="13">13×13</option>
+                                    <option value="11">11×11</option>
+                                    <option value="9">9×9</option>
+                                </select>
+                            </div>
+                            <div class="hr">贴目</div>
+                            <div class="cmd">
+                                <select id="selectKomi"
+                                        onmousedown="nop" onchange="komi">
+                                    <option value="0.5">0.5</option>
+                                    <option value="6.5">6.5</option>
+                                    <option value="7.5" selected>7.5</option>
+                                </select>
+                            </div>
+                            <div class="hr">让子棋</div>
+                            <div class="cmd">
+                                <select id="selectHandicap"
+                                        onchange="handicap" onmousedown="nop">
+                                    <option value="0" selected>不让子</option>
+                                    <option value="2">让2子</option>
+                                    <option value="3">让3子</option>
+                                    <option value="4">让4子</option>
+                                    <option value="5">让5子</option>
+                                    <option value="6">让6子</option>
+                                    <option value="7">让7子</option>
+                                    <option value="8">让8子</option>
+                                    <option value="9">让9子</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>落子</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div id="grpGame">
+                            <div class="hr">游戏</div>
+                            <div class="cmd" id="cmdStart" onmouseup="start">开始</div>
+                            <div class="cmd" id="cmdClear" onmouseup="clear">清除</div>
+                            <div class="template" id="templateResignWhiteWon">白中盘胜</div>
+                            <div class="template" id="templateResignBlackWon">黑中盘胜</div>
+                            <div class="template" id="templateWhiteWon">白胜%.1f目</div>
+                            <div class="template" id="templateBlackWon">黑胜%.1f目</div>
+                            <div class="template" id="templateWhiteResigns">白方认输</div>
+                            <div class="template" id="templateBlackResigns">黑方认输</div>
+                            <div class="template" id="templateWhitePasses">白方虚着</div>
+                            <div class="template" id="templateBlackPasses">黑方虚着</div>
+                            <div class="template" id="templateCalculatingScore">计算得分中...</div>
+                            </div>
+                            <div id="grpMoves">
+                            <div class="hr">落子</div>
+                            <div class="cmd" id="cmdPass" onmouseup="pass">停一手</div>
+                            <div class="cmd" onmouseup="play once">提示</div>
+                            <div class="cmd" onmouseup="undo move">悔棋</div>
+                            <div class="cmd" id="cmdResign" onmouseup="resign">认输</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>分析</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">GnuGo</div>
+                            <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">形势判断</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable right">
+                    <span>关于我们</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">版本</div>
+                            <div class="cmd" onmouseup="about">Goban 0.0.3 zh</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable right">
+                    <span>调试</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">帧率</div>
+                            <div class="template" id="templateFPS">%.1f 帧/秒</div>
+                            <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="grpPlayers">
+            <div id="grpBlack" class="hoverable bottom left">
+                <div class="show bottom left">
+                  <div class="cmd" id="cntBlack" onmouseup="black">Black: 0</div>
+                </div>
+            </div>
+            <div id="grpWhite" class="hoverable top right">
+                <div class="show top right">
+                  <div class="cmd" id="cntWhite" onmouseup="white">White: 0</div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="cmd bottom center" id="lblMessage" onmouseup="msg"></div>
+        </div>
+    </game>
+</body>
+</rml>
