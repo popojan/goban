@@ -432,6 +432,7 @@ void Board::copyStateFrom(const Board& b) {
     capturedWhite = b.capturedWhite;
     territoryReady = b.territoryReady;
     moveNumber = b.moveNumber;
+    score = b.score;
 }
 
 bool Board::parseGtp(const std::vector<std::string>& lines) {

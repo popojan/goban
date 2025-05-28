@@ -111,6 +111,7 @@ bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
 
 const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
     estimateTerritory(final, colorToMove);
+    board.score = final ? final_score() : 0.0f;
     board.invalidate();
     return board;
 }
@@ -132,4 +133,15 @@ bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, cons
         return true;
     }
     return false;
+}
+
+float GtpEngine::final_score() {
+    if(const GtpClient::CommandOutput ret = GtpClient::issueCommand("final_score"); GtpClient::success(ret)) {
+        std::istringstream ss(ret[0].substr(2));
+        char winner;
+        float score = 0.0;
+        ss >> winner >> score;
+        return winner == 'B' ? score : -score;
+    }
+    return 0.0f;
 }

@@ -186,7 +186,7 @@ void GameRecord::finalizeGame(const GameState::Result& result) {
 
     auto type = T::RE;
     std::ostringstream ss;
-    ss << (result.delta > 0.0 ? "W+" : "B+");
+    ss << (result.delta < 0.0 ? "W+" : "B+");
     if(result.reason == GameState::RESIGNATION)
         ss << "R";
     else

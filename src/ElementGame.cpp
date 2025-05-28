@@ -309,7 +309,7 @@ void ElementGame::OnUpdate()
                         context->GetDocument("game_window")
                         ->GetElementById("templateWhiteWon")
                         ->GetInnerRML().CString(),
-                    model.state.adata.delta).CString()
+                    -model.state.adata.delta).CString()
                 );
             else
                 msg->SetInnerRML(
@@ -317,7 +317,7 @@ void ElementGame::OnUpdate()
                         context->GetDocument("game_window")
                         ->GetElementById("templateBlackWon")
                         ->GetInnerRML().CString(),
-                    -model.state.adata.delta).CString()
+                    model.state.adata.delta).CString()
                 );
             view.state.reason = model.state.reason;
         }
