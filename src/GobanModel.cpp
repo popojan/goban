@@ -39,60 +39,14 @@ void GobanModel::onBoardSized(int boardSize) {
 GobanModel::~GobanModel() = default;
 
 float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
-    if (state.reason == GameState::DOUBLE_PASS) {
-        ret.black_territory = ret.white_territory = 0;
-        ret.black_prisoners = ret.white_prisoners = 0;
-        ret.black_captured = board.capturedCount(Color::BLACK);
-        ret.white_captured = board.capturedCount(Color::WHITE);
-        auto& points = board.get();
-        for (auto & point : points) {
-            const Color& stone = point.stone;
-            const Color& area = point.influence;
-            if (stone == Color::EMPTY) {
-                if (area == Color::WHITE) {
-                    ret.white_territory++;
-                    ret.white_area++;
-                }
-                else if (area == Color::BLACK) {
-                    ret.black_territory++;
-                    ret.black_area++;
-                }
-            }
-            else if (area != stone){
-                if (area == Color::WHITE) {
-                    ret.black_prisoners++;
-                    ret.white_territory++;
-                }
-                else if (area == Color::BLACK) {
-                    ret.white_prisoners++;
-                    ret.black_territory++;
-                }
-            }
-            else {
-                if (area == Color::WHITE)
-                    ret.white_area++;
-                else if (area == Color::BLACK)
-                    ret.black_area++;
-            }
-        }
-        ret.delta = (float)(
-                  ret.white_territory
-                + ret.black_captured
-                + ret.black_prisoners
-                - ret.black_territory
-                - ret.white_captured
-                - ret.white_prisoners) + state.komi;
-    }
-    else {
-        ret.delta = lastMove == Color::BLACK ? 1.0f : -1.0f;
-    }
+    ret.delta = board.score;
     ret.reason = state.reason;
     if (state.reason == GameState::DOUBLE_PASS) {
-        bool whiteWon = ret.delta > 0.0;
+        bool whiteWon = ret.delta < 0.0;
         state.msg = whiteWon ? GameState::WHITE_WON : GameState::BLACK_WON;
     }
     else if(state.reason == GameState::RESIGNATION){
-        bool blackResigned =  ret.delta > 0.0;
+        bool blackResigned =  lastMove == Color::BLACK;
         state.msg =  blackResigned ? GameState::BLACK_RESIGNED : GameState::WHITE_RESIGNED;
     }
     return ret.delta;

@@ -277,6 +277,7 @@ private:
     volatile long moveNumber;
 public:
     double collision;
+    float score;
 };
 
 #endif // BOARD_H

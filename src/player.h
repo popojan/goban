@@ -82,6 +82,7 @@ public:
     Move genmove(const Color& colorToMove) override = 0;
     virtual const Board& showboard() = 0;
     virtual const Board& showterritory(bool final, Color colorToMove) = 0;
+    virtual float final_score() = 0;
     ~Engine() override = default;
 protected:
     Board board;
@@ -109,6 +110,7 @@ public:
     bool undo() override;
     virtual bool estimateTerritory(bool final, const Color& colorToMove);
     const Board& showterritory(bool final, Color colorToMove) override;
+    float final_score() override;
 
 protected:
 
