@@ -8,7 +8,7 @@ Targets Windows 7/10 and Linux.
 
 For windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/goban).
 
-Command to run Chinese translation with suppresed logging:
+Command to run Chinese translation with suppressed logging:
 
 ```
 ./goban --verbosity error --config data/zh/config.json
