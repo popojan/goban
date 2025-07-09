@@ -4,6 +4,12 @@
 #include <Rocket/Controls/DataSource.h>
 #include <filesystem>
 #include <vector>
+#include <memory>
+
+// Forward declaration
+namespace LibSgfcPlusPlus {
+    class ISgfcGame;
+}
 
 struct FileEntry {
     std::string name;
@@ -30,10 +36,6 @@ public:
     FileChooserDataSource();
     virtual ~FileChooserDataSource();
 
-    static void Initialize();
-    static void Shutdown();
-    static FileChooserDataSource* GetInstance();
-
     // DataSource interface
     virtual void GetRow(Rocket::Core::StringList& row, const Rocket::Core::String& table, int row_index, const Rocket::Core::StringList& columns) override;
     virtual int GetNumRows(const Rocket::Core::String& table) override;
@@ -51,13 +53,15 @@ public:
     // Game selection
     void SelectGame(int gameIndex);
     const SGFGameInfo* GetSelectedGame() const;
+    int GetSelectedGameIndex() const;
     
     // Get selected file path for loading
     std::string GetSelectedFilePath() const;
+    
+    // Explicitly load games for the selected SGF file
+    void LoadSelectedFileGames();
 
 private:
-    static FileChooserDataSource* instance;
-    
     std::filesystem::path currentPath;
     std::vector<FileEntry> files;
     std::vector<SGFGameInfo> games;
@@ -68,6 +72,7 @@ private:
     void refreshFileList();
     void previewSGF(const std::string& filePath);
     std::vector<SGFGameInfo> parseSGFGames(const std::string& filePath);
+    int countMovesInGame(std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game);
 };
 
 #endif // GOBAN_FILECHOOSERDATASOURCE_H

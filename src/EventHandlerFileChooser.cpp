@@ -9,7 +9,7 @@
 
 // Remove static context dependency - context will be passed as parameter
 
-EventHandlerFileChooser::EventHandlerFileChooser() : dialogDocument(nullptr) {
+EventHandlerFileChooser::EventHandlerFileChooser() : dialogDocument(nullptr), dataSource(nullptr) {
 }
 
 EventHandlerFileChooser::~EventHandlerFileChooser() {
@@ -22,6 +22,13 @@ EventHandlerFileChooser::~EventHandlerFileChooser() {
         }
         dialogDocument = nullptr;
     }
+    
+    // Clean up data source
+    if (dataSource) {
+        delete dataSource;
+        dataSource = nullptr;
+        spdlog::debug("Data source cleaned up in destructor");
+    }
 }
 
 void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value) {
@@ -29,7 +36,6 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
     spdlog::debug("Event type: '{}', target element: '{}'", event.GetType().CString(), 
                   event.GetTargetElement() ? event.GetTargetElement()->GetTagName().CString() : "null");
     
-    auto dataSource = FileChooserDataSource::GetInstance();
     if (!dataSource) {
         spdlog::error("FileChooserDataSource not initialized");
         return;
@@ -46,11 +52,25 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
     else if (value == "refresh") {
         spdlog::debug("Refresh button clicked");
         dataSource->RefreshFiles();
+        
+        // Clear selections when refreshing
+        auto filesGrid = dialogDocument->GetElementById("files_grid");
+        auto gamesGrid = dialogDocument->GetElementById("games_grid");
+        if (filesGrid) clearGridSelection(filesGrid);
+        if (gamesGrid) clearGridSelection(gamesGrid);
+        
         updateCurrentPath();
     }
     else if (value == "navigate_up") {
         spdlog::debug("Navigate up button clicked");
         dataSource->NavigateUp();
+        
+        // Clear selections when navigating
+        auto filesGrid = dialogDocument->GetElementById("files_grid");
+        auto gamesGrid = dialogDocument->GetElementById("games_grid");
+        if (filesGrid) clearGridSelection(filesGrid);
+        if (gamesGrid) clearGridSelection(gamesGrid);
+        
         updateCurrentPath();
     }
     else if (value == "select_file") {
@@ -71,6 +91,16 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                 if (dataGridRow) {
                     int selectedRow = dataGridRow->GetTableRelativeIndex();
                     spdlog::debug("Selected file row: {}", selectedRow);
+                    
+                    // Clear previous selection in files grid
+                    auto filesGrid = dialogDocument->GetElementById("files_grid");
+                    if (filesGrid) {
+                        clearGridSelection(filesGrid);
+                    }
+                    
+                    // Add selected class to clicked row
+                    dataGridRow->SetClass("selected", true);
+                    
                     dataSource->SelectFile(selectedRow);
                     updateCurrentPath();
                 } else {
@@ -101,6 +131,16 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                 if (dataGridRow) {
                     int selectedRow = dataGridRow->GetTableRelativeIndex();
                     spdlog::debug("Selected game row: {}", selectedRow);
+                    
+                    // Clear previous selection in games grid
+                    auto gamesGrid = dialogDocument->GetElementById("games_grid");
+                    if (gamesGrid) {
+                        clearGridSelection(gamesGrid);
+                    }
+                    
+                    // Add selected class to clicked row
+                    dataGridRow->SetClass("selected", true);
+                    
                     dataSource->SelectGame(selectedRow);
                 } else {
                     spdlog::debug("Failed to cast to ElementDataGridRow");
@@ -125,11 +165,13 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                 if (gameElement) {
                     GameThread& gameThread = gameElement->getGameThread();
                     
-                    if (gameThread.loadSGF(filePath)) {
-                        spdlog::info("Successfully loaded SGF file: {}", filePath);
+                    int gameIndex = dataSource->GetSelectedGameIndex();
+                    spdlog::debug("Loading SGF file: {} with game index: {}", filePath, gameIndex);
+                    if (gameThread.loadSGF(filePath, gameIndex)) {
+                        spdlog::info("Successfully loaded SGF file: {} (game index: {})", filePath, gameIndex);
                         hideDialog();
                     } else {
-                        spdlog::error("Failed to load SGF file: {}", filePath);
+                        spdlog::error("Failed to load SGF file: {} (game index: {})", filePath, gameIndex);
                     }
                 }
             }
@@ -157,6 +199,9 @@ void EventHandlerFileChooser::LoadDialog(Rocket::Core::Context* context) {
         return;
     }
     
+    // Create data source
+    dataSource = new FileChooserDataSource();
+    
     // Load the dialog document and keep it hidden initially
     spdlog::debug("Loading dialog document: data/gui/open.rml");
     dialogDocument = context->LoadDocument("data/gui/open.rml");
@@ -165,6 +210,9 @@ void EventHandlerFileChooser::LoadDialog(Rocket::Core::Context* context) {
         dialogDocument->Hide(); // Keep it hidden initially
     } else {
         spdlog::error("Failed to load dialog document");
+        // Clean up data source if dialog loading failed
+        delete dataSource;
+        dataSource = nullptr;
     }
 }
 
@@ -189,6 +237,13 @@ void EventHandlerFileChooser::UnloadDialog(Rocket::Core::Context* context) {
         spdlog::debug("Dialog document unloaded");
     } else {
         spdlog::debug("No dialog document to unload");
+    }
+    
+    // Clean up data source
+    if (dataSource) {
+        delete dataSource;
+        dataSource = nullptr;
+        spdlog::debug("Data source cleaned up");
     }
 }
 
@@ -245,7 +300,6 @@ void EventHandlerFileChooser::updateCurrentPath() {
     
     auto pathDisplay = dialogDocument->GetElementById("current_path");
     if (pathDisplay) {
-        auto dataSource = FileChooserDataSource::GetInstance();
         if (dataSource) {
             std::string currentPath = dataSource->GetCurrentPath().string();
             spdlog::debug("Updating path display to: {}", currentPath);
@@ -255,5 +309,19 @@ void EventHandlerFileChooser::updateCurrentPath() {
         }
     } else {
         spdlog::debug("current_path element not found in dialog");
+    }
+}
+
+void EventHandlerFileChooser::clearGridSelection(Rocket::Core::Element* grid) {
+    if (!grid) return;
+    
+    // Find all datagridrow elements in the grid and remove selected class
+    Rocket::Core::ElementList rows;
+    grid->GetElementsByTagName(rows, Rocket::Core::String("datagridrow"));
+    for (int i = 0; i < rows.size(); ++i) {
+        auto row = rows[i];
+        if (row->IsClassSet("selected")) {
+            row->SetClass("selected", false);
+        }
     }
 }

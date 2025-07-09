@@ -73,7 +73,7 @@ public:
 
     std::vector<Player*> getPlayers() { return players;}
 
-    bool loadSGF(const std::string& fileName);
+    bool loadSGF(const std::string& fileName, int gameIndex = 0);
 
 private:
     void setHandicapStones(const std::vector<Position>& stones);
