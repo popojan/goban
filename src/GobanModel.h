@@ -54,7 +54,7 @@ public:
         return state.colorToMove;
     }
 
-    bool isGameOver() { return state.adata.reason != GameState::NO_REASON;}
+    bool isGameOver() { return state.reason != GameState::NO_REASON;}
 
     unsigned getBoardSize() const;
 
@@ -76,7 +76,7 @@ public:
     Board board;
 
     bool prevPass;
-    bool over;
+    volatile bool over;
     bool started;
     GameState state;
 

@@ -254,6 +254,7 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo)
         gameInfo.blackPlayer = "Black";
         gameInfo.whitePlayer = "White";
         gameInfo.handicapStones.clear();
+        gameInfo.gameResult = LibSgfcPlusPlus::SgfcGameResult();
 
         for (auto property : rootNode->GetProperties()) {
             switch (property->GetPropertyType()) {
@@ -300,6 +301,13 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo)
                             Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
                             gameInfo.handicapStones.push_back(pos);
                         }
+                    }
+                    break;
+                }
+                case T::RE: {
+                    auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue());
+                    if (textValue) {
+                        gameInfo.gameResult = SgfcGameResult::FromPropertyValue(textValue->GetSimpleTextValue());
                     }
                     break;
                 }

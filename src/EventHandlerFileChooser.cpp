@@ -221,6 +221,19 @@ void EventHandlerFileChooser::hideDialog() {
     }
     
     dialogDocument->Hide();
+    
+    // Restore focus to the main game element to ensure keyboard shortcuts work
+    auto mainDoc = context->GetDocument("game_window");
+    if (mainDoc) {
+        auto gameElement = mainDoc->GetElementById("game");
+        if (gameElement) {
+            spdlog::debug("Restoring focus to main game element");
+            gameElement->Focus();
+        } else {
+            spdlog::debug("Game element not found, focusing on main document");
+            mainDoc->Focus();
+        }
+    }
 }
 
 void EventHandlerFileChooser::updateCurrentPath() {

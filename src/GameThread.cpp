@@ -1,6 +1,7 @@
 #include "GameThread.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <cmath>
 
 GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr), interruptRequested(false), hasThreadRunning(false),
@@ -501,6 +502,83 @@ bool GameThread::loadSGF(const std::string& fileName) {
     }
 
     model.pause();
+    
+    // Check if the loaded game is finished and trigger final scoring
+    if (gameInfo.gameResult.IsValid && 
+        (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin ||
+         gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::WhiteWin ||
+         gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::Draw)) {
+        
+        spdlog::info("Loaded SGF contains finished game, triggering final scoring");
+        
+        // Check if we ended with consecutive passes (typical for finished games)
+        bool endedWithPasses = false;
+        if (moves.size() >= 2) {
+            const Move& lastMove = moves[moves.size() - 1];
+            const Move& secondLastMove = moves[moves.size() - 2];
+            endedWithPasses = (lastMove == Move::PASS && secondLastMove == Move::PASS);
+        }
+        
+        // Check if the game ended by resignation
+        bool endedByResignation = false;
+        if (!moves.empty()) {
+            const Move& lastMove = moves[moves.size() - 1];
+            endedByResignation = (lastMove == Move::RESIGN);
+        }
+        
+        // Trigger final scoring for finished games (both double pass and resignation)
+        if (coach && (endedWithPasses || endedByResignation)) {
+            // Set the game state reason but don't set 'over' yet to avoid breaking the game loop
+            model.state.reason = endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
+
+            model.board.toggleTerritoryAuto(true);
+            const Board& result = coach->showterritory(true, model.state.colorToMove);
+            
+            // Update observers with the final board state
+            std::for_each(
+                gameObservers.begin(), gameObservers.end(),
+                [result](GameObserver* observer) {
+                    observer->onBoardChange(result);
+                }
+            );
+            
+            // Now safely set the game as over after all operations are complete
+            model.over = true;
+            
+            // Compare coach's calculated score with SGF result
+            if (endedWithPasses) {
+                float coachScore = coach->final_score();
+                float sgfScore = 0.0f;
+                bool sgfScoreValid = false;
+                
+                // Extract score from SGF result if it's a win with score
+                if (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinWithScore) {
+                    sgfScore = gameInfo.gameResult.Score;
+                    if (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::WhiteWin) {
+                        sgfScore = -sgfScore; // Convert to coach's convention (negative = white wins)
+                    }
+                    sgfScoreValid = true;
+                }
+                
+                if (sgfScoreValid) {
+                    float scoreDifference = std::abs(coachScore - sgfScore);
+                    if (scoreDifference > 0.1f) {
+                        spdlog::warn("Score discrepancy detected: Coach calculated {:.1f}, SGF shows {:.1f} (difference: {:.1f}). "
+                                   "This may be due to different scoring rules or SGF error.",
+                                   coachScore, sgfScore, scoreDifference);
+                    } else {
+                        spdlog::info("Score verification: Coach {:.1f}, SGF {:.1f} - scores match", coachScore, sgfScore);
+                    }
+                }
+            }
+            
+            if (endedByResignation) {
+                spdlog::info("Final scoring completed for resigned game (showing territory influence)");
+            } else {
+                spdlog::info("Final scoring completed for loaded SGF game");
+            }
+        }
+    }
     
     spdlog::info("SGF file [{}] loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
                  fileName, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, moves.size());
