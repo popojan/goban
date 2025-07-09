@@ -22,7 +22,7 @@ EventHandlerFileChooser::~EventHandlerFileChooser() {
         }
         dialogDocument = nullptr;
     }
-    
+
     // Clean up data source
     if (dataSource) {
         delete dataSource;
@@ -232,9 +232,18 @@ void EventHandlerFileChooser::UnloadDialog(Rocket::Core::Context* context) {
             focusedElement->Blur();
         }
         
+        // Explicitly clear all event handlers and references from the document
+        spdlog::debug("Clearing all event handlers from dialog document");
+        //dialogDocument->GetEventDispatcher()->DetachAllEvents();
+        
         context->UnloadDocument(dialogDocument);
+        dialogDocument->RemoveReference();
         dialogDocument = nullptr;
         spdlog::debug("Dialog document unloaded");
+        
+        // Force immediate context update to finalize document cleanup
+        spdlog::debug("Forcing context update to finalize document cleanup");
+        context->Update();
     } else {
         spdlog::debug("No dialog document to unload");
     }
@@ -324,4 +333,5 @@ void EventHandlerFileChooser::clearGridSelection(Rocket::Core::Element* grid) {
             row->SetClass("selected", false);
         }
     }
+
 }
