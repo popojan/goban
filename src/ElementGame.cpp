@@ -15,6 +15,7 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
     engine.addGameObserver(&view);
 
     engine.clearGame(19, 0.5, 0);
+    model.createNewRecord();
     control.togglePlayer(0, 0);
     control.togglePlayer(1, 0);
 }

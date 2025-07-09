@@ -15,7 +15,7 @@ void GobanModel::onBoardSized(int boardSize) {
 	board.toggleTerritoryAuto(false);
     board.positionNumber += 1;
 
-	over    = false;
+	isGameOver    = false;
 	started = false;
 
     auto black = state.black;
@@ -166,7 +166,7 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
         board.toggleTerritoryAuto(true);
-        over = true;
+        isGameOver = true;
         spdlog::debug("Main Over! Reason {}", state.reason);
     }
     else if (move == Move::PASS) {
@@ -205,9 +205,9 @@ void GobanModel::onBoardChange(const Board& result) {
     state.capturedBlack = board.capturedCount(Color::BLACK);
     state.capturedWhite = board.capturedCount(Color::WHITE);
 
-    spdlog::debug("over {} ready {}", over, result.territoryReady);
+    spdlog::debug("over {} ready {}", isGameOver, result.territoryReady);
 
-    if(over && result.territoryReady) {
+    if(isGameOver && result.territoryReady) {
         this->result(game.lastMove(), state.adata);
         game.finalizeGame(state.adata);
         game.saveAs("");

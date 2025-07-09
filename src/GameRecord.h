@@ -23,7 +23,7 @@ public:
         std::for_each(history.begin(), history.end(), fMove);
     }
 
-    [[nodiscard]] const Move& lastMove() const  { return history.back(); }
+    [[nodiscard]] const Move lastMove() const  { return history.back(); }
 
     void move(const Move& move);
 
@@ -36,6 +36,12 @@ public:
     void setHandicapStones(const std::vector<Position>& stones);
 
     void finalizeGame(const GameState::Result& result);
+
+    [[nodiscard]] const Move secondLastMove() const {
+        return history.size() > 1 ? history[history.size() -2]
+            : Move(Move::Special::INVALID, Color(Color::BLACK));
+    }
+
 
     struct SGFGameInfo {
         int boardSize;

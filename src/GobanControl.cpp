@@ -12,6 +12,7 @@ bool GobanControl::newGame(unsigned boardSize) {
     engine.interrupt();
     engine.reset();
 	if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
+        model.createNewRecord();
         view.animateIntro();
         return true;
 	}
@@ -29,11 +30,11 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
             bool playNow = true;
-            if (model.isGameOver()) {
+            if (model.isGameOver) {
                 newGame(model.getBoardSize());
                 playNow = false;
             }
-            else if(!engine.isRunning() && !model.over) {
+            else if(!engine.isRunning() && !model.isGameOver) {
                engine.run();
             }
             spdlog::debug("engine.isRunning() = {}", engine.isRunning());
@@ -130,12 +131,12 @@ bool GobanControl::command(const std::string& cmd) {
         }
     }
     else if (cmd == "clear") {
-        if (model.isGameOver()) {
+        if (model.isGameOver) {
             newGame(model.getBoardSize());
         }
     }
     else if (cmd == "start") {
-        if(!engine.isRunning() && !model.over) {
+        if(!engine.isRunning() && !model.isGameOver) {
             engine.run();
         }
     }
