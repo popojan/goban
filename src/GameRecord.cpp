@@ -334,14 +334,15 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo)
                     }
                 }
             }
+            currentNode = node;
             node = node->GetFirstChild();
         }
 
-        doc = nullptr;
-        game = nullptr;
-        currentNode = nullptr;
-        gameStarted = false;
-        numGames = 0;
+        doc = loadedDoc->GetDocument();
+        game = loadedGame;
+        //currentNode = node;
+        gameStarted = true;
+        numGames = loadedDoc->GetDocument()->GetGames().size();
 
         boardSize.Columns = gameInfo.boardSize;
         boardSize.Rows = gameInfo.boardSize;

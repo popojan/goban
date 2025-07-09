@@ -337,7 +337,7 @@ void GameThread::gameLoop() {
                 );
             }
 
-            if(model.over) {
+            if(model.isGameOver) {
                 break;
             }
 
@@ -448,6 +448,16 @@ Move GameThread::getLocalMove(const Move::Special move) const {
 bool GameThread::loadSGF(const std::string& fileName) {
     //std::unique_lock<std::mutex> lock(mutex2);
     
+    // Auto-save current game if it has moves before replacing it
+    if (model.game.moveCount() > 0) {
+        try {
+            model.game.saveAs(""); // Use default auto-generated filename
+            spdlog::info("Auto-saved current game with {} moves before loading SGF", model.game.moveCount());
+        } catch (const std::exception& ex) {
+            spdlog::warn("Failed to auto-save current game before SGF loading: {}", ex.what());
+        }
+    }
+    
     GameRecord::SGFGameInfo gameInfo;
     
     if (!model.game.loadFromSGF(fileName, gameInfo)) {
@@ -466,11 +476,6 @@ bool GameThread::loadSGF(const std::string& fileName) {
         spdlog::error("Failed to get SGF player");
         return false;
     }
-    
-    std::vector<Move> moves;
-    model.game.replay([&moves](const Move& move) {
-        moves.push_back(move);
-    });
     
     if (!clearGame(gameInfo.boardSize, gameInfo.komi, gameInfo.handicap)) {
         spdlog::error("Failed to clear game for SGF loading");
@@ -501,6 +506,15 @@ bool GameThread::loadSGF(const std::string& fileName) {
         );
     }
 
+    if (model.game.moveCount() > 0) {
+        model.state.colorToMove = Color(model.game.lastMove().col == Color::BLACK
+            ? Color::WHITE : Color::BLACK);
+    } else if (gameInfo.handicap > 0) {
+        model.state.colorToMove = Color(Color::WHITE);
+    } else {
+        model.state.colorToMove = Color(Color::BLACK);
+    }
+
     model.pause();
     
     // Check if the loaded game is finished and trigger final scoring
@@ -513,16 +527,16 @@ bool GameThread::loadSGF(const std::string& fileName) {
         
         // Check if we ended with consecutive passes (typical for finished games)
         bool endedWithPasses = false;
-        if (moves.size() >= 2) {
-            const Move& lastMove = moves[moves.size() - 1];
-            const Move& secondLastMove = moves[moves.size() - 2];
+        if (model.game.moveCount() >= 2) {
+            const Move& lastMove = model.game.lastMove();
+            const Move& secondLastMove = model.game.secondLastMove();
             endedWithPasses = (lastMove == Move::PASS && secondLastMove == Move::PASS);
         }
         
         // Check if the game ended by resignation
         bool endedByResignation = false;
-        if (!moves.empty()) {
-            const Move& lastMove = moves[moves.size() - 1];
+        if (!model.game.moveCount() == 0) {
+            const Move& lastMove = model.game.lastMove();
             endedByResignation = (lastMove == Move::RESIGN);
         }
         
@@ -531,19 +545,17 @@ bool GameThread::loadSGF(const std::string& fileName) {
             // Set the game state reason but don't set 'over' yet to avoid breaking the game loop
             model.state.reason = endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
 
+            {}
             model.board.toggleTerritoryAuto(true);
             const Board& result = coach->showterritory(true, model.state.colorToMove);
-            
-            // Update observers with the final board state
-            std::for_each(
+
+            // Do not update observers with the final board state
+            /*std::for_each(
                 gameObservers.begin(), gameObservers.end(),
                 [result](GameObserver* observer) {
                     observer->onBoardChange(result);
                 }
-            );
-            
-            // Now safely set the game as over after all operations are complete
-            model.over = true;
+            );*/
             
             // Compare coach's calculated score with SGF result
             if (endedWithPasses) {
@@ -570,8 +582,19 @@ bool GameThread::loadSGF(const std::string& fileName) {
                         spdlog::info("Score verification: Coach {:.1f}, SGF {:.1f} - scores match", coachScore, sgfScore);
                     }
                 }
+                model.state.adata.delta = coachScore;
             }
-            
+
+            // Now safely set the game as over after all operations are complete
+            model.isGameOver = true;
+            model.board.copyStateFrom(result);
+            model.board.positionNumber += 1;
+
+            model.state.capturedBlack = model.board.capturedCount(Color::BLACK);
+            model.state.capturedWhite = model.board.capturedCount(Color::WHITE);
+
+            model.result(model.game.lastMove(), model.state.adata);
+
             if (endedByResignation) {
                 spdlog::info("Final scoring completed for resigned game (showing territory influence)");
             } else {
@@ -581,7 +604,7 @@ bool GameThread::loadSGF(const std::string& fileName) {
     }
     
     spdlog::info("SGF file [{}] loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
-                 fileName, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, moves.size());
+                 fileName, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, model.game.moveCount());
     
     return true;
 }
