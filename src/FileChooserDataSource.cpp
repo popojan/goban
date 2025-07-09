@@ -101,10 +101,6 @@ void FileChooserDataSource::NavigateUp() {
 void FileChooserDataSource::RefreshFiles() {
     spdlog::debug("RefreshFiles() called");
     
-    // Store old sizes for proper notification
-    int oldFileCount = static_cast<int>(files.size());
-    int oldGameCount = static_cast<int>(games.size());
-    
     refreshFileList();
     
     // Clear games when changing directories
@@ -112,24 +108,17 @@ void FileChooserDataSource::RefreshFiles() {
     selectedFileIndex = -1;
     selectedGameIndex = -1;
     
-    // Notify about row changes only if data actually changed
-    int newFileCount = GetNumRows("files");
-    int newGameCount = GetNumRows("games");
-    
-    if (oldFileCount != newFileCount) {
-        spdlog::debug("Notifying file table change: {} -> {}", oldFileCount, newFileCount);
-        NotifyRowChange("files");  // Refresh entire files table
-    }
-    
-    if (oldGameCount != newGameCount) {
-        spdlog::debug("Notifying games table change: {} -> {}", oldGameCount, newGameCount);
-        NotifyRowChange("games");  // Refresh entire games table
-    }
+    // Use NotifyRowChange for complete table refresh (preferred pattern)
+    spdlog::debug("Notifying complete files table refresh");
+    NotifyRowChange("files");
+
+    spdlog::debug("Notifying complete games table refresh");
+    NotifyRowChange("games");
 }
 
 void FileChooserDataSource::refreshFileList() {
     files.clear();
-    
+
     try {
         if (std::filesystem::exists(currentPath) && std::filesystem::is_directory(currentPath)) {
             for (const auto& entry : std::filesystem::directory_iterator(currentPath)) {
@@ -230,15 +219,14 @@ void FileChooserDataSource::LoadSelectedFileGames() {
 void FileChooserDataSource::previewSGF(const std::string& filePath) {
     spdlog::debug("previewSGF() called for: {}", filePath);
     
-    int oldGameCount = static_cast<int>(games.size());
     games = parseSGFGames(filePath);
     selectedGameIndex = games.empty() ? -1 : 0;
     
     spdlog::debug("Parsed {} games from SGF file", games.size());
     
-    // Notify that games table has changed using proper pattern
-    spdlog::debug("Notifying games table change: {} -> {}", oldGameCount, GetNumRows("games"));
-    NotifyRowChange("games");  // Refresh entire games table
+    // Use NotifyRowChange for complete table refresh
+    spdlog::debug("Notifying complete games table refresh");
+    NotifyRowChange("games");
 }
 
 std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string& filePath) {
