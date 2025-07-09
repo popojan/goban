@@ -51,7 +51,6 @@ div {
 }
 
 div {
-  position: static;
 }
 
 .menu span {

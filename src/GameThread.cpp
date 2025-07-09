@@ -445,7 +445,7 @@ Move GameThread::getLocalMove(const Move::Special move) const {
     return {move, model.state.colorToMove};
 }
 
-bool GameThread::loadSGF(const std::string& fileName) {
+bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     //std::unique_lock<std::mutex> lock(mutex2);
     
     // Auto-save current game if it has moves before replacing it
@@ -460,7 +460,7 @@ bool GameThread::loadSGF(const std::string& fileName) {
     
     GameRecord::SGFGameInfo gameInfo;
     
-    if (!model.game.loadFromSGF(fileName, gameInfo)) {
+    if (!model.game.loadFromSGF(fileName, gameInfo, gameIndex)) {
         return false;
     }
 
@@ -603,8 +603,8 @@ bool GameThread::loadSGF(const std::string& fileName) {
         }
     }
     
-    spdlog::info("SGF file [{}] loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
-                 fileName, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, model.game.moveCount());
+    spdlog::info("SGF file [{}] (game index {}) loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
+                 fileName, gameIndex, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, model.game.moveCount());
     
     return true;
 }

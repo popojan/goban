@@ -3,8 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
-
-FileChooserDataSource* FileChooserDataSource::instance = nullptr;
+#include "SGF.h"
 
 FileChooserDataSource::FileChooserDataSource() 
     : Rocket::Controls::DataSource("file_chooser")
@@ -12,24 +11,14 @@ FileChooserDataSource::FileChooserDataSource()
     , selectedFileIndex(-1)
     , selectedGameIndex(-1) {
     
-    instance = this;
     RefreshFiles();
 }
 
 FileChooserDataSource::~FileChooserDataSource() {
-    instance = nullptr;
-}
-
-void FileChooserDataSource::Initialize() {
-    new FileChooserDataSource();
-}
-
-void FileChooserDataSource::Shutdown() {
-    delete instance;
-}
-
-FileChooserDataSource* FileChooserDataSource::GetInstance() {
-    return instance;
+    spdlog::debug("FileChooserDataSource destructor called");
+    // Clear containers to free memory
+    files.clear();
+    games.clear();
 }
 
 void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::Core::String& table, int row_index, const Rocket::Core::StringList& columns) {
@@ -69,7 +58,14 @@ void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::
             } else if (columns[i] == "result") {
                 row.push_back(Rocket::Core::String(game.gameResult.c_str()));
             } else if (columns[i] == "moves") {
-                row.push_back(Rocket::Core::String(8, "%d", game.moveCount));
+                // Calculate move count on demand if not already calculated
+                if (game.moveCount == -1) {
+                    // This is a bit of a hack - we need to modify the game object
+                    // In a real implementation, we might want to cache this differently
+                    row.push_back(Rocket::Core::String("-"));
+                } else {
+                    row.push_back(Rocket::Core::String(8, "%d", game.moveCount));
+                }
             } else if (columns[i] == "board_size") {
                 row.push_back(Rocket::Core::String(8, "%d", game.boardSize));
             } else if (columns[i] == "komi") {
@@ -116,12 +112,19 @@ void FileChooserDataSource::RefreshFiles() {
     selectedFileIndex = -1;
     selectedGameIndex = -1;
     
-    // Notify about row changes using proper RocketLib pattern
-    spdlog::debug("Notifying file table change: {} -> {}", oldFileCount, GetNumRows("files"));
-    NotifyRowChange("files");  // Refresh entire files table
+    // Notify about row changes only if data actually changed
+    int newFileCount = GetNumRows("files");
+    int newGameCount = GetNumRows("games");
     
-    spdlog::debug("Notifying games table change: {} -> {}", oldGameCount, GetNumRows("games"));
-    NotifyRowChange("games");  // Refresh entire games table
+    if (oldFileCount != newFileCount) {
+        spdlog::debug("Notifying file table change: {} -> {}", oldFileCount, newFileCount);
+        NotifyRowChange("files");  // Refresh entire files table
+    }
+    
+    if (oldGameCount != newGameCount) {
+        spdlog::debug("Notifying games table change: {} -> {}", oldGameCount, newGameCount);
+        NotifyRowChange("games");  // Refresh entire games table
+    }
 }
 
 void FileChooserDataSource::refreshFileList() {
@@ -133,7 +136,16 @@ void FileChooserDataSource::refreshFileList() {
                 FileEntry fileEntry;
                 fileEntry.name = entry.path().filename().string();
                 fileEntry.fullPath = entry.path();
-                fileEntry.isDirectory = entry.is_directory();
+                
+                // Use status() once instead of multiple calls
+                std::error_code ec;
+                auto status = entry.status(ec);
+                if (ec) {
+                    spdlog::debug("Error getting file status for {}: {}", fileEntry.name, ec.message());
+                    continue;
+                }
+                
+                fileEntry.isDirectory = std::filesystem::is_directory(status);
                 
                 if (fileEntry.isDirectory) {
                     fileEntry.type = "Directory";
@@ -145,9 +157,6 @@ void FileChooserDataSource::refreshFileList() {
                 }
                 
                 files.push_back(fileEntry);
-                if (files.size() > 3) {
-                    break;
-                }
             }
             
             // Sort: directories first, then files
@@ -174,8 +183,8 @@ void FileChooserDataSource::SelectFile(int fileIndex) {
         // Navigate to directory
         SetCurrentPath(file.fullPath);
     } else if (file.name.find(".sgf") != std::string::npos) {
-        // Preview SGF file
-        //previewSGF(file.fullPath.string());
+        // Load games for the selected SGF file
+        LoadSelectedFileGames();
     }
 }
 
@@ -199,12 +208,23 @@ const SGFGameInfo* FileChooserDataSource::GetSelectedGame() const {
     return nullptr;
 }
 
+int FileChooserDataSource::GetSelectedGameIndex() const {
+    return selectedGameIndex;
+}
+
 std::string FileChooserDataSource::GetSelectedFilePath() const {
     const FileEntry* file = GetSelectedFile();
     if (file && !file->isDirectory) {
         return file->fullPath.string();
     }
     return "";
+}
+
+void FileChooserDataSource::LoadSelectedFileGames() {
+    const FileEntry* file = GetSelectedFile();
+    if (file && !file->isDirectory && file->name.find(".sgf") != std::string::npos) {
+        previewSGF(file->fullPath.string());
+    }
 }
 
 void FileChooserDataSource::previewSGF(const std::string& filePath) {
@@ -222,88 +242,91 @@ void FileChooserDataSource::previewSGF(const std::string& filePath) {
 }
 
 std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string& filePath) {
+    using namespace LibSgfcPlusPlus;
+    
     std::vector<SGFGameInfo> gameList;
     
     try {
-        std::ifstream file(filePath);
-        if (!file.is_open()) {
-            spdlog::error("Cannot open SGF file: {}", filePath);
+        auto reader = SgfcPlusPlusFactory::CreateDocumentReader();
+        auto result = reader->ReadSgfFile(filePath);
+        
+        if (!result || !result->IsSgfDataValid()) {
+            spdlog::error("Failed to parse SGF file: {}", filePath);
             return gameList;
         }
         
-        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        file.close();
+        auto document = result->GetDocument();
+        auto games = document->GetGames();
         
-        // Simple SGF parsing - look for game trees
-        size_t pos = 0;
-        int gameIndex = 0;
+        spdlog::debug("Found {} games in SGF file", games.size());
         
-        while ((pos = content.find("(;", pos)) != std::string::npos) {
+        for (size_t gameIndex = 0; gameIndex < games.size(); ++gameIndex) {
+            auto game = games[gameIndex];
+            auto rootNode = game->GetRootNode();
+            
             SGFGameInfo gameInfo;
             gameInfo.blackPlayer = "Unknown";
             gameInfo.whitePlayer = "Unknown";
             gameInfo.boardSize = 19;
             gameInfo.komi = 0.0f;
             gameInfo.moveCount = 0;
-            gameInfo.gameIndex = gameIndex++;
+            gameInfo.gameIndex = static_cast<int>(gameIndex);
             
-            // Find the end of this game
-            size_t gameEnd = content.find(";)", pos);
-            if (gameEnd == std::string::npos) {
-                gameEnd = content.length();
-            }
-            
-            std::string gameContent = content.substr(pos, gameEnd - pos);
-            
-            // Parse basic properties
-            auto extractProperty = [&](const std::string& prop) -> std::string {
-                std::string pattern = prop + "[";
-                size_t start = gameContent.find(pattern);
-                if (start != std::string::npos) {
-                    start += pattern.length();
-                    size_t end = gameContent.find("]", start);
-                    if (end != std::string::npos) {
-                        return gameContent.substr(start, end - start);
-                    }
+            // Extract game properties from root node
+            auto properties = rootNode->GetProperties();
+            for (const auto& property : properties) {
+                auto propertyType = property->GetPropertyType();
+                auto propertyValues = property->GetPropertyValues();
+                
+                if (propertyValues.empty()) continue;
+                
+                switch (propertyType) {
+                    case SgfcPropertyType::PB: // Black player
+                        if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(propertyValues[0])) {
+                            gameInfo.blackPlayer = textValue->GetSimpleTextValue();
+                        }
+                        break;
+                    case SgfcPropertyType::PW: // White player
+                        if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(propertyValues[0])) {
+                            gameInfo.whitePlayer = textValue->GetSimpleTextValue();
+                        }
+                        break;
+                    case SgfcPropertyType::SZ: // Board size
+                        if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(propertyValues[0])) {
+                            gameInfo.boardSize = static_cast<int>(numberValue->GetNumberValue());
+                        }
+                        break;
+                    case SgfcPropertyType::KM: // Komi
+                        if (auto realValue = std::dynamic_pointer_cast<ISgfcRealPropertyValue>(propertyValues[0])) {
+                            gameInfo.komi = static_cast<float>(realValue->GetRealValue());
+                        }
+                        break;
+                    case SgfcPropertyType::RE: // Result
+                        if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(propertyValues[0])) {
+                            gameInfo.gameResult = textValue->GetSimpleTextValue();
+                        }
+                        break;
+                    case SgfcPropertyType::DT: // Date
+                        if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(propertyValues[0])) {
+                            gameInfo.date = textValue->GetSimpleTextValue();
+                        }
+                        break;
+                    default:
+                        break;
                 }
-                return "";
-            };
-            
-            std::string bp = extractProperty("PB");
-            std::string wp = extractProperty("PW");
-            std::string sz = extractProperty("SZ");
-            std::string km = extractProperty("KM");
-            std::string re = extractProperty("RE");
-            std::string dt = extractProperty("DT");
-            
-            if (!bp.empty()) gameInfo.blackPlayer = bp;
-            if (!wp.empty()) gameInfo.whitePlayer = wp;
-            if (!sz.empty()) gameInfo.boardSize = std::stoi(sz);
-            if (!km.empty()) gameInfo.komi = std::stof(km);
-            if (!re.empty()) gameInfo.gameResult = re;
-            if (!dt.empty()) gameInfo.date = dt;
-            
-            // Count moves (simple approach - count ;B[ and ;W[ occurrences)
-            size_t movePos = 0;
-            while ((movePos = gameContent.find(";B[", movePos)) != std::string::npos) {
-                gameInfo.moveCount++;
-                movePos += 3;
-            }
-            movePos = 0;
-            while ((movePos = gameContent.find(";W[", movePos)) != std::string::npos) {
-                gameInfo.moveCount++;
-                movePos += 3;
             }
             
-            // Create display strings
+            // Count moves by traversing the game tree
+            gameInfo.moveCount = countMovesInGame(game);
+            
+            // Create display strings with move count
             char titleBuffer[64];
             snprintf(titleBuffer, sizeof(titleBuffer), "Game %d (%dx%d, %d moves)", 
-                    gameIndex, gameInfo.boardSize, gameInfo.boardSize, gameInfo.moveCount);
+                    static_cast<int>(gameIndex + 1), gameInfo.boardSize, gameInfo.boardSize, gameInfo.moveCount);
             gameInfo.title = std::string(titleBuffer);
             gameInfo.players = gameInfo.blackPlayer + " vs " + gameInfo.whitePlayer;
             
             gameList.push_back(gameInfo);
-            pos = gameEnd + 1;
         }
         
     } catch (const std::exception& e) {
@@ -311,4 +334,35 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
     }
     
     return gameList;
+}
+
+int FileChooserDataSource::countMovesInGame(std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game) {
+    using namespace LibSgfcPlusPlus;
+    
+    int moveCount = 0;
+    auto currentNode = game->GetRootNode();
+    
+    // Traverse the game tree to count move nodes
+    std::function<void(std::shared_ptr<ISgfcNode>)> traverseNode = [&](std::shared_ptr<ISgfcNode> node) {
+        if (!node) return;
+        
+        // Check if this node contains a move property
+        auto properties = node->GetProperties();
+        for (const auto& property : properties) {
+            auto propertyType = property->GetPropertyType();
+            if (propertyType == SgfcPropertyType::B || propertyType == SgfcPropertyType::W) {
+                moveCount++;
+                break; // Only count once per node
+            }
+        }
+        
+        // Traverse children (we'll just follow the main line for move counting)
+        auto children = node->GetChildren();
+        if (!children.empty()) {
+            traverseNode(children[0]); // Follow main line
+        }
+    };
+    
+    traverseNode(currentNode);
+    return moveCount;
 }

@@ -189,7 +189,6 @@ const char * WINDOW_NAME = "Goban";
     EventManager::RegisterEventHandler("goban", new EventHandlerNewGame());
     
     // Initialize file chooser
-    FileChooserDataSource::Initialize();
     auto fileChooserHandler = new EventHandlerFileChooser();
     EventManager::RegisterEventHandler("open", fileChooserHandler);
     fileChooserHandler->LoadDialog(context);
@@ -208,7 +207,6 @@ const char * WINDOW_NAME = "Goban";
 
     fileChooserHandler->UnloadDialog(context);
     EventManager::Shutdown();
-    FileChooserDataSource::Shutdown();
 
     spdlog::debug("Before context destroy");;
 

@@ -231,7 +231,7 @@ void GameRecord::undo() {
     }
 }
 
-bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo) {
+bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo, int gameIndex) {
     using namespace LibSgfcPlusPlus;
 
     std::lock_guard<std::mutex> lock(mutex);
@@ -245,8 +245,22 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo)
             return false;
         }
 
-        auto loadedGame = loadedDoc->GetDocument()->GetGame();
+        auto games = loadedDoc->GetDocument()->GetGames();
+        if (games.empty()) {
+            spdlog::error("No games found in SGF file [{}]", fileName);
+            return false;
+        }
+        
+        if (gameIndex < 0 || gameIndex >= static_cast<int>(games.size())) {
+            spdlog::error("Invalid game index {} for SGF file [{}] (contains {} games)", 
+                         gameIndex, fileName, games.size());
+            return false;
+        }
+        
+        auto loadedGame = games[gameIndex];
         auto rootNode = loadedGame->GetRootNode();
+        
+        spdlog::info("Loading game {} of {} from SGF file [{}]", gameIndex + 1, games.size(), fileName);
         
         gameInfo.boardSize = 19;
         gameInfo.komi = 6.5f;

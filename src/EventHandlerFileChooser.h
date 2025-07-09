@@ -5,6 +5,8 @@
 #include <Rocket/Core/ElementDocument.h>
 #include "spdlog/spdlog.h"
 
+class FileChooserDataSource;
+
 class EventHandlerFileChooser : public EventHandler {
 public:
     EventHandlerFileChooser();
@@ -20,8 +22,10 @@ private:
     void showDialog();
     void hideDialog();
     void updateCurrentPath();
+    void clearGridSelection(Rocket::Core::Element* grid);
     
     Rocket::Core::ElementDocument* dialogDocument;
+    FileChooserDataSource* dataSource;
 };
 
 #endif //GOBAN_EVENTHANDLERFILECHOOSER_H

@@ -375,7 +375,8 @@ else()
     set(Boost_USE_MULTITHREADED ON)
     set(Boost_USE_STATIC_RUNTIME OFF)
 
-    add_executable(${PROJECT_NAME})
+    add_executable(${PROJECT_NAME}
+            src/FileChooserDataSource.cpp)
 
     if(WIN32)
         cmake_language(CALL find_libsndfile)
@@ -487,6 +488,7 @@ else()
         src/Vector.cpp
         src/GobanView.cpp
         src/GobanModel.cpp
+        src/FileChooserDataSource.cpp
         src/GobanControl.cpp
         src/GobanShader.cpp
         src/Metrics.cpp
@@ -498,7 +500,6 @@ else()
         src/sound/util.cpp src/Configuration.cpp
         src/glad/src/glad.c
         src/GameRecord.cpp
-        src/FileChooserDataSource.cpp
     )
     target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
