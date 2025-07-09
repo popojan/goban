@@ -44,6 +44,7 @@ public:
         std::string blackPlayer;
         std::string whitePlayer;
         std::vector<Position> handicapStones;
+        LibSgfcPlusPlus::SgfcGameResult gameResult;
     };
 
     bool loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo);

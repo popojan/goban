@@ -28,5 +28,6 @@
 #include <ISgfcDocumentWriter.h>
 #include <ISgfcDocumentReader.h>
 #include <ISgfcDocumentReadResult.h>
+#include <SgfcGameResult.h>
 
 #endif //GOBAN_SGF_H
