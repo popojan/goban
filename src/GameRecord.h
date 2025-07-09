@@ -36,6 +36,18 @@ public:
     void setHandicapStones(const std::vector<Position>& stones);
 
     void finalizeGame(const GameState::Result& result);
+
+    struct SGFGameInfo {
+        int boardSize;
+        float komi;
+        int handicap;
+        std::string blackPlayer;
+        std::string whitePlayer;
+        std::vector<Position> handicapStones;
+    };
+
+    bool loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo);
+
 private:
 
     typedef LibSgfcPlusPlus::SgfcPlusPlusFactory F;

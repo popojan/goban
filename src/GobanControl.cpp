@@ -211,6 +211,10 @@ bool GobanControl::command(const std::string& cmd) {
         //dynamic_cast<GtpEngine*>(engine.currentCoach())->issueCommand("printsgf ./lastgame.sgf");
         model.game.saveAs("");
     }
+    else if(cmd == "load") {
+        engine.loadSGF("data/sgf/2025-06-23T14-18-52.sgf");
+        view.requestRepaint();
+    }
     else if(cmd == "msg") {
         auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
         if(msg) {

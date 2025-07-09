@@ -73,7 +73,10 @@ public:
 
     std::vector<Player*> getPlayers() { return players;}
 
+    bool loadSGF(const std::string& fileName);
+
 private:
+    void setHandicapStones(const std::vector<Position>& stones);
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;
     std::vector<Engine*> engines; //engines know the rules

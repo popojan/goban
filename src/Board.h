@@ -80,6 +80,15 @@ public:
         return ss.str();
     }
 
+    static Position fromSgf(const std::string& sgfPoint, int boardSize) {
+        if (sgfPoint.length() != 2) {
+            return Position(-1, -1);
+        }
+        int col = sgfPoint[0] - 'a';
+        int row = boardSize - (sgfPoint[1] - 'a') - 1;
+        return Position(col, row);
+    }
+
     friend std::istream& operator>> (std::istream&, Position&);
 
     friend std::ostream& operator<< (std::ostream&, const Position&);

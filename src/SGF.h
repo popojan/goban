@@ -22,7 +22,11 @@
 #include <ISgfcTextPropertyValue.h>
 #include <ISgfcGame.h>
 #include <ISgfcNode.h>
+#include <ISgfcGoPoint.h>
+#include <ISgfcGoMove.h>
 #include <ISgfcDocument.h>
 #include <ISgfcDocumentWriter.h>
+#include <ISgfcDocumentReader.h>
+#include <ISgfcDocumentReadResult.h>
 
 #endif //GOBAN_SGF_H

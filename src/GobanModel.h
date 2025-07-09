@@ -44,6 +44,10 @@ public:
         game.setHandicapStones(handicapStones);
     }
 
+    void pause() {
+        started = false;
+    }
+
     Color changeTurn() {
         state.colorToMove = Color::other(state.colorToMove);
         spdlog::debug("changeTurn = {}", state.colorToMove.toString());
