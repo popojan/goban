@@ -430,3 +430,7 @@ void GobanView::onGameMove(const Move& move, const std::string& comment) {
         board.setOverlay(move.pos, ss.str(), move.col);
     }
 }
+
+void GobanView::onBoardChange(const Board& board) {
+    requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);
+}

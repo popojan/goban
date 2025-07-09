@@ -445,6 +445,7 @@ else()
         src/Event.h
         src/EventHandler.h
         src/EventHandlerNewGame.h
+        src/EventHandlerFileChooser.h
         src/EventInstancer.h
         src/EventManager.h
         src/GameThread.h
@@ -465,6 +466,7 @@ else()
         src/Configuration.h
         src/InputThread.h
         src/GameRecord.h
+        src/FileChooserDataSource.h
     )
 
     set(GOBAN_SRC_FILES
@@ -474,6 +476,7 @@ else()
         src/Event.cpp
         src/EventHandler.cpp
         src/EventHandlerNewGame.cpp
+        src/EventHandlerFileChooser.cpp
         src/EventInstancer.cpp
         src/EventManager.cpp
         src/GameThread.cpp
@@ -495,6 +498,7 @@ else()
         src/sound/util.cpp src/Configuration.cpp
         src/glad/src/glad.c
         src/GameRecord.cpp
+        src/FileChooserDataSource.cpp
     )
     target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 

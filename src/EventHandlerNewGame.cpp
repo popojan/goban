@@ -19,10 +19,10 @@ EventHandlerNewGame::~EventHandlerNewGame()
 
 void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value)
 {
-
-  auto doc = event.GetCurrentElement()->GetContext()->GetDocument("game_window");
-  if(!doc) return;
-  GobanControl& controller = dynamic_cast<ElementGame*>(doc->GetElementById("game"))->getController();
+    spdlog::debug("EventHandlerNewGame recieved event");
+    auto doc = event.GetCurrentElement()->GetContext()->GetDocument("game_window");
+    if(!doc) return;
+    GobanControl& controller = dynamic_cast<ElementGame*>(doc->GetElementById("game"))->getController();
 
     if (value == "boardsize") {
         std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "19").CString());

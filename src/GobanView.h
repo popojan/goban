@@ -39,6 +39,7 @@ public:
     explicit GobanView(GobanModel& m);
 
     void onGameMove(const Move& move, const std::string& comment) override;
+    void onBoardChange(const Board& board) override;
 
     ~GobanView() {
         gobanShader.destroy();

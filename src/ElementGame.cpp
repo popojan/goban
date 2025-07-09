@@ -116,6 +116,7 @@ ElementGame::~ElementGame() = default;
 
 void ElementGame::ProcessEvent(Rocket::Core::Event& event)
 {
+    spdlog::debug("ElementGame processes event");
     Rocket::Core::Element::ProcessEvent(event);
     if(event.GetTargetElement() != this && !(event == "mousemove")) {
         view.requestRepaint();
