@@ -18,6 +18,8 @@
 #include "EventManager.h"
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
+#include "EventHandlerFileChooser.h"
+#include "FileChooserDataSource.h"
 #include <Input.h>
 #include <Shell.h>
 
@@ -185,10 +187,16 @@ const char * WINDOW_NAME = "Goban";
 
     EventManager::SetPrefix(config->data.value("gui","./data/gui").c_str());
     EventManager::RegisterEventHandler("goban", new EventHandlerNewGame());
+    
+    // Initialize file chooser
+    FileChooserDataSource::Initialize();
+    auto fileChooserHandler = new EventHandlerFileChooser();
+    EventManager::RegisterEventHandler("open", fileChooserHandler);
+    fileChooserHandler->LoadDialog(context);
 
     //Shell::ToggleFullscreen();
 
-    auto window = EventManager::LoadWindow("goban");
+    auto window = EventManager::LoadWindow("goban", context);
 
     if(window) {
 		Shell::EventLoop(GameLoop);
@@ -198,7 +206,9 @@ const char * WINDOW_NAME = "Goban";
         return 13;
     }
 
+    fileChooserHandler->UnloadDialog(context);
     EventManager::Shutdown();
+    FileChooserDataSource::Shutdown();
 
     spdlog::debug("Before context destroy");;
 

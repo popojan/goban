@@ -445,14 +445,14 @@ Move GameThread::getLocalMove(const Move::Special move) const {
 }
 
 bool GameThread::loadSGF(const std::string& fileName) {
-    std::unique_lock<std::mutex> lock(mutex2);
+    //std::unique_lock<std::mutex> lock(mutex2);
     
     GameRecord::SGFGameInfo gameInfo;
     
     if (!model.game.loadFromSGF(fileName, gameInfo)) {
         return false;
     }
-    
+
     interrupt();
     
     if (sgf == static_cast<size_t>(-1)) {
@@ -471,47 +471,15 @@ bool GameThread::loadSGF(const std::string& fileName) {
         moves.push_back(move);
     });
     
-    sgfPlayer->setMoves(moves);
-    
     if (!clearGame(gameInfo.boardSize, gameInfo.komi, gameInfo.handicap)) {
         spdlog::error("Failed to clear game for SGF loading");
         return false;
     }
-    
+
     if (!gameInfo.handicapStones.empty()) {
         setHandicapStones(gameInfo.handicapStones);
     }
-    
-    auto findPlayerByName = [this](const std::string& name) -> size_t {
-        for (size_t i = 0; i < players.size(); ++i) {
-            if (players[i]->getName() == name) {
-                return i;
-            }
-        }
-        return static_cast<size_t>(-1);
-    };
-    
-    size_t blackPlayerIndex = findPlayerByName(gameInfo.blackPlayer);
-    size_t whitePlayerIndex = findPlayerByName(gameInfo.whitePlayer);
-    
-    if (blackPlayerIndex == static_cast<size_t>(-1)) {
-        blackPlayerIndex = sgf;
-    }
-    if (whitePlayerIndex == static_cast<size_t>(-1)) {
-        whitePlayerIndex = sgf;
-    }
-    
-    setRole(activePlayer[0], Player::BLACK, false);
-    setRole(activePlayer[1], Player::WHITE, false);
-    
-    activePlayer[0] = blackPlayerIndex;
-    activePlayer[1] = whitePlayerIndex;
-    
-    setRole(activePlayer[0], Player::BLACK, true);
-    setRole(activePlayer[1], Player::WHITE, true);
-    
-    model.start();
-    
+
     Engine* coach = currentCoach();
     if (coach) {
         model.game.replay([&](const Move& move) {
@@ -531,7 +499,7 @@ bool GameThread::loadSGF(const std::string& fileName) {
             }
         );
     }
-    
+
     model.pause();
     
     spdlog::info("SGF file [{}] loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",

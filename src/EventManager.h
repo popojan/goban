@@ -30,6 +30,8 @@
 
 #include <Rocket/Core/Event.h>
 
+#include "Rocket/Core/Context.h"
+
 class EventHandler;
 
 /**
@@ -53,8 +55,14 @@ public:
 	static void ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value);
 	/// Loads a window and binds the event handler for it.
 	/// @param[in] window_name The name of the window to load.
-	static bool LoadWindow(const Rocket::Core::String& window_name);
+	/// @param[in] context The Rocket context to use for loading the document.
+	static bool LoadWindow(const Rocket::Core::String& window_name, Rocket::Core::Context* context);
     static void SetPrefix(const Rocket::Core::String& prefix);
+    
+    /// Gets an event handler by name.
+    /// @param[in] handler_name The name of the handler to retrieve.
+    /// @return Pointer to the event handler, or nullptr if not found.
+    static EventHandler* GetEventHandler(const Rocket::Core::String& handler_name);
 private:
 	EventManager();
 	~EventManager();

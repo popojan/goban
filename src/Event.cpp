@@ -27,6 +27,11 @@
 
 #include "Event.h"
 #include "EventManager.h"
+#include <spdlog/spdlog.h>
+
+#include "EventHandler.h"
+#include "Rocket/Core/Element.h"
+#include "Rocket/Core/ElementDocument.h"
 
 Event::Event(const Rocket::Core::String& value) : value(value)
 {
@@ -39,7 +44,34 @@ Event::~Event()
 // Sends the event value through to Invader's event processing system.
 void Event::ProcessEvent(Rocket::Core::Event& event)
 {
-	EventManager::ProcessEvent(event, value);
+	// Get the document that owns this event
+	auto* document = event.GetTargetElement()->GetOwnerDocument();
+	if (!document) {
+		spdlog::debug("Event has no owner document, falling back to EventManager");
+		EventManager::ProcessEvent(event, value);
+		return;
+	}
+	
+	// Determine which handler to use based on the document ID
+	Rocket::Core::String documentId = document->GetId();
+	spdlog::debug("Event from document: '{}'", documentId.CString());
+	
+	EventHandler* handler = nullptr;
+	if (documentId == "open_dialog") {
+		// File chooser dialog events
+		handler = EventManager::GetEventHandler("open");
+	} else {
+		// Main game window events (or fallback)
+		handler = EventManager::GetEventHandler("goban");
+	}
+	
+	if (handler) {
+		spdlog::debug("Routing event to specific handler for document '{}'", documentId.CString());
+		handler->ProcessEvent(event, value);
+	} else {
+		spdlog::debug("No specific handler found, using EventManager fallback");
+		EventManager::ProcessEvent(event, value);
+	}
 }
 
 // Destroys the event.

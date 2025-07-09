@@ -5,6 +5,8 @@
 #include <Rocket/Core.h>
 #include <Shell.h>
 #include "GobanControl.h"
+#include "EventHandlerFileChooser.h"
+#include "EventManager.h"
 
 bool GobanControl::newGame(unsigned boardSize) {
     engine.interrupt();
@@ -212,8 +214,18 @@ bool GobanControl::command(const std::string& cmd) {
         model.game.saveAs("");
     }
     else if(cmd == "load") {
-        engine.loadSGF("data/sgf/2025-06-23T14-18-52.sgf");
-        view.requestRepaint();
+        // Get the file chooser event handler and trigger the dialog
+        auto fileChooserHandler = dynamic_cast<EventHandlerFileChooser*>(
+            EventManager::GetEventHandler("open"));
+        if (fileChooserHandler) {
+            // Create a dummy event and trigger the load dialog
+            Rocket::Core::Dictionary parameters;
+            auto doc = parent->GetContext()->GetDocument("game_window");
+            if (doc) {
+                Rocket::Core::Event dummy_event(doc, "dummy", parameters, false);
+                fileChooserHandler->ProcessEvent(dummy_event, "load");
+            }
+        }
     }
     else if(cmd == "msg") {
         auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");

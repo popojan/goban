@@ -26,6 +26,7 @@ public:
     void gameLoop();
     void populateEngines();
     GobanControl& getController() { return control; }
+    GameThread& getGameThread() { return engine; }
     void OnMenuToggle(const std::string& cmd, bool checked);
 
 protected:
