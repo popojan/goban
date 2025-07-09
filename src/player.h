@@ -89,6 +89,46 @@ protected:
     //TODO GTP API
 };
 
+class SGFPlayer : public Player {
+public:
+    explicit SGFPlayer(const std::string& name = "SGF Player") : Player(name, NONE, LOCAL), currentMoveIndex(0) {}
+    
+    void setMoves(const std::vector<Move>& moves) {
+        sgfMoves = moves;
+        currentMoveIndex = 0;
+    }
+    
+    Move genmove(const Color& colorToMove) override {
+        if (currentMoveIndex >= sgfMoves.size()) {
+            return Move(Move::INVALID, colorToMove);
+        }
+        
+        Move move = sgfMoves[currentMoveIndex];
+        if (move.col == colorToMove) {
+            currentMoveIndex++;
+            return move;
+        }
+        
+        return Move(Move::INVALID, colorToMove);
+    }
+    
+    bool hasMoreMoves() const {
+        return currentMoveIndex < sgfMoves.size();
+    }
+    
+    void reset() {
+        currentMoveIndex = 0;
+    }
+    
+    size_t getCurrentMoveIndex() const {
+        return currentMoveIndex;
+    }
+    
+private:
+    std::vector<Move> sgfMoves;
+    size_t currentMoveIndex;
+};
+
 class GtpEngine : public Engine, public GtpClient {
 public:
 

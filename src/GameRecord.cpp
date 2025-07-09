@@ -1,6 +1,7 @@
 #include "GameRecord.h"
 #include <iomanip>
 #include <chrono>
+#include <spdlog/spdlog.h>
 
 using namespace LibSgfcPlusPlus;
 
@@ -227,5 +228,121 @@ void GameRecord::undo() {
     if(currentNode->HasParent()) {
         history.pop_back();
         currentNode = currentNode->GetParent();
+    }
+}
+
+bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo) {
+    using namespace LibSgfcPlusPlus;
+
+    std::lock_guard<std::mutex> lock(mutex);
+
+    try {
+        auto reader = F::CreateDocumentReader();
+        auto loadedDoc = reader->ReadSgfFile(fileName);
+        
+        if (!loadedDoc || !loadedDoc->IsSgfDataValid()) {
+            spdlog::error("Failed to load SGF file [{}] or no games found", fileName);
+            return false;
+        }
+
+        auto loadedGame = loadedDoc->GetDocument()->GetGame();
+        auto rootNode = loadedGame->GetRootNode();
+        
+        gameInfo.boardSize = 19;
+        gameInfo.komi = 6.5f;
+        gameInfo.handicap = 0;
+        gameInfo.blackPlayer = "Black";
+        gameInfo.whitePlayer = "White";
+        gameInfo.handicapStones.clear();
+
+        for (auto property : rootNode->GetProperties()) {
+            switch (property->GetPropertyType()) {
+                case T::SZ: {
+                    auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue());
+                    if (numberValue) {
+                        gameInfo.boardSize = numberValue->GetNumberValue();
+                    }
+                    break;
+                }
+                case T::KM: {
+                    auto realValue = std::dynamic_pointer_cast<ISgfcRealPropertyValue>(property->GetPropertyValue());
+                    if (realValue) {
+                        gameInfo.komi = realValue->GetRealValue();
+                    }
+                    break;
+                }
+                case T::HA: {
+                    auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue());
+                    if (numberValue) {
+                        gameInfo.handicap = numberValue->GetNumberValue();
+                    }
+                    break;
+                }
+                case T::PB: {
+                    auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue());
+                    if (textValue) {
+                        gameInfo.blackPlayer = textValue->GetSimpleTextValue();
+                    }
+                    break;
+                }
+                case T::PW: {
+                    auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue());
+                    if (textValue) {
+                        gameInfo.whitePlayer = textValue->GetSimpleTextValue();
+                    }
+                    break;
+                }
+                case T::AB: {
+                    for (auto value : property->GetPropertyValues()) {
+                        auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value);
+                        if (stoneValue) {
+                            auto sgfPoint = stoneValue->GetStoneValue();
+                            Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
+                            gameInfo.handicapStones.push_back(pos);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        history.clear();
+        
+        auto node = rootNode->GetFirstChild();
+        while (node) {
+            for (auto property : node->GetProperties()) {
+                if (property->GetPropertyType() == T::B || property->GetPropertyType() == T::W) {
+                    auto moveValue = std::dynamic_pointer_cast<ISgfcGoMovePropertyValue>(property->GetPropertyValue());
+                    if (moveValue) {
+                        Color color = Color((property->GetPropertyType() == T::B) ? Color::BLACK : Color::WHITE);
+                        
+                        if (moveValue->GetGoMove()->IsPassMove()) {
+                            history.push_back(Move(Move::PASS, color));
+                        } else {
+                            auto sgfPoint = moveValue->GetGoMove()->GetStoneLocation();
+                            Position pos = Position::fromSgf(sgfPoint->GetPosition(SgfcGoPointNotation::Sgf), gameInfo.boardSize);
+                            history.push_back(Move(pos, color));
+                        }
+                    }
+                }
+            }
+            node = node->GetFirstChild();
+        }
+
+        doc = nullptr;
+        game = nullptr;
+        currentNode = nullptr;
+        gameStarted = false;
+        numGames = 0;
+
+        boardSize.Columns = gameInfo.boardSize;
+        boardSize.Rows = gameInfo.boardSize;
+
+        spdlog::info("Successfully loaded SGF file [{}] with {} moves", fileName, history.size());
+        return true;
+
+    } catch (const std::exception& ex) {
+        spdlog::error("Error loading SGF file [{}]: {}", fileName, ex.what());
+        return false;
     }
 }
