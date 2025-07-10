@@ -14,8 +14,6 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <memory>
 
-//#define DEBUG_OVERLAY
-
 const char *font_path = nullptr;
 
 static std::array<std::shared_ptr<GlyphyBuffer>, 3> buffer;
@@ -180,21 +178,6 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 
     glUseProgram(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-#ifdef DEBUG_OVERLAY
-    glEnable(GL_BLEND);
-    glColor4f(1.0f,0.0f,0.0f,0.2f);
-    glBegin(GL_QUADS);
-    double a = content_scale;
-    x = 0.0;
-    y = 0.0;
-
-    glVertex3f(a*-1.0f+x, a*-1.0f+y, 0.0);
-    glVertex3f(a*1.0f+x, a*-1.0f+y, 0.0);
-    glVertex3f(a*1.0f+x, a*1.0f+y, 0.0);
-    glVertex3f(a*-1.0f+x, a*1.0f+y, 0.0);
-    glEnd();
-#endif
 
     glPopMatrix();
     glMatrixMode(GL_PROJECTION);
