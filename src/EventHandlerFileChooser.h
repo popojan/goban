@@ -24,7 +24,8 @@ private:
     void updateCurrentPath();
     void updatePaginationInfo();
     void clearGridSelection(Rocket::Core::Element* grid);
-    
+    void requestRepaint();
+
     Rocket::Core::ElementDocument* dialogDocument;
     FileChooserDataSource* dataSource;
 };
