@@ -216,6 +216,27 @@ void ElementGame::OnUpdate()
             elBlackCnt->SetInnerRML(Rocket::Core::String(128, "Black: %d", model.state.capturedWhite).CString());
             requestRepaint();
         }
+
+        // Update prisoner counts in Analysis menu
+        Rocket::Core::Element* elPrisonersWhite = context->GetDocument("game_window")->GetElementById("lblPrisonersWhite");
+        Rocket::Core::Element* elPrisonersBlack = context->GetDocument("game_window")->GetElementById("lblPrisonersBlack");
+        if (elPrisonersWhite != nullptr) {
+            auto templateWhite = context->GetDocument("game_window")->GetElementById("templatePrisonersWhite");
+            if (templateWhite != nullptr) {
+                elPrisonersWhite->SetInnerRML(
+                    Rocket::Core::String(128, templateWhite->GetInnerRML().CString(), model.state.capturedBlack).CString()
+                );
+            }
+        }
+        if (elPrisonersBlack != nullptr) {
+            auto templateBlack = context->GetDocument("game_window")->GetElementById("templatePrisonersBlack");
+            if (templateBlack != nullptr) {
+                elPrisonersBlack->SetInnerRML(
+                    Rocket::Core::String(128, templateBlack->GetInnerRML().CString(), model.state.capturedWhite).CString()
+                );
+            }
+        }
+
         view.state.capturedBlack = model.state.capturedBlack;
         view.state.capturedWhite = model.state.capturedWhite;
         view.state.reason = model.state.reason;
@@ -297,21 +318,18 @@ void ElementGame::OnUpdate()
         case GameState::WHITE_WON: {
             Rocket::Core::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
             Rocket::Core::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
+            // Show simplified captured stone counts (no detailed scoring breakdown)
             elWhiteCnt->SetInnerRML(
-                    Rocket::Core::String(128, "White: %d + %d + %d", model.state.adata.black_captured,
-                                         model.state.adata.black_prisoners,
-                                         model.state.adata.white_territory).CString());
+                    Rocket::Core::String(128, "White captured: %d", model.state.capturedWhite).CString());
             elBlackCnt->SetInnerRML(
-                    Rocket::Core::String(128, "Black: %d + %d + %d", model.state.adata.white_captured,
-                                         model.state.adata.white_prisoners,
-                                         model.state.adata.black_territory).CString());
-            if (model.state.msg == GameState::WHITE_WON)
+                    Rocket::Core::String(128, "Black captured: %d", model.state.capturedBlack).CString());
+            if (model.state.winner == Color::WHITE)
                 msg->SetInnerRML(
                     Rocket::Core::String(128,
                         context->GetDocument("game_window")
                         ->GetElementById("templateWhiteWon")
                         ->GetInnerRML().CString(),
-                    -model.state.adata.delta).CString()
+                    std::abs(model.state.scoreDelta)).CString()
                 );
             else
                 msg->SetInnerRML(
@@ -319,7 +337,7 @@ void ElementGame::OnUpdate()
                         context->GetDocument("game_window")
                         ->GetElementById("templateBlackWon")
                         ->GetInnerRML().CString(),
-                    model.state.adata.delta).CString()
+                    std::abs(model.state.scoreDelta)).CString()
                 );
             view.state.reason = model.state.reason;
         }

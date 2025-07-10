@@ -177,7 +177,7 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
 
 }
 
-void GameRecord::finalizeGame(const GameState::Result& result) {
+void GameRecord::finalizeGame(float scoreDelta) {
     using namespace LibSgfcPlusPlus;
 
     std::lock_guard<std::mutex> lock(mutex);
@@ -187,11 +187,9 @@ void GameRecord::finalizeGame(const GameState::Result& result) {
 
     auto type = T::RE;
     std::ostringstream ss;
-    ss << (result.delta < 0.0 ? "W+" : "B+");
-    if(result.reason == GameState::RESIGNATION)
-        ss << "R";
-    else
-        ss << std::abs(result.delta);
+    // Use sign convention since we still get the traditional scoreDelta
+    ss << (scoreDelta < 0.0 ? "W+" : "B+");
+    ss << std::abs(scoreDelta);
 
     auto value (vF->CreateSimpleTextPropertyValue(ss.str()));
 

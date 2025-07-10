@@ -38,20 +38,21 @@ void GobanModel::onBoardSized(int boardSize) {
 }
 GobanModel::~GobanModel() = default;
 
-float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
-    ret.delta = board.score;
-    ret.reason = state.reason;
+float GobanModel::result(const Move& lastMove) {
+    state.scoreDelta = board.score;
     if (state.reason == GameState::DOUBLE_PASS) {
-        bool whiteWon = ret.delta < 0.0;
-        state.msg = whiteWon ? GameState::WHITE_WON : GameState::BLACK_WON;
+        state.winner = Color(state.scoreDelta < 0.0 ? Color::WHITE : Color::BLACK);
+        state.msg = state.winner == Color::WHITE ? GameState::WHITE_WON : GameState::BLACK_WON;
     }
     else if(state.reason == GameState::RESIGNATION){
-        bool blackResigned =  lastMove == Color::BLACK;
-        state.msg =  blackResigned ? GameState::BLACK_RESIGNED : GameState::WHITE_RESIGNED;
-        ret.delta = blackResigned ? -1.0 : 1.0;
+        bool blackResigned = lastMove == Color::BLACK;
+        state.winner = Color(blackResigned ? Color::WHITE : Color::BLACK);
+        state.msg = blackResigned ? GameState::BLACK_RESIGNED : GameState::WHITE_RESIGNED;
+        state.scoreDelta = blackResigned ? -1.0 : 1.0;
     }
-    return ret.delta;
+    return state.scoreDelta;
 }
+
 unsigned GobanModel::getBoardSize() const {
     return board.getSize();
 }
@@ -209,8 +210,8 @@ void GobanModel::onBoardChange(const Board& result) {
     spdlog::debug("over {} ready {}", isGameOver, result.territoryReady);
 
     if(isGameOver && result.territoryReady) {
-        this->result(game.lastMove(), state.adata);
-        game.finalizeGame(state.adata);
+        this->result(game.lastMove());
+        game.finalizeGame(state.scoreDelta);
         game.saveAs("");
     }
 }

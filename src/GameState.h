@@ -27,35 +27,15 @@ public:
     GameState(): colorToMove(Color::BLACK), black(), white(), capturedBlack(0), capturedWhite(0),
                  reservoirBlack(32), reservoirWhite(32),
                  komi(0.5f), handicap(0), result(0.0f), cmd("xxx"), msg(PAUSED),
-                 reason(NO_REASON), adata(), metricsReady(false),
+                 reason(NO_REASON), scoreDelta(0.0f), winner(Color::EMPTY), metricsReady(false),
                  holdsStone(false)
     { }
 
     enum Reason { NO_REASON, DOUBLE_PASS, RESIGNATION } reason;
-    struct Result {
-        int black_territory;
-        int white_territory;
-        int black_prisoners;
-        int white_prisoners;
-        int black_captured;
-        int white_captured;
-        int black_area;
-        int white_area;
-        float delta;
-        Reason reason;
-        Result() :
-                black_territory(0),
-                white_territory(0),
-                black_prisoners(0),
-                white_prisoners(0),
-                black_captured(0),
-                white_captured(0),
-                black_area(0),
-                white_area(0),
-                delta(0.0),
-                reason(NO_REASON)
-        { }
-    } adata;
+    
+    // Simplified game result - only contains essential scoring information
+    float scoreDelta;  // Score difference (positive = black leads, negative = white leads)
+    Color winner;      // Winner of the game (EMPTY = no winner/ongoing game)
     bool metricsReady;
 	bool holdsStone;
 };

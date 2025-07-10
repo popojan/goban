@@ -35,7 +35,7 @@ public:
 
     void setHandicapStones(const std::vector<Position>& stones);
 
-    void finalizeGame(const GameState::Result& result);
+    void finalizeGame(float scoreDelta);
 
     [[nodiscard]] const Move secondLastMove() const {
         return history.size() > 1 ? history[history.size() -2]

@@ -149,6 +149,13 @@
                             <div class="hr">GnuGo</div>
                             <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">Territory</div>
                         </div>
+                        <div class="grp">
+                            <div class="hr">Prisoners</div>
+                            <div class="template" id="templatePrisonersWhite">White: %d</div>
+                            <div class="template" id="templatePrisonersBlack">Black: %d</div>
+                            <div class="cmd" id="lblPrisonersWhite"></div>
+                            <div class="cmd" id="lblPrisonersBlack"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable right">

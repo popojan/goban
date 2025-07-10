@@ -35,7 +35,7 @@
                 </div>
             </div>
             <div class="bottomleft">
-                <span class="sep cmd nav_button hidden" onmouseup="refresh" onmousemove="mouse_moved">Refresh</span>
+                <span class="sep cmd nav_button" onmouseup="refresh" onmousemove="mouse_moved">Refresh</span>
             </div>
 
             <div class="bottom">

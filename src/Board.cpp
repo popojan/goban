@@ -295,9 +295,7 @@ int Board::updateStones(const Board& board) {
             Color newStone(np.stone);
             Color newArea(np.influence);
 
-            if(!this->showTerritory
-                // || !board.territoryReady //ugly flashing
-            ) {
+            if(!this->showTerritory) {
                 newArea = Color();
             }
 
@@ -314,93 +312,6 @@ int Board::updateStones(const Board& board) {
     }
     return changed;
 }
-    /*
-    float halfN = 0.5f * boardSize - 0.5f;
-    auto bbegin = board.begin(), bend = board.end();
-	this->showTerritory = board.showTerritory;
-	this->showTerritoryAuto = board.showTerritoryAuto;
-	int lpi = lastPlayed_i;
-	int lpj = lastPlayed_j;
-	bool placedSomeStone = false;
-    for (auto cit = bbegin, pit = board.tbegin(); cit != bend; ++cit, ++pit) {
-        int pos = static_cast<unsigned>(cit - bbegin);
-        int j = board.row(pos);
-        int i = board.col(pos);
-        if(i < 0 || j < 0 || i >= boardSize || j >= boardSize) continue;
-        const Color& stone = *cit;
-        const Color& area = *pit;
-        float mValue = mEmpty;
-		int oidx = boardSize  * i + j;
-		if(stone != Color::EMPTY) {
-            if (area == Color::EMPTY || area == stone || !showTerritory)
-                mValue = stone == Color::BLACK ? mBlack : mWhite;
-            else
-                mValue = (area == Color::BLACK ? mWhite : mBlack) + mDeltaCaptured;
-        }
-        else if(showTerritory && area != Color::EMPTY) {
-            mValue = area == Color::BLACK ? mBlackArea : mWhiteArea;
-			float x = j - halfN;
-			float y = i - halfN;
-			overlay[oidx].x = x;
-			overlay[oidx].y = y;
-        }
-        unsigned idx = ((boardSize  * i + j) << 2u) + 2u;
-        bool placedOnCursor = cursor.row() == j && cursor.col() == i;
-		if (stones[idx] != mValue) {
-		    int change = 0;
-			bool territoryToggle = std::abs(stones[idx] - mValue) == mDeltaCaptured;
-			bool placeStone = !territoryToggle && mValue != mEmpty
-			        &&  mValue != mBlackArea && mValue != mWhiteArea;
-			if (placeStone) {
-				placedSomeStone = true;
-                change = 2;
-                placeFuzzy(Position(j, i));
-				//order += 1;
-				overlay[oidx].x = stones[idx - 2];
-				overlay[oidx].y = stones[idx - 1];
-				lastPlayed_i = i;
-				lastPlayed_j = j;
-			}
-			stones[idx + 0] = mValue;
-			changed = std::max(1, change);
-			bool isCaptured = mValue == mWhite + mDeltaCaptured || mValue == mBlack + mDeltaCaptured;
-			bool isArea = mValue == mBlackArea || mValue == mWhiteArea;
-			//bool isEmpty = mValue == mEmpty;
-			bool isStone = mValue == mWhite || mValue == mBlack || isCaptured;
-			if (isArea) {
-				if (mValue == mBlackArea) {
-					//overlay[oidx].text = std::string("B");
-					//overlay[oidx].layer = 0;
-				}
-				else if (mValue == mWhiteArea) {
-					//overlay[oidx].text = std::string("W");
-					//overlay[oidx].layer = 0;
-				}
-			}
-			else if (isCaptured && (lastPlayed_i != i || lastPlayed_j != j)) {
-				//overlay[oidx].text = "D";
-				//overlay[oidx].layer = mValue == mBlack + mDeltaCaptured ? 1 : 2;
-			}
-			else if (isStone && placeStone && lastPlayed_i == i && lastPlayed_j == j) {
-				std::stringstream ss;
-                order = board.order;
-				ss << order;
-				overlay[oidx].text = ss.str();
-				overlay[oidx].layer = mValue == mBlack || mValue == mBlack + mDeltaCaptured ? 1 : 2;
-			}
-			else {
-				overlay[oidx].text = std::string("");
-				overlay[oidx].layer = -1u;
-			}
-		}
-
-	}
-	if (placedSomeStone && lpi > -1 && lpj > -1)  {
-		int oidx = boardSize  * lpi + lpj;
-		overlay[oidx].text = std::string("");
-		overlay[oidx].layer = -1u;
-	}
-    return changed;*/
 //}
 
 int Board::capturedCount(const Color::Value& whose) const {

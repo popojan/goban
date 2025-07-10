@@ -287,7 +287,7 @@ bool GobanControl::setKomi(float komi) {
 }
 
 bool GobanControl::setHandicap(int handicap){
-    bool isOver = model.state.adata.reason != GameState::NO_REASON;
+    bool isOver = model.state.reason != GameState::NO_REASON;
     bool isRunning = engine.isRunning();
     bool success = false;
     if(!isRunning && !isOver) {

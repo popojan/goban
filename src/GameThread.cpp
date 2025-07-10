@@ -582,7 +582,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
                         spdlog::info("Score verification: Coach {:.1f}, SGF {:.1f} - scores match", coachScore, sgfScore);
                     }
                 }
-                model.state.adata.delta = coachScore;
+                model.state.scoreDelta = coachScore;
             }
 
             // Now safely set the game as over after all operations are complete
@@ -598,9 +598,9 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
                 Color resigningPlayer = Color((gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin)
                                         ? Color::WHITE : Color::BLACK);
                 Move resignationMove(Move::RESIGN, resigningPlayer);
-                model.result(resignationMove, model.state.adata);
+                model.result(resignationMove);
             } else {
-                model.result(model.game.lastMove(), model.state.adata);
+                model.result(model.game.lastMove());
             }
 
             if (endedByResignation) {
