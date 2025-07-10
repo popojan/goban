@@ -10,7 +10,7 @@
             <div class="main_content">
                 <div class="file_list_container">
                     <div class="section_title">Records in <span class="sep path_display" id="current_path">data/sgf</span></div>
-                    <datagrid id="files_grid" source="file_chooser.files" onclick="select_file" onmousemove="mouse_moved">
+                    <datagrid id="files_grid" source="file_chooser.files" onclick="select_file" onmousemove="mouse_moved" onmousescroll="mousescroll">
                         <col fields="name" width="80%">Name</col>
                         <col fields="type" width="20%">Type</col>
                     </datagrid>
@@ -23,7 +23,7 @@
 
                 <div class="preview_container">
                     <div class="section_title">Selected File Contents</div>
-                    <datagrid id="games_grid" source="file_chooser.games" onclick="select_game" onmousemove="mouse_moved">
+                    <datagrid id="games_grid" source="file_chooser.games" onclick="select_game" onmousemove="mouse_moved" onmousescroll="mousescroll">
                         <col fields="title" width="50%">Game</col>
                         <col fields="players" width="50%">Players</col>
                     </datagrid>

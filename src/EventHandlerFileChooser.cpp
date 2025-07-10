@@ -43,6 +43,64 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
 
     bool repaintNeeded = false;
 
+    // Handle mouse wheel scrolling for pagination
+    if (event.GetType() == "mousescroll") {
+        auto targetElement = event.GetTargetElement();
+        if (targetElement) {
+            // Find if the mouse is over a datagrid or its child elements
+            auto element = targetElement;
+            Rocket::Core::Element* datagrid = nullptr;
+            
+            // Walk up the DOM tree to find the datagrid parent
+            while (element && !datagrid) {
+                if (element->GetTagName() == "datagrid") {
+                    datagrid = element;
+                } else {
+                    element = element->GetParentNode();
+                }
+            }
+            
+            if (datagrid) {
+                int wheel_delta = event.GetParameter<int>("wheel_delta", 0);
+                Rocket::Core::String gridId = datagrid->GetId();
+                
+                spdlog::debug("Mouse wheel over datagrid '{}', delta: {}", gridId.CString(), wheel_delta);
+                
+                if (gridId == "files_grid") {
+                    if (wheel_delta < 0 && dataSource->CanGoToFilesPrevPage()) {
+                        // Scroll up - previous page
+                        dataSource->SetFilesPage(dataSource->GetFilesCurrentPage() - 1);
+                        updatePaginationInfo();
+                        repaintNeeded = true;
+                    } else if (wheel_delta > 0 && dataSource->CanGoToFilesNextPage()) {
+                        // Scroll down - next page  
+                        dataSource->SetFilesPage(dataSource->GetFilesCurrentPage() + 1);
+                        updatePaginationInfo();
+                        repaintNeeded = true;
+                    }
+                } else if (gridId == "games_grid") {
+                    if (wheel_delta < 0 && dataSource->CanGoToGamesPrevPage()) {
+                        // Scroll up - previous page
+                        dataSource->SetGamesPage(dataSource->GetGamesCurrentPage() - 1);
+                        updatePaginationInfo();
+                        repaintNeeded = true;
+                    } else if (wheel_delta > 0 && dataSource->CanGoToGamesNextPage()) {
+                        // Scroll down - next page
+                        dataSource->SetGamesPage(dataSource->GetGamesCurrentPage() + 1);
+                        updatePaginationInfo();
+                        repaintNeeded = true;
+                    }
+                }
+                
+                // Stop event propagation to prevent other elements from handling it
+                if (repaintNeeded) {
+                    event.StopPropagation();
+                    return;
+                }
+            }
+        }
+    }
+
     if (value == "load") {
         spdlog::debug("Showing file chooser dialog");
         showDialog();
@@ -108,14 +166,8 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                     // Convert page-relative row index to actual file index
                     int actualFileIndex;
                     if (dataSource->GetCurrentPath().has_parent_path()) {
-                        // Page 1 has one less file slot due to ".." row
-                        if (dataSource->GetFilesCurrentPage() == 1) {
-                            actualFileIndex = fileIndex;
-                        } else {
-                            // For pages after 1, account for the reduced capacity of page 1
-                            actualFileIndex = (dataSource->GetFilesPageSize() - 1) + 
-                                           (dataSource->GetFilesCurrentPage() - 2) * dataSource->GetFilesPageSize() + fileIndex;
-                        }
+                        // Every page shows ".." row, so every page has (FILES_PAGE_SIZE - 1) actual files
+                        actualFileIndex = (dataSource->GetFilesCurrentPage() - 1) * (dataSource->GetFilesPageSize() - 1) + fileIndex;
                     } else {
                         // Normal pagination when no ".." row
                         actualFileIndex = (dataSource->GetFilesCurrentPage() - 1) * dataSource->GetFilesPageSize() + fileIndex;
