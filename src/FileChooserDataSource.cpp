@@ -49,13 +49,8 @@ void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::
         // Map file index to actual file index based on current page
         int actualIndex;
         if (currentPath.has_parent_path()) {
-            // Page 1 has one less file slot due to ".." row
-            if (filesCurrentPage == 1) {
-                actualIndex = fileIndex;
-            } else {
-                // For pages after 1, account for the reduced capacity of page 1
-                actualIndex = (FILES_PAGE_SIZE - 1) + (filesCurrentPage - 2) * FILES_PAGE_SIZE + fileIndex;
-            }
+            // Every page shows ".." row, so every page has (FILES_PAGE_SIZE - 1) actual files
+            actualIndex = (filesCurrentPage - 1) * (FILES_PAGE_SIZE - 1) + fileIndex;
         } else {
             // Normal pagination when no ".." row
             actualIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE + fileIndex;
@@ -120,16 +115,11 @@ int FileChooserDataSource::GetNumRows(const Rocket::Core::String& table) {
         int totalFiles = static_cast<int>(files.size());
         
         if (currentPath.has_parent_path()) {
-            // If we're on the first page, show ".." row plus (FILES_PAGE_SIZE - 1) files
-            if (filesCurrentPage == 1) {
-                int maxFiles = FILES_PAGE_SIZE - 1; // Reserve one slot for ".." row
-                int fileRows = std::min(maxFiles, totalFiles);
-                return fileRows + 1; // +1 for the ".." row
-            }
-            // For other pages, account for the ".." row taking up space on page 1
-            int adjustedStartIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE - 1; // -1 because page 1 has the ".." row
-            int adjustedEndIndex = std::min(adjustedStartIndex + FILES_PAGE_SIZE, totalFiles);
-            return std::max(0, adjustedEndIndex - adjustedStartIndex);
+            // Every page shows ".." row plus (FILES_PAGE_SIZE - 1) actual files
+            int startIndex = (filesCurrentPage - 1) * (FILES_PAGE_SIZE - 1);
+            int endIndex = std::min(startIndex + (FILES_PAGE_SIZE - 1), totalFiles);
+            int fileRows = std::max(0, endIndex - startIndex);
+            return fileRows + 1; // +1 for the ".." row
         } else {
             // No ".." row, normal pagination
             int startIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE;
