@@ -9,7 +9,9 @@ FileChooserDataSource::FileChooserDataSource()
     : Rocket::Controls::DataSource("file_chooser")
     , currentPath("data/sgf")
     , selectedFileIndex(-1)
-    , selectedGameIndex(-1) {
+    , selectedGameIndex(-1)
+    , filesCurrentPage(1)
+    , gamesCurrentPage(1) {
     
     RefreshFiles();
 }
@@ -23,11 +25,13 @@ FileChooserDataSource::~FileChooserDataSource() {
 
 void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::Core::String& table, int row_index, const Rocket::Core::StringList& columns) {
     if (table == "files") {
-        if (row_index < 0 || row_index >= static_cast<int>(files.size())) {
+        // Map row_index to actual file index based on current page
+        int actualIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE + row_index;
+        if (actualIndex < 0 || actualIndex >= static_cast<int>(files.size())) {
             return;
         }
         
-        const FileEntry& file = files[row_index];
+        const FileEntry& file = files[actualIndex];
         
         for (size_t i = 0; i < columns.size(); ++i) {
             if (columns[i] == "name") {
@@ -40,11 +44,13 @@ void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::
         }
     }
     else if (table == "games") {
-        if (row_index < 0 || row_index >= static_cast<int>(games.size())) {
+        // Map row_index to actual game index based on current page
+        int actualIndex = (gamesCurrentPage - 1) * GAMES_PAGE_SIZE + row_index;
+        if (actualIndex < 0 || actualIndex >= static_cast<int>(games.size())) {
             return;
         }
         
-        const SGFGameInfo& game = games[row_index];
+        const SGFGameInfo& game = games[actualIndex];
         
         for (size_t i = 0; i < columns.size(); ++i) {
             if (columns[i] == "title") {
@@ -77,9 +83,17 @@ void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::
 
 int FileChooserDataSource::GetNumRows(const Rocket::Core::String& table) {
     if (table == "files") {
-        return static_cast<int>(files.size());
+        // Return the number of items on the current page
+        int totalFiles = static_cast<int>(files.size());
+        int startIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE;
+        int endIndex = std::min(startIndex + FILES_PAGE_SIZE, totalFiles);
+        return std::max(0, endIndex - startIndex);
     } else if (table == "games") {
-        return static_cast<int>(games.size());
+        // Return the number of items on the current page
+        int totalGames = static_cast<int>(games.size());
+        int startIndex = (gamesCurrentPage - 1) * GAMES_PAGE_SIZE;
+        int endIndex = std::min(startIndex + GAMES_PAGE_SIZE, totalGames);
+        return std::max(0, endIndex - startIndex);
     }
     return 0;
 }
@@ -107,6 +121,10 @@ void FileChooserDataSource::RefreshFiles() {
     games.clear();
     selectedFileIndex = -1;
     selectedGameIndex = -1;
+    
+    // Reset pagination to first page
+    filesCurrentPage = 1;
+    gamesCurrentPage = 1;
     
     // Use NotifyRowChange for complete table refresh (preferred pattern)
     spdlog::debug("Notifying complete files table refresh");
@@ -221,6 +239,9 @@ void FileChooserDataSource::previewSGF(const std::string& filePath) {
     
     games = parseSGFGames(filePath);
     selectedGameIndex = games.empty() ? -1 : 0;
+    
+    // Reset games pagination to first page
+    gamesCurrentPage = 1;
     
     spdlog::debug("Parsed {} games from SGF file", games.size());
     
@@ -353,4 +374,32 @@ int FileChooserDataSource::countMovesInGame(std::shared_ptr<LibSgfcPlusPlus::ISg
     
     traverseNode(currentNode);
     return moveCount;
+}
+
+void FileChooserDataSource::SetFilesPage(int page) {
+    int totalPages = GetFilesTotalPages();
+    if (page >= 1 && page <= totalPages) {
+        filesCurrentPage = page;
+        // Refresh the files table
+        NotifyRowChange("files");
+    }
+}
+
+void FileChooserDataSource::SetGamesPage(int page) {
+    int totalPages = GetGamesTotalPages();
+    if (page >= 1 && page <= totalPages) {
+        gamesCurrentPage = page;
+        // Refresh the games table
+        NotifyRowChange("games");
+    }
+}
+
+int FileChooserDataSource::GetFilesTotalPages() const {
+    int totalFiles = static_cast<int>(files.size());
+    return (totalFiles + FILES_PAGE_SIZE - 1) / FILES_PAGE_SIZE; // Ceiling division
+}
+
+int FileChooserDataSource::GetGamesTotalPages() const {
+    int totalGames = static_cast<int>(games.size());
+    return (totalGames + GAMES_PAGE_SIZE - 1) / GAMES_PAGE_SIZE; // Ceiling division
 }

@@ -92,6 +92,10 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                     int selectedRow = dataGridRow->GetTableRelativeIndex();
                     spdlog::debug("Selected file row: {}", selectedRow);
                     
+                    // Convert page-relative row index to actual file index
+                    int actualFileIndex = (dataSource->GetFilesCurrentPage() - 1) * dataSource->GetFilesPageSize() + selectedRow;
+                    spdlog::debug("Converted to actual file index: {}", actualFileIndex);
+                    
                     // Clear previous selection in files grid
                     auto filesGrid = dialogDocument->GetElementById("files_grid");
                     if (filesGrid) {
@@ -101,7 +105,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                     // Add selected class to clicked row
                     dataGridRow->SetClass("selected", true);
                     
-                    dataSource->SelectFile(selectedRow);
+                    dataSource->SelectFile(actualFileIndex);
                     updateCurrentPath();
                 } else {
                     spdlog::debug("Failed to cast to ElementDataGridRow");
@@ -132,6 +136,10 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                     int selectedRow = dataGridRow->GetTableRelativeIndex();
                     spdlog::debug("Selected game row: {}", selectedRow);
                     
+                    // Convert page-relative row index to actual game index
+                    int actualGameIndex = (dataSource->GetGamesCurrentPage() - 1) * dataSource->GetGamesPageSize() + selectedRow;
+                    spdlog::debug("Converted to actual game index: {}", actualGameIndex);
+                    
                     // Clear previous selection in games grid
                     auto gamesGrid = dialogDocument->GetElementById("games_grid");
                     if (gamesGrid) {
@@ -141,7 +149,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                     // Add selected class to clicked row
                     dataGridRow->SetClass("selected", true);
                     
-                    dataSource->SelectGame(selectedRow);
+                    dataSource->SelectGame(actualGameIndex);
                 } else {
                     spdlog::debug("Failed to cast to ElementDataGridRow");
                 }
@@ -177,6 +185,34 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
             }
         } else {
             spdlog::warn("No file selected");
+        }
+    }
+    else if (value == "files_prev_page") {
+        spdlog::debug("Files previous page button clicked");
+        if (dataSource->CanGoToFilesPrevPage()) {
+            dataSource->SetFilesPage(dataSource->GetFilesCurrentPage() - 1);
+            updatePaginationInfo();
+        }
+    }
+    else if (value == "files_next_page") {
+        spdlog::debug("Files next page button clicked");
+        if (dataSource->CanGoToFilesNextPage()) {
+            dataSource->SetFilesPage(dataSource->GetFilesCurrentPage() + 1);
+            updatePaginationInfo();
+        }
+    }
+    else if (value == "games_prev_page") {
+        spdlog::debug("Games previous page button clicked");
+        if (dataSource->CanGoToGamesPrevPage()) {
+            dataSource->SetGamesPage(dataSource->GetGamesCurrentPage() - 1);
+            updatePaginationInfo();
+        }
+    }
+    else if (value == "games_next_page") {
+        spdlog::debug("Games next page button clicked");
+        if (dataSource->CanGoToGamesNextPage()) {
+            dataSource->SetGamesPage(dataSource->GetGamesCurrentPage() + 1);
+            updatePaginationInfo();
         }
     }
     else {
@@ -318,6 +354,59 @@ void EventHandlerFileChooser::updateCurrentPath() {
         }
     } else {
         spdlog::debug("current_path element not found in dialog");
+    }
+    
+    // Also update pagination info when path changes
+    updatePaginationInfo();
+}
+
+void EventHandlerFileChooser::updatePaginationInfo() {
+    spdlog::debug("updatePaginationInfo() called");
+    if (!dialogDocument || !dataSource) {
+        spdlog::debug("No dialog document or data source in updatePaginationInfo()");
+        return;
+    }
+    
+    // Update files pagination info
+    auto filesPageInfo = dialogDocument->GetElementById("files_page_info");
+    if (filesPageInfo) {
+        int currentPage = dataSource->GetFilesCurrentPage();
+        int totalPages = dataSource->GetFilesTotalPages();
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "Page %d of %d", currentPage, totalPages);
+        filesPageInfo->SetInnerRML(buffer);
+        spdlog::debug("Updated files pagination info: {}", buffer);
+    }
+    
+    // Update files pagination buttons
+    auto filesPrev = dialogDocument->GetElementById("files_prev");
+    auto filesNext = dialogDocument->GetElementById("files_next");
+    if (filesPrev) {
+        filesPrev->SetClass("disabled", !dataSource->CanGoToFilesPrevPage());
+    }
+    if (filesNext) {
+        filesNext->SetClass("disabled", !dataSource->CanGoToFilesNextPage());
+    }
+    
+    // Update games pagination info
+    auto gamesPageInfo = dialogDocument->GetElementById("games_page_info");
+    if (gamesPageInfo) {
+        int currentPage = dataSource->GetGamesCurrentPage();
+        int totalPages = dataSource->GetGamesTotalPages();
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "Page %d of %d", currentPage, totalPages);
+        gamesPageInfo->SetInnerRML(buffer);
+        spdlog::debug("Updated games pagination info: {}", buffer);
+    }
+    
+    // Update games pagination buttons
+    auto gamesPrev = dialogDocument->GetElementById("games_prev");
+    auto gamesNext = dialogDocument->GetElementById("games_next");
+    if (gamesPrev) {
+        gamesPrev->SetClass("disabled", !dataSource->CanGoToGamesPrevPage());
+    }
+    if (gamesNext) {
+        gamesNext->SetClass("disabled", !dataSource->CanGoToGamesNextPage());
     }
 }
 

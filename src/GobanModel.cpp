@@ -48,6 +48,7 @@ float GobanModel::result(const Move& lastMove, GameState::Result& ret) {
     else if(state.reason == GameState::RESIGNATION){
         bool blackResigned =  lastMove == Color::BLACK;
         state.msg =  blackResigned ? GameState::BLACK_RESIGNED : GameState::WHITE_RESIGNED;
+        ret.delta = blackResigned ? -1.0 : 1.0;
     }
     return ret.delta;
 }

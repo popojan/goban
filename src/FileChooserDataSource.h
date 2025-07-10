@@ -61,13 +61,36 @@ public:
     // Explicitly load games for the selected SGF file
     void LoadSelectedFileGames();
 
+    // Pagination methods
+    void SetFilesPage(int page);
+    void SetGamesPage(int page);
+    int GetFilesCurrentPage() const { return filesCurrentPage; }
+    int GetGamesCurrentPage() const { return gamesCurrentPage; }
+    int GetFilesTotalPages() const;
+    int GetGamesTotalPages() const;
+    bool CanGoToFilesPrevPage() const { return filesCurrentPage > 1; }
+    bool CanGoToFilesNextPage() const { return filesCurrentPage < GetFilesTotalPages(); }
+    bool CanGoToGamesPrevPage() const { return gamesCurrentPage > 1; }
+    bool CanGoToGamesNextPage() const { return gamesCurrentPage < GetGamesTotalPages(); }
+    
+    // Page size constants
+    static int GetFilesPageSize() { return FILES_PAGE_SIZE; }
+    static int GetGamesPageSize() { return GAMES_PAGE_SIZE; }
+
 private:
+    static const int FILES_PAGE_SIZE = 12;
+    static const int GAMES_PAGE_SIZE = 10;
+    
     std::filesystem::path currentPath;
     std::vector<FileEntry> files;
     std::vector<SGFGameInfo> games;
     
     int selectedFileIndex;
     int selectedGameIndex;
+    
+    // Pagination state
+    int filesCurrentPage;
+    int gamesCurrentPage;
     
     void refreshFileList();
     void previewSGF(const std::string& filePath);
