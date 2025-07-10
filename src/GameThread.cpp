@@ -533,12 +533,8 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
             endedWithPasses = (lastMove == Move::PASS && secondLastMove == Move::PASS);
         }
         
-        // Check if the game ended by resignation
-        bool endedByResignation = false;
-        if (!model.game.moveCount() == 0) {
-            const Move& lastMove = model.game.lastMove();
-            endedByResignation = (lastMove == Move::RESIGN);
-        }
+        // Check if the game ended by resignation (from SGF result, not from moves)
+        bool endedByResignation = (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinByResignation);
         
         // Trigger final scoring for finished games (both double pass and resignation)
         if (coach && (endedWithPasses || endedByResignation)) {
@@ -547,7 +543,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
 
             {}
             model.board.toggleTerritoryAuto(true);
-            const Board& result = coach->showterritory(true, model.state.colorToMove);
+            const Board& result = coach->showterritory(endedWithPasses, model.state.colorToMove);
 
             // Do not update observers with the final board state
             /*std::for_each(
@@ -593,7 +589,15 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
             model.state.capturedBlack = model.board.capturedCount(Color::BLACK);
             model.state.capturedWhite = model.board.capturedCount(Color::WHITE);
 
-            model.result(model.game.lastMove(), model.state.adata);
+            if (endedByResignation) {
+                // For resigned games, create a resignation move based on SGF game result
+                Color resigningPlayer = Color((gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin)
+                                        ? Color::WHITE : Color::BLACK);
+                Move resignationMove(Move::RESIGN, resigningPlayer);
+                model.result(resignationMove, model.state.adata);
+            } else {
+                model.result(model.game.lastMove(), model.state.adata);
+            }
 
             if (endedByResignation) {
                 spdlog::info("Final scoring completed for resigned game (showing territory influence)");

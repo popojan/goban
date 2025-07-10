@@ -22,6 +22,7 @@ private:
     void showDialog();
     void hideDialog();
     void updateCurrentPath();
+    void updatePaginationInfo();
     void clearGridSelection(Rocket::Core::Element* grid);
     
     Rocket::Core::ElementDocument* dialogDocument;
