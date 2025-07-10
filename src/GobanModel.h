@@ -63,7 +63,7 @@ public:
 
     Move getUndoMove() const;
 
-    float result(const Move& lastMove, GameState::Result& ret);
+    float result(const Move& lastMove);
 
     void calcCaptured(Metrics& m, int capturedBlack, int capturedWhite);
 
