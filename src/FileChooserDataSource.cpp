@@ -25,8 +25,41 @@ FileChooserDataSource::~FileChooserDataSource() {
 
 void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::Core::String& table, int row_index, const Rocket::Core::StringList& columns) {
     if (table == "files") {
-        // Map row_index to actual file index based on current page
-        int actualIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE + row_index;
+        // Check if this is the first row and we can navigate up
+        if (row_index == 0 && currentPath.has_parent_path()) {
+            // Show ".." row for navigating up
+            for (size_t i = 0; i < columns.size(); ++i) {
+                if (columns[i] == "name") {
+                    row.push_back(Rocket::Core::String(".."));
+                } else if (columns[i] == "type") {
+                    row.push_back(Rocket::Core::String("Up"));
+                } else if (columns[i] == "path") {
+                    row.push_back(Rocket::Core::String(currentPath.parent_path().string().c_str()));
+                }
+            }
+            return;
+        }
+        
+        // Adjust index for regular files (skip the ".." row if present)
+        int fileIndex = row_index;
+        if (currentPath.has_parent_path()) {
+            fileIndex = row_index - 1; // Account for the ".." row
+        }
+        
+        // Map file index to actual file index based on current page
+        int actualIndex;
+        if (currentPath.has_parent_path()) {
+            // Page 1 has one less file slot due to ".." row
+            if (filesCurrentPage == 1) {
+                actualIndex = fileIndex;
+            } else {
+                // For pages after 1, account for the reduced capacity of page 1
+                actualIndex = (FILES_PAGE_SIZE - 1) + (filesCurrentPage - 2) * FILES_PAGE_SIZE + fileIndex;
+            }
+        } else {
+            // Normal pagination when no ".." row
+            actualIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE + fileIndex;
+        }
         if (actualIndex < 0 || actualIndex >= static_cast<int>(files.size())) {
             return;
         }
@@ -83,11 +116,26 @@ void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::
 
 int FileChooserDataSource::GetNumRows(const Rocket::Core::String& table) {
     if (table == "files") {
-        // Return the number of items on the current page
+        // Calculate base number of files on current page
         int totalFiles = static_cast<int>(files.size());
-        int startIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE;
-        int endIndex = std::min(startIndex + FILES_PAGE_SIZE, totalFiles);
-        return std::max(0, endIndex - startIndex);
+        
+        if (currentPath.has_parent_path()) {
+            // If we're on the first page, show ".." row plus (FILES_PAGE_SIZE - 1) files
+            if (filesCurrentPage == 1) {
+                int maxFiles = FILES_PAGE_SIZE - 1; // Reserve one slot for ".." row
+                int fileRows = std::min(maxFiles, totalFiles);
+                return fileRows + 1; // +1 for the ".." row
+            }
+            // For other pages, account for the ".." row taking up space on page 1
+            int adjustedStartIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE - 1; // -1 because page 1 has the ".." row
+            int adjustedEndIndex = std::min(adjustedStartIndex + FILES_PAGE_SIZE, totalFiles);
+            return std::max(0, adjustedEndIndex - adjustedStartIndex);
+        } else {
+            // No ".." row, normal pagination
+            int startIndex = (filesCurrentPage - 1) * FILES_PAGE_SIZE;
+            int endIndex = std::min(startIndex + FILES_PAGE_SIZE, totalFiles);
+            return std::max(0, endIndex - startIndex);
+        }
     } else if (table == "games") {
         // Return the number of items on the current page
         int totalGames = static_cast<int>(games.size());
@@ -396,6 +444,12 @@ void FileChooserDataSource::SetGamesPage(int page) {
 
 int FileChooserDataSource::GetFilesTotalPages() const {
     int totalFiles = static_cast<int>(files.size());
+    
+    // If we can navigate up, we need to account for the ".." row
+    if (currentPath.has_parent_path()) {
+        totalFiles += 1; // Add 1 for the ".." row
+    }
+    
     return (totalFiles + FILES_PAGE_SIZE - 1) / FILES_PAGE_SIZE; // Ceiling division
 }
 
