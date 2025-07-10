@@ -535,7 +535,11 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
         
         // Check if the game ended by resignation (from SGF result, not from moves)
         bool endedByResignation = (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinByResignation);
-        
+
+        if (!endedWithPasses && !endedByResignation && gameInfo.gameResult.IsValid) {
+            endedWithPasses = true;
+        }
+
         // Trigger final scoring for finished games (both double pass and resignation)
         if (coach && (endedWithPasses || endedByResignation)) {
             // Set the game state reason but don't set 'over' yet to avoid breaking the game loop
