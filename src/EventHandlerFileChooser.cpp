@@ -61,18 +61,6 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
         
         updateCurrentPath();
     }
-    else if (value == "navigate_up") {
-        spdlog::debug("Navigate up button clicked");
-        dataSource->NavigateUp();
-        
-        // Clear selections when navigating
-        auto filesGrid = dialogDocument->GetElementById("files_grid");
-        auto gamesGrid = dialogDocument->GetElementById("games_grid");
-        if (filesGrid) clearGridSelection(filesGrid);
-        if (gamesGrid) clearGridSelection(gamesGrid);
-        
-        updateCurrentPath();
-    }
     else if (value == "select_file") {
         spdlog::debug("File selection event triggered");
         // Try to get the row index from the target element
@@ -92,8 +80,42 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
                     int selectedRow = dataGridRow->GetTableRelativeIndex();
                     spdlog::debug("Selected file row: {}", selectedRow);
                     
+                    // Check if this is the ".." row (first row when we can navigate up)
+                    if (selectedRow == 0 && dataSource->GetCurrentPath().has_parent_path()) {
+                        spdlog::debug("Navigate up (..) row selected");
+                        dataSource->NavigateUp();
+                        
+                        // Clear selections when navigating
+                        auto filesGrid = dialogDocument->GetElementById("files_grid");
+                        auto gamesGrid = dialogDocument->GetElementById("games_grid");
+                        if (filesGrid) clearGridSelection(filesGrid);
+                        if (gamesGrid) clearGridSelection(gamesGrid);
+                        
+                        updateCurrentPath();
+                        return;
+                    }
+                    
+                    // Adjust index for regular files (skip the ".." row if present)
+                    int fileIndex = selectedRow;
+                    if (dataSource->GetCurrentPath().has_parent_path()) {
+                        fileIndex = selectedRow - 1; // Account for the ".." row
+                    }
+                    
                     // Convert page-relative row index to actual file index
-                    int actualFileIndex = (dataSource->GetFilesCurrentPage() - 1) * dataSource->GetFilesPageSize() + selectedRow;
+                    int actualFileIndex;
+                    if (dataSource->GetCurrentPath().has_parent_path()) {
+                        // Page 1 has one less file slot due to ".." row
+                        if (dataSource->GetFilesCurrentPage() == 1) {
+                            actualFileIndex = fileIndex;
+                        } else {
+                            // For pages after 1, account for the reduced capacity of page 1
+                            actualFileIndex = (dataSource->GetFilesPageSize() - 1) + 
+                                           (dataSource->GetFilesCurrentPage() - 2) * dataSource->GetFilesPageSize() + fileIndex;
+                        }
+                    } else {
+                        // Normal pagination when no ".." row
+                        actualFileIndex = (dataSource->GetFilesCurrentPage() - 1) * dataSource->GetFilesPageSize() + fileIndex;
+                    }
                     spdlog::debug("Converted to actual file index: {}", actualFileIndex);
                     
                     // Clear previous selection in files grid
