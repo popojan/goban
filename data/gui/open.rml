@@ -6,45 +6,41 @@
 </head>
 <body id="open_dialog" class="open">
     <div id="file_chooser" class="dialog">
-        <div class="title_bar">
-            <span class="sep">Open SGF File</span>
-            <span class="sep cmd close_button" onmouseup="cancel">×</span>
-            <span class="sep path_display" id="current_path">data/sgf</span>
-            <span class="sep cmd nav_button" onmouseup="refresh">Refresh</span>
-        </div>
-        
         <div class="content">
             <div class="main_content">
                 <div class="file_list_container">
-                    <div class="section_title">Files & Folders</div>
-                    <datagrid id="files_grid" source="file_chooser.files" onclick="select_file">
-                        <col fields="name" width="70%">Name</col>
-                        <col fields="type" width="30%">Type</col>
+                    <div class="section_title">Records in <span class="sep path_display" id="current_path">data/sgf</span></div>
+                    <datagrid id="files_grid" source="file_chooser.files" onclick="select_file" onmousemove="mouse_moved">
+                        <col fields="name" width="80%">Name</col>
+                        <col fields="type" width="20%">Type</col>
                     </datagrid>
                     <div class="pagination_controls">
-                        <span class="cmd pagination_button" id="files_prev" onmouseup="files_prev_page">← Prev</span>
+                        <span class="cmd pagination_button" id="files_prev" onmouseup="files_prev_page" onmousemove="mouse_moved">← Prev</span>
                         <span class="pagination_info" id="files_page_info">Page 1 of 1</span>
-                        <span class="cmd pagination_button" id="files_next" onmouseup="files_next_page">Next →</span>
+                        <span class="cmd pagination_button" id="files_next" onmouseup="files_next_page" onmousemove="mouse_moved">Next →</span>
                     </div>
                 </div>
-                
+
                 <div class="preview_container">
-                    <div class="section_title">SGF Games</div>
-                    <datagrid id="games_grid" source="file_chooser.games" onclick="select_game">
-                        <col fields="title" width="60%">Game</col>
-                        <col fields="players" width="40%">Players</col>
+                    <div class="section_title">Selected File Contents</div>
+                    <datagrid id="games_grid" source="file_chooser.games" onclick="select_game" onmousemove="mouse_moved">
+                        <col fields="title" width="50%">Game</col>
+                        <col fields="players" width="50%">Players</col>
                     </datagrid>
                     <div class="pagination_controls">
-                        <span class="cmd pagination_button" id="games_prev" onmouseup="games_prev_page">← Prev</span>
+                        <span class="cmd pagination_button" id="games_prev" onmouseup="games_prev_page" onmousemove="mouse_moved">← Prev</span>
                         <span class="pagination_info" id="games_page_info">Page 1 of 1</span>
-                        <span class="cmd pagination_button" id="games_next" onmouseup="games_next_page">Next →</span>
+                        <span class="cmd pagination_button" id="games_next" onmouseup="games_next_page" onmousemove="mouse_moved">Next →</span>
                     </div>
                 </div>
             </div>
-            
-            <div class="dialog_buttons">
-                <div class="cmd button" onmouseup="cancel">Cancel</div>
-                <div class="cmd button primary" id="open_button" onmouseup="open_file">Open</div>
+            <div class="bottomleft">
+                <span class="sep cmd nav_button hidden" onmouseup="refresh" onmousemove="mouse_moved">Refresh</span>
+            </div>
+
+            <div class="bottom">
+                <span class="cmd button" onmouseup="cancel" onmousemove="mouse_moved">Cancel</span>
+                <span class="cmd button primary" id="open_button" onmouseup="open_file" onmousemove="mouse_moved">Open</span>
             </div>
         </div>
     </div>

@@ -40,7 +40,9 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
         spdlog::error("FileChooserDataSource not initialized");
         return;
     }
-    
+
+    bool repaintNeeded = false;
+
     if (value == "load") {
         spdlog::debug("Showing file chooser dialog");
         showDialog();
@@ -48,6 +50,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
     else if (value == "cancel") {
         spdlog::debug("Cancel button clicked");
         hideDialog();
+        repaintNeeded = true;
     }
     else if (value == "refresh") {
         spdlog::debug("Refresh button clicked");
@@ -60,6 +63,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
         if (gamesGrid) clearGridSelection(gamesGrid);
         
         updateCurrentPath();
+        repaintNeeded = true;
     }
     else if (value == "select_file") {
         spdlog::debug("File selection event triggered");
@@ -138,6 +142,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
         } else {
             spdlog::debug("No target element found");
         }
+        repaintNeeded = true;
     }
     else if (value == "select_game") {
         spdlog::debug("Game selection event triggered");
@@ -181,6 +186,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
         } else {
             spdlog::debug("No target element found");
         }
+        repaintNeeded = true;
     }
     else if (value == "open_file") {
         spdlog::debug("Open file button clicked");
@@ -208,6 +214,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
         } else {
             spdlog::warn("No file selected");
         }
+        repaintNeeded = true;
     }
     else if (value == "files_prev_page") {
         spdlog::debug("Files previous page button clicked");
@@ -215,6 +222,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
             dataSource->SetFilesPage(dataSource->GetFilesCurrentPage() - 1);
             updatePaginationInfo();
         }
+        repaintNeeded = true;
     }
     else if (value == "files_next_page") {
         spdlog::debug("Files next page button clicked");
@@ -222,6 +230,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
             dataSource->SetFilesPage(dataSource->GetFilesCurrentPage() + 1);
             updatePaginationInfo();
         }
+        repaintNeeded = true;
     }
     else if (value == "games_prev_page") {
         spdlog::debug("Games previous page button clicked");
@@ -229,6 +238,7 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
             dataSource->SetGamesPage(dataSource->GetGamesCurrentPage() - 1);
             updatePaginationInfo();
         }
+        repaintNeeded = true;
     }
     else if (value == "games_next_page") {
         spdlog::debug("Games next page button clicked");
@@ -236,12 +246,25 @@ void EventHandlerFileChooser::ProcessEvent(Rocket::Core::Event& event, const Roc
             dataSource->SetGamesPage(dataSource->GetGamesCurrentPage() + 1);
             updatePaginationInfo();
         }
+        repaintNeeded = true;
     }
     else {
         spdlog::debug("Unknown event value: '{}'", value.CString());
     }
-    
+
+    if (value == "mouse_moved" || repaintNeeded) {
+        requestRepaint();
+    }
+
     event.StopPropagation();
+}
+
+void EventHandlerFileChooser::requestRepaint() {
+    auto mainDoc = dialogDocument->GetContext()->GetDocument("game_window");
+    if (mainDoc) {
+        auto gameElement = dynamic_cast<ElementGame*>(mainDoc->GetElementById("game"));
+        gameElement->requestRepaint();
+    }
 }
 
 // Instance methods for dialog lifecycle management

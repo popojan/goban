@@ -78,8 +78,8 @@ public:
     static int GetGamesPageSize() { return GAMES_PAGE_SIZE; }
 
 private:
-    static const int FILES_PAGE_SIZE = 12;
-    static const int GAMES_PAGE_SIZE = 10;
+    static const int FILES_PAGE_SIZE = 15;
+    static const int GAMES_PAGE_SIZE = 15;
     
     std::filesystem::path currentPath;
     std::vector<FileEntry> files;
