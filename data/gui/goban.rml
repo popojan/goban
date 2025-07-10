@@ -12,9 +12,8 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">SGF</div>
-                            <!--<div class="cmd" onmouseup="load">Load game...</div>-->
-                            <div class="cmd" onmouseup="save">Save now</div>
                             <div class="cmd" onmouseup="load">Load game...</div>
+                            <div class="cmd" onmouseup="save">Save now</div>
                         </div>
                         <div class="grp">
                             <div class="hr">System</div>
@@ -153,8 +152,8 @@
                             <div class="hr">Prisoners</div>
                             <div class="template" id="templatePrisonersWhite">White: %d</div>
                             <div class="template" id="templatePrisonersBlack">Black: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite"></div>
-                            <div class="cmd" id="lblPrisonersBlack"></div>
+                            <div class="cmd" id="lblPrisonersWhite">White: 0</div>
+                            <div class="cmd" id="lblPrisonersBlack">Black: 0</div>
                         </div>
                     </div>
                 </div>
