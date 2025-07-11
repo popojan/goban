@@ -417,20 +417,36 @@ void GobanView::updateCursor(){
 }
 
 
+void GobanView::updateLastMoveOverlay() {
+	if (model.game.moveCount() > 0) {
+		auto move = model.game.lastStoneMove();
+		if (move == Move::NORMAL) {
+			std::ostringstream ss;
+			ss << model.game.moveCount();
+			if (lastMove) {
+				board.removeOverlay(lastMove);
+			}
+			lastMove = move.pos;
+			board.setOverlay(move.pos, ss.str(), move.col);
+		}
+	}
+}
+
+void GobanView::onBoardSized(int newBoardSize) {
+	board.clear(newBoardSize);
+	lastMove = Position(-1, -1);
+}
+
 void GobanView::onGameMove(const Move& move, const std::string& comment) {
     if(move == Move::NORMAL) {
-        updateFlag |= UPDATE_SOUND_STONE;
-        std::ostringstream ss;
-        ss << model.game.moveCount();
-        if(lastMove) {
-            board.removeOverlay(lastMove);
-        }
-        lastMove = move.pos;
         board.setRandomStoneRotation();
-        board.setOverlay(move.pos, ss.str(), move.col);
+        updateLastMoveOverlay();
+    	requestRepaint(UPDATE_SOUND_STONE | UPDATE_OVERLAY);
     }
 }
 
 void GobanView::onBoardChange(const Board& board) {
-    requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);
+	this->board.updateStones(board);
+	updateLastMoveOverlay();
+	requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);
 }

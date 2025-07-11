@@ -34,13 +34,12 @@
                     </div>
                 </div>
             </div>
-            <div class="bottomleft">
-                <span class="sep cmd nav_button" onmouseup="refresh" onmousemove="mouse_moved">Refresh</span>
-            </div>
-
             <div class="bottom">
                 <span class="cmd button" onmouseup="cancel" onmousemove="mouse_moved">Cancel</span>
                 <span class="cmd button primary" id="open_button" onmouseup="open_file" onmousemove="mouse_moved">Open</span>
+            </div>
+            <div class="bottomleft">
+                <span class="cmd button" onmouseup="refresh" onmousemove="mouse_moved">Refresh</span>
             </div>
         </div>
     </div>

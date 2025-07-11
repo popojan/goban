@@ -434,16 +434,10 @@ void FileChooserDataSource::SetGamesPage(int page) {
 
 int FileChooserDataSource::GetFilesTotalPages() const {
     int totalFiles = static_cast<int>(files.size());
-    
-    // If we can navigate up, we need to account for the ".." row
-    if (currentPath.has_parent_path()) {
-        totalFiles += 1; // Add 1 for the ".." row
-    }
-    
-    return (totalFiles + FILES_PAGE_SIZE - 1) / FILES_PAGE_SIZE; // Ceiling division
+    return (totalFiles + FILES_PAGE_SIZE - 1) / (FILES_PAGE_SIZE - 1); // Ceiling division
 }
 
 int FileChooserDataSource::GetGamesTotalPages() const {
     int totalGames = static_cast<int>(games.size());
-    return (totalGames + GAMES_PAGE_SIZE - 1) / GAMES_PAGE_SIZE; // Ceiling division
+    return (totalGames + GAMES_PAGE_SIZE) / GAMES_PAGE_SIZE; // Ceiling division
 }

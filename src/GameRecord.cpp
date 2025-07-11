@@ -41,11 +41,6 @@ void GameRecord::move(const Move& move)  {
 
     if (move == Move::NORMAL || move == Move::PASS){
         if(!gameStarted) {
-            if(doc == nullptr)
-                doc = F::CreateDocument(game);
-            else
-                doc->AppendGame(game);
-            ++numGames;
             gameStarted = true;
         }
         auto col = move.col == Color::BLACK ? SgfcColor::Black : SgfcColor::White;
@@ -135,6 +130,13 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
     game = F::CreateGame();
     currentNode = game->GetRootNode();
     gameStarted = false;
+    
+    if (doc == nullptr) {
+        doc = F::CreateDocument(game);
+    } else {
+        doc->AppendGame(game);
+        ++numGames;
+    }
 
     using namespace LibSgfcPlusPlus;
     std::vector<std::shared_ptr<ISgfcProperty> > properties;
@@ -200,6 +202,22 @@ void GameRecord::finalizeGame(float scoreDelta) {
     properties.push_back(property);
 
     game->GetRootNode()->SetProperties(properties);
+}
+
+void GameRecord::appendGameToDocument() {
+
+    if (game == nullptr) {
+        return;
+    }
+    
+    if (doc == nullptr) {
+        doc = F::CreateDocument(game);
+    } else {
+        doc->AppendGame(game);
+        ++numGames;
+    }
+    
+    game = nullptr;
 }
 
 void GameRecord::saveAs(const std::string& fileName) {
@@ -350,11 +368,15 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
             node = node->GetFirstChild();
         }
 
-        doc = loadedDoc->GetDocument();
-        game = loadedGame;
-        //currentNode = node;
-        gameStarted = true;
-        numGames = loadedDoc->GetDocument()->GetGames().size();
+        // keep the loaded game for future record only if it is not finished
+        if (gameInfo.gameResult.IsValid) {
+            doc = nullptr;
+            game = nullptr;
+            currentNode = nullptr;
+        } else {
+            game = loadedGame ;
+            doc = F::CreateDocument(game);
+        }
 
         boardSize.Columns = gameInfo.boardSize;
         boardSize.Rows = gameInfo.boardSize;
