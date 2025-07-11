@@ -24,6 +24,15 @@ public:
     }
 
     [[nodiscard]] const Move lastMove() const  { return history.back(); }
+    
+    [[nodiscard]] const Move lastStoneMove() const {
+        for (auto it = history.rbegin(); it != history.rend(); ++it) {
+            if (*it == Move::NORMAL) {
+                return *it;
+            }
+        }
+        return Move(Move::INVALID, Color(Color::EMPTY));
+    }
 
     void move(const Move& move);
 
@@ -56,6 +65,8 @@ public:
     bool loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo, int gameIndex = 0);
 
 private:
+
+    void appendGameToDocument();
 
     typedef LibSgfcPlusPlus::SgfcPlusPlusFactory F;
     typedef LibSgfcPlusPlus::SgfcPropertyType T;

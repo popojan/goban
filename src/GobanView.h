@@ -40,6 +40,7 @@ public:
 
     void onGameMove(const Move& move, const std::string& comment) override;
     void onBoardChange(const Board& board) override;
+    void onBoardSized(int newBoardSize) override;
 
     ~GobanView() {
         gobanShader.destroy();
@@ -126,6 +127,7 @@ public:
     void Update();
     void moveCursor(float, float);
     void updateCursor();
+    void updateLastMoveOverlay();
 
 public:
     GobanShader gobanShader;
