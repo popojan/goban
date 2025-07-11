@@ -174,9 +174,9 @@ bool GameThread::setFixedHandicap(int handicap) {
                     player->boardsize(lastSize);
                     player->clear();
                     for (auto & stone : stones)
-                        success &= player->play(Move(stone, Color(Color::BLACK)));
+                        success &= player->play(Move(stone, Color::BLACK));
                 }
-                model.state.colorToMove = Color(Color::WHITE);
+                model.state.colorToMove = Color::WHITE;
             }
         } else {
             success = true;
@@ -510,9 +510,9 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
         model.state.colorToMove = Color(model.game.lastMove().col == Color::BLACK
             ? Color::WHITE : Color::BLACK);
     } else if (gameInfo.handicap > 0) {
-        model.state.colorToMove = Color(Color::WHITE);
+        model.state.colorToMove = Color::WHITE;
     } else {
-        model.state.colorToMove = Color(Color::BLACK);
+        model.state.colorToMove = Color::BLACK;
     }
 
     model.pause();
@@ -624,7 +624,7 @@ void GameThread::setHandicapStones(const std::vector<Position>& stones) {
         coach->clear();
         
         for (const auto& stone : stones) {
-            coach->play(Move(stone, Color(Color::BLACK)));
+            coach->play(Move(stone, Color::BLACK));
         }
         
         for (auto player : players) {
@@ -632,12 +632,12 @@ void GameThread::setHandicapStones(const std::vector<Position>& stones) {
                 player->boardsize(model.getBoardSize());
                 player->clear();
                 for (const auto& stone : stones) {
-                    player->play(Move(stone, Color(Color::BLACK)));
+                    player->play(Move(stone, Color::BLACK));
                 }
             }
         }
         
-        model.state.colorToMove = Color(Color::WHITE);
+        model.state.colorToMove = Color::WHITE;
         
         const Board& result = coach->showboard();
         std::for_each(

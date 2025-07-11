@@ -74,8 +74,6 @@ public:
 public:
     ElementGame* parent;
 
-    //TODO multiple views in the future
-
     Board board;
 
     bool prevPass;
@@ -83,7 +81,7 @@ public:
     bool started;
     GameState state;
 
-    GameRecord game; //TODO find usage and create API including SGF generation
+    GameRecord game;
 
     bool invalidated;
 

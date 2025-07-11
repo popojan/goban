@@ -366,10 +366,10 @@ bool Board::parseGtp(const std::vector<std::string>& lines) {
                         Position p((j - 3) >> 1, size - i + 1);
                         Color color;
                         if(c == 'X') {
-                            color = Color(Color::BLACK);
+                            color = Color::BLACK;
                         }
                         else if(c == 'O') {
-                            color = Color(Color::WHITE);
+                            color = Color::WHITE;
                         }
                         (*this)[p].stone = color;
                     }
@@ -424,9 +424,9 @@ bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
                 ssin >> val;
                 Color c;
                 if (val > 2)
-                    c = Color(Color::WHITE);
+                    c = Color::WHITE;
                 else if (val < -2)
-                    c = Color(Color::BLACK);
+                    c = Color::BLACK;
                 (*this)[Position(j, boardSize - i - 1)].influence = c;
             }
         }

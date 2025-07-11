@@ -19,10 +19,10 @@ public:
 
     Color(): col(EMPTY) {}
 
-    explicit Color(Value col): col(col) {}
+    Color(Value col): col(col) {}
 
     static Color other(const Color& b) {
-        return Color(b.col == EMPTY ?  b.col : b.col == BLACK ? WHITE : BLACK);
+        return b.col == EMPTY ?  b.col : b.col == BLACK ? WHITE : BLACK;
     }
 
     explicit operator int() const {
@@ -115,7 +115,7 @@ public:
     bool operator== (Special b) const { return spec == b; }
     bool operator!= (Special b) const { return spec != b; }
 
-    bool operator== (const Color::Value & b) const { return col == Color(b); }
+    bool operator== (const Color::Value & b) const { return col == b; }
 
     bool operator== (const Position& p) const { return pos == p; }
 
@@ -201,7 +201,7 @@ public:
     void clear(int boardSize = DEFAULT_SIZE);
     void clearTerritory() {
         for(auto & point : points) {
-            point.influence = Color(Color::EMPTY);
+            point.influence = Color::EMPTY;
         }
     };
 
