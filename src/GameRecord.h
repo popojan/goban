@@ -31,7 +31,7 @@ public:
                 return *it;
             }
         }
-        return Move(Move::INVALID, Color(Color::EMPTY));
+        return Move(Move::INVALID, Color::EMPTY);
     }
 
     void move(const Move& move);
@@ -48,7 +48,7 @@ public:
 
     [[nodiscard]] const Move secondLastMove() const {
         return history.size() > 1 ? history[history.size() -2]
-            : Move(Move::Special::INVALID, Color(Color::BLACK));
+            : Move(Move::Special::INVALID, Color::BLACK);
     }
 
 

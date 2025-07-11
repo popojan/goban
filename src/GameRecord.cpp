@@ -352,7 +352,7 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
                 if (property->GetPropertyType() == T::B || property->GetPropertyType() == T::W) {
                     auto moveValue = std::dynamic_pointer_cast<ISgfcGoMovePropertyValue>(property->GetPropertyValue());
                     if (moveValue) {
-                        Color color = Color((property->GetPropertyType() == T::B) ? Color::BLACK : Color::WHITE);
+                        Color color = (property->GetPropertyType() == T::B) ? Color::BLACK : Color::WHITE;
                         
                         if (moveValue->GetGoMove()->IsPassMove()) {
                             history.push_back(Move(Move::PASS, color));

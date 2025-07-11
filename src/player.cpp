@@ -66,11 +66,11 @@ bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
         spdlog::debug("initial territory");
         board.clearTerritory();
         spdlog::debug("dead");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), board, Color(Color::EMPTY));
+        success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), board, Color::EMPTY);
         spdlog::debug("white");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), board, Color(Color::WHITE));
+        success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), board, Color::WHITE);
         spdlog::debug("black");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), board, Color(Color::BLACK));
+        success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), board, Color::BLACK);
     }
     else {
         std::stringstream ss;
