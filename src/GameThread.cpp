@@ -509,6 +509,14 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     if (model.game.moveCount() > 0) {
         model.state.colorToMove = Color(model.game.lastMove().col == Color::BLACK
             ? Color::WHITE : Color::BLACK);
+        
+        // Set pass message if last move was a pass (needed for proper UI display)
+        const Move& lastMove = model.game.lastMove();
+        if (lastMove == Move::PASS) {
+            model.state.msg = (lastMove.col == Color::BLACK) 
+                ? GameState::BLACK_PASS 
+                : GameState::WHITE_PASS;
+        }
     } else if (gameInfo.handicap > 0) {
         model.state.colorToMove = Color::WHITE;
     } else {

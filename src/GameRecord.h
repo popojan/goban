@@ -34,6 +34,16 @@ public:
         return Move(Move::INVALID, Color::EMPTY);
     }
 
+    [[nodiscard]] std::pair<Move, size_t> lastStoneMoveIndex() const {
+        for (auto it = history.rbegin(); it != history.rend(); ++it) {
+            if (*it == Move::NORMAL) {
+                size_t index = std::distance(history.begin(), it.base()) - 1;
+                return std::make_pair(*it, index + 1); // +1 for 1-based move numbering
+            }
+        }
+        return std::make_pair(Move(Move::INVALID, Color::EMPTY), 0);
+    }
+
     void move(const Move& move);
 
     void annotate(const std::string& comment);

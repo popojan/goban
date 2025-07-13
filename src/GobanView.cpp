@@ -419,10 +419,10 @@ void GobanView::updateCursor(){
 
 void GobanView::updateLastMoveOverlay() {
 	if (model.game.moveCount() > 0) {
-		auto move = model.game.lastStoneMove();
+		auto [move, moveIndex] = model.game.lastStoneMoveIndex();
 		if (move == Move::NORMAL) {
 			std::ostringstream ss;
-			ss << model.game.moveCount();
+			ss << moveIndex;
 			if (lastMove) {
 				board.removeOverlay(lastMove);
 			}

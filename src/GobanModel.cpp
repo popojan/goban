@@ -165,20 +165,26 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     spdlog::debug("LOCK model");
     std::lock_guard<std::mutex> lock(mutex);
 
-    if ((move == Move::PASS && prevPass) || move == Move::RESIGN) {
+    // Check for consecutive passes by looking at game history
+    // Since coach has already processed this move, we can check the last two moves
+    bool isDoublePass = false;
+    if (move == Move::PASS && game.moveCount() >= 1) {
+        const Move& lastMove = game.lastMove();
+        isDoublePass = (lastMove == Move::PASS);
+    }
+    
+    if (isDoublePass || move == Move::RESIGN) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
         board.toggleTerritoryAuto(true);
         isGameOver = true;
         spdlog::debug("Main Over! Reason {}", state.reason);
     }
     else if (move == Move::PASS) {
-        prevPass = true;
         state.msg = state.colorToMove == Color::BLACK
             ? GameState::BLACK_PASS
             : GameState::WHITE_PASS;
     }
     else {
-        prevPass = false;
         state.msg = GameState::NONE;
         if(state.holdsStone == false) {
             if (state.colorToMove == Color::BLACK)
