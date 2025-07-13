@@ -83,7 +83,7 @@ private:
     std::string defaultFileName;
     std::mutex mutex;
     size_t numGames;
-    bool gameStarted;
+    bool gameHasNewMoves;
 };
 
 #endif //GOBAN_GAMERECORD_H

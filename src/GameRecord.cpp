@@ -14,7 +14,7 @@ GameRecord::GameRecord():
         game(nullptr),
         doc(nullptr),
         numGames(0u),
-        gameStarted(false)
+        gameHasNewMoves(false)
 {
     std::time_t t = std::time(nullptr);
     std::tm time {};
@@ -40,9 +40,6 @@ void GameRecord::move(const Move& move)  {
     auto newNode(F::CreateNode());
 
     if (move == Move::NORMAL || move == Move::PASS){
-        if(!gameStarted) {
-            gameStarted = true;
-        }
         auto col = move.col == Color::BLACK ? SgfcColor::Black : SgfcColor::White;
         auto type = (move.col == Color::BLACK ? T::B : T::W);
         std::shared_ptr<ISgfcPropertyValue> value{nullptr};
@@ -59,6 +56,10 @@ void GameRecord::move(const Move& move)  {
         newNode->SetProperties(properties);
         game->GetTreeBuilder()->InsertChild(currentNode, newNode, currentNode->GetFirstChild());
         currentNode = newNode;
+        if(!gameHasNewMoves) {
+            gameHasNewMoves = true;
+            appendGameToDocument();
+        }
     }
 }
 
@@ -129,15 +130,8 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
 
     game = F::CreateGame();
     currentNode = game->GetRootNode();
-    gameStarted = false;
+    gameHasNewMoves = false;
     
-    if (doc == nullptr) {
-        doc = F::CreateDocument(game);
-    } else {
-        doc->AppendGame(game);
-        ++numGames;
-    }
-
     using namespace LibSgfcPlusPlus;
     std::vector<std::shared_ptr<ISgfcProperty> > properties;
 
@@ -216,8 +210,7 @@ void GameRecord::appendGameToDocument() {
         doc->AppendGame(game);
         ++numGames;
     }
-    
-    game = nullptr;
+
 }
 
 void GameRecord::saveAs(const std::string& fileName) {
@@ -370,13 +363,12 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
 
         // keep the loaded game for future record only if it is not finished
         if (gameInfo.gameResult.IsValid) {
-            doc = nullptr;
             game = nullptr;
             currentNode = nullptr;
         } else {
-            game = loadedGame ;
-            doc = F::CreateDocument(game);
+            game = loadedGame;
         }
+        gameHasNewMoves = false;
 
         boardSize.Columns = gameInfo.boardSize;
         boardSize.Rows = gameInfo.boardSize;
