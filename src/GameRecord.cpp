@@ -183,9 +183,19 @@ void GameRecord::finalizeGame(float scoreDelta) {
 
     auto type = T::RE;
     std::ostringstream ss;
-    // Use sign convention since we still get the traditional scoreDelta
-    ss << (scoreDelta < 0.0 ? "W+" : "B+");
-    ss << std::abs(scoreDelta);
+    
+    // Check if the game ended by resignation
+    bool isResignation = !history.empty() && history.back() == Move::RESIGN;
+    
+    if (isResignation) {
+        // For resignation, use R instead of score
+        Color resigningPlayer = history.back().col;
+        ss << (resigningPlayer == Color::BLACK ? "W+R" : "B+R");
+    } else {
+        // Use sign convention since we still get the traditional scoreDelta
+        ss << (scoreDelta < 0.0 ? "W+" : "B+");
+        ss << std::abs(scoreDelta);
+    }
 
     auto value (vF->CreateSimpleTextPropertyValue(ss.str()));
 

@@ -73,6 +73,7 @@ bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
         success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), board, Color::BLACK);
     }
     else {
+        /*
         std::stringstream ss;
         ss << "initial_influence " << colorToMove << " influence_regions";
         GtpClient::CommandOutput ret = GtpClient::issueCommand(ss.str());
@@ -104,6 +105,7 @@ bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
                 }
             }
         }
+        */
     }
     board.territoryReady = success;
     return success;
