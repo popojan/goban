@@ -38,11 +38,17 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
         }
     }
     else if(value == "mdown" || value == "mup") {
-        int state = value == "mdown" ? 1 : 0;
-        int button = event.GetParameter< int >("button", -1);
-        int x = event.GetParameter<int>("mouse_x", -1);
-        int y = event.GetParameter<int>("mouse_y", -1);
-        controller.mouseClick(button, state, x, y);
+        // Only forward mouse events to board controller if they're not from menu elements
+        Rocket::Core::Element* target = event.GetTargetElement();
+        if (target && target->GetId() == "game") {
+            // Event originated from the game element itself (board area), not a menu item
+            int state = value == "mdown" ? 1 : 0;
+            int button = event.GetParameter< int >("button", -1);
+            int x = event.GetParameter<int>("mouse_x", -1);
+            int y = event.GetParameter<int>("mouse_y", -1);
+            controller.mouseClick(button, state, x, y);
+        }
+        // If event came from a menu element, don't forward to board controller
     }
       else if (value == "handicap") {
         std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0").CString());
