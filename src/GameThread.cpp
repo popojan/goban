@@ -329,7 +329,7 @@ void GameThread::gameLoop() {
             if(influence) {
                 bool finalized = model.state.reason == GameState::DOUBLE_PASS;
                 const Board& result(
-                    coach->showterritory(finalized, model.state.colorToMove)
+                    coach->showterritory(finalized, model.game.lastStoneMove().col)
                 );
                 std::for_each(
                     gameObservers.begin(), gameObservers.end(),
@@ -553,9 +553,8 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
             // Set the game state reason but don't set 'over' yet to avoid breaking the game loop
             model.state.reason = endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
 
-            {}
             model.board.toggleTerritoryAuto(true);
-            const Board& result = coach->showterritory(endedWithPasses, model.state.colorToMove);
+            const Board& result = coach->showterritory(endedWithPasses, model.game.lastStoneMove().col);
 
             // Do not update observers with the final board state
             /*std::for_each(
