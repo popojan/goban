@@ -175,5 +175,5 @@
       "height": 0.0
     }
   ],
-  "gui": "./data/gui"
+  "gui": "./data/gui/en"
 }

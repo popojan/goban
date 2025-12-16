@@ -1,0 +1,7 @@
+/* English font configuration */
+
+body, html
+{
+  font-family: Delicious;
+  font-charset: U+0020-00FF,U+2014;
+}

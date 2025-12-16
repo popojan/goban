@@ -1,6 +1,7 @@
 <rml>
 <head>
-	<link type="text/css" href="goban.rcss"/>
+	<link type="text/css" href="../base.rcss"/>
+	<link type="text/css" href="fonts.rcss"/>
 	<title>Window</title>
 </head>
 <body id="game_window">
@@ -12,7 +13,7 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">SGF</div>
-                            <!--<div class="cmd" onmouseup="load">Load game...</div>-->
+                            <div class="cmd" onmouseup="load">加载棋谱...</div>
                             <div class="cmd" onmouseup="save">保存棋谱</div>
                         </div>
                         <div class="grp">

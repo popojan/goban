@@ -25,9 +25,14 @@ private:
     void updatePaginationInfo();
     void clearGridSelection(Rocket::Core::Element* grid);
     void requestRepaint();
+    std::string getTemplateString(const char* templateId, const char* defaultValue);
+    void initializeLocalization();
 
     Rocket::Core::ElementDocument* dialogDocument;
     FileChooserDataSource* dataSource;
+
+    // Localized strings
+    std::string strPageInfoFmt = "Page %d of %d";
 };
 
 #endif //GOBAN_EVENTHANDLERFILECHOOSER_H

@@ -1,5 +1,6 @@
 #include "EventHandlerFileChooser.h"
 #include "ElementGame.h"
+#include "EventManager.h"
 #include "FileChooserDataSource.h"
 #include <Rocket/Core/Context.h>
 #include <Rocket/Core/ElementDocument.h>
@@ -336,17 +337,45 @@ void EventHandlerFileChooser::LoadDialog(Rocket::Core::Context* context) {
     dataSource = new FileChooserDataSource();
     
     // Load the dialog document and keep it hidden initially
-    spdlog::debug("Loading dialog document: data/gui/open.rml");
-    dialogDocument = context->LoadDocument("data/gui/open.rml");
+    Rocket::Core::String dialogPath = EventManager::GetPrefix() + "/open.rml";
+    spdlog::debug("Loading dialog document: {}", dialogPath.CString());
+    dialogDocument = context->LoadDocument(dialogPath.CString());
     if (dialogDocument) {
         spdlog::debug("Dialog document loaded successfully, ID: {}", dialogDocument->GetId().CString());
         dialogDocument->Hide(); // Keep it hidden initially
+        initializeLocalization();
     } else {
         spdlog::error("Failed to load dialog document");
         // Clean up data source if dialog loading failed
         delete dataSource;
         dataSource = nullptr;
     }
+}
+
+std::string EventHandlerFileChooser::getTemplateString(const char* templateId, const char* defaultValue) {
+    if (!dialogDocument) return defaultValue;
+    auto element = dialogDocument->GetElementById(templateId);
+    if (element) {
+        return element->GetInnerRML().CString();
+    }
+    return defaultValue;
+}
+
+void EventHandlerFileChooser::initializeLocalization() {
+    if (!dialogDocument || !dataSource) return;
+
+    // Get localized strings from templates
+    std::string strDirectory = getTemplateString("tplDirectory", "Directory");
+    std::string strSgfFile = getTemplateString("tplSgfFile", "SGF File");
+    std::string strUp = getTemplateString("tplUp", "Up");
+    std::string strGameInfo = getTemplateString("tplGameInfo", "Game %d (%dx%d, %d moves)");
+    strPageInfoFmt = getTemplateString("tplPageInfo", "Page %d of %d");
+
+    // Pass to data source
+    dataSource->SetLocalizedStrings(strDirectory, strSgfFile, strUp, strGameInfo);
+
+    spdlog::debug("Localization initialized: dir='{}', sgf='{}', up='{}', page='{}'",
+                  strDirectory, strSgfFile, strUp, strPageInfoFmt);
 }
 
 void EventHandlerFileChooser::UnloadDialog(Rocket::Core::Context* context) {
@@ -469,8 +498,8 @@ void EventHandlerFileChooser::updatePaginationInfo() {
     if (filesPageInfo) {
         int currentPage = dataSource->GetFilesCurrentPage();
         int totalPages = dataSource->GetFilesTotalPages();
-        char buffer[64];
-        snprintf(buffer, sizeof(buffer), "Page %d of %d", currentPage, totalPages);
+        char buffer[128];
+        snprintf(buffer, sizeof(buffer), strPageInfoFmt.c_str(), currentPage, totalPages);
         filesPageInfo->SetInnerRML(buffer);
         spdlog::debug("Updated files pagination info: {}", buffer);
     }
@@ -490,8 +519,8 @@ void EventHandlerFileChooser::updatePaginationInfo() {
     if (gamesPageInfo) {
         int currentPage = dataSource->GetGamesCurrentPage();
         int totalPages = dataSource->GetGamesTotalPages();
-        char buffer[64];
-        snprintf(buffer, sizeof(buffer), "Page %d of %d", currentPage, totalPages);
+        char buffer[128];
+        snprintf(buffer, sizeof(buffer), strPageInfoFmt.c_str(), currentPage, totalPages);
         gamesPageInfo->SetInnerRML(buffer);
         spdlog::debug("Updated games pagination info: {}", buffer);
     }

@@ -161,7 +161,7 @@ function(build_libsgfcplusplus)
     SET(SGFCPLUSPLUS_STATIC_DEFINE 1 PARENT_SCOPE)
     MESSAGE("build type = ${CMAKE_BUILD_TYPE}")
     ExternalProject_Add(project_libsgfcplusplus
-            GIT_REPOSITORY  https://github.com/popojan/libsgfcplusplus.git
+            GIT_REPOSITORY  https://github.com/herzbube/libsgfcplusplus.git
             GIT_TAG master
             CMAKE_ARGS  ${CL_ARGS}
             BUILD_COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus -DENABLE_TESTS=0
@@ -169,10 +169,8 @@ function(build_libsgfcplusplus)
             SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
             STEP_TARGETS build
-            #UPDATE_COMMAND ""
-            UPDATE_COMMAND git restore --source=HEAD --staged --worktree -- sgfc
-            COMMAND git fetch
-            COMMAND git checkout sgfc
+            UPDATE_COMMAND ""
+            PATCH_COMMAND git apply ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch || true
             INSTALL_COMMAND     echo Skipping install step for libsgfcplusplus
             )
 

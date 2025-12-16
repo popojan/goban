@@ -198,6 +198,11 @@ void EventManager::SetPrefix(const Rocket::Core::String& prefix)
     rml_data_prefix = prefix;
 }
 
+const Rocket::Core::String& EventManager::GetPrefix()
+{
+    return rml_data_prefix;
+}
+
 EventHandler* EventManager::GetEventHandler(const Rocket::Core::String& handler_name)
 {
     EventHandlerMap::iterator iterator = event_handlers.find(handler_name);
