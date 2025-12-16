@@ -77,7 +77,16 @@ public:
     static int GetFilesPageSize() { return FILES_PAGE_SIZE; }
     static int GetGamesPageSize() { return GAMES_PAGE_SIZE; }
 
+    // Localization
+    void SetLocalizedStrings(const std::string& directory, const std::string& sgfFile,
+                            const std::string& up, const std::string& gameInfoFmt);
+
 private:
+    // Localized strings (with defaults)
+    std::string strDirectory = "Directory";
+    std::string strSgfFile = "SGF File";
+    std::string strUp = "Up";
+    std::string strGameInfoFmt = "Game %d (%dx%d, %d moves)";
     static const int FILES_PAGE_SIZE = 15;
     static const int GAMES_PAGE_SIZE = 15;
     

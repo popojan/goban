@@ -1,6 +1,7 @@
 <rml>
 <head>
-	<link type="text/css" href="goban.rcss"/>
+	<link type="text/css" href="../base.rcss"/>
+	<link type="text/css" href="fonts.rcss"/>
 	<title>Window</title>
 </head>
 <body id="game_window">

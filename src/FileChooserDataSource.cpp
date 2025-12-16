@@ -32,7 +32,7 @@ void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::
                 if (columns[i] == "name") {
                     row.push_back(Rocket::Core::String(".."));
                 } else if (columns[i] == "type") {
-                    row.push_back(Rocket::Core::String("Up"));
+                    row.push_back(Rocket::Core::String(strUp.c_str()));
                 } else if (columns[i] == "path") {
                     row.push_back(Rocket::Core::String(currentPath.parent_path().string().c_str()));
                 }
@@ -193,9 +193,9 @@ void FileChooserDataSource::refreshFileList() {
                 fileEntry.isDirectory = std::filesystem::is_directory(status);
                 
                 if (fileEntry.isDirectory) {
-                    fileEntry.type = "Directory";
+                    fileEntry.type = strDirectory;
                 } else if (fileEntry.name.find(".sgf") != std::string::npos) {
-                    fileEntry.type = "SGF File";
+                    fileEntry.type = strSgfFile;
                 } else {
                     // Skip non-SGF files
                     continue;
@@ -367,8 +367,8 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
             gameInfo.moveCount = countMovesInGame(game);
             
             // Create display strings with move count
-            char titleBuffer[64];
-            snprintf(titleBuffer, sizeof(titleBuffer), "Game %d (%dx%d, %d moves)", 
+            char titleBuffer[128];
+            snprintf(titleBuffer, sizeof(titleBuffer), strGameInfoFmt.c_str(),
                     static_cast<int>(gameIndex + 1), gameInfo.boardSize, gameInfo.boardSize, gameInfo.moveCount);
             gameInfo.title = std::string(titleBuffer);
             gameInfo.players = gameInfo.blackPlayer + " vs " + gameInfo.whitePlayer;
@@ -440,4 +440,12 @@ int FileChooserDataSource::GetFilesTotalPages() const {
 int FileChooserDataSource::GetGamesTotalPages() const {
     int totalGames = static_cast<int>(games.size());
     return (totalGames + GAMES_PAGE_SIZE) / GAMES_PAGE_SIZE; // Ceiling division
+}
+
+void FileChooserDataSource::SetLocalizedStrings(const std::string& directory, const std::string& sgfFile,
+                                                const std::string& up, const std::string& gameInfoFmt) {
+    strDirectory = directory;
+    strSgfFile = sgfFile;
+    strUp = up;
+    strGameInfoFmt = gameInfoFmt;
 }

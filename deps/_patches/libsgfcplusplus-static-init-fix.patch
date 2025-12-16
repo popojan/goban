@@ -1,0 +1,16 @@
+--- a/src/SgfcConstants.cpp
++++ b/src/SgfcConstants.cpp
+@@ -33,11 +33,11 @@ namespace LibSgfcPlusPlus
+
+   const int SgfcConstants::LibraryErrorNumberNoError = 0;
+
+-  const std::string SgfcConstants::NoneValueString = SgfcPrivateConstants::EmptyString;
++  const std::string SgfcConstants::NoneValueString = "";  // Fix static init order fiasco
+   const std::string SgfcConstants::DoubleNormalString = "1";
+   const std::string SgfcConstants::DoubleEmphasizedString = "2";
+   const std::string SgfcConstants::ColorBlackString = "B";
+   const std::string SgfcConstants::ColorWhiteString = "W";
+-  const std::string SgfcConstants::GoMovePassString = SgfcPrivateConstants::EmptyString;
++  const std::string SgfcConstants::GoMovePassString = "";  // Fix static init order fiasco
+
+   const SgfcSimpleText SgfcConstants::GoRulesetAGA = "AGA";

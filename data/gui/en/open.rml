@@ -1,7 +1,8 @@
 <rml class="open">
 <head>
-    <link type="text/css" href="goban.rcss"/>
-    <link type="text/css" href="open.rcss"/>
+    <link type="text/css" href="../base.rcss"/>
+    <link type="text/css" href="fonts.rcss"/>
+    <link type="text/css" href="../open.rcss"/>
     <title>Open SGF File</title>
 </head>
 <body id="open_dialog" class="open">
@@ -43,5 +44,11 @@
             </div>
         </div>
     </div>
+    <!-- Templates for C++ localization -->
+    <div class="template" id="tplDirectory">Directory</div>
+    <div class="template" id="tplSgfFile">SGF File</div>
+    <div class="template" id="tplUp">Up</div>
+    <div class="template" id="tplPageInfo">Page %d of %d</div>
+    <div class="template" id="tplGameInfo">Game %d (%dx%d, %d moves)</div>
 </body>
 </rml>

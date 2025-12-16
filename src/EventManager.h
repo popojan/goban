@@ -58,7 +58,9 @@ public:
 	/// @param[in] context The Rocket context to use for loading the document.
 	static bool LoadWindow(const Rocket::Core::String& window_name, Rocket::Core::Context* context);
     static void SetPrefix(const Rocket::Core::String& prefix);
-    
+    /// Gets the RML data prefix path.
+    static const Rocket::Core::String& GetPrefix();
+
     /// Gets an event handler by name.
     /// @param[in] handler_name The name of the handler to retrieve.
     /// @return Pointer to the event handler, or nullptr if not found.
