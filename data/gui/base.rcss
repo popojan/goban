@@ -28,7 +28,7 @@ game {
   position: absolute;
 }
 
-/* Menu bar at top */
+/* Menu bar at top - hidden by default, shows on hover */
 .menu {
   width: 100%;
   height: 2rem;
@@ -36,6 +36,14 @@ game {
   top: 0px;
   left: 0px;
   z-index: 100;
+}
+
+.menu.hoverable {
+  background-color: transparent;
+}
+
+.menu.hoverable:hover {
+  background-color: #00000040;
 }
 
 /* Menu bar items (File, View, Game, etc.) */
@@ -59,21 +67,25 @@ game {
   color: #ffffffff;
 }
 
-/* Menu item label */
+/* Menu item label - hidden by default, shown on hover */
 .menu span {
-  display: inline-block;
+  display: none;
   padding-right: 0.25rem;
 }
 
-/* Dropdown menus - hidden by default */
+.menu.hoverable:hover span {
+  display: inline-block;
+}
+
+/* Dropdown menus - hidden by default, positioned below parent */
 .menuitem.show {
   display: none;
   position: absolute;
-  top: 1.5rem;
+  top: 1.6rem;
   left: 0px;
-  width: 12rem;
-  background-color: #000000e0;
-  padding: 0.5rem;
+  width: 10rem;
+  background-color: #00000040;
+  padding: 0.25rem;
   z-index: 200;
 }
 
@@ -92,23 +104,20 @@ game {
 div.cmd {
   display: block;
   height: 1.25rem;
-  padding: 0.1rem 0.25rem;
   color: #ffffff80;
 }
 
 div.cmd:hover {
-  color: #ffffffff;
-  background-color: #ffffff20;
+  color: #fffffff0;
 }
 
 /* Section headers in dropdowns */
 div.hr {
   display: block;
   margin-top: 0.5rem;
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.15rem;
   font-size: 0.6rem;
   color: #ffffff60;
-  border-bottom: 1px #ffffff40;
 }
 
 /* Group containers */
@@ -117,19 +126,27 @@ div.grp {
 }
 
 /* Select dropdowns */
+select {
+  display: block;
+  width: 100%;
+}
+
 select option {
   color: #ffffff80;
 }
 
 select option:hover {
-  color: #ffffffff;
+  color: #fffffff0;
 }
 
 select selectbox {
   width: 10rem;
-  position: relative;
+  position: absolute;
+  left: 100%;
+  top: 0px;
+  margin-left: -0.5rem;
   padding: 0.25rem;
-  background-color: #00000060;
+  background-color: #00000040;
 }
 
 /* Templates - hidden always */
@@ -137,30 +154,17 @@ div.template {
   display: none;
 }
 
-/* Bottom status area */
+/* Bottom status area - prisoner counts hidden (now in Analyze menu) */
 #grpPlayers {
-  position: absolute;
-  bottom: 0px;
-  left: 0px;
-  width: 100%;
-  height: 2rem;
-  z-index: 50;
+  display: none;
 }
 
 #cntBlack {
-  display: inline-block;
-  position: absolute;
-  bottom: 0px;
-  left: 0px;
-  padding: 0.25rem;
+  display: none;
 }
 
 #cntWhite {
-  display: inline-block;
-  position: absolute;
-  bottom: 0px;
-  right: 0px;
-  padding: 0.25rem;
+  display: none;
 }
 
 #lblMessage {
