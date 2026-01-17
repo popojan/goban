@@ -218,8 +218,13 @@ bool GobanControl::command(const std::string& cmd) {
         model.game.saveAs("");
     }
     else if(cmd == "load") {
-        // File chooser is disabled - DataGrid not available in RmlUi
-        spdlog::warn("Load command disabled - file chooser not available");
+        // Get the file chooser handler and show the dialog
+        auto* handler = dynamic_cast<EventHandlerFileChooser*>(EventManager::GetEventHandler("open"));
+        if (handler) {
+            handler->ShowDialog();
+        } else {
+            spdlog::warn("File chooser handler not found");
+        }
     }
     else if(cmd == "msg") {
         auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");

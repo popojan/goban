@@ -2,162 +2,158 @@ body.open {
     width: 80%;
     height: 80%;
     margin: auto;
-    z-index:2;
+    z-index: 2;
     white-space: normal;
     overflow: hidden;
     padding: 1%;
-    border-top: 1%;
-    background-color: #00000040;
+    background-color: #00000080;
+    border-width: 1px;
     border-color: #ffffffaa;
     margin-bottom: 5%;
-    margin-color: transparent;
 }
 
-.title_bar {
+.dialog {
     width: 100%;
-    height: 5%;
+    height: 100%;
+    position: relative;
 }
 
-.close_button {
-    float: right;
-    cursor: auto;
-    font-weight: bold;
+.content {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.main_content {
+    width: 100%;
+    height: 85%;
+    position: relative;
 }
 
 .path_display {
     font-weight: bold;
 }
 
-.nav_button {
-}
-
-.hidden {
-    visibility: hidden;
-}
-.main_content {
-}
-
 .sep {
-    padding-right: 3rem;
+    padding-right: 1rem;
 }
+
 .file_list_container {
     width: 48%;
     height: 100%;
-    float: left;
-    margin-right: 2%;
+    position: absolute;
+    left: 0%;
+    top: 0%;
 }
 
 .preview_container {
     width: 48%;
     height: 100%;
-    margin-left: 2%;
-    float: right;
+    position: absolute;
+    right: 0%;
+    top: 0%;
 }
 
 .section_title {
     font-weight: bold;
+    margin-bottom: 0.5rem;
 }
 
-datagridrow {
+.item_list {
     width: 100%;
+    height: 80%;
+    overflow-y: auto;
+}
+
+/* File/game row styling */
+.file_row, .game_row {
     display: block;
-}
-datagridheader {
-}
-datagrid {
     width: 100%;
+    cursor: pointer;
+    padding: 0.1rem 0.2rem;
+    position: relative;
 }
 
-datagridcell {
-    display: block;
-    width: auto;
-    text-align: left;
-}
-
-datagridrow:hover {
+.file_row:hover, .game_row:hover {
     color: #e0e000;
 }
 
-
-datagridrow:active {
+.file_row:active, .game_row:active {
     color: #d0d000;
 }
 
-datagridrow.selected {
+.file_row.selected, .game_row.selected {
     background-color: #4CAF50;
     color: white;
 }
 
-datagridcell.selected {
-    background-color: #4CAF50;
-    color: white;
+.file_name, .game_title {
+    display: inline-block;
+}
+
+.file_type, .game_players {
+    position: absolute;
+    right: 0.5rem;
+    color: #888;
+}
+
+.file_row.selected .file_type,
+.game_row.selected .game_players {
+    color: #ccc;
 }
 
 .pagination_controls {
-    position: absolute;
-    bottom: 3%;
+    width: 100%;
     text-align: center;
+    margin-top: 0.5rem;
 }
 
 .pagination_button {
     margin: 0 4px;
-    padding: 0.5rem;
-    cursor: auto;
+    padding: 0.3rem 0.5rem;
     color: #cccccc;
-    min-width: 40px;
-    text-align: center;
 }
 
 .pagination_button:hover {
     color: #e0e000;
-    border-color: #999;
 }
 
 .pagination_button:active {
     color: #d0d000;
-    border-color: #bbb;
 }
 
 .pagination_button.disabled {
-    border-color: #444;
     color: #666;
-    cursor: auto;
 }
 
 .pagination_info {
-    margin: 0 12px;
+    margin: 0 8px;
     color: #aaa;
 }
 
-.bottomright {
-    position: absolute;
-    bottom: 2%;
-    right: 2%;
-    width: 15%;
-}
 .bottom {
     position: absolute;
-    bottom: 2%;
-    left: 2%;
+    bottom: 0%;
+    left: 0%;
+    right: 0%;
     text-align: center;
-    width: 100%;
 }
 
 .bottomleft {
     position: absolute;
-    bottom: 2%;
-    left: 2%;
-    width: 15%;
+    bottom: 0%;
+    left: 0%;
 }
 
 .button {
-    padding-bottom: 0.2%;
-    padding-top: 0.2%;
-    margin-right:1%;
-    padding-left:0.8%;
-    padding-right:0.8%;
+    padding: 0.3rem 0.8rem;
+    margin-right: 0.5rem;
 }
 
 .button.primary {
-    background: #4CAF50;
+    background-color: #4CAF50;
+}
+
+.button.primary:hover {
+    background-color: #5CBF60;
 }

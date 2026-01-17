@@ -11,36 +11,32 @@
             <div class="main_content">
                 <div class="file_list_container">
                     <div class="section_title">Records in <span class="sep path_display" id="current_path">data/sgf</span></div>
-                    <datagrid id="files_grid" source="file_chooser.files" onclick="select_file" onmousemove="mouse_moved" onmousescroll="mousescroll">
-                        <col fields="name" width="80%">Name</col>
-                        <col fields="type" width="20%">Type</col>
-                    </datagrid>
+                    <div class="item_list" id="files_list">
+                    </div>
                     <div class="pagination_controls">
-                        <span class="cmd pagination_button" id="files_prev" onmouseup="files_prev_page" onmousemove="mouse_moved">← Prev</span>
+                        <span class="cmd pagination_button" id="files_prev" onmouseup="files_prev_page">Prev</span>
                         <span class="pagination_info" id="files_page_info">Page 1 of 1</span>
-                        <span class="cmd pagination_button" id="files_next" onmouseup="files_next_page" onmousemove="mouse_moved">Next →</span>
+                        <span class="cmd pagination_button" id="files_next" onmouseup="files_next_page">Next</span>
                     </div>
                 </div>
 
                 <div class="preview_container">
                     <div class="section_title">Selected File Contents</div>
-                    <datagrid id="games_grid" source="file_chooser.games" onclick="select_game" onmousemove="mouse_moved" onmousescroll="mousescroll">
-                        <col fields="title" width="50%">Game</col>
-                        <col fields="players" width="50%">Players</col>
-                    </datagrid>
+                    <div class="item_list" id="games_list">
+                    </div>
                     <div class="pagination_controls">
-                        <span class="cmd pagination_button" id="games_prev" onmouseup="games_prev_page" onmousemove="mouse_moved">← Prev</span>
+                        <span class="cmd pagination_button" id="games_prev" onmouseup="games_prev_page">Prev</span>
                         <span class="pagination_info" id="games_page_info">Page 1 of 1</span>
-                        <span class="cmd pagination_button" id="games_next" onmouseup="games_next_page" onmousemove="mouse_moved">Next →</span>
+                        <span class="cmd pagination_button" id="games_next" onmouseup="games_next_page">Next</span>
                     </div>
                 </div>
             </div>
             <div class="bottom">
-                <span class="cmd button" onmouseup="cancel" onmousemove="mouse_moved">Cancel</span>
-                <span class="cmd button primary" id="open_button" onmouseup="open_file" onmousemove="mouse_moved">Open</span>
+                <span class="cmd button" onmouseup="cancel">Cancel</span>
+                <span class="cmd button primary" id="open_button" onmouseup="open_file">Open</span>
             </div>
             <div class="bottomleft">
-                <span class="cmd button" onmouseup="refresh" onmousemove="mouse_moved">Refresh</span>
+                <span class="cmd button" onmouseup="refresh">Refresh</span>
             </div>
         </div>
     </div>

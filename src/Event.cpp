@@ -44,17 +44,19 @@ Event::~Event()
 // Sends the event value through to Invader's event processing system.
 void Event::ProcessEvent(Rml::Event& event)
 {
+	spdlog::info("Event::ProcessEvent called with value: '{}' type: '{}'", value.c_str(), event.GetType().c_str());
+
 	// Get the document that owns this event
 	auto* document = event.GetTargetElement()->GetOwnerDocument();
 	if (!document) {
-		spdlog::debug("Event has no owner document, falling back to EventManager");
+		spdlog::info("Event has no owner document, falling back to EventManager");
 		EventManager::ProcessEvent(event, value);
 		return;
 	}
 
 	// Determine which handler to use based on the document ID
 	Rml::String documentId = document->GetId();
-	spdlog::debug("Event from document: '{}'", documentId.c_str());
+	spdlog::info("Event from document: '{}' value: '{}'", documentId.c_str(), value.c_str());
 
 	EventHandler* handler = nullptr;
 	if (documentId == "open_dialog") {
