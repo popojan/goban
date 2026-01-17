@@ -28,24 +28,21 @@
 #ifndef ROCKETINVADERSEVENTINSTANCER_H
 #define ROCKETINVADERSEVENTINSTANCER_H
 
-#include <Rocket/Core/EventListenerInstancer.h>
+#include <RmlUi/Core/EventListenerInstancer.h>
 
 /**
 	@author Peter Curry
  */
 
-class EventInstancer : public Rocket::Core::EventListenerInstancer
+class EventInstancer : public Rml::EventListenerInstancer
 {
 public:
 	EventInstancer();
 	~EventInstancer() override;
 
 	/// Instances a new event handle for Invaders.
-	Rocket::Core::EventListener* InstanceEventListener(
-            const Rocket::Core::String& value, Rocket::Core::Element* element) override;
-
-	/// Destroys the instancer.
-	void Release() override;
+	Rml::EventListener* InstanceEventListener(
+            const Rml::String& value, Rml::Element* element) override;
 };
 
 #endif

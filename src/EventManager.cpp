@@ -26,8 +26,9 @@
  */
 
 #include "EventManager.h"
-#include <Rocket/Core/Context.h>
-#include <Rocket/Core/ElementDocument.h>
+#include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/StringUtilities.h>
 #include <Shell.h>
 #include "EventHandler.h"
 #include <map>
@@ -39,9 +40,9 @@
 static EventHandler* event_handler = NULL;
 
 // The event handlers registered with the manager.
-typedef std::map< Rocket::Core::String, EventHandler* > EventHandlerMap;
+typedef std::map< Rml::String, EventHandler* > EventHandlerMap;
 EventHandlerMap event_handlers;
-Rocket::Core::String rml_data_prefix;
+Rml::String rml_data_prefix;
 
 EventManager::EventManager()
 {
@@ -62,7 +63,7 @@ void EventManager::Shutdown()
 }
 
 // Registers a new event handler with the manager.
-void EventManager::RegisterEventHandler(const Rocket::Core::String& handler_name, EventHandler* handler)
+void EventManager::RegisterEventHandler(const Rml::String& handler_name, EventHandler* handler)
 {
 	// Release any handler bound under the same name.
 	EventHandlerMap::iterator iterator = event_handlers.find(handler_name);
@@ -73,22 +74,22 @@ void EventManager::RegisterEventHandler(const Rocket::Core::String& handler_name
 }
 
 // Processes an event coming through from Rocket.
-void EventManager::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value)
+void EventManager::ProcessEvent(Rml::Event& event, const Rml::String& value)
 {
-	spdlog::debug("EventManager::ProcessEvent called with value: '{}'", value.CString());
-	spdlog::debug("Event type: {}", event.GetType().CString());
+	spdlog::debug("EventManager::ProcessEvent called with value: '{}'", value.c_str());
+	spdlog::debug("Event type: {}", event.GetType().c_str());
 	
-	Rocket::Core::StringList commands;
-	Rocket::Core::StringUtilities::ExpandString(commands, value, ';');
+	Rml::StringList commands;
+	Rml::StringUtilities::ExpandString(commands, value, ';');
 	spdlog::debug("Found {} commands", commands.size());
 	
 	for (size_t i = 0; i < commands.size(); ++i)
 	{
-		spdlog::debug("Processing command {}: '{}'", i, commands[i].CString());
+		spdlog::debug("Processing command {}: '{}'", i, commands[i].c_str());
 		
 		// Check for a generic 'load' or 'exit' command.
-		Rocket::Core::StringList values;
-		Rocket::Core::StringUtilities::ExpandString(values, commands[i], ' ');
+		Rml::StringList values;
+		Rml::StringUtilities::ExpandString(values, commands[i], ' ');
 
 		if (values.empty())
 		{
@@ -96,12 +97,12 @@ void EventManager::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::
 			return;
 		}
 
-		spdlog::debug("Command has {} values, first value: '{}'", values.size(), values[0].CString());
+		spdlog::debug("Command has {} values, first value: '{}'", values.size(), values[0].c_str());
 
 		if (values[0] == "load" &&
  			values.size() > 1)
 		{
-			spdlog::debug("Executing load command with window: '{}'", values[1].CString());
+			spdlog::debug("Executing load command with window: '{}'", values[1].c_str());
 			// Load the window using context from the event.
 			auto* context = event.GetCurrentElement()->GetContext();
 			LoadWindow(values[1], context);
@@ -109,14 +110,14 @@ void EventManager::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::
 		else if (values[0] == "close")
 		{
 			spdlog::debug("Executing close command");
-			Rocket::Core::ElementDocument* target_document = NULL;
+			Rml::ElementDocument* target_document = NULL;
 
 			if (values.size() > 1)
 			{
-				spdlog::debug("Closing document by name: '{}'", values[1].CString());
+				spdlog::debug("Closing document by name: '{}'", values[1].c_str());
 				// Get context from the event instead of using static variable
 				auto* context = event.GetCurrentElement()->GetContext();
-				target_document = context->GetDocument(values[1].CString());
+				target_document = context->GetDocument(values[1].c_str());
 			}
 			else
 			{
@@ -157,7 +158,7 @@ void EventManager::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::
 }
 
 // Loads a window and binds the event handler for it.
-bool EventManager::LoadWindow(const Rocket::Core::String& window_name, Rocket::Core::Context* context)
+bool EventManager::LoadWindow(const Rml::String& window_name, Rml::Context* context)
 {
 	// Set the event handler for the new screen, if one has been registered.
 	EventHandler* old_event_handler = event_handler;
@@ -168,8 +169,8 @@ bool EventManager::LoadWindow(const Rocket::Core::String& window_name, Rocket::C
 		event_handler = NULL;
 
 	// Attempt to load the referenced RML document.
-	Rocket::Core::String document_path = rml_data_prefix + Rocket::Core::String("/") + window_name + Rocket::Core::String(".rml");
-	Rocket::Core::ElementDocument* document = context->LoadDocument(document_path.CString());
+	Rml::String document_path = rml_data_prefix + Rml::String("/") + window_name + Rml::String(".rml");
+	Rml::ElementDocument* document = context->LoadDocument(document_path.c_str());
 	if (document == NULL)
 	{
 		event_handler = old_event_handler;
@@ -177,7 +178,7 @@ bool EventManager::LoadWindow(const Rocket::Core::String& window_name, Rocket::C
 	}
 
 	// Set the element's title on the title; IDd 'title' in the RML.
-	Rocket::Core::Element* title = document->GetElementById("title");
+	Rml::Element* title = document->GetElementById("title");
 	if (title != NULL)
 		title->SetInnerRML(document->GetTitle());
 
@@ -186,24 +187,24 @@ bool EventManager::LoadWindow(const Rocket::Core::String& window_name, Rocket::C
 	// Remove the caller's reference.
 	document->RemoveReference();
 	
-	Rocket::Core::Element* gameElement = document->GetElementById("game");
+	Rml::Element* gameElement = document->GetElementById("game");
 	
 	gameElement->Focus();
 
 	return true;
 }
 
-void EventManager::SetPrefix(const Rocket::Core::String& prefix)
+void EventManager::SetPrefix(const Rml::String& prefix)
 {
     rml_data_prefix = prefix;
 }
 
-const Rocket::Core::String& EventManager::GetPrefix()
+const Rml::String& EventManager::GetPrefix()
 {
     return rml_data_prefix;
 }
 
-EventHandler* EventManager::GetEventHandler(const Rocket::Core::String& handler_name)
+EventHandler* EventManager::GetEventHandler(const Rml::String& handler_name)
 {
     EventHandlerMap::iterator iterator = event_handlers.find(handler_name);
     if (iterator != event_handlers.end())

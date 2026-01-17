@@ -12,9 +12,8 @@
 #include <clipp.h>
 
 #include "ElementGame.h"
-#include <Rocket/Core.h>
-#include <Rocket/Controls.h>
-#include <Rocket/Debugger.h>
+#include <RmlUi/Core.h>
+#include <RmlUi/Debugger.h>
 #include "EventManager.h"
 #include "EventInstancer.h"
 #include "EventHandlerNewGame.h"
@@ -23,7 +22,7 @@
 #include <Input.h>
 #include <Shell.h>
 
-#if defined ROCKET_PLATFORM_WIN32
+#if defined RMLUI_PLATFORM_WIN32
   #undef __GNUC__
   #include <io.h>
   #include <fcntl.h>
@@ -38,7 +37,7 @@
 #include <memory>
 
 
-Rocket::Core::Context* context = nullptr;
+Rml::Context* context = nullptr;
 std::shared_ptr<Configuration> config;
 
 void GameLoop() {
@@ -46,7 +45,7 @@ void GameLoop() {
 }
 
 
-#if defined ROCKET_PLATFORM_WIN32
+#if defined RMLUI_PLATFORM_WIN32
 void DoAllocConsole()
 {
     static const WORD MAX_CONSOLE_LINES = 500;
@@ -89,7 +88,7 @@ void DoAllocConsole()
     ShowWindow(GetConsoleWindow(), SW_HIDE);
 }
 
-int APIENTRY WinMain(HINSTANCE ROCKET_UNUSED_PARAMETER(instance_handle), HINSTANCE ROCKET_UNUSED_PARAMETER(previous_instance_handle), char* ROCKET_UNUSED_PARAMETER(command_line), int ROCKET_UNUSED_PARAMETER(command_show))
+int APIENTRY WinMain(HINSTANCE RMLUI_UNUSED_PARAMETER(instance_handle), HINSTANCE RMLUI_UNUSED_PARAMETER(previous_instance_handle), char* RMLUI_UNUSED_PARAMETER(command_line), int RMLUI_UNUSED_PARAMETER(command_show))
 #else
 int main(int argc, char** argv)
 #endif
@@ -101,21 +100,21 @@ int main(int argc, char** argv)
         option("-v", "--verbosity") & word("level", logLevel),
         option("-c", "--config") & value("file", configurationFile)
     );
-#ifdef ROCKET_PLATFORM_WIN32
-    ROCKET_UNUSED(instance_handle);
-    ROCKET_UNUSED(previous_instance_handle);
-    ROCKET_UNUSED(command_line);
-    ROCKET_UNUSED(command_show);
+#ifdef RMLUI_PLATFORM_WIN32
+    RMLUI_UNUSED(instance_handle);
+    RMLUI_UNUSED(previous_instance_handle);
+    RMLUI_UNUSED(command_line);
+    RMLUI_UNUSED(command_show);
     parse(__argc, __argv, cli);
 #else
     parse(argc, argv, cli);
 #endif
 
-const Rocket::Core::String APP_PATH(".");
+const Rml::String APP_PATH(".");
 
 const char * WINDOW_NAME = "Goban";
 
-#ifdef ROCKET_PLATFORM_WIN32
+#ifdef RMLUI_PLATFORM_WIN32
         DoAllocConsole();
 #endif
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -142,31 +141,31 @@ const char * WINDOW_NAME = "Goban";
     }
 
     // Rocket initialisation.
-    Rocket::Core::SetRenderInterface(popengl_renderer.get());
+    Rml::SetRenderInterface(popengl_renderer.get());
     //(&opengl_renderer)->SetViewport(window_width, window_height);
 
     ShellSystemInterface system_interface;
-    Rocket::Core::SetSystemInterface(&system_interface);
+    Rml::SetSystemInterface(&system_interface);
 
     //std::locale::global(std::locale("C"));
 
-    Rocket::Core::Initialise();
-    Rocket::Controls::Initialise();
+    Rml::Initialise();
+    Rml::Initialise();
 
     config = std::make_shared<Configuration>(configurationFile);
 
     // Create the main Rocket context and set it on the shell's input layer.
-    context = Rocket::Core::CreateContext("main",
-            Rocket::Core::Vector2i(window_width, window_height));
+    context = Rml::CreateContext("main",
+            Rml::Vector2i(window_width, window_height));
     if (context == nullptr)
     {
-        Rocket::Core::Shutdown();
+        Rml::Shutdown();
         Shell::Shutdown();
         return -1;
     }
 
-    Rocket::Debugger::Initialise(context);
-    //Rocket::Debugger::SetVisible(true);
+    Rml::Debugger::Initialise(context);
+    //Rml::Debugger::SetVisible(true);
     Input::SetContext(context);
 	shell_renderer->SetContext(context);
 
@@ -177,12 +176,12 @@ const char * WINDOW_NAME = "Goban";
 
     Shell::LoadFonts(fonts);
 
-    Rocket::Core::ElementInstancer* element_instancer = new Rocket::Core::ElementInstancerGeneric< ElementGame >();
-    Rocket::Core::Factory::RegisterElementInstancer("game", element_instancer);
+    Rml::ElementInstancer* element_instancer = new Rml::ElementInstancerGeneric< ElementGame >();
+    Rml::Factory::RegisterElementInstancer("game", element_instancer);
     element_instancer->RemoveReference();
 
     auto event_instancer = new EventInstancer();
-    Rocket::Core::Factory::RegisterEventListenerInstancer(event_instancer);
+    Rml::Factory::RegisterEventListenerInstancer(event_instancer);
     event_instancer->RemoveReference();
 
     EventManager::SetPrefix(config->data.value("gui","./data/gui").c_str());
@@ -215,8 +214,8 @@ const char * WINDOW_NAME = "Goban";
 
     spdlog::debug("Before Rocket shutdown");
 
-    Rocket::Core::ReleaseTextures();
-    Rocket::Core::Shutdown();
+    Rml::ReleaseTextures();
+    Rml::Shutdown();
     spdlog::debug("Before Window Close");
 
     Shell::CloseWindow();

@@ -15,6 +15,7 @@ set_property(GLOBAL PROPERTY CMAKE_CXX_FLAGS_RELEASE "-O3 -s")
 set_property(GLOBAL PROPERTY CMAKE_CXX_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
 
 INCLUDE(ExternalProject)
+INCLUDE(FetchContent)
 
 function(build_portaudio)
     ExternalProject_Add(project_portaudio
@@ -245,6 +246,34 @@ function(fetch_clipp)
     endif()
 endfunction()
 
+function(fetch_glfw)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(glfw
+            GIT_REPOSITORY https://github.com/glfw/glfw.git
+            GIT_TAG 3.4)
+
+    FetchContent_GetProperties(glfw)
+    if(NOT glfw_POPULATED)
+        FetchContent_MakeAvailable(glfw)
+    endif()
+endfunction()
+
+function(fetch_rmlui)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
+    set(RMLUI_TESTS OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(rmlui
+            GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
+            GIT_TAG master)  # Using master for GCC 15 fix (PR #766)
+
+    FetchContent_MakeAvailable(rmlui)
+endfunction()
+
 function(find_libsndfile)
     find_library(libsndfile_DBG
         NAMES sndfile.lib
@@ -333,7 +362,9 @@ function(generate_glad_headers)
 endfunction()
 
 cmake_language(CALL build_glyphy)
-cmake_language(CALL build_librocket)
+# cmake_language(CALL build_librocket)  # Replaced by RmlUi
+cmake_language(CALL fetch_rmlui)
+cmake_language(CALL fetch_glfw)
 cmake_language(CALL build_libsgfcplusplus)
 cmake_language(CALL fetch_json)
 cmake_language(CALL fetch_clipp)
@@ -367,7 +398,7 @@ else()
     message("Build Goban")
     add_custom_target(Rescan)
 
-    find_package(LibRocket REQUIRED)
+    # find_package(LibRocket REQUIRED)  # Replaced by RmlUi
     cmake_language(CALL find_libsgfcplusplus)
 
     set(Boost_USE_MULTITHREADED ON)
@@ -385,7 +416,7 @@ else()
         add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00)
         #option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
         set(Boost_USE_STATIC_LIBS ON)
-        add_definitions(-DROCKET_STATIC_LIB)
+        # add_definitions(-DROCKET_STATIC_LIB)  # Not needed for RmlUi
     endif()
 
     set(SHELL_SRC_FILES_COMMON
@@ -518,7 +549,7 @@ else()
             src/glad/include
             ${OPENGL_INCLUDE_DIRS}
             ${CURSES_INCLUDE_DIR}
-            ${LIBROCKET_INCLUDE_DIR}
+            # ${LIBROCKET_INCLUDE_DIR}  # Replaced by RmlUi
             ${LIBGLYPHY_INCLUDE_DIR}
             ${FREETYPE_INCLUDE_DIRS}
             ${SNDFILE_INCLUDE_DIRS}
@@ -527,7 +558,7 @@ else()
     )
 
     add_dependencies(${PROJECT_NAME}
-            project_librocket
+            # project_librocket  # Replaced by RmlUi
             project_glyphy
             project_libsgfcplusplus
     )
@@ -542,9 +573,11 @@ else()
         boost_filesystem
         libglyphy
         freetype
-        LibRocket_Core
-        LibRocket_Controls
-        LibRocket_Debugger
+        # LibRocket_Core      # Replaced by RmlUi
+        # LibRocket_Controls
+        # LibRocket_Debugger
+        rmlui
+        glfw
         portaudio
         sndfile
         libsgfcplusplus

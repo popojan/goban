@@ -5,10 +5,8 @@
 #include <utility>
 #include <string>
 #include "GobanOverlay.h"
-#include <Rocket/Core/Types.h>
-#include <Rocket/Core/Texture.h>
-#include <Rocket/Controls/ElementFormControlSelect.h>
-#include <Rocket/Controls/SelectOption.h>
+#include <RmlUi/Core/Types.h>
+#include <RmlUi/Core/Texture.h>
 #include "GobanShader.h"
 #include "GobanModel.h"
 #include "GameObserver.h"

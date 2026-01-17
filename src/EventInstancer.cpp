@@ -37,14 +37,8 @@ EventInstancer::~EventInstancer()
 }
 
 // Instances a new event handle for Invaders.
-Rocket::Core::EventListener* EventInstancer::InstanceEventListener(const Rocket::Core::String& value, Rocket::Core::Element* element)
+Rml::EventListener* EventInstancer::InstanceEventListener(const Rml::String& value, Rml::Element* element)
 {
     (void)element;
     return new Event(value);
-}
-
-// Destroys the instancer.
-void EventInstancer::Release()
-{
-	delete this;
 }
