@@ -41,8 +41,35 @@
 Rml::Context* context = nullptr;
 std::shared_ptr<Configuration> config;
 
-// Use the SystemInterface_GLFW from RmlUi backend
-static SystemInterface_GLFW system_interface;
+// Custom SystemInterface to route RmlUi logs to spdlog
+class GobanSystemInterface : public SystemInterface_GLFW {
+public:
+    bool LogMessage(Rml::Log::Type type, const Rml::String& message) override {
+        switch (type) {
+            case Rml::Log::LT_ERROR:
+                spdlog::error("[RmlUi] {}", message.c_str());
+                break;
+            case Rml::Log::LT_ASSERT:
+                spdlog::critical("[RmlUi] {}", message.c_str());
+                break;
+            case Rml::Log::LT_WARNING:
+                spdlog::warn("[RmlUi] {}", message.c_str());
+                break;
+            case Rml::Log::LT_INFO:
+                spdlog::info("[RmlUi] {}", message.c_str());
+                break;
+            case Rml::Log::LT_DEBUG:
+                spdlog::debug("[RmlUi] {}", message.c_str());
+                break;
+            default:
+                spdlog::trace("[RmlUi] {}", message.c_str());
+                break;
+        }
+        return true;
+    }
+};
+
+static GobanSystemInterface system_interface;
 static RenderInterface_GL2 render_interface;
 
 // GLFW callbacks
@@ -308,10 +335,17 @@ int main(int argc, char** argv)
             }
 
             // Clear and render
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
+            int fb_width, fb_height;
+            glfwGetFramebufferSize(window, &fb_width, &fb_height);
+            glViewport(0, 0, fb_width, fb_height);
 
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // RmlUi rendering
+            render_interface.BeginFrame();
             context->Render();
+            render_interface.EndFrame();
 
             glfwSwapBuffers(window);
         }

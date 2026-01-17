@@ -36,6 +36,7 @@ bool ToggleFullscreen() {
 
     if (g_fullscreen) {
         // Save windowed position and size
+        // Note: glfwGetWindowPos may fail on Wayland - that's OK, we use stored defaults
         glfwGetWindowPos(g_window, &g_windowedX, &g_windowedY);
         glfwGetWindowSize(g_window, &g_windowedWidth, &g_windowedHeight);
 
