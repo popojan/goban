@@ -130,11 +130,11 @@ void ElementGame::ProcessEvent(Rml::Event& event)
         control.mouseMove(x, y);
     }
     else if (event == "mousescroll") {
-        //int button = event.GetParameter< int >("button", -1);
         int x = event.GetParameter<int>("mouse_x", -1);
         int y = event.GetParameter<int>("mouse_y", -1);
-        int delta = event.GetParameter<int>("wheel_delta", -1);
-        control.mouseClick((delta < 0 ? 3 : 4), 1, x, y);
+        // RmlUi uses wheel_delta_y for vertical scroll
+        float deltaY = event.GetParameter<float>("wheel_delta_y", 0.0f);
+        control.mouseClick((deltaY < 0 ? 3 : 4), 1, x, y);
     }
     else if (event == "resize") {
         view.requestRepaint();
