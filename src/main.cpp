@@ -19,8 +19,12 @@
 #include "EventHandlerNewGame.h"
 #include "EventHandlerFileChooser.h"
 #include "FileChooserDataSource.h"
-#include <Input.h>
-#include <Shell.h>
+#include "AppState.h"
+
+// GLFW and RmlUi backends
+#include <GLFW/glfw3.h>
+#include <RmlUi_Platform_GLFW.h>
+#include <RmlUi_Renderer_GL2.h>
 
 #if defined RMLUI_PLATFORM_WIN32
   #undef __GNUC__
@@ -28,22 +32,99 @@
   #include <fcntl.h>
 #endif
 
-//#define SHOW_CONSOLE 1
-
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <memory>
 
-
 Rml::Context* context = nullptr;
 std::shared_ptr<Configuration> config;
 
-void GameLoop() {
-    dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"))->gameLoop();
+// Use the SystemInterface_GLFW from RmlUi backend
+static SystemInterface_GLFW system_interface;
+static RenderInterface_GL2 render_interface;
+
+// GLFW callbacks
+static void GlfwErrorCallback(int error, const char* description) {
+    spdlog::error("GLFW Error {}: {}", error, description);
 }
 
+static void GlfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
+    (void)window;
+    if (context) {
+        context->SetDimensions(Rml::Vector2i(width, height));
+    }
+    render_interface.SetViewport(width, height);
+}
+
+static void GlfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    (void)window;
+    (void)scancode;
+    if (!context) return;
+
+    // Toggle debugger with F8
+    if (key == GLFW_KEY_F8 && action == GLFW_PRESS) {
+        Rml::Debugger::SetVisible(!Rml::Debugger::IsVisible());
+        return;
+    }
+
+    RmlGLFW::ProcessKeyCallback(context, key, action, mods);
+}
+
+static void GlfwCharCallback(GLFWwindow* window, unsigned int codepoint) {
+    (void)window;
+    if (context) {
+        RmlGLFW::ProcessCharCallback(context, codepoint);
+    }
+}
+
+static void GlfwCursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+    if (context) {
+        int mods = RmlGLFW::ConvertKeyModifiers(0);
+        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+            mods |= Rml::Input::KM_SHIFT;
+        if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS)
+            mods |= Rml::Input::KM_CTRL;
+        if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS)
+            mods |= Rml::Input::KM_ALT;
+
+        RmlGLFW::ProcessCursorPosCallback(context, window, xpos, ypos, mods);
+    }
+}
+
+static void GlfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    (void)window;
+    if (!context) return;
+
+    RmlGLFW::ProcessMouseButtonCallback(context, button, action, mods);
+}
+
+static void GlfwScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    (void)xoffset;
+    if (context) {
+        int mods = 0;
+        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+            mods |= Rml::Input::KM_SHIFT;
+
+        RmlGLFW::ProcessScrollCallback(context, yoffset, mods);
+    }
+}
+
+static void LoadFonts(const nlohmann::json& fonts) {
+    for (const auto& font : fonts) {
+        std::string fontPath = font.get<std::string>();
+        if (!Rml::LoadFontFace(fontPath.c_str())) {
+            spdlog::warn("Failed to load font: {}", fontPath);
+        } else {
+            spdlog::info("Loaded font: {}", fontPath);
+        }
+    }
+}
 
 #if defined RMLUI_PLATFORM_WIN32
 void DoAllocConsole()
@@ -110,13 +191,12 @@ int main(int argc, char** argv)
     parse(argc, argv, cli);
 #endif
 
-const Rml::String APP_PATH(".");
-
-const char * WINDOW_NAME = "Goban";
+    const char* WINDOW_NAME = "Goban";
 
 #ifdef RMLUI_PLATFORM_WIN32
-        DoAllocConsole();
+    DoAllocConsole();
 #endif
+
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("last_run.log", true);
     spdlog::sinks_init_list sink_list = { file_sink, console_sink };
@@ -127,99 +207,141 @@ const char * WINDOW_NAME = "Goban";
     int window_width = 1024;
     int window_height = 768;
 
-    std::shared_ptr<ShellRenderInterfaceOpenGL> popengl_renderer(new ShellRenderInterfaceOpenGL());
-    ShellRenderInterfaceOpenGL *shell_renderer = popengl_renderer.get();
-
-    // Generic OS initialisation, creates a window and attaches OpenGL.
-
-    if (!Shell::Initialise(APP_PATH) ||
-        !Shell::OpenWindow(WINDOW_NAME, shell_renderer, window_width, window_height, true))
-    {
-        spdlog::critical("cannot Shell::OpenWindow.");
-        Shell::Shutdown();
+    // Initialize GLFW
+    glfwSetErrorCallback(GlfwErrorCallback);
+    if (!glfwInit()) {
+        spdlog::critical("Failed to initialize GLFW");
         return -1;
     }
 
-    // Rocket initialisation.
-    Rml::SetRenderInterface(popengl_renderer.get());
-    //(&opengl_renderer)->SetViewport(window_width, window_height);
+    // Request OpenGL 2.1 compatibility profile for GL2 renderer
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 
-    ShellSystemInterface system_interface;
+    // Create GLFW window
+    GLFWwindow* window = glfwCreateWindow(window_width, window_height, WINDOW_NAME, nullptr, nullptr);
+    if (!window) {
+        spdlog::critical("Failed to create GLFW window");
+        glfwTerminate();
+        return -1;
+    }
+
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
+
+    // Store window in AppState for fullscreen toggle etc.
+    AppState::SetWindow(window);
+
+    // Initialize glad
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        spdlog::critical("Failed to initialize GLAD");
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return -1;
+    }
+
+    spdlog::info("OpenGL version: {}", (const char*)glGetString(GL_VERSION));
+
+    // Set up GLFW callbacks
+    glfwSetWindowSizeCallback(window, GlfwWindowSizeCallback);
+    glfwSetKeyCallback(window, GlfwKeyCallback);
+    glfwSetCharCallback(window, GlfwCharCallback);
+    glfwSetCursorPosCallback(window, GlfwCursorPosCallback);
+    glfwSetMouseButtonCallback(window, GlfwMouseButtonCallback);
+    glfwSetScrollCallback(window, GlfwScrollCallback);
+
+    // Initialize RmlUi
+    render_interface.SetViewport(window_width, window_height);
+    Rml::SetRenderInterface(&render_interface);
     Rml::SetSystemInterface(&system_interface);
 
-    //std::locale::global(std::locale("C"));
-
-    Rml::Initialise();
     Rml::Initialise();
 
     config = std::make_shared<Configuration>(configurationFile);
 
-    // Create the main Rocket context and set it on the shell's input layer.
-    context = Rml::CreateContext("main",
-            Rml::Vector2i(window_width, window_height));
-    if (context == nullptr)
-    {
+    // Create the main RmlUi context
+    context = Rml::CreateContext("main", Rml::Vector2i(window_width, window_height));
+    if (context == nullptr) {
+        spdlog::critical("Failed to create RmlUi context");
         Rml::Shutdown();
-        Shell::Shutdown();
+        glfwDestroyWindow(window);
+        glfwTerminate();
         return -1;
     }
 
     Rml::Debugger::Initialise(context);
-    //Rml::Debugger::SetVisible(true);
-    Input::SetContext(context);
-	shell_renderer->SetContext(context);
 
-	using nlohmann::json;
-	auto fonts = config->data
-	        .value("fonts", json({}))
-	        .value("gui", json::array());
+    // Load fonts
+    using nlohmann::json;
+    auto fonts = config->data
+            .value("fonts", json({}))
+            .value("gui", json::array());
+    LoadFonts(fonts);
 
-    Shell::LoadFonts(fonts);
+    // Register element and event instancers
+    // RmlUi takes ownership of the raw pointers
+    Rml::Factory::RegisterElementInstancer("game", new Rml::ElementInstancerGeneric<ElementGame>());
+    Rml::Factory::RegisterEventListenerInstancer(new EventInstancer());
 
-    Rml::ElementInstancer* element_instancer = new Rml::ElementInstancerGeneric< ElementGame >();
-    Rml::Factory::RegisterElementInstancer("game", element_instancer);
-    element_instancer->RemoveReference();
-
-    auto event_instancer = new EventInstancer();
-    Rml::Factory::RegisterEventListenerInstancer(event_instancer);
-    event_instancer->RemoveReference();
-
-    EventManager::SetPrefix(config->data.value("gui","./data/gui").c_str());
+    EventManager::SetPrefix(config->data.value("gui", "./data/gui").c_str());
     EventManager::RegisterEventHandler("goban", new EventHandlerNewGame());
-    
+
     // Initialize file chooser
     auto fileChooserHandler = new EventHandlerFileChooser();
     EventManager::RegisterEventHandler("open", fileChooserHandler);
     fileChooserHandler->LoadDialog(context);
 
-    //Shell::ToggleFullscreen();
+    auto windowLoaded = EventManager::LoadWindow("goban", context);
 
-    auto window = EventManager::LoadWindow("goban", context);
+    if (windowLoaded) {
+        // Main loop
+        while (!glfwWindowShouldClose(window) && !AppState::ExitRequested()) {
+            glfwPollEvents();
 
-    if(window) {
-		Shell::EventLoop(GameLoop);
-    }
-    else {
-        spdlog::critical("cannot create window, exiting immediately");
+            // Get game element and run game loop
+            auto gameDoc = context->GetDocument("game_window");
+            if (gameDoc) {
+                auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
+                if (gameElement) {
+                    gameElement->gameLoop();
+                }
+            }
+
+            // Clear and render
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            context->Render();
+
+            glfwSwapBuffers(window);
+        }
+    } else {
+        spdlog::critical("Cannot create window, exiting immediately");
+        fileChooserHandler->UnloadDialog(context);
+        EventManager::Shutdown();
+        Rml::Shutdown();
+        glfwDestroyWindow(window);
+        glfwTerminate();
         return 13;
     }
 
     fileChooserHandler->UnloadDialog(context);
     EventManager::Shutdown();
 
-    spdlog::debug("Before context destroy");;
+    spdlog::debug("Before context destroy");
 
-    context->RemoveReference();
+    // Context is cleaned up by Rml::Shutdown()
     context = nullptr;
 
-    spdlog::debug("Before Rocket shutdown");
+    spdlog::debug("Before RmlUi shutdown");
 
     Rml::ReleaseTextures();
     Rml::Shutdown();
-    spdlog::debug("Before Window Close");
 
-    Shell::CloseWindow();
-    Shell::Shutdown();
+    spdlog::debug("Before window close");
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
 
     return 0;
 }

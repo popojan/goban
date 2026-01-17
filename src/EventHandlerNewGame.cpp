@@ -1,11 +1,10 @@
 #include "ElementGame.h"
 #include "EventHandlerNewGame.h"
-#include <Rocket/Core/Context.h>
-#include <Rocket/Controls/ElementFormControlSelect.h>
-#include <Rocket/Controls/SelectOption.h>
-#include <Rocket/Core/ElementDocument.h>
-#include <Rocket/Core/ElementUtilities.h>
-#include <Rocket/Core/Event.h>
+#include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/Elements/ElementFormControlSelect.h>
+#include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/ElementUtilities.h>
+#include <RmlUi/Core/Event.h>
 #include "EventManager.h"
 #include <iostream>
 
@@ -17,7 +16,7 @@ EventHandlerNewGame::~EventHandlerNewGame()
 {
 }
 
-void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value)
+void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& value)
 {
     spdlog::debug("EventHandlerNewGame recieved event");
     auto doc = event.GetCurrentElement()->GetContext()->GetDocument("game_window");
@@ -25,11 +24,11 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
     GobanControl& controller = dynamic_cast<ElementGame*>(doc->GetElementById("game"))->getController();
 
     if (value == "boardsize") {
-        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "19").CString());
+        std::istringstream ss(event.GetParameter<Rml::String>("value", "19").c_str());
         float boardSize = 19;
         ss >> boardSize;
 
-        auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selBoard"));
+        auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selBoard"));
         if(!controller.newGame(boardSize)) {
             spdlog::error("setting boardsize failed");
             select->SetSelection(lastBoardSelection);
@@ -39,7 +38,7 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
     }
     else if(value == "mdown" || value == "mup") {
         // Only forward mouse events to board controller if they're not from menu elements
-        Rocket::Core::Element* target = event.GetTargetElement();
+        Rml::Element* target = event.GetTargetElement();
         if (target && target->GetId() == "game") {
             // Event originated from the game element itself (board area), not a menu item
             int state = value == "mdown" ? 1 : 0;
@@ -51,11 +50,11 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
         // If event came from a menu element, don't forward to board controller
     }
       else if (value == "handicap") {
-        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0").CString());
+        std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
         float handicap = 0;
         ss >> handicap;
 
-        auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selectHandicap"));
+        auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectHandicap"));
         if(!controller.setHandicap(handicap)) {
             spdlog::error("setting handicap failed");
             select->SetSelection(lastHandicapSelection);
@@ -64,7 +63,7 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
         }
     }
     else if(value == "engine") {
-        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0").CString());
+        std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
         int index = 0;
         ss >> index;
         if(event.GetCurrentElement()->GetId() == "selectBlack") {
@@ -75,18 +74,18 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
         }
     }
     else if(value == "shader") {
-        std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0").CString());
+        std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
         int index = 0;
         ss >> index;
         spdlog::info("switching shader to #{}", index);
         controller.switchShader(index);
     }
     else if (value == "komi") {
-      std::istringstream ss(event.GetParameter<Rocket::Core::String>("value", "0.5").CString());
+      std::istringstream ss(event.GetParameter<Rml::String>("value", "0.5").c_str());
       float komi = 0.5;
       ss >> komi;
 
-      auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
+      auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
       if(!controller.setKomi(komi)) {
           spdlog::error("setting komi failed");
           select->SetSelection(lastKomiSelection);
@@ -95,7 +94,7 @@ void EventHandlerNewGame::ProcessEvent(Rocket::Core::Event& event, const Rocket:
       }
     }
     else {
-        controller.command(value.CString());
+        controller.command(value.c_str());
     }
     event.StopPropagation();
 }

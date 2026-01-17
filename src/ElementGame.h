@@ -2,20 +2,20 @@
 #define ROCKETINVADERSELEMENTGAME_H
 
 #include "GobanControl.h"
-#include <Rocket/Core/Element.h>
-#include <Rocket/Core/EventListener.h>
-#include <Rocket/Core/StyleSheet.h>
+#include <RmlUi/Core/Element.h>
+#include <RmlUi/Core/EventListener.h>
+#include <RmlUi/Core/StyleSheet.h>
 
-class ElementGame : public Rocket::Core::Element,
-    public Rocket::Core::EventListener
+class ElementGame : public Rml::Element,
+    public Rml::EventListener
 {
 public:
-    explicit ElementGame(const Rocket::Core::String& tag);
+    explicit ElementGame(const Rml::String& tag);
     ~ElementGame() override;
 
-    void ProcessEvent(Rocket::Core::Event& event);
+    void ProcessEvent(Rml::Event& event) override;
 
-    void OnChildAdd(Rocket::Core::Element* element);
+    void OnChildAdd(Rml::Element* element) override;
 
     void requestRepaint() {
         view.requestRepaint();

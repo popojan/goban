@@ -1,13 +1,14 @@
 #include "ElementGame.h"
-#include <Rocket/Core/ElementDocument.h>
-#include <Rocket/Core/Factory.h>
-#include <Rocket/Core/Input.h>
-#include <Rocket/Core.h>
-#include <Shell.h>
-#include <Rocket/Controls/ElementFormControlSelect.h>
+#include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/Factory.h>
+#include <RmlUi/Core/Input.h>
+#include <RmlUi/Core.h>
+#include <RmlUi/Core/StringUtilities.h>
+#include <GLFW/glfw3.h>
+#include <RmlUi/Core/Elements/ElementFormControlSelect.h>
 
-ElementGame::ElementGame(const Rocket::Core::String& tag)
-        : Rocket::Core::Element(tag), model(this), view(model), engine(model),
+ElementGame::ElementGame(const Rml::String& tag)
+        : Rml::Element(tag), model(this), view(model), engine(model),
           control(this, model, view, engine)
 {
     engine.loadEngines(config);
@@ -21,9 +22,9 @@ ElementGame::ElementGame(const Rocket::Core::String& tag)
 }
 
 void ElementGame::populateEngines() {
-    auto selectBlack = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(
+    auto selectBlack = dynamic_cast<Rml::ElementFormControlSelect*>(
             GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
-    auto selectWhite = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(
+    auto selectWhite = dynamic_cast<Rml::ElementFormControlSelect*>(
             GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
     const auto players(engine.getPlayers());
 
@@ -47,7 +48,7 @@ void ElementGame::populateEngines() {
         selectWhite->SetSelection(0);
     }
 
-    auto selectShader = dynamic_cast<Rocket::Controls::ElementFormControlSelect*>(
+    auto selectShader = dynamic_cast<Rml::ElementFormControlSelect*>(
             GetContext()->GetDocument("game_window")->GetElementById("selectShader"));
 
     if(!selectShader) {
@@ -74,17 +75,17 @@ void ElementGame::gameLoop() {
     static float lastTime = -1;
     auto context = GetContext();
 
-    float currentTime = Shell::GetElapsedTime();
+    float currentTime = static_cast<float>(glfwGetTime());
     if (currentTime - lastTime >= 1.0) {
         static int frames = 1;
         auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
         auto fpsTemplate = context->GetDocument("game_window")->GetElementById("templateFPS");
-        const Rocket::Core::String sFps(128, fpsTemplate->GetInnerRML().CString(), (float)cnt / (currentTime - lastTime));
+        const Rml::String sFps = Rml::CreateString(fpsTemplate->GetInnerRML().c_str(), (float)cnt / (currentTime - lastTime));
         if (debugElement != nullptr) {
-            debugElement->SetInnerRML(sFps.CString());
+            debugElement->SetInnerRML(sFps.c_str());
             view.requestRepaint();
         }
-        spdlog::debug(sFps.CString());
+        spdlog::debug(sFps.c_str());
         //if(frames % 10 == 0)
         frames += 1;
         lastTime = currentTime;
@@ -99,15 +100,11 @@ void ElementGame::gameLoop() {
         view.requestRepaint();
     }
     if (view.updateFlag) {
-        auto shell_renderer = dynamic_cast<ShellRenderInterfaceOpenGL*>(Rocket::Core::GetRenderInterface());
-        if (shell_renderer != nullptr) {
-            shell_renderer->PrepareRenderBuffer();
-            glPushAttrib(GL_ALL_ATTRIB_BITS);
-            context->Render();
-            glPopAttrib();
-            shell_renderer->PresentRenderBuffer();
-            cnt++;
-        }
+        // Rendering is now managed in the main loop with GLFW
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
+        context->Render();
+        glPopAttrib();
+        cnt++;
     }
     if (!view.MAX_FPS){
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -115,16 +112,16 @@ void ElementGame::gameLoop() {
 }
 ElementGame::~ElementGame() = default;
 
-void ElementGame::ProcessEvent(Rocket::Core::Event& event)
+void ElementGame::ProcessEvent(Rml::Event& event)
 {
     spdlog::debug("ElementGame processes event");
-    Rocket::Core::Element::ProcessEvent(event);
+    // RmlUi doesn't have Element::ProcessEvent - event handling is different
     if(event.GetTargetElement() != this && !(event == "mousemove")) {
         view.requestRepaint();
     }
 
     if (event == "keydown" || event == "keyup") {
-        Rocket::Core::Input::KeyIdentifier key_identifier = (Rocket::Core::Input::KeyIdentifier) event.GetParameter< int >("key_identifier", 0);
+        Rml::Input::KeyIdentifier key_identifier = (Rml::Input::KeyIdentifier) event.GetParameter< int >("key_identifier", 0);
         control.keyPress(key_identifier, 0, 0, event == "keydown");
     }
     else if (event == "mousemove") {
@@ -161,7 +158,7 @@ void ElementGame::OnUpdate()
     bool isOver = model.state.reason != GameState::NO_REASON;
     bool isRunning = engine.isRunning();
 
-    Rocket::Core::Context* context = GetContext();
+    Rml::Context* context = GetContext();
 
     std::string gameState(!isOver && isRunning ? "1" : (isOver ? "2" : "4"));
     model.state.cmd = gameState;
@@ -170,7 +167,7 @@ void ElementGame::OnUpdate()
         auto cmdClear = context->GetDocument("game_window")->GetElementById("cmdClear");
         auto grpMoves = context->GetDocument("game_window")->GetElementById("grpMoves");
         auto grpGame  = context->GetDocument("game_window")->GetElementById("grpGame");
-        const Rocket::Core::String DISPLAY("display");
+        const Rml::String DISPLAY("display");
         bool gameInProgress = !isOver && isRunning;
         grpMoves->SetProperty(DISPLAY, gameInProgress ? "block" : "none");
         grpGame->SetProperty(DISPLAY, gameInProgress ? "none" : "block");
@@ -189,8 +186,8 @@ void ElementGame::OnUpdate()
 
     if (view.state.colorToMove != model.state.colorToMove) {
         bool blackMove = model.state.colorToMove == Color::BLACK;
-        Rocket::Core::Element* elBlack = context->GetDocument("game_window")->GetElementById("blackMoves");
-        Rocket::Core::Element* elWhite = context->GetDocument("game_window")->GetElementById("whiteMoves");
+        Rml::Element* elBlack = context->GetDocument("game_window")->GetElementById("blackMoves");
+        Rml::Element* elWhite = context->GetDocument("game_window")->GetElementById("whiteMoves");
         if (elBlack != nullptr) {
             elBlack->SetClass("active", blackMove);
             view.state.colorToMove = model.state.colorToMove;
@@ -206,25 +203,25 @@ void ElementGame::OnUpdate()
         || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */
         || (view.state.reason != GameState::NO_REASON && model.state.reason == GameState::NO_REASON) /* new game */)
     {
-        Rocket::Core::Element* elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
-        Rocket::Core::Element* elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
+        Rml::Element* elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
+        Rml::Element* elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
         if (elWhiteCnt != nullptr) {
-            elWhiteCnt->SetInnerRML(Rocket::Core::String(128, "White: %d", model.state.capturedBlack).CString());
+            elWhiteCnt->SetInnerRML(Rml::CreateString( "White: %d", model.state.capturedBlack).c_str());
             requestRepaint();
         }
         if (elBlackCnt != nullptr) {
-            elBlackCnt->SetInnerRML(Rocket::Core::String(128, "Black: %d", model.state.capturedWhite).CString());
+            elBlackCnt->SetInnerRML(Rml::CreateString( "Black: %d", model.state.capturedWhite).c_str());
             requestRepaint();
         }
 
         // Update prisoner counts in Analysis menu
-        Rocket::Core::Element* elPrisonersWhite = context->GetDocument("game_window")->GetElementById("lblPrisonersWhite");
-        Rocket::Core::Element* elPrisonersBlack = context->GetDocument("game_window")->GetElementById("lblPrisonersBlack");
+        Rml::Element* elPrisonersWhite = context->GetDocument("game_window")->GetElementById("lblPrisonersWhite");
+        Rml::Element* elPrisonersBlack = context->GetDocument("game_window")->GetElementById("lblPrisonersBlack");
         if (elPrisonersWhite != nullptr) {
             auto templateWhite = context->GetDocument("game_window")->GetElementById("templatePrisonersWhite");
             if (templateWhite != nullptr) {
                 elPrisonersWhite->SetInnerRML(
-                    Rocket::Core::String(128, templateWhite->GetInnerRML().CString(), model.state.capturedBlack).CString()
+                    Rml::CreateString( templateWhite->GetInnerRML().c_str(), model.state.capturedBlack).c_str()
                 );
             }
         }
@@ -232,7 +229,7 @@ void ElementGame::OnUpdate()
             auto templateBlack = context->GetDocument("game_window")->GetElementById("templatePrisonersBlack");
             if (templateBlack != nullptr) {
                 elPrisonersBlack->SetInnerRML(
-                    Rocket::Core::String(128, templateBlack->GetInnerRML().CString(), model.state.capturedWhite).CString()
+                    Rml::CreateString( templateBlack->GetInnerRML().c_str(), model.state.capturedWhite).c_str()
                 );
             }
         }
@@ -248,22 +245,22 @@ void ElementGame::OnUpdate()
         requestRepaint();
     }
     if (view.state.handicap != model.state.handicap) {
-        Rocket::Core::Element* hand = context->GetDocument("game_window")->GetElementById("lblHandicap");
+        Rml::Element* hand = context->GetDocument("game_window")->GetElementById("lblHandicap");
         if (hand != nullptr) {
-            hand->SetInnerRML(Rocket::Core::String(128, "Handicap: %d", model.state.handicap).CString());
+            hand->SetInnerRML(Rml::CreateString( "Handicap: %d", model.state.handicap).c_str());
             requestRepaint();
             view.state.handicap = model.state.handicap;
         }
     }
     if (view.state.komi != model.state.komi) {
-        Rocket::Core::Element* elKomi = context->GetDocument("game_window")->GetElementById("lblKomi");
+        Rml::Element* elKomi = context->GetDocument("game_window")->GetElementById("lblKomi");
         if (elKomi != nullptr) {
-            elKomi->SetInnerRML(Rocket::Core::String(128, "Komi: %.1f", model.state.komi).CString());
+            elKomi->SetInnerRML(Rml::CreateString( "Komi: %.1f", model.state.komi).c_str());
             view.state.komi = model.state.komi;
             requestRepaint();
         }
     }
-    Rocket::Core::Element* msg = context->GetDocument("game_window")->GetElementById("lblMessage");
+    Rml::Element* msg = context->GetDocument("game_window")->GetElementById("lblMessage");
     if (view.state.msg != model.state.msg) {
         switch (model.state.msg) {
         case GameState::CALCULATING_SCORE:
@@ -316,28 +313,28 @@ void ElementGame::OnUpdate()
             break;
         case GameState::BLACK_WON:
         case GameState::WHITE_WON: {
-            Rocket::Core::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
-            Rocket::Core::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
+            Rml::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
+            Rml::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
             // Show simplified captured stone counts (no detailed scoring breakdown)
             elWhiteCnt->SetInnerRML(
-                    Rocket::Core::String(128, "White captured: %d", model.state.capturedWhite).CString());
+                    Rml::CreateString( "White captured: %d", model.state.capturedWhite).c_str());
             elBlackCnt->SetInnerRML(
-                    Rocket::Core::String(128, "Black captured: %d", model.state.capturedBlack).CString());
+                    Rml::CreateString( "Black captured: %d", model.state.capturedBlack).c_str());
             if (model.state.winner == Color::WHITE)
                 msg->SetInnerRML(
-                    Rocket::Core::String(128,
+                    Rml::CreateString(
                         context->GetDocument("game_window")
                         ->GetElementById("templateWhiteWon")
-                        ->GetInnerRML().CString(),
-                    std::abs(model.state.scoreDelta)).CString()
+                        ->GetInnerRML().c_str(),
+                    std::abs(model.state.scoreDelta)).c_str()
                 );
             else
                 msg->SetInnerRML(
-                    Rocket::Core::String(128,
+                    Rml::CreateString(
                         context->GetDocument("game_window")
                         ->GetElementById("templateBlackWon")
-                        ->GetInnerRML().CString(),
-                    std::abs(model.state.scoreDelta)).CString()
+                        ->GetInnerRML().c_str(),
+                    std::abs(model.state.scoreDelta)).c_str()
                 );
             view.state.reason = model.state.reason;
         }
@@ -368,25 +365,20 @@ void ElementGame::OnUpdate()
 }
 
 void ElementGame::Reshape() {
-    Rocket::Core::Context* context = GetContext();
-    Rocket::Core::Vector2i d = context->GetDimensions();
+    Rml::Context* context = GetContext();
+    Rml::Vector2i d = context->GetDimensions();
     if (WINDOW_HEIGHT != d.y || WINDOW_WIDTH != d.x) {
-        Rocket::Core::StyleSheet* style = context->GetDocument("game_window")->GetStyleSheet();
-        Rocket::Core::StyleSheet* newStyle = Rocket::Core::Factory::InstanceStyleSheetString(
-                Rocket::Core::String(128, "body{ font-size:%.1fpt; }", 25.0*d.y/1050).CString());
-        auto combined = style->CombineStyleSheet(newStyle);
-        context->GetDocument("game_window")->SetStyleSheet(combined);
-        newStyle->RemoveReference();
-        combined->RemoveReference();
+        // Note: RmlUi's StyleSheet API has changed significantly.
+        // Dynamic font-size adjustment is disabled for now.
+        // The font size could be adjusted via CSS calc() or data bindings in RmlUi.
         WINDOW_WIDTH = d.x;
         WINDOW_HEIGHT = d.y;
     }
-
 }
 
 void ElementGame::OnMenuToggle(const std::string &cmd, bool checked) {
     if(cmd.substr(0, 7) == "toggle_") {
-        std::vector<Rocket::Core::Element*> elements;
+        std::vector<Rml::Element*> elements;
         GetContext()->GetDocument("game_window")->GetElementsByClassName(elements, cmd.c_str());
         for(auto el: elements) {
             el->SetClass("selected", checked);
@@ -404,9 +396,9 @@ void ElementGame::OnRender()
     glPopAttrib();
 }
 
-void ElementGame::OnChildAdd(Rocket::Core::Element* element)
+void ElementGame::OnChildAdd(Rml::Element* element)
 {
-    Rocket::Core::Element::OnChildAdd(element);
+    Rml::Element::OnChildAdd(element);
 
     if (element == this)
         GetOwnerDocument()->AddEventListener("load", this);

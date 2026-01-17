@@ -5,9 +5,8 @@
 #include <sstream>
 #include "SGF.h"
 
-FileChooserDataSource::FileChooserDataSource() 
-    : Rocket::Controls::DataSource("file_chooser")
-    , currentPath("data/sgf")
+FileChooserDataSource::FileChooserDataSource()
+    : currentPath("data/sgf")
     , selectedFileIndex(-1)
     , selectedGameIndex(-1)
     , filesCurrentPage(1)
@@ -23,18 +22,18 @@ FileChooserDataSource::~FileChooserDataSource() {
     games.clear();
 }
 
-void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::Core::String& table, int row_index, const Rocket::Core::StringList& columns) {
+void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::string& table, int row_index, const std::vector<std::string>& columns) {
     if (table == "files") {
         // Check if this is the first row and we can navigate up
         if (row_index == 0 && currentPath.has_parent_path()) {
             // Show ".." row for navigating up
             for (size_t i = 0; i < columns.size(); ++i) {
                 if (columns[i] == "name") {
-                    row.push_back(Rocket::Core::String(".."));
+                    row.push_back(std::string(".."));
                 } else if (columns[i] == "type") {
-                    row.push_back(Rocket::Core::String(strUp.c_str()));
+                    row.push_back(std::string(strUp.c_str()));
                 } else if (columns[i] == "path") {
-                    row.push_back(Rocket::Core::String(currentPath.parent_path().string().c_str()));
+                    row.push_back(std::string(currentPath.parent_path().string().c_str()));
                 }
             }
             return;
@@ -63,11 +62,11 @@ void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::
         
         for (size_t i = 0; i < columns.size(); ++i) {
             if (columns[i] == "name") {
-                row.push_back(Rocket::Core::String(file.name.c_str()));
+                row.push_back(std::string(file.name.c_str()));
             } else if (columns[i] == "type") {
-                row.push_back(Rocket::Core::String(file.type.c_str()));
+                row.push_back(std::string(file.type.c_str()));
             } else if (columns[i] == "path") {
-                row.push_back(Rocket::Core::String(file.fullPath.string().c_str()));
+                row.push_back(std::string(file.fullPath.string().c_str()));
             }
         }
     }
@@ -82,34 +81,34 @@ void FileChooserDataSource::GetRow(Rocket::Core::StringList& row, const Rocket::
         
         for (size_t i = 0; i < columns.size(); ++i) {
             if (columns[i] == "title") {
-                row.push_back(Rocket::Core::String(game.title.c_str()));
+                row.push_back(std::string(game.title.c_str()));
             } else if (columns[i] == "players") {
-                row.push_back(Rocket::Core::String(game.players.c_str()));
+                row.push_back(std::string(game.players.c_str()));
             } else if (columns[i] == "black") {
-                row.push_back(Rocket::Core::String(game.blackPlayer.c_str()));
+                row.push_back(std::string(game.blackPlayer.c_str()));
             } else if (columns[i] == "white") {
-                row.push_back(Rocket::Core::String(game.whitePlayer.c_str()));
+                row.push_back(std::string(game.whitePlayer.c_str()));
             } else if (columns[i] == "result") {
-                row.push_back(Rocket::Core::String(game.gameResult.c_str()));
+                row.push_back(std::string(game.gameResult.c_str()));
             } else if (columns[i] == "moves") {
                 // Calculate move count on demand if not already calculated
                 if (game.moveCount == -1) {
-                    // This is a bit of a hack - we need to modify the game object
-                    // In a real implementation, we might want to cache this differently
-                    row.push_back(Rocket::Core::String("-"));
+                    row.push_back(std::string("-"));
                 } else {
-                    row.push_back(Rocket::Core::String(8, "%d", game.moveCount));
+                    row.push_back(std::to_string(game.moveCount));
                 }
             } else if (columns[i] == "board_size") {
-                row.push_back(Rocket::Core::String(8, "%d", game.boardSize));
+                row.push_back(std::to_string(game.boardSize));
             } else if (columns[i] == "komi") {
-                row.push_back(Rocket::Core::String(8, "%.1f", game.komi));
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%.1f", game.komi);
+                row.push_back(std::string(buf));
             }
         }
     }
 }
 
-int FileChooserDataSource::GetNumRows(const Rocket::Core::String& table) {
+int FileChooserDataSource::GetNumRows(const std::string& table) {
     if (table == "files") {
         // Calculate base number of files on current page
         int totalFiles = static_cast<int>(files.size());
@@ -164,12 +163,8 @@ void FileChooserDataSource::RefreshFiles() {
     filesCurrentPage = 1;
     gamesCurrentPage = 1;
     
-    // Use NotifyRowChange for complete table refresh (preferred pattern)
-    spdlog::debug("Notifying complete files table refresh");
-    NotifyRowChange("files");
-
-    spdlog::debug("Notifying complete games table refresh");
-    NotifyRowChange("games");
+    // File chooser is disabled - DataSource functionality not available
+    spdlog::debug("Files list updated (data source disabled)");
 }
 
 void FileChooserDataSource::refreshFileList() {
@@ -283,9 +278,8 @@ void FileChooserDataSource::previewSGF(const std::string& filePath) {
     
     spdlog::debug("Parsed {} games from SGF file", games.size());
     
-    // Use NotifyRowChange for complete table refresh
-    spdlog::debug("Notifying complete games table refresh");
-    NotifyRowChange("games");
+    // File chooser is disabled - DataSource functionality not available
+    spdlog::debug("Games list updated (data source disabled)");
 }
 
 std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string& filePath) {
@@ -418,8 +412,7 @@ void FileChooserDataSource::SetFilesPage(int page) {
     int totalPages = GetFilesTotalPages();
     if (page >= 1 && page <= totalPages) {
         filesCurrentPage = page;
-        // Refresh the files table
-        NotifyRowChange("files");
+        // File chooser disabled - DataSource not available
     }
 }
 
@@ -427,8 +420,7 @@ void FileChooserDataSource::SetGamesPage(int page) {
     int totalPages = GetGamesTotalPages();
     if (page >= 1 && page <= totalPages) {
         gamesCurrentPage = page;
-        // Refresh the games table
-        NotifyRowChange("games");
+        // File chooser disabled - DataSource not available
     }
 }
 

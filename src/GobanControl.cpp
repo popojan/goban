@@ -2,8 +2,9 @@
 // Created by jan on 7.5.17.
 //
 #include "ElementGame.h"
-#include <Rocket/Core.h>
-#include <Shell.h>
+#include <RmlUi/Core.h>
+#include <RmlUi/Core/Elements/ElementFormControlSelect.h>
+#include "AppState.h"
 #include "GobanControl.h"
 #include "EventHandlerFileChooser.h"
 #include "EventManager.h"
@@ -89,11 +90,11 @@ bool GobanControl::command(const std::string& cmd) {
     if(cmd == "quit") {
         model.game.saveAs("");
         exit = true;
-        Shell::RequestExit();
+        AppState::RequestExit();
     }
     else if (cmd == "toggle_fullscreen") {
         fullscreen = !fullscreen;
-        Shell::ToggleFullscreen();
+        AppState::ToggleFullscreen();
         checked = fullscreen;
     }
     else if (cmd == "fps") {
@@ -101,7 +102,7 @@ bool GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "animate") {
         view.lastTime = 0.0;
-        view.startTime = Shell::GetElapsedTime();
+        view.startTime = AppState::GetElapsedTime();
         view.animationRunning = true;
         view.requestRepaint();
     }
@@ -166,9 +167,11 @@ bool GobanControl::command(const std::string& cmd) {
         //TODO generalize linked select boxes and cycle commands
         auto doc = parent->GetContext()->GetDocument("game_window");
         if(doc) {
-            auto select = dynamic_cast<Rocket::Controls::ElementFormControlSelect *>(doc->GetElementById("selectShader"));
-            int currentProgram = select->GetSelection();
-            select->SetSelection((currentProgram + 1) % select->GetNumOptions());
+            auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectShader"));
+            if(select) {
+                int currentProgram = select->GetSelection();
+                select->SetSelection((currentProgram + 1) % select->GetNumOptions());
+            }
         }
     }
     else if (cmd == "increase gamma") {
@@ -215,18 +218,8 @@ bool GobanControl::command(const std::string& cmd) {
         model.game.saveAs("");
     }
     else if(cmd == "load") {
-        // Get the file chooser event handler and trigger the dialog
-        auto fileChooserHandler = dynamic_cast<EventHandlerFileChooser*>(
-            EventManager::GetEventHandler("open"));
-        if (fileChooserHandler) {
-            // Create a dummy event and trigger the load dialog
-            Rocket::Core::Dictionary parameters;
-            auto doc = parent->GetContext()->GetDocument("game_window");
-            if (doc) {
-                Rocket::Core::Event dummy_event(doc, "dummy", parameters, false);
-                fileChooserHandler->ProcessEvent(dummy_event, "load");
-            }
-        }
+        // File chooser is disabled - DataGrid not available in RmlUi
+        spdlog::warn("Load command disabled - file chooser not available");
     }
     else if(cmd == "msg") {
         auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
@@ -243,27 +236,27 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     (void) y;
 
     if (!downNotUp) {
-        std::string cmd(config->getCommand(static_cast<Rocket::Core::Input::KeyIdentifier>(key)));
+        std::string cmd(config->getCommand(static_cast<Rml::Input::KeyIdentifier>(key)));
         if (!cmd.empty()) {
             command(cmd);
             return;
         }
-        if (key == Rocket::Core::Input::KI_D) {
+        if (key == Rml::Input::KI_D) {
             view.endPan();
-        } else if (key == Rocket::Core::Input::KI_A) {
+        } else if (key == Rml::Input::KI_A) {
             view.endRotation();
-        } else if (key == Rocket::Core::Input::KI_S) {
+        } else if (key == Rml::Input::KI_S) {
             view.endZoom();
         }
     }
     else {
-        if (key == Rocket::Core::Input::KI_D) {
+        if (key == Rml::Input::KI_D) {
             view.initPan(mouseX, mouseY);
         }
-        else if (key == Rocket::Core::Input::KI_A) {
+        else if (key == Rml::Input::KI_A) {
             view.initRotation(mouseX, mouseY);
         }
-        else if (key == Rocket::Core::Input::KI_S) {
+        else if (key == Rml::Input::KI_S) {
             view.initZoom(mouseX, mouseY);
         }
     }

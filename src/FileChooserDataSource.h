@@ -1,10 +1,12 @@
 #ifndef GOBAN_FILECHOOSERDATASOURCE_H
 #define GOBAN_FILECHOOSERDATASOURCE_H
 
-#include <Rocket/Controls/DataSource.h>
+// Note: RmlUi removed the DataSource/DataGrid system from Controls
+// This class is temporarily stubbed - file chooser functionality disabled
 #include <filesystem>
 #include <vector>
 #include <memory>
+#include <string>
 
 // Forward declaration
 namespace LibSgfcPlusPlus {
@@ -31,14 +33,15 @@ struct SGFGameInfo {
     int gameIndex;
 };
 
-class FileChooserDataSource : public Rocket::Controls::DataSource {
+// Temporarily disabled - DataSource was removed from RmlUi
+class FileChooserDataSource {
 public:
     FileChooserDataSource();
-    virtual ~FileChooserDataSource();
+    ~FileChooserDataSource();
 
-    // DataSource interface
-    virtual void GetRow(Rocket::Core::StringList& row, const Rocket::Core::String& table, int row_index, const Rocket::Core::StringList& columns) override;
-    virtual int GetNumRows(const Rocket::Core::String& table) override;
+    // Legacy DataSource interface - stubbed out
+    void GetRow(std::vector<std::string>& row, const std::string& table, int row_index, const std::vector<std::string>& columns);
+    int GetNumRows(const std::string& table);
 
     // File navigation
     void SetCurrentPath(const std::filesystem::path& path);
