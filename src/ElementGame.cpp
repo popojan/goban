@@ -114,7 +114,7 @@ ElementGame::~ElementGame() = default;
 
 void ElementGame::ProcessEvent(Rml::Event& event)
 {
-    spdlog::debug("ElementGame processes event");
+    spdlog::debug("ElementGame processes event: {}", event.GetType().c_str());
     // RmlUi doesn't have Element::ProcessEvent - event handling is different
     if(event.GetTargetElement() != this && !(event == "mousemove")) {
         view.requestRepaint();
@@ -373,6 +373,7 @@ void ElementGame::Reshape() {
         // The font size could be adjusted via CSS calc() or data bindings in RmlUi.
         WINDOW_WIDTH = d.x;
         WINDOW_HEIGHT = d.y;
+        spdlog::debug("ElementGame::Reshape - context: {}x{}", d.x, d.y);
     }
 }
 
@@ -400,6 +401,11 @@ void ElementGame::OnChildAdd(Rml::Element* element)
 {
     Rml::Element::OnChildAdd(element);
 
-    if (element == this)
+    if (element == this) {
         GetOwnerDocument()->AddEventListener("load", this);
+        GetOwnerDocument()->AddEventListener("mousemove", this);
+        GetOwnerDocument()->AddEventListener("mousescroll", this);
+        GetOwnerDocument()->AddEventListener("keydown", this);
+        GetOwnerDocument()->AddEventListener("keyup", this);
+    }
 }

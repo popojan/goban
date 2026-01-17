@@ -214,11 +214,11 @@ void GobanView::reshape(int width, int height) {
 	WINDOW_HEIGHT = height;
 	resolution = glm::vec2(static_cast<float>(width), static_cast<float>(height));
 
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
+	// Set the viewport to match the window dimensions
+	glViewport(0, 0, width, height);
 
-	VIEWPORT_WIDTH = (float)viewport[2];
-	VIEWPORT_HEIGHT = (float)viewport[3];
+	VIEWPORT_WIDTH = static_cast<float>(width);
+	VIEWPORT_HEIGHT = static_cast<float>(height);
 
 	gobanShader.setResolution(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 }
@@ -245,9 +245,12 @@ void GobanView::shadeIt(float time, GobanShader& shader) const {
 
 void GobanView::Render(int w, int h)
 {
-
 	if(!gobanShader.isReady())
         return;
+
+	// Ensure viewport is set correctly (RmlUi may have changed it)
+	glViewport(0, 0, w, h);
+
     glDisable(GL_BLEND);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
