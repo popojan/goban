@@ -360,6 +360,17 @@ int main(int argc, char** argv)
     }
 
     fileChooserHandler->UnloadDialog(context);
+
+    // Stop game thread before destroying RmlUi elements
+    spdlog::debug("Stopping game thread");
+    auto gameDoc = context->GetDocument("game_window");
+    if (gameDoc) {
+        auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
+        if (gameElement) {
+            gameElement->getGameThread().interrupt();
+        }
+    }
+
     EventManager::Shutdown();
 
     spdlog::debug("Before context destroy");
@@ -373,6 +384,17 @@ int main(int argc, char** argv)
     Rml::Shutdown();
 
     spdlog::debug("Before window close");
+
+    // Unregister all callbacks before cleanup to prevent access to freed resources
+    // Error callback especially important - SystemInterface_GLFW destructor triggers
+    // GLFW errors after main() returns, when spdlog is already destroyed
+    glfwSetErrorCallback(nullptr);
+    glfwSetWindowSizeCallback(window, nullptr);
+    glfwSetKeyCallback(window, nullptr);
+    glfwSetCharCallback(window, nullptr);
+    glfwSetCursorPosCallback(window, nullptr);
+    glfwSetMouseButtonCallback(window, nullptr);
+    glfwSetScrollCallback(window, nullptr);
 
     glfwDestroyWindow(window);
     glfwTerminate();
