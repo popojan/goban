@@ -1,0 +1,51 @@
+# IDE
+.idea/
+
+# Build directories
+cmake-build-*/
+
+# Binary executable
+goban
+
+# Dependencies (external libraries)
+deps/
+external/
+
+# External Go engines
+engine/
+
+# Generated game saves (keep directory structure)
+data/sgf/*.sgf
+data/sgf/archive/
+data/sgf/bak/
+data/sgf/multiple/
+data/sgf/now/
+
+# Temporary and generated data
+data/tmp/
+data/view.txt.bak
+
+# Localization work-in-progress (config.json is tracked)
+data/gui/zh*.txt
+data/zh/*.txt
+
+# Debug and log files
+debug_*.glsl
+debug_logs.txt
+last_run.log
+memcheck.log
+test_*.log
+gtp_logs/
+
+# Valgrind core dumps
+vgcore.*
+
+# Build scripts (local)
+make.sh
+
+# Development folders
+backlog/
+publish/
+
+# Claude Code local instructions
+CLAUDE.local.md
