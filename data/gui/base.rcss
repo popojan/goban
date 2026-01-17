@@ -168,15 +168,17 @@ div.template {
 }
 
 #lblMessage {
-  display: inline-block;
+  display: block;
   position: absolute;
   bottom: 0px;
-  left: 50%;
+  left: 0px;
+  right: 0px;
+  text-align: center;
   padding: 0.25rem;
 }
 
 /* Positioning utilities */
-.bottom { position: absolute; bottom: 0px; }
+.bottom { position: absolute; bottom: 0px; left: 0px; right: 0px; }
 .left { position: absolute; left: 0px; }
 .center { text-align: center; }
 .right { position: absolute; right: 0px; }

@@ -72,6 +72,9 @@ void GlyphyState::fast_setup()
 {
 	glUseProgram(program);
 
+	// Re-bind atlas texture - RmlUi may have changed texture bindings
+	atlas->bind_texture();
+
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glUniform4fv(glGetUniformLocation(program, "u_color"), 1, u_color);
