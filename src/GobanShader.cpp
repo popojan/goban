@@ -8,7 +8,6 @@
 #include <fstream>
 #include "GobanView.h"
 #include "Shadinclude.hpp"
-#include <Shell.h>
 
 const GLushort GobanShader::elementBufferData[] = {0, 1, 2, 3};
 const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {

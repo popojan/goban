@@ -1,9 +1,9 @@
 #include "StreamHandler.hpp"
 #include <spdlog/spdlog.h>
 
-#include <Rocket/Core/Platform.h>
+#include <RmlUi/Core/Platform.h>
 
-#if defined(ROCKET_PLATFORM_LINUX)
+#if defined(RMLUI_PLATFORM_LINUX)
     #include <alsa/error.h>
     #include <cstdarg>
     #include <cstdio>
@@ -149,7 +149,7 @@ void StreamHandler::init() {
         //putenv(latency);
 #endif
 
-#if defined(ROCKET_PLATFORM_LINUX)
+#if defined(RMLUI_PLATFORM_LINUX)
         snd_lib_error_set_handler(alsa_error_callback);
 #endif
 

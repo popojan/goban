@@ -1,5 +1,5 @@
 #include "GobanView.h"
-#include "Shell.h"
+#include <GLFW/glfw3.h>
 #include "AudioPlayer.hpp"
 #include "ElementGame.h"
 
@@ -104,7 +104,7 @@ void GobanView::resetView() {
 		    spdlog::debug("no saved view found");
     }
     lastTime = 0.0;
-    startTime = Shell::GetElapsedTime();
+    startTime = static_cast<float>(glfwGetTime());
     animationRunning = true;
     requestRepaint();
 }
@@ -253,7 +253,7 @@ void GobanView::Render(int w, int h)
 	glEnable(GL_DEPTH_TEST);
 
 
-	float time = Shell::GetElapsedTime();
+	float time = static_cast<float>(glfwGetTime());
 
 	if (WINDOW_HEIGHT != h || WINDOW_WIDTH != w) {
 		reshape(w, h);
@@ -374,7 +374,7 @@ glm::vec2 GobanView::boardCoordinate(float x, float y) const {
 
 void GobanView::animateIntro() {
     lastTime = 0.0;
-    startTime = Shell::GetElapsedTime();
+    startTime = static_cast<float>(glfwGetTime());
     animationRunning = true;
     requestRepaint(UPDATE_BOARD|UPDATE_STONES|UPDATE_OVERLAY);
 }

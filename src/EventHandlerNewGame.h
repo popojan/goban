@@ -1,5 +1,5 @@
-#ifndef ROCKETINVADERSEVENTHANDLERSTARTGAME_H
-#define ROCKETINVADERSEVENTHANDLERSTARTGAME_H
+#ifndef GOBAN_EVENTHANDLERNEWGAME_H
+#define GOBAN_EVENTHANDLERNEWGAME_H
 
 #include "EventHandler.h"
 #include "spdlog/spdlog.h"
@@ -14,7 +14,7 @@ public:
 	EventHandlerNewGame();
 	virtual ~EventHandlerNewGame();
 
-	virtual void ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value);
+	virtual void ProcessEvent(Rml::Event& event, const Rml::String& value) override;
 private:
     int lastKomiSelection = -1;
     int lastBoardSelection = -1;

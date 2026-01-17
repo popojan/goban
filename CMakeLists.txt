@@ -272,6 +272,9 @@ function(fetch_rmlui)
             GIT_TAG master)  # Using master for GCC 15 fix (PR #766)
 
     FetchContent_MakeAvailable(rmlui)
+
+    # Export source dir to parent scope
+    set(RMLUI_BACKENDS_DIR "${rmlui_SOURCE_DIR}/Backends" PARENT_SCOPE)
 endfunction()
 
 function(find_libsndfile)
@@ -419,22 +422,13 @@ else()
         # add_definitions(-DROCKET_STATIC_LIB)  # Not needed for RmlUi
     endif()
 
-    set(SHELL_SRC_FILES_COMMON
-        src/shell/src/Input.cpp
-        src/shell/src/Shell.cpp
-        src/shell/src/ShellFileInterface.cpp
-        src/shell/src/ShellRenderInterfaceOpenGL.cpp
-        src/shell/src/ShellSystemInterface.cpp
+    # RmlUi backend files (Platform + Renderer)
+    set(RMLUI_BACKEND_SRC_FILES
+        ${RMLUI_BACKENDS_DIR}/RmlUi_Platform_GLFW.cpp
+        ${RMLUI_BACKENDS_DIR}/RmlUi_Renderer_GL2.cpp
     )
+
     if (WIN32)
-        set(PLATFORM_DEPENDENT_SRC_FILES
-            src/shell/src/Win32
-            src/shell/src/Win32/ShellRenderInterfaceExtensionsOpenGL_Win32.cpp
-            src/shell/src/Win32/InputWin32.cpp
-            src/shell/src/Win32/ShellWin32.cpp
-            src/goban.rc
-            src/glad/src/glad_wgl.c
-        )
         add_dependencies(${PROJECT_NAME}
                 project_boost
                 project_freetype2
@@ -444,19 +438,11 @@ else()
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libcmtd.lib")
         set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     else()
-        set(PLATFORM_DEPENDENT_SRC_FILES
-            src/shell/src/x11
-            src/shell/src/x11/ShellRenderInterfaceExtensionsOpenGL_X11.cpp
-            src/shell/src/x11/InputX11.cpp
-            src/shell/src/x11/ShellX11.cpp
-            src/glad/src/glad_glx.c
-        )
         set(EXTRA_LIBS
                 rt
                 ${ALSA_LIBRARIES}
                 pthread
                 ${CMAKE_THREAD_LIBS_INIT}
-                ${X11_LIBRARIES}
         )
     endif()
 
@@ -497,6 +483,7 @@ else()
         src/InputThread.h
         src/GameRecord.h
         src/FileChooserDataSource.h
+        src/AppState.h
     )
 
     set(GOBAN_SRC_FILES
@@ -529,6 +516,7 @@ else()
         src/sound/util.cpp src/Configuration.cpp
         src/glad/src/glad.c
         src/GameRecord.cpp
+        src/AppState.cpp
     )
     target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
@@ -536,20 +524,18 @@ else()
         ${GOBAN_SRC_FILES}
         ${GOBAN_HDR_FILES}
         ${GLYPHY_SRC_FILES}
-        ${SHELL_SRC_FILES_COMMON}
-        ${PLATFORM_DEPENDENT_SRC_FILES}
+        ${RMLUI_BACKEND_SRC_FILES}
     )
     target_include_directories(${PROJECT_NAME} PRIVATE
             deps/glm
             deps/boost
             src
-            src/shell/include
             src/glyphy
             src/sound/
             src/glad/include
+            ${RMLUI_BACKENDS_DIR}
             ${OPENGL_INCLUDE_DIRS}
             ${CURSES_INCLUDE_DIR}
-            # ${LIBROCKET_INCLUDE_DIR}  # Replaced by RmlUi
             ${LIBGLYPHY_INCLUDE_DIR}
             ${FREETYPE_INCLUDE_DIRS}
             ${SNDFILE_INCLUDE_DIRS}

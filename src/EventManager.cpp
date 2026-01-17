@@ -29,7 +29,7 @@
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/StringUtilities.h>
-#include <Shell.h>
+#include "AppState.h"
 #include "EventHandler.h"
 #include <map>
 #include <spdlog/spdlog.h>
@@ -138,7 +138,7 @@ void EventManager::ProcessEvent(Rml::Event& event, const Rml::String& value)
 		else if (values[0] == "exit")
 		{
 			spdlog::debug("Executing exit command");
-			Shell::RequestExit();
+			AppState::RequestExit();
 		}
 		else
 		{
@@ -184,9 +184,6 @@ bool EventManager::LoadWindow(const Rml::String& window_name, Rml::Context* cont
 
 	document->Show();
 
-	// Remove the caller's reference.
-	document->RemoveReference();
-	
 	Rml::Element* gameElement = document->GetElementById("game");
 	
 	gameElement->Focus();

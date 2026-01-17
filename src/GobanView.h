@@ -13,7 +13,7 @@
 #include "Metrics.h"
 #include "Camera.h"
 #include "GameState.h"
-#include "Shell.h"
+#include <GLFW/glfw3.h>
 
 #ifndef GOBAN_GOBANVIEW_H
 #define GOBAN_GOBANVIEW_H
