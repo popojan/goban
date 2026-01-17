@@ -2,7 +2,7 @@
 #define GOBAN_EVENTHANDLERFILECHOOSER_H
 
 #include "EventHandler.h"
-#include <Rocket/Core/ElementDocument.h>
+#include <RmlUi/Core/ElementDocument.h>
 #include "spdlog/spdlog.h"
 
 class FileChooserDataSource;
@@ -12,23 +12,23 @@ public:
     EventHandlerFileChooser();
     virtual ~EventHandlerFileChooser();
 
-    virtual void ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value);
-    
+    void ProcessEvent(Rml::Event& event, const Rml::String& value) override;
+
     // Instance methods for managing the dialog document
-    void LoadDialog(Rocket::Core::Context* context);
-    void UnloadDialog(Rocket::Core::Context* context);
+    void LoadDialog(Rml::Context* context);
+    void UnloadDialog(Rml::Context* context);
 
 private:
     void showDialog();
     void hideDialog();
     void updateCurrentPath();
     void updatePaginationInfo();
-    void clearGridSelection(Rocket::Core::Element* grid);
+    void clearGridSelection(Rml::Element* grid);
     void requestRepaint();
     std::string getTemplateString(const char* templateId, const char* defaultValue);
     void initializeLocalization();
 
-    Rocket::Core::ElementDocument* dialogDocument;
+    Rml::ElementDocument* dialogDocument;
     FileChooserDataSource* dataSource;
 
     // Localized strings

@@ -11,17 +11,17 @@ void Configuration::load(const std::string& fileName) {
             auto key = it.find("key");
             auto command = it.find("command");
             if (key != it.end() && command != it.end()) {
-                addKey(static_cast<Rocket::Core::Input::KeyIdentifier>(*key), *command);
+                addKey(static_cast<Rml::Input::KeyIdentifier>(*key), *command);
             }
         }
     }
 }
 
-void Configuration::addKey(Rocket::Core::Input::KeyIdentifier key, const std::string& cmd) {
+void Configuration::addKey(Rml::Input::KeyIdentifier key, const std::string& cmd) {
     keyToCommand[key] = cmd;
 }
 
-std::string Configuration::getCommand(Rocket::Core::Input::KeyIdentifier key) const {
+std::string Configuration::getCommand(Rml::Input::KeyIdentifier key) const {
     auto it = keyToCommand.find(key);
     if(it != keyToCommand.end()) {
         return it->second;

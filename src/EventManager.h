@@ -28,9 +28,8 @@
 #ifndef ROCKETINVADERSEVENTMANAGER_H
 #define ROCKETINVADERSEVENTMANAGER_H
 
-#include <Rocket/Core/Event.h>
-
-#include "Rocket/Core/Context.h"
+#include <RmlUi/Core/Event.h>
+#include <RmlUi/Core/Context.h>
 
 class EventHandler;
 
@@ -47,24 +46,24 @@ public:
 	/// Registers a new event handler with the manager.
 	/// @param[in] handler_name The name of the handler; this must be the same as the window it is handling events for.
 	/// @param[in] handler The event handler.
-	static void RegisterEventHandler(const Rocket::Core::String& handler_name, EventHandler* handler);
+	static void RegisterEventHandler(const Rml::String& handler_name, EventHandler* handler);
 
-	/// Processes an event coming through from Rocket.
-	/// @param[in] event The Rocket event that spawned the application event.
+	/// Processes an event coming through from RmlUi.
+	/// @param[in] event The RmlUi event that spawned the application event.
 	/// @param[in] value The application-specific event value.
-	static void ProcessEvent(Rocket::Core::Event& event, const Rocket::Core::String& value);
+	static void ProcessEvent(Rml::Event& event, const Rml::String& value);
 	/// Loads a window and binds the event handler for it.
 	/// @param[in] window_name The name of the window to load.
-	/// @param[in] context The Rocket context to use for loading the document.
-	static bool LoadWindow(const Rocket::Core::String& window_name, Rocket::Core::Context* context);
-    static void SetPrefix(const Rocket::Core::String& prefix);
+	/// @param[in] context The RmlUi context to use for loading the document.
+	static bool LoadWindow(const Rml::String& window_name, Rml::Context* context);
+    static void SetPrefix(const Rml::String& prefix);
     /// Gets the RML data prefix path.
-    static const Rocket::Core::String& GetPrefix();
+    static const Rml::String& GetPrefix();
 
     /// Gets an event handler by name.
     /// @param[in] handler_name The name of the handler to retrieve.
     /// @return Pointer to the event handler, or nullptr if not found.
-    static EventHandler* GetEventHandler(const Rocket::Core::String& handler_name);
+    static EventHandler* GetEventHandler(const Rml::String& handler_name);
 private:
 	EventManager();
 	~EventManager();

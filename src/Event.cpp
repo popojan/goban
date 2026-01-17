@@ -30,10 +30,10 @@
 #include <spdlog/spdlog.h>
 
 #include "EventHandler.h"
-#include "Rocket/Core/Element.h"
-#include "Rocket/Core/ElementDocument.h"
+#include <RmlUi/Core/Element.h>
+#include <RmlUi/Core/ElementDocument.h>
 
-Event::Event(const Rocket::Core::String& value) : value(value)
+Event::Event(const Rml::String& value) : value(value)
 {
 }
 
@@ -42,7 +42,7 @@ Event::~Event()
 }
 
 // Sends the event value through to Invader's event processing system.
-void Event::ProcessEvent(Rocket::Core::Event& event)
+void Event::ProcessEvent(Rml::Event& event)
 {
 	// Get the document that owns this event
 	auto* document = event.GetTargetElement()->GetOwnerDocument();
@@ -51,11 +51,11 @@ void Event::ProcessEvent(Rocket::Core::Event& event)
 		EventManager::ProcessEvent(event, value);
 		return;
 	}
-	
+
 	// Determine which handler to use based on the document ID
-	Rocket::Core::String documentId = document->GetId();
-	spdlog::debug("Event from document: '{}'", documentId.CString());
-	
+	Rml::String documentId = document->GetId();
+	spdlog::debug("Event from document: '{}'", documentId.c_str());
+
 	EventHandler* handler = nullptr;
 	if (documentId == "open_dialog") {
 		// File chooser dialog events
@@ -64,9 +64,9 @@ void Event::ProcessEvent(Rocket::Core::Event& event)
 		// Main game window events (or fallback)
 		handler = EventManager::GetEventHandler("goban");
 	}
-	
+
 	if (handler) {
-		spdlog::debug("Routing event to specific handler for document '{}'", documentId.CString());
+		spdlog::debug("Routing event to specific handler for document '{}'", documentId.c_str());
 		handler->ProcessEvent(event, value);
 	} else {
 		spdlog::debug("No specific handler found, using EventManager fallback");
@@ -75,9 +75,7 @@ void Event::ProcessEvent(Rocket::Core::Event& event)
 }
 
 // Destroys the event.
-void Event::OnDetach(Rocket::Core::Element* ROCKET_UNUSED_PARAMETER(element))
+void Event::OnDetach(Rml::Element* /*element*/)
 {
-	ROCKET_UNUSED(element);
-
 	delete this;
 }
