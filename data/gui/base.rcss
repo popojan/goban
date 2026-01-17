@@ -18,53 +18,7 @@ body, html
   overflow: visible;
 }
 
-/* uncomment to debug layout */
-/*
-div {
-  border-width: 1px;
-  border-color:#ffff00;
-}
-*/
-
-.padding {
-  padding: 0.25rem;
-}
-
-div {
-  position: static;
-}
-
-.menu span {
-  padding-right: 0.75rem;
-}
-
-select option {
-  color:#ffffff80;
-}
-
-select option:hover, .cmd:hover {
-  color:#fffffff0;
-}
-
-select selectbox {
-  width: 10rem;
-  position:relative;
-  left:9.2rem;
-  top:-1.75rem;
-  border-color: #ffffff00;
-  padding: 0.25rem;
-  background-color: #00000040;
-  border-left: 1rem;
-  border-right: 1rem;
-  border-bottom: 1rem;
-  border-top: 1rem;
-
-}
-div.cmd   {
-  height: 1.25rem;
-  display: block;
-}
-
+/* Game element fills entire window */
 game {
   display: block;
   width: 100%;
@@ -74,112 +28,175 @@ game {
   position: absolute;
 }
 
+/* Menu bar at top */
 .menu {
-  width:100%;
-  height:2rem;
-  border-bottom: 1rem;
-  border-color: #00000000;
+  width: 100%;
+  height: 2rem;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  z-index: 100;
 }
 
-
-.menu.hoverable:hover {
-  background-color: #00000040;
-}
-
-.menuitem {
-  position:relative;
-  padding: 0.25rem;
-  width: 0px;
+/* Menu bar items (File, View, Game, etc.) */
+.menuitem.hoverable {
+  display: inline-block;
+  position: relative;
+  padding: 0.25rem 0.5rem;
+  color: #ffffffa0;
 }
 
 .menuitem.hoverable.left {
-  float:left;
-  position:relative;
+  float: left;
 }
 
 .menuitem.hoverable.right {
-  float:right;
-  position:relative;
+  float: right;
 }
 
-.left .menuitem.show {
-  position: absolute;
-  width: 10rem;
-  top: 1rem;
-  left: -1rem;
-  background-color: #00000040;
-  border-top:1rem;
-  border-left:1rem;
-  border-right:1rem;
-  border-bottom:1rem;
-  border-color:#ffff0000;
+.menuitem.hoverable:hover {
+  background-color: #00000080;
+  color: #ffffffff;
 }
 
-.right .menuitem.show {
-  position: absolute;
-  width: 10rem;
-  top: 1rem;
-  right: -1rem;
-  background-color: #00000040;
-  border-top:1rem;
-  border-left:1rem;
-  border-right:1rem;
-  border-bottom:1rem;
-  border-color:#ffff0000;
+/* Menu item label */
+.menu span {
+  display: inline-block;
+  padding-right: 0.25rem;
 }
 
-div.selected {  border-right:0.2rem; border-color:#ffffff80; }
-div.unselected {  border-right:0.2rem; border-color:#ffffff20; }
-
-div.hide,
-.show:hover,
-.menu.hoverable:hover .menu:first-child.show,
-.menuitem.hoverable:hover .menuitem.show,
-.menuitem:hover, .menu:hover,
-.hoverable:hover .hide:hover,
-.hoverable:hover span
-{
-  display: block;
-  z-index:1;
-}
-
-div.show,
-.hoverable:hover .hide,
-.hoverable span
-{
+/* Dropdown menus - hidden by default */
+.menuitem.show {
   display: none;
-  z-index: 1;
+  position: absolute;
+  top: 1.5rem;
+  left: 0px;
+  width: 12rem;
+  background-color: #000000e0;
+  padding: 0.5rem;
+  z-index: 200;
 }
 
-.bottom {  position: absolute; bottom: 0px; }
-.left   {  position: absolute; left: 0px; text-align: left;  }
-.center {  text-align:center; }
-.right  { position:absolute; right: 0px;}
-.top    {  position: absolute; top: 0px; }
+/* Right-aligned menu dropdowns */
+.menuitem.hoverable.right .menuitem.show {
+  left: auto;
+  right: 0px;
+}
 
-div.hr
-{
-  display:block;
+/* Show dropdown on hover */
+.menuitem.hoverable:hover .menuitem.show {
+  display: block;
+}
+
+/* Command items in dropdowns */
+div.cmd {
+  display: block;
+  height: 1.25rem;
+  padding: 0.1rem 0.25rem;
+  color: #ffffff80;
+}
+
+div.cmd:hover {
+  color: #ffffffff;
+  background-color: #ffffff20;
+}
+
+/* Section headers in dropdowns */
+div.hr {
+  display: block;
   margin-top: 0.5rem;
-  margin-bottom: -0.15rem;
-  border-color:#00000000;
-  border-bottom: 0px;
-  border-color: #ffffff40;
+  margin-bottom: 0.1rem;
   font-size: 0.6rem;
+  color: #ffffff60;
+  border-bottom: 1px #ffffff40;
 }
 
+/* Group containers */
+div.grp {
+  display: block;
+}
+
+/* Select dropdowns */
+select option {
+  color: #ffffff80;
+}
+
+select option:hover {
+  color: #ffffffff;
+}
+
+select selectbox {
+  width: 10rem;
+  position: relative;
+  padding: 0.25rem;
+  background-color: #00000060;
+}
+
+/* Templates - hidden always */
 div.template {
-    display:none;
+  display: none;
 }
 
-#blackMoves {
-  border-color: #ffffff00;
-  border-right: 0.05rem;
+/* Bottom status area */
+#grpPlayers {
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  width: 100%;
+  height: 2rem;
+  z-index: 50;
+}
+
+#cntBlack {
+  display: inline-block;
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  padding: 0.25rem;
+}
+
+#cntWhite {
+  display: inline-block;
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  padding: 0.25rem;
 }
 
 #lblMessage {
-  padding-bottom: 0.25rem;
+  display: inline-block;
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  padding: 0.25rem;
 }
+
+/* Positioning utilities */
+.bottom { position: absolute; bottom: 0px; }
+.left { position: absolute; left: 0px; }
+.center { text-align: center; }
+.right { position: absolute; right: 0px; }
+.top { position: absolute; top: 0px; }
+
+/* Combined positioning classes */
+.top.right { position: absolute; top: 0px; right: 0px; }
+.top.left { position: absolute; top: 0px; left: 0px; }
+.bottom.right { position: absolute; bottom: 0px; right: 0px; }
+.bottom.left { position: absolute; bottom: 0px; left: 0px; }
+
+/* State indicators */
+div.selected { border-right: 0.2rem #ffffff80; }
+div.unselected { border-right: 0.2rem #ffffff20; }
+
+/* Hide/Show utilities */
+div.hide { display: none; }
+div.show { display: block; }
+
+/* Active move indicator */
 .active {
   text-decoration: underline;
+}
+
+#blackMoves {
+  border-right: 0.05rem #ffffff40;
 }

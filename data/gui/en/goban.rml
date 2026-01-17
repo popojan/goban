@@ -7,7 +7,7 @@
 <body id="game_window">
     <game id="game" onmousedown="mdown" onmouseup="mup">
         <div class="menu hoverable top right">
-            <divs class="menu show">
+            <div class="menu show">
                 <div class="menuitem hoverable left">
                     <span>File</span>
                     <div class="menuitem show">
@@ -177,7 +177,7 @@
                         </div>
                     </div>
                 </div>
-            </divs>
+            </div>
         </div>
 
         <div id="grpPlayers">

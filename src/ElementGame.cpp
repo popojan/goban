@@ -100,10 +100,7 @@ void ElementGame::gameLoop() {
         view.requestRepaint();
     }
     if (view.updateFlag) {
-        // Rendering is now managed in the main loop with GLFW
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
-        context->Render();
-        glPopAttrib();
+        // Rendering is managed in the main loop - just count frames here
         cnt++;
     }
     if (!view.MAX_FPS){
@@ -392,6 +389,9 @@ void ElementGame::OnMenuToggle(const std::string &cmd, bool checked) {
 void ElementGame::OnRender()
 {
     glPushAttrib(GL_ALL_ATTRIB_BITS);
+    // Enable depth test for 3D rendering (main loop disables it for RmlUi)
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     Reshape();
     view.Render(WINDOW_WIDTH, WINDOW_HEIGHT);
     glPopAttrib();
