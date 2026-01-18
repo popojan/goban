@@ -4,7 +4,7 @@
 #include <RmlUi/Core/Platform.h>
 
 #if defined(RMLUI_PLATFORM_LINUX)
-    #include <alsa/error.h>
+    #include <alsa/asoundlib.h>
     #include <cstdarg>
     #include <cstdio>
 
@@ -16,13 +16,14 @@
     {
         va_list args;
         va_start(args, fmt);
-        char * msg;
-        vasprintf(&msg, fmt, args);
-        if(err >= SND_ERROR_BEGIN)
-            spdlog::error("Alsa error {} in {} at {}:{}: {}", err, function, file, line, msg);
-        else
-            spdlog::warn("Alsa info {} in {} at {}:{}: {}", err, function, file, line, msg);
-        free(msg);
+        char * msg = nullptr;
+        if (vasprintf(&msg, fmt, args) >= 0 && msg) {
+            if(err >= SND_ERROR_BEGIN)
+                spdlog::error("Alsa error {} in {} at {}:{}: {}", err, function, file, line, msg);
+            else
+                spdlog::warn("Alsa info {} in {} at {}:{}: {}", err, function, file, line, msg);
+            free(msg);
+        }
         va_end(args);
     }
 #endif
