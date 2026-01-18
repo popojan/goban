@@ -1,33 +1,30 @@
 body.open {
-    width: 80%;
-    height: 80%;
+    width: 80vw;
+    height: 80vh;
     margin: auto;
     z-index: 2;
     white-space: normal;
     overflow: hidden;
-    padding: 1%;
+    padding: 1vw;
     background-color: #00000080;
     border-width: 1px;
     border-color: #ffffffaa;
-    margin-bottom: 5%;
+    margin-bottom: 5vh;
 }
 
 .dialog {
-    width: 100%;
+    width: 78vw;
     height: 100%;
-    position: relative;
 }
 
 .content {
-    width: 100%;
+    width: 78vw;
     height: 100%;
-    position: relative;
 }
 
 .main_content {
-    width: 100%;
-    height: 85%;
-    position: relative;
+    width: 78vw;
+    height: 90%;
 }
 
 .path_display {
@@ -38,20 +35,14 @@ body.open {
     padding-right: 1rem;
 }
 
-.file_list_container {
-    width: 48%;
-    height: 100%;
-    position: absolute;
-    left: 0%;
-    top: 0%;
+.file_list_container, .preview_container {
+    display: block;
+    width: 78vw;
+    height: 35vh;
 }
 
 .preview_container {
-    width: 48%;
-    height: 100%;
-    position: absolute;
-    right: 0%;
-    top: 0%;
+    margin-top: 1vh;
 }
 
 .section_title {
@@ -60,18 +51,21 @@ body.open {
 }
 
 .item_list {
-    width: 100%;
-    height: 80%;
+    display: block;
+    width: 76vw;
+    height: 28vh;
     overflow-y: auto;
+    overflow-x: hidden;
+    pointer-events: none;
 }
 
 /* File/game row styling */
 .file_row, .game_row {
     display: block;
-    width: 100%;
+    width: 74vw;
     cursor: pointer;
     padding: 0.1rem 0.2rem;
-    position: relative;
+    pointer-events: auto;
 }
 
 .file_row:hover, .game_row:hover {
@@ -87,14 +81,17 @@ body.open {
     color: white;
 }
 
-.file_name, .game_title {
+span.file_name, span.game_title {
     display: inline-block;
+    width: 70%;
+    overflow: hidden;
 }
 
-.file_type, .game_players {
-    position: absolute;
-    right: 0.5rem;
+span.file_type, span.game_players {
+    display: inline-block;
+    width: 25%;
     color: #888;
+    text-align: right;
 }
 
 .file_row.selected .file_type,
@@ -103,9 +100,7 @@ body.open {
 }
 
 .pagination_controls {
-    width: 100%;
-    text-align: center;
-    margin-top: 0.5rem;
+    display: none;
 }
 
 .pagination_button {
@@ -133,7 +128,7 @@ body.open {
 
 .bottom {
     position: absolute;
-    bottom: 0%;
+    bottom: 0.5rem;
     left: 0%;
     right: 0%;
     text-align: center;
@@ -156,4 +151,33 @@ body.open {
 
 .button.primary:hover {
     background-color: #5CBF60;
+}
+
+/* Responsive layout - side by side when viewport is wide enough */
+@media (min-aspect-ratio: 3/2) {
+    .file_list_container {
+        width: 38vw;
+        height: 70vh;
+        position: absolute;
+        left: 1vw;
+        top: 0;
+    }
+
+    .preview_container {
+        width: 38vw;
+        height: 70vh;
+        position: absolute;
+        right: 1vw;
+        top: 0;
+        margin-top: 0;
+    }
+
+    .item_list {
+        width: 36vw;
+        height: 60vh;
+    }
+
+    .file_row, .game_row {
+        width: 34vw;
+    }
 }
