@@ -3,6 +3,7 @@
 
 # Build directories
 cmake-build-*/
+build/
 
 # Binary executable
 goban
@@ -14,20 +15,18 @@ external/
 # External Go engines
 engine/
 
-# Generated game saves (keep directory structure)
-data/sgf/*.sgf
-data/sgf/archive/
-data/sgf/bak/
-data/sgf/multiple/
-data/sgf/now/
+# Game saves (SGF files)
+games/*.sgf
+games/**/*.sgf
+
+# Downloaded fonts (cmake downloads these)
+config/fonts/*.otf
+config/fonts/*.ttf
+!config/fonts/default-font.ttf
 
 # Temporary and generated data
 data/tmp/
 data/view.txt.bak
-
-# Localization work-in-progress (config.json is tracked)
-data/gui/zh*.txt
-data/zh/*.txt
 
 # Debug and log files
 debug_*.glsl
