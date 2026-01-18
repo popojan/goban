@@ -46,5 +46,14 @@
     <div class="template" id="tplUp">返回上层</div>
     <div class="template" id="tplPageInfo">第 %d 页，共 %d 页</div>
     <div class="template" id="tplGameInfo">第 %d 局 (%dx%d, %d 手)</div>
+    <!-- Column headers for games table -->
+    <div class="template" id="tplColIndex">#</div>
+    <div class="template" id="tplColBoard">棋盘</div>
+    <div class="template" id="tplColBlack">黑方</div>
+    <div class="template" id="tplColWhite">白方</div>
+    <div class="template" id="tplColResult">结果</div>
+    <div class="template" id="tplColMoves">手数</div>
+    <div class="template" id="tplColKomi">贴目</div>
+    <div class="template" id="tplColPlayers">对局者</div>
 </body>
 </rml>
