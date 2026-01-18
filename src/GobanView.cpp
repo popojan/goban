@@ -78,7 +78,7 @@ void GobanView::endZoom() {
 }
 
 void GobanView::resetView() {
-    std::ifstream fin("data/user.json");
+    std::ifstream fin("user.json");
     if(fin) {
         try {
             nlohmann::json user;
@@ -127,7 +127,7 @@ void GobanView::resetView() {
 void GobanView::saveView() {
     // Read existing user.json to preserve other settings (last_config, fullscreen, etc.)
     nlohmann::json user;
-    std::ifstream fin("data/user.json");
+    std::ifstream fin("user.json");
     if (fin) {
         try { fin >> user; } catch (...) {}
         fin.close();
@@ -151,13 +151,13 @@ void GobanView::saveView() {
         {"contrast", gobanShader.getContrast()}
     };
 
-    std::ofstream fout("data/user.json");
+    std::ofstream fout("user.json");
     fout << user.dump(2);
     fout.close();
 }
 
 void GobanView::clearView() {
-    std::remove("data/user.json");
+    std::remove("user.json");
     initCam();
     updateTranslation();
     translate[0] = newTranslate[0];

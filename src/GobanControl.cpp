@@ -100,13 +100,13 @@ bool GobanControl::command(const std::string& cmd) {
 
         // Save fullscreen state to user.json
         nlohmann::json user;
-        std::ifstream fin("data/user.json");
+        std::ifstream fin("user.json");
         if (fin) {
             try { fin >> user; } catch (...) {}
             fin.close();
         }
         user["fullscreen"] = fullscreen;
-        std::ofstream fout("data/user.json");
+        std::ofstream fout("user.json");
         if (fout) {
             fout << user.dump(2);
             fout.close();
