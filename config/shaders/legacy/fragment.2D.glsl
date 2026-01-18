@@ -1,5 +1,4 @@
-#version 300 es
-precision highp float;
+#version 330 core
 
 /* === DO NOT CHANGE BELOW === */
 const int MAXSTONES = 19*19;
