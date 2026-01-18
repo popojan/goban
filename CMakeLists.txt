@@ -212,15 +212,11 @@ find_package(OpenGL REQUIRED)
 
 if(WIN32)
     # Windows: use vcpkg for dependencies
-    set(Boost_USE_STATIC_LIBS ON)
-    find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
     find_package(Freetype REQUIRED)
     find_package(Portaudio REQUIRED)
     find_package(LibSndFile REQUIRED)
 elseif(APPLE)
     # macOS: GLFW handles Cocoa, PortAudio handles CoreAudio
-    set(Boost_USE_STATIC_LIBS OFF)
-    find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
     find_package(Freetype REQUIRED)
     find_package(Portaudio REQUIRED)
     find_package(LibSndFile REQUIRED)
@@ -232,8 +228,6 @@ elseif(APPLE)
     find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox REQUIRED)
 else()
     # Linux
-    set(Boost_USE_STATIC_LIBS OFF)
-    find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
     find_package(X11 REQUIRED)
     find_package(ALSA REQUIRED)
     find_package(Freetype REQUIRED)
@@ -253,16 +247,12 @@ else()
 
     cmake_language(CALL find_libsgfcplusplus)
 
-    set(Boost_USE_MULTITHREADED ON)
-    set(Boost_USE_STATIC_RUNTIME OFF)
-
     add_executable(${PROJECT_NAME}
             src/FileChooserDataSource.cpp)
 
     if(WIN32)
         # WIN32_LEAN_AND_MEAN prevents windows.h from including winsock.h
         add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN)
-        set(Boost_USE_STATIC_LIBS ON)
     endif()
 
     # RmlUi backend files (Platform + Renderer)
@@ -273,11 +263,9 @@ else()
 
     if(WIN32)
         # Windows: vcpkg dependencies
-        set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
         set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     elseif(APPLE)
-        set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
         set(EXTRA_LIBS
                 ${COCOA_LIBRARY}
                 ${IOKIT_LIBRARY}
@@ -289,7 +277,6 @@ else()
         )
     else()
         # Linux
-        set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
         set(EXTRA_LIBS
                 rt
                 ${ALSA_LIBRARIES}
@@ -332,7 +319,6 @@ else()
         src/GobanOverlay.h
         src/GameState.h
         src/Configuration.h
-        src/InputThread.h
         src/GameRecord.h
         src/FileChooserDataSource.h
         src/AppState.h
@@ -380,7 +366,6 @@ else()
     )
     target_include_directories(${PROJECT_NAME} PRIVATE
             ${glm_SOURCE_DIR}
-            ${BOOST_INCLUDE_DIR}
             src
             src/glyphy
             src/sound/
@@ -404,9 +389,6 @@ else()
     target_link_libraries(${PROJECT_NAME}
         ${CMAKE_DL_LIBS}
         ${OPENGL_LIBRARIES}
-        boost_system
-        boost_iostreams
-        boost_filesystem
         libglyphy
         freetype
         rmlui
