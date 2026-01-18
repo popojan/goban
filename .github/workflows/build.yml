@@ -1,0 +1,131 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'  # Only on version tags like v0.0.3
+  workflow_dispatch:  # Manual trigger from GitHub UI
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - linux
+          - macos
+          - windows
+
+jobs:
+  build-linux:
+    if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake \
+            autoconf automake libtool \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libncurses-dev \
+            libasound2-dev \
+            libboost-system-dev libboost-filesystem-dev libboost-iostreams-dev \
+            libportaudio2 portaudio19-dev \
+            libsndfile1-dev \
+            libfreetype6-dev
+
+      - name: Build prerequisites (glyphy, etc.)
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON
+          make -j$(nproc)
+
+      - name: Build goban
+        run: |
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
+          make -j$(nproc)
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goban-linux-x64
+          path: build/goban
+
+  build-macos:
+    if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install autoconf automake libtool
+          brew install boost portaudio libsndfile freetype
+
+      - name: Build prerequisites (glyphy, etc.)
+        run: |
+          mkdir -p build
+          cd build
+          # Note: macOS doesn't need X11/ALSA - GLFW uses Cocoa, PortAudio uses CoreAudio
+          # This may require CMakeLists.txt fixes for macOS
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON || true
+          make -j$(sysctl -n hw.ncpu) || true
+
+      - name: Build goban
+        continue-on-error: true  # Expected to fail until CMakeLists.txt is fixed for macOS
+        run: |
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Upload artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: goban-macos-x64
+          path: build/goban
+
+  build-windows:
+    if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build prerequisites
+        shell: cmd
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON
+          cmake --build . --config Release --parallel
+
+      - name: Build goban
+        shell: cmd
+        continue-on-error: true  # May need fixes for Windows CI
+        run: |
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
+          cmake --build . --config Release --parallel
+
+      - name: Upload artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: goban-windows-x64
+          path: build/Release/goban.exe
