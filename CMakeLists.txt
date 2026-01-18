@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 cmake_policy(SET CMP0072 NEW)
 cmake_policy(SET CMP0167 OLD)
@@ -6,8 +6,6 @@ cmake_policy(SET CMP0167 OLD)
 project(goban LANGUAGES C CXX VERSION  0.0.3.0)
 
 include(GNUInstallDirs)
-
-set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
@@ -116,7 +114,7 @@ function(download_boost)
         PREFIX "boost"
         DOWNLOAD_COMMAND
             if not exist ${PROJECT_BINARY_DIR}/boost/src/${boost_archive}
-                wget --progress=dot:giga https://dl.bintray.com/boostorg/release/1.68.0/binaries/${boost_archive}
+                wget --progress=dot:giga https://boostorg.jfrog.io/artifactory/main/release/1.68.0/binaries/${boost_archive}
         SOURCE_DIR ${PROJECT_BINARY_DIR}/boost/src/
         BINARY_DIR ${PROJECT_BINARY_DIR}/boost/src/
         CONFIGURE_COMMAND ""
@@ -136,26 +134,6 @@ function(download_boost)
     ADD_LIBRARY(boost_system STATIC IMPORTED)
     ADD_LIBRARY(boost_filesystem STATIC IMPORTED)
     ADD_LIBRARY(boost_iostreams STATIC IMPORTED)
-endfunction()
-
-function(build_librocket)
-    ExternalProject_Add(project_librocket
-            GIT_REPOSITORY      https://github.com/popojan/libRocket.git
-            SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/libRocket
-            BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/libRocket/build
-            SOURCE_SUBDIR Build
-            CMAKE_ARGS
-            -DBUILD_SHARED_LIBS=
-            -DFREETYPE_INCLUDE_DIRS=${PROJECT_SOURCE_DIR}/deps/freetype2/include
-            -DFREETYPE_LIBRARY=${freetype2_lib_dir}/freetype
-            INSTALL_COMMAND     echo Skipping install step for libRocket
-            )
-    ExternalProject_Get_Property(project_librocket SOURCE_DIR)
-    ExternalProject_Get_Property(project_librocket BINARY_DIR)
-    SET(librocket_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
-    SET(librocket_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
-
-    #ADD_LIBRARY(librocket STATIC IMPORTED)
 endfunction()
 
 function(build_libsgfcplusplus)
@@ -207,10 +185,6 @@ function(fetch_json)
     )
 
     FetchContent_MakeAvailable(json)
-    FetchContent_GetProperties(json)
-    if(NOT json_POPULATED)
-        FetchContent_MakeAvailable(json)
-    endif()
 endfunction()
 
 function(fetch_glm)
@@ -389,7 +363,6 @@ function(generate_glad_headers)
 endfunction()
 
 cmake_language(CALL build_glyphy)
-# cmake_language(CALL build_librocket)  # Replaced by RmlUi
 cmake_language(CALL fetch_rmlui)
 cmake_language(CALL fetch_glfw)
 cmake_language(CALL build_libsgfcplusplus)
@@ -439,7 +412,6 @@ else()
     message("Build Goban")
     add_custom_target(Rescan)
 
-    # find_package(LibRocket REQUIRED)  # Replaced by RmlUi
     cmake_language(CALL find_libsgfcplusplus)
 
     set(Boost_USE_MULTITHREADED ON)
@@ -467,6 +439,7 @@ else()
     )
 
     if (WIN32)
+        set(BOOST_INCLUDE_DIR ${PROJECT_BINARY_DIR}/boost/src/boost)
         add_dependencies(${PROJECT_NAME}
                 project_boost
                 project_freetype2
@@ -476,6 +449,7 @@ else()
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libcmtd.lib")
         set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     elseif(APPLE)
+        set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
         set(EXTRA_LIBS
                 ${COCOA_LIBRARY}
                 ${IOKIT_LIBRARY}
@@ -487,6 +461,7 @@ else()
         )
     else()
         # Linux
+        set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
         set(EXTRA_LIBS
                 rt
                 ${ALSA_LIBRARIES}
@@ -576,8 +551,8 @@ else()
         ${RMLUI_BACKEND_SRC_FILES}
     )
     target_include_directories(${PROJECT_NAME} PRIVATE
-            deps/glm
-            deps/boost
+            ${glm_SOURCE_DIR}
+            ${BOOST_INCLUDE_DIR}
             src
             src/glyphy
             src/sound/
@@ -592,7 +567,6 @@ else()
     )
 
     add_dependencies(${PROJECT_NAME}
-            # project_librocket  # Replaced by RmlUi
             project_glyphy
             project_libsgfcplusplus
     )
@@ -607,9 +581,6 @@ else()
         boost_filesystem
         libglyphy
         freetype
-        # LibRocket_Core      # Replaced by RmlUi
-        # LibRocket_Controls
-        # LibRocket_Debugger
         rmlui
         glfw
         portaudio
