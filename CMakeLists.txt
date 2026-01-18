@@ -262,7 +262,8 @@ else()
     if(WIN32)
         # WIN32_LEAN_AND_MEAN prevents windows.h from including winsock.h,
         # which conflicts with Boost.Asio's winsock2.h
-        add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN)
+        # BOOST_PROCESS_VERSION=1 forces Boost.Process v1 API (v2 is default in Boost 1.86+)
+        add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN -DBOOST_PROCESS_VERSION=1)
         set(Boost_USE_STATIC_LIBS ON)
     endif()
 
