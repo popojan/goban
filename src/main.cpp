@@ -53,7 +53,7 @@ void RequestRestart(const std::string& configFile) {
 
     // Save last_config to user.json
     nlohmann::json user;
-    std::ifstream fin("data/user.json");
+    std::ifstream fin("user.json");
     if (fin) {
         try {
             fin >> user;
@@ -61,7 +61,7 @@ void RequestRestart(const std::string& configFile) {
         fin.close();
     }
     user["last_config"] = configFile;
-    std::ofstream fout("data/user.json");
+    std::ofstream fout("user.json");
     if (fout) {
         fout << user.dump(2);
         fout.close();
@@ -269,7 +269,7 @@ int main(int argc, char** argv)
     std::string configurationFile("./config/en.json");
     bool startFullscreen = false;
     {
-        std::ifstream fin("data/user.json");
+        std::ifstream fin("user.json");
         if (fin) {
             try {
                 nlohmann::json user;

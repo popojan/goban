@@ -16,17 +16,14 @@ external/
 engine/
 
 # Game saves (SGF files)
-games/*.sgf
-games/**/*.sgf
+games/
+*.sgf
 
 # Downloaded fonts (cmake downloads these)
 config/fonts/*.otf
 config/fonts/*.ttf
 !config/fonts/default-font.ttf
 
-# Temporary and generated data
-data/tmp/
-data/view.txt.bak
 
 # Debug and log files
 debug_*.glsl
