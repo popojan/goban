@@ -2,5 +2,5 @@
 
 body, html
 {
-  font-family: Delicious;
+  font-family: "Noto Sans CJK SC";
 }

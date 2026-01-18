@@ -54,6 +54,34 @@ bool ToggleFullscreen() {
     return g_fullscreen;
 }
 
+bool IsFullscreen() {
+    return g_fullscreen;
+}
+
+void SetFullscreen(bool fullscreen) {
+    if (g_fullscreen == fullscreen) return;
+
+    g_fullscreen = fullscreen;
+
+    if (!g_window) return;
+
+    if (g_fullscreen) {
+        // Save windowed position and size
+        glfwGetWindowPos(g_window, &g_windowedX, &g_windowedY);
+        glfwGetWindowSize(g_window, &g_windowedWidth, &g_windowedHeight);
+
+        // Get primary monitor and its video mode
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+        // Switch to fullscreen
+        glfwSetWindowMonitor(g_window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+    } else {
+        // Restore windowed mode
+        glfwSetWindowMonitor(g_window, nullptr, g_windowedX, g_windowedY, g_windowedWidth, g_windowedHeight, 0);
+    }
+}
+
 float GetElapsedTime() {
     return static_cast<float>(glfwGetTime());
 }

@@ -98,8 +98,8 @@ void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::str
                     row.push_back(std::to_string(game.moveCount));
                 }
             } else if (columns[i] == "board_size") {
-                // Format as "NxN"
-                std::string sizeStr = std::to_string(game.boardSize) + "x" + std::to_string(game.boardSize);
+                // Format as "N×N" (using Unicode multiplication sign)
+                std::string sizeStr = std::to_string(game.boardSize) + "×" + std::to_string(game.boardSize);
                 row.push_back(sizeStr);
             } else if (columns[i] == "komi") {
                 char buf[16];

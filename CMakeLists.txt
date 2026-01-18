@@ -277,6 +277,30 @@ function(fetch_rmlui)
     set(RMLUI_BACKENDS_DIR "${rmlui_SOURCE_DIR}/Backends" PARENT_SCOPE)
 endfunction()
 
+function(download_fonts)
+    set(FONT_DIR "${PROJECT_SOURCE_DIR}/config/fonts")
+    set(FONT_FILE "${FONT_DIR}/NotoSansCJKsc-Regular.otf")
+    set(FONT_URL "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf")
+
+    if(NOT EXISTS "${FONT_FILE}")
+        message(STATUS "Downloading Noto Sans CJK SC font...")
+        file(DOWNLOAD
+            "${FONT_URL}"
+            "${FONT_FILE}"
+            SHOW_PROGRESS
+            STATUS DOWNLOAD_STATUS
+        )
+        list(GET DOWNLOAD_STATUS 0 STATUS_CODE)
+        if(NOT STATUS_CODE EQUAL 0)
+            message(WARNING "Failed to download font: ${DOWNLOAD_STATUS}")
+        else()
+            message(STATUS "Font downloaded successfully: ${FONT_FILE}")
+        endif()
+    else()
+        message(STATUS "Font already exists: ${FONT_FILE}")
+    endif()
+endfunction()
+
 function(find_libsndfile)
     find_library(libsndfile_DBG
         NAMES sndfile.lib
@@ -373,6 +397,7 @@ cmake_language(CALL fetch_json)
 cmake_language(CALL fetch_clipp)
 cmake_language(CALL fetch_glm)
 cmake_language(CALL fetch_spdlog)
+cmake_language(CALL download_fonts)
 find_package(Threads)
 find_package(OpenGL REQUIRED)
 if(WIN32)
