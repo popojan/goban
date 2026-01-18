@@ -161,8 +161,15 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable right">
-                    <span>调试</span>
+                    <span>选项</span>
                     <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">语言</div>
+                            <div class="cmd">
+                                <select id="selectLanguage" onchange="language" onmousedown="nop">
+                                </select>
+                            </div>
+                        </div>
                         <div class="grp">
                             <div class="hr">帧率</div>
                             <div class="template" id="templateFPS">%.1f 帧/秒</div>

@@ -8,6 +8,8 @@
 #include "GobanControl.h"
 #include "EventHandlerFileChooser.h"
 #include "EventManager.h"
+#include <nlohmann/json.hpp>
+#include <fstream>
 
 bool GobanControl::newGame(unsigned boardSize) {
     engine.interrupt();
@@ -93,9 +95,22 @@ bool GobanControl::command(const std::string& cmd) {
         AppState::RequestExit();
     }
     else if (cmd == "toggle_fullscreen") {
-        fullscreen = !fullscreen;
-        AppState::ToggleFullscreen();
+        fullscreen = AppState::ToggleFullscreen();
         checked = fullscreen;
+
+        // Save fullscreen state to user.json
+        nlohmann::json user;
+        std::ifstream fin("data/user.json");
+        if (fin) {
+            try { fin >> user; } catch (...) {}
+            fin.close();
+        }
+        user["fullscreen"] = fullscreen;
+        std::ofstream fout("data/user.json");
+        if (fout) {
+            fout << user.dump(2);
+            fout.close();
+        }
     }
     else if (cmd == "fps") {
         checked = view.toggleFpsLimit();

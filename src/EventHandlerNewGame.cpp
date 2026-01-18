@@ -6,7 +6,11 @@
 #include <RmlUi/Core/ElementUtilities.h>
 #include <RmlUi/Core/Event.h>
 #include "EventManager.h"
+#include "AppState.h"
+#include "Configuration.h"
 #include <iostream>
+
+extern std::shared_ptr<Configuration> config;
 
 EventHandlerNewGame::EventHandlerNewGame()
 {
@@ -92,6 +96,22 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
       } else {
           lastKomiSelection = select->GetSelection();
       }
+    }
+    else if (value == "language") {
+        // Get selected language from select element
+        std::string lang = event.GetParameter<Rml::String>("value", "en").c_str();
+        std::string configFile = "./config/" + lang + ".json";
+
+        // Check if this is already the current config (avoid restart loop)
+        std::string currentGui = config->data.value("gui", "");
+        std::string expectedGui = "./config/gui/" + lang;
+        if (currentGui == expectedGui) {
+            spdlog::debug("Language {} already active, skipping restart", lang);
+            return;
+        }
+
+        spdlog::info("Switching to language: {} (config: {})", lang, configFile);
+        RequestRestart(configFile);
     }
     else {
         controller.command(value.c_str());

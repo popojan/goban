@@ -10,6 +10,7 @@
  */
 
 #include <clipp.h>
+#include <unistd.h>
 
 #include "ElementGame.h"
 #include <RmlUi/Core.h>
@@ -35,11 +36,62 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <nlohmann/json.hpp>
 
 #include <memory>
+#include <fstream>
 
 Rml::Context* context = nullptr;
 std::shared_ptr<Configuration> config;
+
+// For application restart with different config
+static char* g_executable_path = nullptr;
+static std::string g_pending_restart_config;
+
+void RequestRestart(const std::string& configFile) {
+    g_pending_restart_config = configFile;
+
+    // Save last_config to user.json
+    nlohmann::json user;
+    std::ifstream fin("data/user.json");
+    if (fin) {
+        try {
+            fin >> user;
+        } catch (...) {}
+        fin.close();
+    }
+    user["last_config"] = configFile;
+    std::ofstream fout("data/user.json");
+    if (fout) {
+        fout << user.dump(2);
+        fout.close();
+    }
+
+    AppState::RequestExit();
+}
+
+bool HasPendingRestart() {
+    return !g_pending_restart_config.empty();
+}
+
+void ExecuteRestart() {
+    if (g_pending_restart_config.empty() || !g_executable_path) return;
+
+    std::vector<char*> args;
+    args.push_back(g_executable_path);
+    char config_flag[] = "--config";
+    args.push_back(config_flag);
+    // Need to copy the string since execv requires non-const
+    char* config_path = strdup(g_pending_restart_config.c_str());
+    args.push_back(config_path);
+    args.push_back(nullptr);
+
+    spdlog::info("Restarting with config: {}", g_pending_restart_config);
+    execv(g_executable_path, args.data());
+    // If execv returns, it failed
+    spdlog::error("Failed to restart: {}", strerror(errno));
+    free(config_path);
+}
 
 // Custom SystemInterface to route RmlUi logs to spdlog
 class GobanSystemInterface : public SystemInterface_GLFW {
@@ -143,13 +195,17 @@ static void GlfwScrollCallback(GLFWwindow* window, double xoffset, double yoffse
 }
 
 static void LoadFonts(const nlohmann::json& fonts) {
+    size_t count = fonts.size();
+    size_t i = 0;
     for (const auto& font : fonts) {
         std::string fontPath = font.get<std::string>();
-        if (!Rml::LoadFontFace(fontPath.c_str())) {
+        bool isFallback = (i == count - 1) && (count > 1);  // Last font is fallback
+        if (!Rml::LoadFontFace(fontPath.c_str(), isFallback)) {
             spdlog::warn("Failed to load font: {}", fontPath);
         } else {
-            spdlog::info("Loaded font: {}", fontPath);
+            spdlog::info("Loaded font{}: {}", isFallback ? " (fallback)" : "", fontPath);
         }
+        ++i;
     }
 }
 
@@ -201,9 +257,34 @@ int APIENTRY WinMain(HINSTANCE RMLUI_UNUSED_PARAMETER(instance_handle), HINSTANC
 int main(int argc, char** argv)
 #endif
 {
+    // Store executable path for potential restart
+#ifndef RMLUI_PLATFORM_WIN32
+    g_executable_path = argv[0];
+#endif
+
     using namespace clipp;
     std::string logLevel("warning");
+
+    // Try to read user preferences from user.json
     std::string configurationFile("./config/en.json");
+    bool startFullscreen = false;
+    {
+        std::ifstream fin("data/user.json");
+        if (fin) {
+            try {
+                nlohmann::json user;
+                fin >> user;
+                if (user.contains("last_config")) {
+                    configurationFile = user["last_config"].get<std::string>();
+                }
+                if (user.contains("fullscreen")) {
+                    startFullscreen = user["fullscreen"].get<bool>();
+                }
+            } catch (...) {}
+            fin.close();
+        }
+    }
+
     auto cli = (
         option("-v", "--verbosity") & word("level", logLevel),
         option("-c", "--config") & value("file", configurationFile)
@@ -258,6 +339,11 @@ int main(int argc, char** argv)
 
     // Store window in AppState for fullscreen toggle etc.
     AppState::SetWindow(window);
+
+    // Apply saved fullscreen state
+    if (startFullscreen) {
+        AppState::SetFullscreen(true);
+    }
 
     // Initialize glad
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -398,6 +484,11 @@ int main(int argc, char** argv)
 
     glfwDestroyWindow(window);
     glfwTerminate();
+
+    // If restart was requested, execute it now (after cleanup)
+    if (HasPendingRestart()) {
+        ExecuteRestart();
+    }
 
     return 0;
 }

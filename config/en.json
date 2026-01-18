@@ -1,4 +1,5 @@
 {
+  "language_name": "English",
   "humans": [
     "Human"
   ],
@@ -114,8 +115,7 @@
   },
   "fonts": {
     "gui": [
-       "./config/fonts/Delicious-Roman.otf",
-       "./config/fonts/Delicious-Bold.otf"
+       "./config/fonts/NotoSansCJKsc-Regular.otf"
     ],
     "overlay": "./config/fonts/default-font.ttf"
   },

@@ -125,7 +125,14 @@ void GobanView::resetView() {
 }
 
 void GobanView::saveView() {
+    // Read existing user.json to preserve other settings (last_config, fullscreen, etc.)
     nlohmann::json user;
+    std::ifstream fin("data/user.json");
+    if (fin) {
+        try { fin >> user; } catch (...) {}
+        fin.close();
+    }
+
     user["camera"]["rotation"] = {
         {"x", cam.rLast[0]},
         {"y", cam.rLast[1]},

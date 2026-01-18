@@ -1,4 +1,5 @@
 #include "ElementGame.h"
+#include "AppState.h"
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Factory.h>
 #include <RmlUi/Core/Input.h>
@@ -6,6 +7,8 @@
 #include <RmlUi/Core/StringUtilities.h>
 #include <GLFW/glfw3.h>
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
+#include <filesystem>
+#include <fstream>
 
 ElementGame::ElementGame(const Rml::String& tag)
         : Rml::Element(tag), model(this), view(model), engine(model),
@@ -68,6 +71,60 @@ void ElementGame::populateEngines() {
         selectShader->Add(shaderName.c_str(),shaderIndex.c_str());
     }
     selectShader->SetSelection(0);
+
+    // Populate languages from config/*.json files
+    auto selectLanguage = dynamic_cast<Rml::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectLanguage"));
+
+    if (!selectLanguage) {
+        spdlog::warn("missing GUI element [selectLanguage]");
+        return;
+    }
+
+    namespace fs = std::filesystem;
+    std::string configDir = "./config";
+
+    // Get current language from config's gui path (e.g., "./config/gui/zh" -> "zh")
+    std::string currentGui = config->data.value("gui", "./config/gui/en");
+    std::string currentLang = fs::path(currentGui).filename().string();
+    int currentLangIndex = -1;
+    int index = 0;
+
+    try {
+        for (const auto& entry : fs::directory_iterator(configDir)) {
+            if (entry.path().extension() == ".json") {
+                std::ifstream file(entry.path());
+                if (file) {
+                    try {
+                        nlohmann::json cfg;
+                        file >> cfg;
+                        if (cfg.contains("language_name")) {
+                            std::string langName = cfg["language_name"].get<std::string>();
+                            std::string langFile = entry.path().stem().string();  // e.g., "en" from "en.json"
+                            selectLanguage->Add(langName.c_str(), langFile.c_str());
+                            spdlog::info("Found language: {} ({})", langName, langFile);
+                            if (langFile == currentLang) {
+                                currentLangIndex = index;
+                            }
+                            index++;
+                        }
+                    } catch (const std::exception& e) {
+                        spdlog::warn("Failed to parse {}: {}", entry.path().string(), e.what());
+                    }
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("Failed to scan config directory: {}", e.what());
+    }
+
+    // Set selection to current language to avoid triggering onchange
+    if (currentLangIndex >= 0) {
+        selectLanguage->SetSelection(currentLangIndex);
+    }
+
+    // Sync fullscreen menu state with restored state
+    OnMenuToggle("toggle_fullscreen", AppState::IsFullscreen());
 }
 
 void ElementGame::gameLoop() {
