@@ -15,61 +15,6 @@ set_property(GLOBAL PROPERTY CMAKE_CXX_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
 INCLUDE(ExternalProject)
 INCLUDE(FetchContent)
 
-function(build_portaudio)
-    ExternalProject_Add(project_portaudio
-            GIT_REPOSITORY      https://github.com/PortAudio/portaudio
-            SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/portaudio
-            BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/portaudio/build
-            CMAKE_ARGS  -DPA_USE_JACK=0 -DPA_USE_ALSA=1 -DPA_USE_ASIO=0 -DPA_USE_WASAPI=1
-            GIT_TAG v19.7.0
-            STEP_TARGETS build
-            INSTALL_COMMAND     echo Skipping install step for portaudio
-            )
-
-    ExternalProject_Get_Property(project_portaudio SOURCE_DIR)
-    ExternalProject_Get_Property(project_portaudio BINARY_DIR)
-
-    SET(portaudio_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
-    SET(portaudio_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
-
-    ADD_LIBRARY(portaudio STATIC IMPORTED)
-endfunction()
-
-function(build_libsndfile)
-    ExternalProject_Add(project_libsndfile
-        GIT_REPOSITORY     https://github.com/erikd/libsndfile.git
-        GIT_TAG 1.0.31
-        SOURCE_DIR  ${PROJECT_SOURCE_DIR}/deps/libsndfile
-        BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/libsndfile/build
-        STEP_TARGETS build
-        UPDATE_COMMAND ""
-        INSTALL_COMMAND  echo Skipping install step for libsndfile
-    )
-
-    ExternalProject_Get_Property(project_libsndfile SOURCE_DIR)
-    ExternalProject_Get_Property(project_libsndfile BINARY_DIR)
-    SET(libsndfile_inc_dir "${SOURCE_DIR}/src" "${SOURCE_DIR}/include" "${BINARY_DIR}/include" PARENT_SCOPE)
-    SET(libsndfile_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
-
-    ADD_LIBRARY(sndfile STATIC IMPORTED)
-endfunction()
-
-function(build_freetype2)
-    ExternalProject_Add(project_freetype2
-            GIT_REPOSITORY  https://git.savannah.gnu.org/git/freetype/freetype2.git
-            SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/freetype2
-            BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/freetype2/build
-            INSTALL_COMMAND  echo Skipping install step for freetype2
-    )
-
-    ExternalProject_Get_Property(project_freetype2 SOURCE_DIR)
-    ExternalProject_Get_Property(project_freetype2 BINARY_DIR)
-    SET(freetype2_lib_dir "${BINARY_DIR}/${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
-    SET(freetype2_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
-
-    ADD_LIBRARY(freetype STATIC IMPORTED)
-endfunction()
-
 function(build_glyphy)
     if(WIN32)
         ExternalProject_Add(project_glyphy
@@ -106,34 +51,6 @@ function(build_glyphy)
     ExternalProject_Get_Property(project_glyphy BINARY_DIR)
     SET(glyphy_lib_dir "${BINARY_DIR}" PARENT_SCOPE)
     SET(glyphy_inc_dir "${SOURCE_DIR}/include" PARENT_SCOPE)
-endfunction()
-
-function(download_boost)
-    SET(boost_archive boost_1_68_0-msvc-14.1-64.exe)
-    ExternalProject_Add( project_boost
-        PREFIX "boost"
-        DOWNLOAD_COMMAND
-            if not exist ${PROJECT_BINARY_DIR}/boost/src/${boost_archive}
-                wget --progress=dot:giga https://boostorg.jfrog.io/artifactory/main/release/1.68.0/binaries/${boost_archive}
-        SOURCE_DIR ${PROJECT_BINARY_DIR}/boost/src/
-        BINARY_DIR ${PROJECT_BINARY_DIR}/boost/src/
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ""
-        INSTALL_COMMAND
-            COMMAND if not exist ${PROJECT_BINARY_DIR}/boost/src/boost
-            innoextract ${PROJECT_BINARY_DIR}/boost/src/${boost_archive} #-I app\\boost
-                -I app\\lib64-msvc-14.1\\libboost_system-vc141-mt-x64-1_68.lib
-                -I app\\lib64-msvc-14.1\\libboost_system-vc141-mt-gd-x64-1_68.lib
-                -I app\\lib64-msvc-14.1\\libboost_filesystem-vc141-mt-x64-1_68.lib
-                -I app\\lib64-msvc-14.1\\libboost_filesystem-vc141-mt-gd-x64-1_68.lib
-                -I app\\lib64-msvc-14.1\\libboost_iostreams-vc141-mt-x64-1_68.lib
-                -I app\\lib64-msvc-14.1\\libboost_iostreams-vc141-mt-gd-x64-1_68.lib
-            COMMAND if not exist ${PROJECT_BINARY_DIR}/boost/src/boost ${CMAKE_COMMAND} -E rename ${PROJECT_BINARY_DIR}/boost/src/app ${PROJECT_BINARY_DIR}/boost/src/boost
-    )
-    SET(boost_lib_dir  ${PROJECT_BINARY_DIR}/boost/src/boost/lib64-msvc-14.1 PARENT_SCOPE)
-    ADD_LIBRARY(boost_system STATIC IMPORTED)
-    ADD_LIBRARY(boost_filesystem STATIC IMPORTED)
-    ADD_LIBRARY(boost_iostreams STATIC IMPORTED)
 endfunction()
 
 function(build_libsgfcplusplus)
@@ -275,87 +192,6 @@ function(download_fonts)
     endif()
 endfunction()
 
-function(find_libsndfile)
-    find_library(libsndfile_DBG
-        NAMES sndfile.lib
-        HINTS "${libsndfile_lib_dir}"
-        PATH_SUFFIXES Debug
-    )
-    find_library(libsndfile_REL
-        NAMES sndfile.lib
-        HINTS "${libsndfile_lib_dir}"
-        PATH_SUFFIXES Release
-    )
-    find_path(SNDFILE_INCLUDE_DIR1 NAMES sndfile.h
-        HINTS ${PROJECT_BINARY_DIR}/deps/libsndfile/build/include
-    )
-    find_path(SNDFILE_INCLUDE_DIR2 NAMES sndfile.hh
-        HINTS
-        ${PROJECT_SOURCE_DIR}/deps/libsndfile/include
-    )
-    set(SNDFILE_INCLUDE_DIRS ${SNDFILE_INCLUDE_DIR1} ${SNDFILE_INCLUDE_DIR2} PARENT_SCOPE)
-    set_target_properties(sndfile PROPERTIES
-        IMPORTED_LOCATION_DEBUG ${libsndfile_DBG}
-        IMPORTED_LOCATION ${libsndfile_REL}
-    )
-endfunction()
-function(find_portaudio)
-    find_library(portaudio_DBG
-        NAMES portaudio_static_x64
-        HINTS "${portaudio_lib_dir}/${CMAKE_BUILD_TYPE}"
-        PATH_SUFFIXES Debug
-    )
-    find_library(portaudio_REL
-        NAMES portaudio_static_x64
-        HINTS "${portaudio_lib_dir}/${CMAKE_BUILD_TYPE}"
-        PATH_SUFFIXES Release
-    )
-    find_path(PORTAUDIO_INCLUDE_DIRS NAMES portaudio.h
-        HINTS ${PROJECT_SOURCE_DIR}/deps/portaudio/include
-    )
-    set_target_properties(portaudio PROPERTIES
-        IMPORTED_LOCATION_DEBUG "${portaudio_DBG}"
-        IMPORTED_LOCATION "${portaudio_REL}"
-    )
-endfunction()
-
-function(find_freetype2)
-    find_library(freetype_DBG
-        NAMES freetyped
-        HINTS ${freetype2_lib_dir}
-    )
-    find_library(freetype_REL
-        NAMES freetype
-        HINTS ${freetype2_lib_dir}
-    )
-    find_path(FREETYPE_INCLUDE_DIRS NAMES ft2build.h
-        HINTS ${PROJECT_SOURCE_DIR}/deps/freetype2/include
-    )
-    set_target_properties(freetype PROPERTIES
-        IMPORTED_LOCATION_DEBUG ${freetype_DBG}
-        IMPORTED_LOCATION ${freetype_REL}
-    )
-endfunction()
-
-function(find_boost)
-    SET(boost_lib_dir  ${PROJECT_BINARY_DIR}/boost/src/boost/lib64-msvc-14.1)
-    find_library(boost_system_DBG NAMES libboost_system-vc141-mt-gd-x64-1_68 HINTS ${boost_lib_dir})
-    find_library(boost_system_REL NAMES libboost_system-vc141-mt-x64-1_68    HINTS ${boost_lib_dir})
-    find_library(boost_filesystem_DBG NAMES libboost_filesystem-vc141-mt-gd-x64-1_68 HINTS ${boost_lib_dir})
-    find_library(boost_filesystem_REL NAMES libboost_filesystem-vc141-mt-x64-1_68    HINTS ${boost_lib_dir})
-    find_library(boost_iostreams_DBG NAMES libboost_iostreams-vc141-mt-gd-x64-1_68 HINTS ${boost_lib_dir})
-    find_library(boost_iostreams_REL NAMES libboost_iostreams-vc141-mt-x64-1_68    HINTS ${boost_lib_dir})
-    set_target_properties(boost_system PROPERTIES
-            IMPORTED_LOCATION_DEBUG ${boost_system_DBG}
-            IMPORTED_LOCATION ${boost_system_REL})
-    set_target_properties(boost_filesystem PROPERTIES
-            IMPORTED_LOCATION_DEBUG ${boost_filesystem_DBG}
-            IMPORTED_LOCATION ${boost_filesystem_REL})
-    set_target_properties(boost_iostreams PROPERTIES
-            IMPORTED_LOCATION_DEBUG ${boost_iostreams_DBG}
-            IMPORTED_LOCATION ${boost_iostreams_REL})
-endfunction()
-
 function(generate_glad_headers)
     #glad --out-path src/glad --profile="compatibility" --api="gl=3.1" --generator="c" --spec="gl" --extensions="" --reproducible
     #glad --out-path src/glad --api="wgl=1.0" --generator="c" --spec="wgl" --extensions="WGL_ARB_extensions_string,WGL_EXT_extensions_string" --reproducible
@@ -373,11 +209,14 @@ cmake_language(CALL fetch_spdlog)
 cmake_language(CALL download_fonts)
 find_package(Threads)
 find_package(OpenGL REQUIRED)
+
 if(WIN32)
-    cmake_language(CALL build_libsndfile)
-    cmake_language(CALL build_freetype2)
-    cmake_language(CALL build_portaudio)
-    cmake_language(CALL download_boost)
+    # Windows: use vcpkg for dependencies
+    set(Boost_USE_STATIC_LIBS ON)
+    find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
+    find_package(Freetype REQUIRED)
+    find_package(Portaudio REQUIRED)
+    find_package(LibSndFile REQUIRED)
 elseif(APPLE)
     # macOS: GLFW handles Cocoa, PortAudio handles CoreAudio
     set(Boost_USE_STATIC_LIBS OFF)
@@ -421,15 +260,8 @@ else()
             src/FileChooserDataSource.cpp)
 
     if(WIN32)
-        cmake_language(CALL find_libsndfile)
-        cmake_language(CALL find_portaudio)
-        cmake_language(CALL find_freetype2)
-        cmake_language(CALL find_boost)
-
         add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00)
-        #option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
         set(Boost_USE_STATIC_LIBS ON)
-        # add_definitions(-DROCKET_STATIC_LIB)  # Not needed for RmlUi
     endif()
 
     # RmlUi backend files (Platform + Renderer)
@@ -438,15 +270,10 @@ else()
         ${RMLUI_BACKENDS_DIR}/RmlUi_Renderer_GL2.cpp
     )
 
-    if (WIN32)
-        set(BOOST_INCLUDE_DIR ${PROJECT_BINARY_DIR}/boost/src/boost)
-        add_dependencies(${PROJECT_NAME}
-                project_boost
-                project_freetype2
-                project_portaudio
-                project_libsndfile
-                )
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libcmtd.lib")
+    if(WIN32)
+        # Windows: vcpkg dependencies
+        set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
         set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     elseif(APPLE)
         set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
