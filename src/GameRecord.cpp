@@ -1,7 +1,10 @@
 #include "GameRecord.h"
+#include "Configuration.h"
 #include <iomanip>
 #include <chrono>
 #include <spdlog/spdlog.h>
+
+extern std::shared_ptr<Configuration> config;
 
 using namespace LibSgfcPlusPlus;
 
@@ -16,11 +19,17 @@ GameRecord::GameRecord():
         numGames(0u),
         gameHasNewMoves(false)
 {
+    // Read games path from config
+    std::string gamesPath = "./games";
+    if (config && config->data.contains("sgf_dialog")) {
+        gamesPath = config->data["sgf_dialog"].value("games_path", "./games");
+    }
+
     std::time_t t = std::time(nullptr);
     std::tm time {};
     time = *std::localtime(&t);
     std::ostringstream ss;
-    ss << "./data/sgf/" << std::put_time(&time, "%Y-%m-%dT%H-%M-%S") << ".sgf";
+    ss << gamesPath << "/" << std::put_time(&time, "%Y-%m-%dT%H-%M-%S") << ".sgf";
     defaultFileName = ss.str();
 }
 

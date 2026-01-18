@@ -5,8 +5,8 @@
 #include <sstream>
 #include "SGF.h"
 
-FileChooserDataSource::FileChooserDataSource()
-    : currentPath("data/sgf")
+FileChooserDataSource::FileChooserDataSource(const std::string& gamesPath)
+    : currentPath(gamesPath)
     , selectedFileIndex(-1)
     , selectedGameIndex(-1)
     , filesCurrentPage(1)
