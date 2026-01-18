@@ -3,11 +3,14 @@
 #include "Event.h"
 #include "EventManager.h"
 #include "FileChooserDataSource.h"
+#include "Configuration.h"
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Event.h>
 #include <RmlUi/Core/Factory.h>
 #include <RmlUi/Core/Input.h>
+
+extern std::shared_ptr<Configuration> config;
 
 EventHandlerFileChooser::EventHandlerFileChooser() : dialogDocument(nullptr), dataSource(nullptr), keyListener(nullptr) {
     dataSource = new FileChooserDataSource();
@@ -43,50 +46,6 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
     }
     else if (value == "cancel") {
         HideDialog();
-    }
-    else if (value == "files_list_click") {
-        // Event delegation - find which row was clicked
-        auto target = event.GetTargetElement();
-        auto filesList = dialogDocument->GetElementById("files_list");
-        if (filesList && target) {
-            // Walk up from target to find the row
-            Rml::Element* row = target;
-            while (row && row->GetParentNode() != filesList) {
-                row = row->GetParentNode();
-            }
-            if (row && row->GetParentNode() == filesList) {
-                // Find index of this row
-                for (int i = 0; i < filesList->GetNumChildren(); ++i) {
-                    if (filesList->GetChild(i) == row) {
-                        spdlog::info("File row {} clicked", i);
-                        handleFileSelection(i);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    else if (value == "games_list_click") {
-        // Event delegation - find which row was clicked
-        auto target = event.GetTargetElement();
-        auto gamesList = dialogDocument->GetElementById("games_list");
-        if (gamesList && target) {
-            // Walk up from target to find the row
-            Rml::Element* row = target;
-            while (row && row->GetParentNode() != gamesList) {
-                row = row->GetParentNode();
-            }
-            if (row && row->GetParentNode() == gamesList) {
-                // Find index of this row
-                for (int i = 0; i < gamesList->GetNumChildren(); ++i) {
-                    if (gamesList->GetChild(i) == row) {
-                        spdlog::info("Game row {} clicked", i);
-                        handleGameSelection(i);
-                        break;
-                    }
-                }
-            }
-        }
     }
     else if (value == "refresh") {
         dataSource->RefreshFiles();
@@ -181,19 +140,11 @@ void EventHandlerFileChooser::LoadDialog(Rml::Context* context) {
         dialogDocument->AddEventListener(Rml::EventId::Keydown, keyListener);
         dialogDocument->AddEventListener(Rml::EventId::Keyup, keyListener);
 
-        // Add click listeners on the list divs for event delegation
-        auto filesList = dialogDocument->GetElementById("files_list");
-        if (filesList) {
-            spdlog::info("Adding click listener to files_list");
-            filesList->AddEventListener(Rml::EventId::Mouseup, new Event("files_list_click"));
-        } else {
+        // Verify list elements exist (mousedown listeners are added per-row in populate methods)
+        if (!dialogDocument->GetElementById("files_list")) {
             spdlog::error("files_list not found!");
         }
-        auto gamesList = dialogDocument->GetElementById("games_list");
-        if (gamesList) {
-            spdlog::info("Adding click listener to games_list");
-            gamesList->AddEventListener(Rml::EventId::Mouseup, new Event("games_list_click"));
-        } else {
+        if (!dialogDocument->GetElementById("games_list")) {
             spdlog::error("games_list not found!");
         }
 
@@ -237,14 +188,15 @@ void EventHandlerFileChooser::ShowDialog() {
             // Restore game selection
             if (selectedGameIdx >= 0 && selectedGameIdx < dataSource->GetNumRows("games")) {
                 dataSource->SelectGame(selectedGameIdx);
-                // Update visual selection for game
+                // Update visual selection for game (account for header row at index 0)
                 auto gamesList = dialogDocument->GetElementById("games_list");
-                if (gamesList && selectedGameIdx < gamesList->GetNumChildren()) {
-                    // Clear default selection from first item
-                    for (int i = 0; i < gamesList->GetNumChildren(); ++i) {
+                int elementIndex = selectedGameIdx + 1;  // +1 for header row
+                if (gamesList && elementIndex < gamesList->GetNumChildren()) {
+                    // Clear default selection from first data item
+                    for (int i = 1; i < gamesList->GetNumChildren(); ++i) {
                         gamesList->GetChild(i)->SetClass("selected", false);
                     }
-                    gamesList->GetChild(selectedGameIdx)->SetClass("selected", true);
+                    gamesList->GetChild(elementIndex)->SetClass("selected", true);
                 }
             }
             // Update visual selection for file
@@ -340,50 +292,74 @@ void EventHandlerFileChooser::populateGamesList() {
     }
 
     int numRows = dataSource->GetNumRows("games");
+    if (numRows == 0) return;
+
+    // Create header row
+    createGameHeaderRow(gamesList);
+
+    // Map config column names to data source column names
+    std::map<std::string, std::string> colNameMapping = {
+        {"index", "title"},  // We'll extract index from title for now, or use a special column
+        {"board", "board_size"},
+        {"black", "black"},
+        {"white", "white"},
+        {"result", "result"},
+        {"moves", "moves"},
+        {"komi", "komi"},
+        {"players", "players"}
+    };
 
     for (int i = 0; i < numRows; ++i) {
-        std::vector<std::string> row;
-        std::vector<std::string> columns = {"title", "players"};
-        dataSource->GetRow(row, "games", i, columns);
-
-        if (row.size() >= 2) {
-            // Create row div element
-            Rml::ElementPtr rowElement = Rml::Factory::InstanceElement(
-                gamesList, "div", "div", Rml::XMLAttributes());
-
-            if (rowElement) {
-                rowElement->SetClass("game_row", true);
-                rowElement->SetAttribute("data-index", std::to_string(i));
-
-                // Mark first game as selected by default
-                if (i == 0) {
-                    rowElement->SetClass("selected", true);
-                }
-
-                // Create title span
-                Rml::ElementPtr titleSpan = Rml::Factory::InstanceElement(
-                    rowElement.get(), "span", "span", Rml::XMLAttributes());
-                if (titleSpan) {
-                    titleSpan->SetClass("game_title", true);
-                    titleSpan->SetInnerRML(row[0].c_str());
-                    rowElement->AppendChild(std::move(titleSpan));
-                }
-
-                // Create players span
-                Rml::ElementPtr playersSpan = Rml::Factory::InstanceElement(
-                    rowElement.get(), "span", "span", Rml::XMLAttributes());
-                if (playersSpan) {
-                    playersSpan->SetClass("game_players", true);
-                    playersSpan->SetInnerRML(row[1].c_str());
-                    rowElement->AppendChild(std::move(playersSpan));
-                }
-
-                // Add mousedown listener directly to row
-                std::string eventValue = "select_game:" + std::to_string(i);
-                rowElement->AddEventListener(Rml::EventId::Mousedown, new Event(eventValue));
-
-                gamesList->AppendChild(std::move(rowElement));
+        // Build the columns list based on gameColumns config (excluding "index" which is generated)
+        std::vector<std::string> requestedColumns;
+        for (const auto& col : gameColumns) {
+            if (col == "index") continue;  // Index is generated, not from data source
+            auto it = colNameMapping.find(col);
+            if (it != colNameMapping.end()) {
+                requestedColumns.push_back(it->second);
             }
+        }
+
+        std::vector<std::string> row;
+        dataSource->GetRow(row, "games", i, requestedColumns);
+
+        // Create row div element
+        Rml::ElementPtr rowElement = Rml::Factory::InstanceElement(
+            gamesList, "div", "div", Rml::XMLAttributes());
+
+        if (rowElement) {
+            rowElement->SetClass("game_row", true);
+            rowElement->SetAttribute("data-index", std::to_string(i));
+
+            // Mark first game as selected by default
+            if (i == 0) {
+                rowElement->SetClass("selected", true);
+            }
+
+            // Create spans for each configured column
+            size_t rowIdx = 0;
+            for (const auto& colType : gameColumns) {
+                std::string cellText;
+
+                if (colType == "index") {
+                    // Generate 1-based index
+                    cellText = std::to_string(i + 1);
+                } else if (rowIdx < row.size()) {
+                    cellText = row[rowIdx];
+                    rowIdx++;
+                }
+
+                auto span = createColumnSpan(rowElement.get(), colType, cellText);
+                if (span) {
+                    rowElement->AppendChild(std::move(span));
+                }
+            }
+
+            // Add mousedown listener directly to row
+            std::string eventValue = "select_game:" + std::to_string(i);
+            rowElement->AddEventListener(Rml::EventId::Mousedown, new Event(eventValue));
+
+            gamesList->AppendChild(std::move(rowElement));
         }
     }
 }
@@ -427,15 +403,18 @@ void EventHandlerFileChooser::handleFileSelection(int index) {
         actualIndex = (dataSource->GetFilesCurrentPage() - 1) * FileChooserDataSource::GetFilesPageSize() + fileIndex;
     }
 
+    // Check what type of file before selecting (SelectFile may navigate and clear selection)
+    const auto& files = dataSource->GetFiles();
+    bool isDirectory = (actualIndex >= 0 && actualIndex < static_cast<int>(files.size()) && files[actualIndex].isDirectory);
+
     dataSource->SelectFile(actualIndex);
 
-    // Check if we navigated to a directory
-    const FileEntry* file = dataSource->GetSelectedFile();
-    if (file && file->isDirectory) {
+    if (isDirectory) {
+        // Directory navigation happened - refresh file list
         populateFilesList();
         updateCurrentPath();
         updatePaginationInfo();
-    } else if (file && !file->isDirectory) {
+    } else {
         // It's an SGF file - populate games list
         populateGamesList();
         updatePaginationInfo();
@@ -445,15 +424,16 @@ void EventHandlerFileChooser::handleFileSelection(int index) {
 void EventHandlerFileChooser::handleGameSelection(int index) {
     if (!dialogDocument) return;
 
-    // Clear previous selection
+    // Clear previous selection (skip header row at index 0)
     auto gamesList = dialogDocument->GetElementById("games_list");
     if (gamesList) {
-        for (int i = 0; i < gamesList->GetNumChildren(); ++i) {
+        for (int i = 1; i < gamesList->GetNumChildren(); ++i) {
             gamesList->GetChild(i)->SetClass("selected", false);
         }
-        // Set new selection
-        if (index >= 0 && index < gamesList->GetNumChildren()) {
-            gamesList->GetChild(index)->SetClass("selected", true);
+        // Set new selection (index is 0-based for data, but element is +1 due to header)
+        int elementIndex = index + 1;  // Account for header row
+        if (elementIndex >= 1 && elementIndex < gamesList->GetNumChildren()) {
+            gamesList->GetChild(elementIndex)->SetClass("selected", true);
         }
     }
 
@@ -555,4 +535,71 @@ void EventHandlerFileChooser::initializeLocalization() {
     std::string strGameInfoFmt = getTemplateString("tplGameInfo", "Game %d (%dx%d, %d moves)");
 
     dataSource->SetLocalizedStrings(strDirectory, strSgfFile, strUp, strGameInfoFmt);
+
+    // Load column header localized strings
+    columnHeaders["index"] = getTemplateString("tplColIndex", "#");
+    columnHeaders["board"] = getTemplateString("tplColBoard", "Board");
+    columnHeaders["black"] = getTemplateString("tplColBlack", "Black");
+    columnHeaders["white"] = getTemplateString("tplColWhite", "White");
+    columnHeaders["result"] = getTemplateString("tplColResult", "Result");
+    columnHeaders["moves"] = getTemplateString("tplColMoves", "Moves");
+    columnHeaders["komi"] = getTemplateString("tplColKomi", "Komi");
+    columnHeaders["players"] = getTemplateString("tplColPlayers", "Players");
+
+    // Load game columns configuration
+    loadGameColumnsConfig();
+}
+
+void EventHandlerFileChooser::loadGameColumnsConfig() {
+    using nlohmann::json;
+
+    // Default columns if not configured
+    gameColumns = {"index", "board", "black", "white", "result"};
+
+    if (config && config->data.contains("sgf_dialog")) {
+        auto sgfDialog = config->data["sgf_dialog"];
+        if (sgfDialog.contains("game_columns") && sgfDialog["game_columns"].is_array()) {
+            gameColumns.clear();
+            for (const auto& col : sgfDialog["game_columns"]) {
+                if (col.is_string()) {
+                    gameColumns.push_back(col.get<std::string>());
+                }
+            }
+            spdlog::debug("Loaded {} game columns from config", gameColumns.size());
+        }
+    }
+}
+
+void EventHandlerFileChooser::createGameHeaderRow(Rml::Element* gamesList) {
+    if (!gamesList) return;
+
+    Rml::ElementPtr headerRow = Rml::Factory::InstanceElement(
+        gamesList, "div", "div", Rml::XMLAttributes());
+
+    if (headerRow) {
+        headerRow->SetClass("game_header", true);
+
+        for (const auto& colType : gameColumns) {
+            auto it = columnHeaders.find(colType);
+            std::string headerText = (it != columnHeaders.end()) ? it->second : colType;
+            auto span = createColumnSpan(headerRow.get(), colType, headerText);
+            if (span) {
+                headerRow->AppendChild(std::move(span));
+            }
+        }
+
+        gamesList->AppendChild(std::move(headerRow));
+    }
+}
+
+Rml::ElementPtr EventHandlerFileChooser::createColumnSpan(Rml::Element* parent, const std::string& colType, const std::string& text) {
+    Rml::ElementPtr span = Rml::Factory::InstanceElement(
+        parent, "span", "span", Rml::XMLAttributes());
+
+    if (span) {
+        span->SetClass(("col-" + colType).c_str(), true);
+        span->SetInnerRML(text.c_str());
+    }
+
+    return span;
 }
