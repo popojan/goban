@@ -405,10 +405,23 @@ if(WIN32)
     cmake_language(CALL build_freetype2)
     cmake_language(CALL build_portaudio)
     cmake_language(CALL download_boost)
-else()
+elseif(APPLE)
+    # macOS: GLFW handles Cocoa, PortAudio handles CoreAudio
     set(Boost_USE_STATIC_LIBS OFF)
     find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
-    find_package(Curses REQUIRED)
+    find_package(Freetype REQUIRED)
+    find_package(Portaudio REQUIRED)
+    find_package(LibSndFile REQUIRED)
+    # macOS frameworks needed for GLFW/PortAudio
+    find_library(COCOA_LIBRARY Cocoa REQUIRED)
+    find_library(IOKIT_LIBRARY IOKit REQUIRED)
+    find_library(COREVIDEO_LIBRARY CoreVideo REQUIRED)
+    find_library(COREAUDIO_LIBRARY CoreAudio REQUIRED)
+    find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox REQUIRED)
+else()
+    # Linux
+    set(Boost_USE_STATIC_LIBS OFF)
+    find_package(Boost 1.64.0 REQUIRED COMPONENTS system iostreams filesystem)
     find_package(X11 REQUIRED)
     find_package(ALSA REQUIRED)
     find_package(Freetype REQUIRED)
@@ -462,7 +475,18 @@ else()
                 )
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libcmtd.lib")
         set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+    elseif(APPLE)
+        set(EXTRA_LIBS
+                ${COCOA_LIBRARY}
+                ${IOKIT_LIBRARY}
+                ${COREVIDEO_LIBRARY}
+                ${COREAUDIO_LIBRARY}
+                ${AUDIOTOOLBOX_LIBRARY}
+                pthread
+                ${CMAKE_THREAD_LIBS_INIT}
+        )
     else()
+        # Linux
         set(EXTRA_LIBS
                 rt
                 ${ALSA_LIBRARIES}
@@ -560,7 +584,6 @@ else()
             src/glad/include
             ${RMLUI_BACKENDS_DIR}
             ${OPENGL_INCLUDE_DIRS}
-            ${CURSES_INCLUDE_DIR}
             ${LIBGLYPHY_INCLUDE_DIR}
             ${FREETYPE_INCLUDE_DIRS}
             ${SNDFILE_INCLUDE_DIRS}
