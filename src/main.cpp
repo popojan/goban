@@ -10,7 +10,13 @@
  */
 
 #include <clipp.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <process.h>
+#else
 #include <unistd.h>
+#endif
 
 #include "ElementGame.h"
 #include <RmlUi/Core.h>
@@ -77,20 +83,36 @@ bool HasPendingRestart() {
 void ExecuteRestart() {
     if (g_pending_restart_config.empty() || !g_executable_path) return;
 
+    spdlog::info("Restarting with config: {}", g_pending_restart_config);
+
+#ifdef _WIN32
+    // Windows: use _spawnv to start new process
+    std::vector<const char*> args;
+    args.push_back(g_executable_path);
+    args.push_back("--config");
+    args.push_back(g_pending_restart_config.c_str());
+    args.push_back(nullptr);
+
+    intptr_t result = _spawnv(_P_NOWAIT, g_executable_path, args.data());
+    if (result == -1) {
+        spdlog::error("Failed to restart: {}", strerror(errno));
+    }
+    // On Windows, we exit current process after spawning new one
+#else
+    // Unix: use execv to replace current process
     std::vector<char*> args;
     args.push_back(g_executable_path);
     char config_flag[] = "--config";
     args.push_back(config_flag);
-    // Need to copy the string since execv requires non-const
     char* config_path = strdup(g_pending_restart_config.c_str());
     args.push_back(config_path);
     args.push_back(nullptr);
 
-    spdlog::info("Restarting with config: {}", g_pending_restart_config);
     execv(g_executable_path, args.data());
     // If execv returns, it failed
     spdlog::error("Failed to restart: {}", strerror(errno));
     free(config_path);
+#endif
 }
 
 // Custom SystemInterface to route RmlUi logs to spdlog
