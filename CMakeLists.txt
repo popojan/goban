@@ -31,7 +31,7 @@ function(build_glyphy)
                 /p:Platform=${CMAKE_VS_PLATFORM_NAME}
                 /p:AssemblySearchPaths=${PROJECT_SOURCE_DIR}/deps/glyphy/include;
             UPDATE_COMMAND ""
-            INSTALL_COMMAND  echo Skipping install step for glyphy
+            INSTALL_COMMAND ""
         )
     else()
         ExternalProject_Add(project_glyphy
@@ -44,7 +44,7 @@ function(build_glyphy)
             --prefix  ${PROJECT_BINARY_DIR}/deps/glyphy/build
             #BUILD_COMMAND ${CMAKE_MAKE_PROGRAM} -C ${PROJECT_SOURCE_DIR}/deps/glyphy/
             UPDATE_COMMAND ""
-            INSTALL_COMMAND  echo Skipping install step for glyphy
+            INSTALL_COMMAND ""
         )
     endif()
     ExternalProject_Get_Property(project_glyphy SOURCE_DIR)
@@ -66,8 +66,8 @@ function(build_libsgfcplusplus)
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
             STEP_TARGETS build
             UPDATE_COMMAND ""
-            PATCH_COMMAND git apply ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch || true
-            INSTALL_COMMAND     echo Skipping install step for libsgfcplusplus
+            PATCH_COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch || true
+            INSTALL_COMMAND ""
             )
 
     ExternalProject_Get_Property(project_libsgfcplusplus SOURCE_DIR)

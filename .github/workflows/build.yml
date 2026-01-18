@@ -116,7 +116,7 @@ jobs:
           mkdir build
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
-          cmake --build . --config Release
+          cmake --build . --config Release --verbose
 
       - name: Build goban
         shell: cmd
@@ -124,7 +124,7 @@ jobs:
         run: |
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
-          cmake --build . --config Release
+          cmake --build . --config Release --verbose
 
       - name: Upload artifact
         if: success()
