@@ -13,7 +13,12 @@
 extern std::shared_ptr<Configuration> config;
 
 EventHandlerFileChooser::EventHandlerFileChooser() : dialogDocument(nullptr), dataSource(nullptr), keyListener(nullptr) {
-    dataSource = new FileChooserDataSource();
+    // Read games path from config
+    std::string gamesPath = "./games";
+    if (config && config->data.contains("sgf_dialog")) {
+        gamesPath = config->data["sgf_dialog"].value("games_path", "./games");
+    }
+    dataSource = new FileChooserDataSource(gamesPath);
     keyListener = new DialogKeyListener(this);
 }
 

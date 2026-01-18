@@ -109,73 +109,79 @@
     {"key": 22, "command": "decrease dof"}
   ],
   "sounds": {
-    "move":  "./data/sound/stone.wav",
-    "clash": "./data/sound/collision.wav"
+    "move":  "./config/sound/stone.wav",
+    "clash": "./config/sound/collision.wav"
   },
   "fonts": {
     "gui": [
-       "./data/fonts/NotoSansSC-Regular.otf"
+       "./config/fonts/NotoSansSC-Regular.otf"
     ],
-    "overlay": "./data/fonts/default-font.ttf"
+    "overlay": "./config/fonts/default-font.ttf"
   },
   "shaders": [
     {
       "name": "Red Carpet",
-      "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/fragment/red_carpet.glsl",
+      "vertex": "./config/shaders/vertex/mono.glsl",
+      "fragment": "./config/shaders/fragment/red_carpet.glsl",
       "height": 0.85
     },
     {
       "name": "Minimal Thin",
-      "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/fragment/thin.glsl",
+      "vertex": "./config/shaders/vertex/mono.glsl",
+      "fragment": "./config/shaders/fragment/thin.glsl",
       "height": 0.85
     },
     {
       "name": "Minimal Flat",
-      "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/fragment/flat.glsl",
+      "vertex": "./config/shaders/vertex/mono.glsl",
+      "fragment": "./config/shaders/fragment/flat.glsl",
       "height": 0.85
     },
     {
       "name": "Minimal 2D",
-      "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/fragment/2d.glsl",
+      "vertex": "./config/shaders/vertex/mono.glsl",
+      "fragment": "./config/shaders/fragment/2d.glsl",
       "height": 0.0
     },
     {
       "name": "[stereo] Red Carpet",
-      "vertex": "./data/shaders/vertex/stereo.glsl",
-      "fragment": "./data/shaders/fragment/red_carpet_stereo.glsl",
+      "vertex": "./config/shaders/vertex/stereo.glsl",
+      "fragment": "./config/shaders/fragment/red_carpet_stereo.glsl",
       "height": 0.85
     },
     {
       "name": "[stereo] Minimal Thin",
-      "vertex": "./data/shaders/vertex/stereo.glsl",
-      "fragment": "./data/shaders/fragment/thin_stereo.glsl",
+      "vertex": "./config/shaders/vertex/stereo.glsl",
+      "fragment": "./config/shaders/fragment/thin_stereo.glsl",
       "height": 0.85
     },
     {
       "name": "(legacy) Red Carpet",
-      "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/legacy/fragment.glsl",
+      "vertex": "./config/shaders/vertex/mono.glsl",
+      "fragment": "./config/shaders/legacy/fragment.glsl",
       "height": 0.85
     },
     {
       "name": "(legacy) Minimal Thin",
-      "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/legacy/fragment.25D.glsl",
+      "vertex": "./config/shaders/vertex/mono.glsl",
+      "fragment": "./config/shaders/legacy/fragment.25D.glsl",
       "height": 0.85
     },
     {
       "name": "(legacy) Minimal Flat",
-      "vertex": "./data/shaders/vertex/mono.glsl",
-      "fragment": "./data/shaders/legacy/fragment.2D.glsl",
+      "vertex": "./config/shaders/vertex/mono.glsl",
+      "fragment": "./config/shaders/legacy/fragment.2D.glsl",
       "height": 0.0
     }
   ],
-  "sgf_dialog": {
-    "game_columns": ["index", "board", "black", "white", "moves", "result"]
+  "overlay_shaders": {
+    "vertex": "./config/shaders/overlay/overlay-vertex.glsl",
+    "fragment": "./config/shaders/overlay/overlay-fragment.glsl",
+    "atlas": "./config/shaders/overlay/overlay-atlas.glsl"
   },
-  "gui": "./data/gui/zh"
+  "sgf_dialog": {
+    "game_columns": ["index", "board", "black", "white", "moves", "result"],
+    "games_path": "./games"
+  },
+  "gui": "./config/gui/zh"
 }

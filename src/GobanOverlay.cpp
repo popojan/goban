@@ -42,7 +42,7 @@ bool GobanOverlay::init() {
         using nlohmann::json;
         std::string overlay_font = config->data
                 .value("fonts", json({}))
-                .value("overlay", "./data/fonts/default-font.ttf");
+                .value("overlay", "./config/fonts/default-font.ttf");
         FT_New_Face(ft_library, overlay_font.c_str(), 0/*face_index*/, &ft_face);
         if(ft_face) {
             spdlog::info("Loading font file [{}]", overlay_font);

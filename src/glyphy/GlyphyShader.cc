@@ -19,6 +19,9 @@
 #include "GlyphyShader.h"
 
 #include "GobanShader.h"
+#include "Configuration.h"
+
+extern std::shared_ptr<Configuration> config;
 
 static unsigned int
 glyph_encode (unsigned int atlas_x ,  /* 7 bits */
@@ -187,9 +190,21 @@ demo_shader_create_program()
 {
   GLuint vshader, fshader, program;
 
-  std::string vshadersrc(createShaderFromFile("data/shaders/overlay/overlay-vertex.glsl"));
-  std::string fshadersrc(createShaderFromFile("data/shaders/overlay/overlay-fragment.glsl"));
-  std::string atlassrc(createShaderFromFile("data/shaders/overlay/overlay-atlas.glsl"));
+  // Read overlay shader paths from config (fallback to defaults)
+  std::string vertexPath = "./config/shaders/overlay/overlay-vertex.glsl";
+  std::string fragmentPath = "./config/shaders/overlay/overlay-fragment.glsl";
+  std::string atlasPath = "./config/shaders/overlay/overlay-atlas.glsl";
+
+  if (config && config->data.contains("overlay_shaders")) {
+      auto& shaders = config->data["overlay_shaders"];
+      vertexPath = shaders.value("vertex", vertexPath);
+      fragmentPath = shaders.value("fragment", fragmentPath);
+      atlasPath = shaders.value("atlas", atlasPath);
+  }
+
+  std::string vshadersrc(createShaderFromFile(vertexPath));
+  std::string fshadersrc(createShaderFromFile(fragmentPath));
+  std::string atlassrc(createShaderFromFile(atlasPath));
 
   const std::array<const GLchar * const ,2> vshader_sources = { GLSL_HEADER_STRING, vshadersrc.c_str() };
 

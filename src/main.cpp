@@ -203,7 +203,7 @@ int main(int argc, char** argv)
 {
     using namespace clipp;
     std::string logLevel("warning");
-    std::string configurationFile("./data/config.json");
+    std::string configurationFile("./config/en.json");
     auto cli = (
         option("-v", "--verbosity") & word("level", logLevel),
         option("-c", "--config") & value("file", configurationFile)
@@ -310,7 +310,7 @@ int main(int argc, char** argv)
     Rml::Factory::RegisterElementInstancer("game", new Rml::ElementInstancerGeneric<ElementGame>());
     Rml::Factory::RegisterEventListenerInstancer(new EventInstancer());
 
-    EventManager::SetPrefix(config->data.value("gui", "./data/gui").c_str());
+    EventManager::SetPrefix(config->data.value("gui", "./config/gui").c_str());
     EventManager::RegisterEventHandler("goban", new EventHandlerNewGame());
 
     // Initialize file chooser

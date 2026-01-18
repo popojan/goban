@@ -36,7 +36,7 @@ struct SGFGameInfo {
 // Temporarily disabled - DataSource was removed from RmlUi
 class FileChooserDataSource {
 public:
-    FileChooserDataSource();
+    FileChooserDataSource(const std::string& gamesPath = "./games");
     ~FileChooserDataSource();
 
     // Legacy DataSource interface - stubbed out
