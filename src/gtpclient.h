@@ -1,16 +1,28 @@
 #ifndef GTPCLIENT_H
 #define GTPCLIENT_H
 
-#include <boost/process.hpp>
-#include <boost/filesystem/path.hpp>
 #include <string>
 #include <vector>
 #include <iostream>
 #include <sstream>
 #include <spdlog/spdlog.h>
-#include "InputThread.h"
 #include <regex>
 #include <nlohmann/json.hpp>
+#include <thread>
+#include <mutex>
+#include <deque>
+#include <condition_variable>
+#include <atomic>
+#include <functional>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#endif
 
 struct OutputFilter {
     std::string regex;
@@ -21,17 +33,58 @@ struct OutputFilter {
 
 void replaceAll(std::string& out, const std::string& what, const std::string& by);
 
+// Cross-platform process with stdin/stdout/stderr pipes
+class Process {
+public:
+    Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir);
+    ~Process();
+
+    bool write(const std::string& data);
+    bool readLine(std::string& line);
+    bool readLineStderr(std::string& line);
+    void closeStdin();
+    int wait();
+    bool running() const;
+
+private:
+#ifdef _WIN32
+    HANDLE hProcess_ = INVALID_HANDLE_VALUE;
+    HANDLE hThread_ = INVALID_HANDLE_VALUE;
+    HANDLE hStdinWrite_ = INVALID_HANDLE_VALUE;
+    HANDLE hStdoutRead_ = INVALID_HANDLE_VALUE;
+    HANDLE hStderrRead_ = INVALID_HANDLE_VALUE;
+#else
+    pid_t pid_ = -1;
+    int stdinFd_ = -1;
+    int stdoutFd_ = -1;
+    int stderrFd_ = -1;
+#endif
+    std::string stdoutBuffer_;
+    std::string stderrBuffer_;
+};
+
+// Async stderr reader thread
+class StderrReaderThread {
+public:
+    StderrReaderThread(Process& proc, std::function<void(const std::string&)> callback);
+    ~StderrReaderThread();
+    void stop();
+
+private:
+    void readLoop();
+    Process& proc_;
+    std::function<void(const std::string&)> callback_;
+    std::thread thread_;
+    std::atomic<bool> running_{true};
+};
+
 class GtpClient {
 private:
-    boost::process::opstream pis;
-    boost::process::ipstream pes;
-    boost::process::ipstream pos;
-    boost::process::child c;
+    std::unique_ptr<Process> proc_;
     std::string exe;
     std::string lastLine;
     std::vector<OutputFilter> outputFilters;
-
-    InputThread<GtpClient, boost::process::ipstream> *reader;
+    std::unique_ptr<StderrReaderThread> stderrReader_;
 
     nlohmann::json vars;
 
@@ -64,8 +117,6 @@ public:
     CommandOutput issueCommand(const std::string &command);
 
     static bool success(const CommandOutput &ret);
-
 };
 
 #endif // GTPCLIENT_H
-

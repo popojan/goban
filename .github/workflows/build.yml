@@ -108,7 +108,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Install dependencies via vcpkg
-        run: vcpkg install freetype boost-system boost-filesystem boost-iostreams boost-process portaudio libsndfile --triplet x64-windows-static
+        run: vcpkg install freetype boost-system boost-filesystem boost-iostreams portaudio libsndfile --triplet x64-windows-static
 
       - name: Build prerequisites
         shell: cmd

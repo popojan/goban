@@ -25,7 +25,6 @@
         #undef Success
     #endif
 #elif defined(RMLUI_PLATFORM_WIN32)
-    #include <boost/process.hpp>
     #include <windows.h>
     #include <glad/glad.h>
     #include <glad/glad_wgl.h>
