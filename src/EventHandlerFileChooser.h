@@ -5,6 +5,8 @@
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/EventListener.h>
 #include "spdlog/spdlog.h"
+#include <vector>
+#include <map>
 
 class FileChooserDataSource;
 
@@ -52,6 +54,13 @@ private:
 
     // Localized strings
     std::string strPageInfoFmt = "Page %d of %d";
+
+    // Configurable game columns
+    std::vector<std::string> gameColumns;
+    std::map<std::string, std::string> columnHeaders;
+    void loadGameColumnsConfig();
+    void createGameHeaderRow(Rml::Element* gamesList);
+    Rml::ElementPtr createColumnSpan(Rml::Element* parent, const std::string& colType, const std::string& text);
 };
 
 #endif //GOBAN_EVENTHANDLERFILECHOOSER_H

@@ -46,5 +46,14 @@
     <div class="template" id="tplUp">Up</div>
     <div class="template" id="tplPageInfo">Page %d of %d</div>
     <div class="template" id="tplGameInfo">Game %d (%dx%d, %d moves)</div>
+    <!-- Column headers for games table -->
+    <div class="template" id="tplColIndex">#</div>
+    <div class="template" id="tplColBoard">Board</div>
+    <div class="template" id="tplColBlack">Black</div>
+    <div class="template" id="tplColWhite">White</div>
+    <div class="template" id="tplColResult">Result</div>
+    <div class="template" id="tplColMoves">Moves</div>
+    <div class="template" id="tplColKomi">Komi</div>
+    <div class="template" id="tplColPlayers">Players</div>
 </body>
 </rml>

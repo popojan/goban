@@ -175,5 +175,8 @@
       "height": 0.0
     }
   ],
+  "sgf_dialog": {
+    "game_columns": ["index", "board", "black", "white", "moves", "result"]
+  },
   "gui": "./data/gui/en"
 }

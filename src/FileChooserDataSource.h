@@ -53,6 +53,7 @@ public:
     void SelectFile(int fileIndex);
     const FileEntry* GetSelectedFile() const;
     int FindFileByPath(const std::string& path) const;
+    const std::vector<FileEntry>& GetFiles() const { return files; }
     
     // Game selection
     void SelectGame(int gameIndex);

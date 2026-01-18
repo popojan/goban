@@ -9,7 +9,7 @@ body.open {
     background-color: #00000080;
     border-width: 1px;
     border-color: #ffffffaa;
-    margin-bottom: 5vh;
+    font-size: 2.5vh;
 }
 
 .dialog {
@@ -47,12 +47,13 @@ body.open {
 
 .section_title {
     font-weight: bold;
+    margin-top: 1vh;
     margin-bottom: 0.5rem;
 }
 
 .item_list {
     display: block;
-    width: 76vw;
+    width: 77vw;
     height: 28vh;
     overflow-y: auto;
     overflow-x: hidden;
@@ -60,12 +61,22 @@ body.open {
 }
 
 /* File/game row styling */
-.file_row, .game_row {
+.file_row {
     display: block;
-    width: 74vw;
+    width: 77vw;
     cursor: pointer;
     padding: 0.1rem 0.2rem;
     pointer-events: auto;
+    white-space: nowrap;
+}
+
+.game_row {
+    display: flex;
+    width: 77vw;
+    cursor: pointer;
+    padding: 0.1rem 0.2rem;
+    pointer-events: auto;
+    white-space: nowrap;
 }
 
 .file_row:hover, .game_row:hover {
@@ -81,22 +92,81 @@ body.open {
     color: white;
 }
 
-span.file_name, span.game_title {
+span.file_name {
     display: inline-block;
     width: 70%;
     overflow: hidden;
 }
 
-span.file_type, span.game_players {
+span.file_type {
     display: inline-block;
     width: 25%;
     color: #888;
     text-align: right;
 }
 
-.file_row.selected .file_type,
-.game_row.selected .game_players {
+.file_row.selected .file_type {
     color: #ccc;
+}
+
+/* Game table column classes - fixed width columns use vh units */
+.col-index {
+    width: 4vh;
+    text-align: right;
+    padding-right: 1vh;
+    flex-shrink: 0;
+}
+
+.col-board {
+    width: 10vh;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.col-moves {
+    width: 6vh;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.col-komi {
+    width: 6vh;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.col-result {
+    width: 10vh;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* Player columns - expand to fill remaining space equally */
+.col-black, .col-white {
+    flex: 1 1 0;
+    overflow: hidden;
+}
+
+.col-players {
+    flex: 2 1 0;
+    overflow: hidden;
+}
+
+/* Header row styling */
+.game_header {
+    display: flex;
+    width: 77vw;
+    padding: 0.1rem 0.2rem;
+    color: #aaa;
+    border-bottom-width: 1px;
+    border-bottom-color: #555;
+    margin-bottom: 0.3vh;
+    white-space: nowrap;
+    /* pointer-events: none inherited from parent, header not clickable */
+}
+
+.game_row.selected span {
+    color: white;
 }
 
 .pagination_controls {
@@ -136,7 +206,7 @@ span.file_type, span.game_players {
 
 .bottomleft {
     position: absolute;
-    bottom: 0%;
+    bottom: 0.5rem;
     left: 0%;
 }
 
@@ -145,39 +215,44 @@ span.file_type, span.game_players {
     margin-right: 0.5rem;
 }
 
-.button.primary {
-    background-color: #4CAF50;
+.button:hover {
+    color: #e0e000;
 }
 
 .button.primary:hover {
-    background-color: #5CBF60;
+    background-color: #4CAF50;
+    color: white;
 }
 
 /* Responsive layout - side by side when viewport is wide enough */
 @media (min-aspect-ratio: 3/2) {
     .file_list_container {
         width: 38vw;
-        height: 70vh;
+        height: 75vh;
         position: absolute;
         left: 1vw;
-        top: 0;
+        top: 1vh;
     }
 
     .preview_container {
         width: 38vw;
-        height: 70vh;
+        height: 75vh;
         position: absolute;
         right: 1vw;
-        top: 0;
+        top: 1vh;
         margin-top: 0;
     }
 
     .item_list {
-        width: 36vw;
-        height: 60vh;
+        width: 37vw;
+        height: 68vh;
     }
 
-    .file_row, .game_row {
-        width: 34vw;
+    .file_row {
+        width: 37vw;
+    }
+
+    .game_row, .game_header {
+        width: 37vw;
     }
 }
