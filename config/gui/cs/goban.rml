@@ -9,36 +9,36 @@
         <div class="menu hoverable top right">
             <div class="menu show">
                 <div class="menuitem hoverable left">
-                    <span>文件</span>
+                    <span>Soubor</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">SGF</div>
-                            <div class="cmd" onmouseup="load">加载棋谱...</div>
-                            <div class="cmd" onmouseup="save">保存棋谱</div>
+                            <div class="cmd" onmouseup="load">Otevřít...</div>
+                            <div class="cmd" onmouseup="save">Uložit</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">系统</div>
-                            <div class="cmd" onmouseup="quit">退出</div>
+                            <div class="hr">Systém</div>
+                            <div class="cmd" onmouseup="quit">Konec</div>
                         </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>显示方式</span>
+                    <span>Zobrazení</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr">外观</div>
+                            <div class="hr">Vzhled</div>
                             <div class="cmd">
                                 <select id="selectShader"
                                         onchange="shader" onmousedown="nop"/>
                             </div>
                         </div>
                         <div class="grp">
-                            <div class="hr">窗口</div>
-                            <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">全屏</div>
+                            <div class="hr">Okno</div>
+                            <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">Celá obrazovka</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">显示手数</div>
-                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">最后一手</div>
+                            <div class="hr">Indikátor</div>
+                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">Poslední tah</div>
                         </div>
                         <!--
                         <div class="grp">
@@ -51,30 +51,30 @@
                         </div>
                         -->
                         <div class="grp">
-                            <div class="hr">视角</div>
+                            <div class="hr">Kamera</div>
                             <!--<div class="cmd" onmouseup="free camera toggle">Toggle free</div>-->
-                            <div class="cmd" onmouseup="reset camera">复位</div>
-                            <div class="cmd" onmouseup="animate">播放动画</div>
-                            <div class="hr">视角预设</div>
-                            <div class="cmd" onmouseup="save camera">保存</div>
-                            <div class="cmd" onmouseup="delete camera">还原</div>
+                            <div class="cmd" onmouseup="reset camera">Výchozí</div>
+                            <div class="cmd" onmouseup="animate">Animace</div>
+                            <div class="hr">Uložená pozice</div>
+                            <div class="cmd" onmouseup="save camera">Uložit</div>
+                            <div class="cmd" onmouseup="delete camera">Smazat</div>
                         </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>游戏</span>
+                    <span>Hra</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr" id="blackMoves">黑棋</div>
+                            <div class="hr" id="blackMoves">Černý hráč</div>
                             <div class="cmd">
                                 <select id="selectBlack"
                                         onchange="engine" onmousedown="nop"/>
                             </div>
-                            <div class="hr"  id="whiteMoves">白棋</div>
+                            <div class="hr"  id="whiteMoves">Bílý hráč</div>
                             <div class="cmd">
                                 <select id="selectWhite" onchange="engine" onmousedown="nop"/>
                             </div>
-                            <div class="hr">棋盘大小</div>
+                            <div class="hr">Velikost desky</div>
                             <div class="cmd">
                                 <select id="selBoard"
                                         onmousedown="nop" onchange="boardsize">
@@ -87,7 +87,7 @@
                                     <option value="9">9×9</option>
                                 </select>
                             </div>
-                            <div class="hr">贴目</div>
+                            <div class="hr">Komi</div>
                             <div class="cmd">
                                 <select id="selectKomi"
                                         onmousedown="nop" onchange="komi">
@@ -96,90 +96,90 @@
                                     <option value="7.5" selected>7.5</option>
                                 </select>
                             </div>
-                            <div class="hr">让子棋</div>
+                            <div class="hr">Handicap</div>
                             <div class="cmd">
                                 <select id="selectHandicap"
                                         onchange="handicap" onmousedown="nop">
-                                    <option value="0" selected>不让子</option>
-                                    <option value="2">让2子</option>
-                                    <option value="3">让3子</option>
-                                    <option value="4">让4子</option>
-                                    <option value="5">让5子</option>
-                                    <option value="6">让6子</option>
-                                    <option value="7">让7子</option>
-                                    <option value="8">让8子</option>
-                                    <option value="9">让9子</option>
+                                    <option value="0" selected>bez handicapu</option>
+                                    <option value="2">2 kameny</option>
+                                    <option value="3">3 kameny</option>
+                                    <option value="4">4 kameny</option>
+                                    <option value="5">5 kamenů</option>
+                                    <option value="6">6 kamenů</option>
+                                    <option value="7">7 kamenů</option>
+                                    <option value="8">8 kamenů</option>
+                                    <option value="9">9 kamenů</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>落子</span>
+                    <span>Tah</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div id="grpGame">
-                            <div class="hr">游戏</div>
-                            <div class="cmd" id="cmdStart" onmouseup="start">开始</div>
-                            <div class="cmd" id="cmdClear" onmouseup="clear">清除</div>
-                            <div class="template" id="templateResignWhiteWon">白中盘胜</div>
-                            <div class="template" id="templateResignBlackWon">黑中盘胜</div>
-                            <div class="template" id="templateWhiteWon">白胜%.1f目</div>
-                            <div class="template" id="templateBlackWon">黑胜%.1f目</div>
-                            <div class="template" id="templateWhiteResigns">白方认输</div>
-                            <div class="template" id="templateBlackResigns">黑方认输</div>
-                            <div class="template" id="templateWhitePasses">白方虚着</div>
-                            <div class="template" id="templateBlackPasses">黑方虚着</div>
-                            <div class="template" id="templateCalculatingScore">计算得分中...</div>
+                            <div class="hr">Partie</div>
+                            <div class="cmd" id="cmdStart" onmouseup="start">Začít</div>
+                            <div class="cmd" id="cmdClear" onmouseup="clear">Nová hra</div>
+                            <div class="template" id="templateResignWhiteWon">Bílý vítězí vzdáním.</div>
+                            <div class="template" id="templateResignBlackWon">Černý vítězí vzdáním.</div>
+                            <div class="template" id="templateWhiteWon">Bílý vítězí o %.1f</div>
+                            <div class="template" id="templateBlackWon">Černý vítězí o %.1f</div>
+                            <div class="template" id="templateWhiteResigns">Bílý se vzdává</div>
+                            <div class="template" id="templateBlackResigns">Černý se vzdává</div>
+                            <div class="template" id="templateWhitePasses">Bílý pasuje</div>
+                            <div class="template" id="templateBlackPasses">Černý pasuje</div>
+                            <div class="template" id="templateCalculatingScore">Počítám skóre...</div>
                             </div>
                             <div id="grpMoves">
-                            <div class="hr">落子</div>
-                            <div class="cmd" id="cmdPass" onmouseup="pass">停一手</div>
-                            <div class="cmd" onmouseup="play once">提示</div>
-                            <div class="cmd" onmouseup="undo move">悔棋</div>
-                            <div class="cmd" id="cmdResign" onmouseup="resign">认输</div>
+                            <div class="hr">Tah</div>
+                            <div class="cmd" id="cmdPass" onmouseup="pass">Pas</div>
+                            <div class="cmd" onmouseup="play once">Nápověda</div>
+                            <div class="cmd" onmouseup="undo move">Zpět</div>
+                            <div class="cmd" id="cmdResign" onmouseup="resign">Vzdát se</div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>分析</span>
+                    <span>Analýza</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">GnuGo</div>
-                            <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">形势判断</div>
+                            <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">Území</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">提子</div>
-                            <div class="template" id="templatePrisonersWhite">白: %d</div>
-                            <div class="template" id="templatePrisonersBlack">黑: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite">白: 0</div>
-                            <div class="cmd" id="lblPrisonersBlack">黑: 0</div>
+                            <div class="hr">Zajatci</div>
+                            <div class="template" id="templatePrisonersWhite">Bílý: %d</div>
+                            <div class="template" id="templatePrisonersBlack">Černý: %d</div>
+                            <div class="cmd" id="lblPrisonersWhite">Bílý: 0</div>
+                            <div class="cmd" id="lblPrisonersBlack">Černý: 0</div>
                         </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable right">
-                    <span>关于我们</span>
+                    <span>O programu</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr">版本</div>
+                            <div class="hr">Verze</div>
                             <div class="cmd" onmouseup="about">Goban 0.0.3</div>
                         </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable right">
-                    <span>选项</span>
+                    <span>Možnosti</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr">语言</div>
+                            <div class="hr">Jazyk</div>
                             <div class="cmd">
                                 <select id="selectLanguage" onchange="language" onmousedown="nop">
                                 </select>
                             </div>
                         </div>
                         <div class="grp">
-                            <div class="hr">帧率</div>
-                            <div class="template" id="templateFPS">%.1f 帧/秒</div>
+                            <div class="hr">Snímková frekvence</div>
+                            <div class="template" id="templateFPS">%.1f fps</div>
                             <div class="cmd" id="lblFPS" onmouseup="fps"></div>
                         </div>
                     </div>

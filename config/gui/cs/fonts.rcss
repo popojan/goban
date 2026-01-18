@@ -1,0 +1,6 @@
+/* Czech font configuration - using Noto Sans for Latin diacritics support */
+
+body, html
+{
+  font-family: "Noto Sans";
+}

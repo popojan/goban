@@ -1,0 +1,59 @@
+<rml class="open">
+<head>
+    <link type="text/css" href="../base.rcss"/>
+    <link type="text/css" href="fonts.rcss"/>
+    <link type="text/css" href="../open.rcss"/>
+    <title>Otevřít SGF soubor</title>
+</head>
+<body id="open_dialog" class="open">
+    <div id="file_chooser" class="dialog">
+        <div class="content">
+            <div class="main_content">
+                <div class="file_list_container">
+                    <div class="section_title">Záznamy v <span class="sep path_display" id="current_path">data/sgf</span></div>
+                    <div class="item_list" id="files_list">
+                    </div>
+                    <div class="pagination_controls">
+                        <span class="cmd pagination_button" id="files_prev" onmouseup="files_prev_page">Předchozí</span>
+                        <span class="pagination_info" id="files_page_info">Strana 1 z 1</span>
+                        <span class="cmd pagination_button" id="files_next" onmouseup="files_next_page">Další</span>
+                    </div>
+                </div>
+
+                <div class="preview_container">
+                    <div class="section_title">Obsah vybraného souboru</div>
+                    <div class="item_list" id="games_list">
+                    </div>
+                    <div class="pagination_controls">
+                        <span class="cmd pagination_button" id="games_prev" onmouseup="games_prev_page">Předchozí</span>
+                        <span class="pagination_info" id="games_page_info">Strana 1 z 1</span>
+                        <span class="cmd pagination_button" id="games_next" onmouseup="games_next_page">Další</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom">
+                <span class="cmd button" onmouseup="cancel">Zrušit</span>
+                <span class="cmd button primary" id="open_button" onmouseup="open_file">Otevřít</span>
+            </div>
+            <div class="bottomleft">
+                <span class="cmd button" onmouseup="refresh">Obnovit</span>
+            </div>
+        </div>
+    </div>
+    <!-- Templates for C++ localization -->
+    <div class="template" id="tplDirectory">Adresář</div>
+    <div class="template" id="tplSgfFile">SGF soubor</div>
+    <div class="template" id="tplUp">Nahoru</div>
+    <div class="template" id="tplPageInfo">Strana %d z %d</div>
+    <div class="template" id="tplGameInfo">Partie %d (%dx%d, %d tahů)</div>
+    <!-- Column headers for games table -->
+    <div class="template" id="tplColIndex">#</div>
+    <div class="template" id="tplColBoard">Deska</div>
+    <div class="template" id="tplColBlack">Černý</div>
+    <div class="template" id="tplColWhite">Bílý</div>
+    <div class="template" id="tplColResult">Výsledek</div>
+    <div class="template" id="tplColMoves">Tahy</div>
+    <div class="template" id="tplColKomi">Komi</div>
+    <div class="template" id="tplColPlayers">Hráči</div>
+</body>
+</rml>

@@ -1,6 +1,6 @@
-/* English font configuration */
+/* English font configuration - using Noto Sans for Latin support */
 
 body, html
 {
-  font-family: "Noto Sans CJK SC";
+  font-family: "Noto Sans";
 }

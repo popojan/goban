@@ -1,7 +1,7 @@
 {
-  "language_name": "English",
+  "language_name": "Čeština",
   "humans": [
-    "Human"
+    "Člověk"
   ],
   "bots": [
     {
@@ -185,5 +185,5 @@
     "game_columns": ["index", "board", "black", "white", "moves", "result"],
     "games_path": "./games"
   },
-  "gui": "./config/gui/en"
+  "gui": "./config/gui/cs"
 }
