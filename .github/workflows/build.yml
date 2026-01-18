@@ -104,28 +104,27 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup MSVC and Ninja
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Install Ninja
-        run: choco install ninja -y
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
 
       - name: Install dependencies via vcpkg
         run: vcpkg install freetype boost-system boost-filesystem boost-iostreams portaudio libsndfile --triplet x64-windows-static
 
       - name: Build prerequisites
+        shell: cmd
         run: |
           mkdir build
           cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON "-DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static
-          cmake --build .
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          cmake --build . --config Release
 
       - name: Build goban
+        shell: cmd
         continue-on-error: true
         run: |
           cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF "-DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static
-          cmake --build .
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          cmake --build . --config Release
 
       - name: Upload artifact
         if: success()
