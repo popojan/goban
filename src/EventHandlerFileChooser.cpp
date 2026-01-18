@@ -16,14 +16,15 @@ EventHandlerFileChooser::EventHandlerFileChooser() : dialogDocument(nullptr), da
 
 // DialogKeyListener implementation
 void DialogKeyListener::ProcessEvent(Rml::Event& event) {
-    if (event.GetType() == "keydown") {
-        auto key = event.GetParameter<int>("key_identifier", 0);
-        // ESC key in RmlUi is typically Rml::Input::KI_ESCAPE = 27
-        if (key == 27 || key == Rml::Input::KI_ESCAPE) {
-            spdlog::info("ESC pressed, closing dialog");
+    auto key = event.GetParameter<int>("key_identifier", 0);
+    // ESC key in RmlUi is KI_ESCAPE = 81
+    if (key == Rml::Input::KI_ESCAPE) {
+        // Hide on keyup so dialog remains modal to consume both events
+        if (event.GetType() == "keyup") {
+            spdlog::info("ESC released, closing dialog");
             handler->HideDialog();
-            event.StopPropagation();
         }
+        event.StopImmediatePropagation();
     }
 }
 
@@ -150,6 +151,8 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
         if (colonPos != std::string::npos) {
             int index = std::stoi(value.substr(colonPos + 1).c_str());
             handleFileSelection(index);
+            event.StopImmediatePropagation();
+            return;
         }
     }
     else if (value.substr(0, 11) == "select_game") {
@@ -158,6 +161,8 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
         if (colonPos != std::string::npos) {
             int index = std::stoi(value.substr(colonPos + 1).c_str());
             handleGameSelection(index);
+            event.StopImmediatePropagation();
+            return;
         }
     }
 
@@ -172,21 +177,22 @@ void EventHandlerFileChooser::LoadDialog(Rml::Context* context) {
 
     if (dialogDocument) {
         dialogDocument->Hide();
-        // Add keyboard listener for ESC key
+        // Add keyboard listener for ESC key (both down and up)
         dialogDocument->AddEventListener(Rml::EventId::Keydown, keyListener);
+        dialogDocument->AddEventListener(Rml::EventId::Keyup, keyListener);
 
         // Add click listeners on the list divs for event delegation
         auto filesList = dialogDocument->GetElementById("files_list");
         if (filesList) {
             spdlog::info("Adding click listener to files_list");
-            filesList->AddEventListener(Rml::EventId::Click, new Event("files_list_click"));
+            filesList->AddEventListener(Rml::EventId::Mouseup, new Event("files_list_click"));
         } else {
             spdlog::error("files_list not found!");
         }
         auto gamesList = dialogDocument->GetElementById("games_list");
         if (gamesList) {
             spdlog::info("Adding click listener to games_list");
-            gamesList->AddEventListener(Rml::EventId::Click, new Event("games_list_click"));
+            gamesList->AddEventListener(Rml::EventId::Mouseup, new Event("games_list_click"));
         } else {
             spdlog::error("games_list not found!");
         }
@@ -211,14 +217,47 @@ void EventHandlerFileChooser::ShowDialog() {
         return;
     }
 
-    // Refresh file list and show dialog
+    // Save current selection before refresh
+    std::string selectedFilePath = dataSource->GetSelectedFilePath();
+    int selectedGameIdx = dataSource->GetSelectedGameIndex();
+
+    // Refresh file list
     dataSource->RefreshFiles();
     populateFilesList();
     updateCurrentPath();
     updatePaginationInfo();
 
-    dialogDocument->Show();
+    // Restore selection if file still exists
+    if (!selectedFilePath.empty()) {
+        int newIndex = dataSource->FindFileByPath(selectedFilePath);
+        if (newIndex >= 0) {
+            dataSource->SelectFile(newIndex);
+            dataSource->LoadSelectedFileGames();
+            populateGamesList();
+            // Restore game selection
+            if (selectedGameIdx >= 0 && selectedGameIdx < dataSource->GetNumRows("games")) {
+                dataSource->SelectGame(selectedGameIdx);
+                // Update visual selection for game
+                auto gamesList = dialogDocument->GetElementById("games_list");
+                if (gamesList && selectedGameIdx < gamesList->GetNumChildren()) {
+                    // Clear default selection from first item
+                    for (int i = 0; i < gamesList->GetNumChildren(); ++i) {
+                        gamesList->GetChild(i)->SetClass("selected", false);
+                    }
+                    gamesList->GetChild(selectedGameIdx)->SetClass("selected", true);
+                }
+            }
+            // Update visual selection for file
+            auto filesList = dialogDocument->GetElementById("files_list");
+            if (filesList && newIndex < filesList->GetNumChildren()) {
+                filesList->GetChild(newIndex)->SetClass("selected", true);
+            }
+        }
+    }
+
+    dialogDocument->Show(Rml::ModalFlag::Modal, Rml::FocusFlag::Auto);
     dialogDocument->PullToFront();
+    spdlog::info("Dialog shown, IsModal={}", dialogDocument->IsModal());
     requestRepaint();
 }
 
@@ -254,6 +293,12 @@ void EventHandlerFileChooser::populateFilesList() {
 
             if (rowElement) {
                 rowElement->SetClass("file_row", true);
+                rowElement->SetAttribute("data-index", std::to_string(i));
+
+                // Mark as selected if this is the currently selected file
+                if (i == dataSource->GetSelectedFileIndex()) {
+                    rowElement->SetClass("selected", true);
+                }
 
                 // Create name span
                 Rml::ElementPtr nameSpan = Rml::Factory::InstanceElement(
@@ -272,6 +317,10 @@ void EventHandlerFileChooser::populateFilesList() {
                     typeSpan->SetInnerRML(row[1].c_str());
                     rowElement->AppendChild(std::move(typeSpan));
                 }
+
+                // Add mousedown listener directly to row
+                std::string eventValue = "select_file:" + std::to_string(i);
+                rowElement->AddEventListener(Rml::EventId::Mousedown, new Event(eventValue));
 
                 filesList->AppendChild(std::move(rowElement));
             }
@@ -304,6 +353,7 @@ void EventHandlerFileChooser::populateGamesList() {
 
             if (rowElement) {
                 rowElement->SetClass("game_row", true);
+                rowElement->SetAttribute("data-index", std::to_string(i));
 
                 // Mark first game as selected by default
                 if (i == 0) {
@@ -327,6 +377,10 @@ void EventHandlerFileChooser::populateGamesList() {
                     playersSpan->SetInnerRML(row[1].c_str());
                     rowElement->AppendChild(std::move(playersSpan));
                 }
+
+                // Add mousedown listener directly to row
+                std::string eventValue = "select_game:" + std::to_string(i);
+                rowElement->AddEventListener(Rml::EventId::Mousedown, new Event(eventValue));
 
                 gamesList->AppendChild(std::move(rowElement));
             }

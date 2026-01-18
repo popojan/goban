@@ -260,6 +260,15 @@ std::string FileChooserDataSource::GetSelectedFilePath() const {
     return "";
 }
 
+int FileChooserDataSource::FindFileByPath(const std::string& path) const {
+    for (size_t i = 0; i < files.size(); ++i) {
+        if (files[i].fullPath.string() == path) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
 void FileChooserDataSource::LoadSelectedFileGames() {
     const FileEntry* file = GetSelectedFile();
     if (file && !file->isDirectory && file->name.find(".sgf") != std::string::npos) {

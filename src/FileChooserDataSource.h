@@ -52,11 +52,13 @@ public:
     // File selection
     void SelectFile(int fileIndex);
     const FileEntry* GetSelectedFile() const;
+    int FindFileByPath(const std::string& path) const;
     
     // Game selection
     void SelectGame(int gameIndex);
     const SGFGameInfo* GetSelectedGame() const;
     int GetSelectedGameIndex() const;
+    int GetSelectedFileIndex() const { return selectedFileIndex; }
     
     // Get selected file path for loading
     std::string GetSelectedFilePath() const;
@@ -90,8 +92,8 @@ private:
     std::string strSgfFile = "SGF File";
     std::string strUp = "Up";
     std::string strGameInfoFmt = "Game %d (%dx%d, %d moves)";
-    static const int FILES_PAGE_SIZE = 15;
-    static const int GAMES_PAGE_SIZE = 15;
+    static const int FILES_PAGE_SIZE = 10000;
+    static const int GAMES_PAGE_SIZE = 10000;
     
     std::filesystem::path currentPath;
     std::vector<FileEntry> files;

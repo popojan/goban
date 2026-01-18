@@ -119,6 +119,7 @@ void ElementGame::ProcessEvent(Rml::Event& event)
 
     if (event == "keydown" || event == "keyup") {
         Rml::Input::KeyIdentifier key_identifier = (Rml::Input::KeyIdentifier) event.GetParameter< int >("key_identifier", 0);
+        spdlog::debug("ElementGame received {} key={}", event.GetType().c_str(), key_identifier);
         control.keyPress(key_identifier, 0, 0, event == "keydown");
     }
     else if (event == "mousemove") {
