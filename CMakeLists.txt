@@ -620,14 +620,5 @@ else()
         nlohmann_json::nlohmann_json
         ${EXTRA_LIBS}
     )
-    set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/publish/Goban)
-
-    file(COPY ${PROJECT_SOURCE_DIR}/data DESTINATION ${RELEASE_DIR})
-    file(COPY ${PROJECT_SOURCE_DIR}/engine DESTINATION ${RELEASE_DIR})
-
-    install(DIRECTORY DESTINATION ${RELEASE_DIR})
-    install(TARGETS ${PROJECT_NAME}
-        RUNTIME DESTINATION ${RELEASE_DIR}
-        BUNDLE DESTINATION ${RELEASE_DIR})
 
 endif()
