@@ -1,0 +1,23 @@
+{
+  "camera": {
+    "rotation": {
+      "w": 0,
+      "x": -0.885992,
+      "y": 0.463701,
+      "z": 0
+    },
+    "translation": {
+      "x": 0.0767509,
+      "y": 0.273361,
+      "z": -0.432482
+    }
+  },
+  "fullscreen": false,
+  "last_config": "./config/en.json",
+  "shader": {
+    "contrast": 0,
+    "dof": -0.0025,
+    "eof": 0.0775,
+    "gamma": 1
+  }
+}
