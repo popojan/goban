@@ -107,12 +107,16 @@ jobs:
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v2
 
+      - name: Install dependencies via vcpkg
+        run: |
+          vcpkg install freetype boost-system boost-filesystem boost-iostreams portaudio libsndfile --triplet x64-windows-static
+
       - name: Build prerequisites
         shell: cmd
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
           cmake --build . --config Release --parallel
 
       - name: Build goban
@@ -120,7 +124,7 @@ jobs:
         continue-on-error: true  # May need fixes for Windows CI
         run: |
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
           cmake --build . --config Release --parallel
 
       - name: Upload artifact
