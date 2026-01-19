@@ -336,6 +336,7 @@ int main(int argc, char** argv)
     auto logger = std::make_shared<spdlog::logger>("multi_sink", sink_list.begin(), sink_list.end());
     spdlog::set_default_logger(logger);
     logger->set_level(spdlog::level::from_str(logLevel));
+    logger->flush_on(spdlog::level::from_str(logLevel));  // Flush immediately for crash debugging
 
     int window_width = 1024;
     int window_height = 768;
