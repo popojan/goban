@@ -269,12 +269,15 @@ else()
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
         set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     elseif(APPLE)
+        # iconv is needed by libsgfcplusplus for SGF encoding conversion
+        find_library(ICONV_LIBRARY iconv REQUIRED)
         set(EXTRA_LIBS
                 ${COCOA_LIBRARY}
                 ${IOKIT_LIBRARY}
                 ${COREVIDEO_LIBRARY}
                 ${COREAUDIO_LIBRARY}
                 ${AUDIOTOOLBOX_LIBRARY}
+                ${ICONV_LIBRARY}
                 pthread
                 ${CMAKE_THREAD_LIBS_INIT}
         )
