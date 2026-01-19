@@ -44,7 +44,7 @@ EventHandlerFileChooser::~EventHandlerFileChooser() {
 }
 
 void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String& value) {
-    spdlog::info("EventHandlerFileChooser::ProcessEvent value: '{}' type: '{}'", value.c_str(), event.GetType().c_str());
+    spdlog::debug("EventHandlerFileChooser::ProcessEvent value: '{}' type: '{}'", value.c_str(), event.GetType().c_str());
 
     if (value == "load") {
         ShowDialog();
