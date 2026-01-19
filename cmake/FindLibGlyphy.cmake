@@ -2,6 +2,7 @@ find_path(LIBGLYPHY_INCLUDE_DIR NAMES glyphy.h HINTS  ${PROJECT_SOURCE_DIR}/deps
 
 find_library(LIBGLYPHY_LIBRARY NAMES goban_glyphy.lib libglyphy.a
     HINTS ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/x64/${CMAKE_BUILD_TYPE}
+    HINTS ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/${CMAKE_BUILD_TYPE}
     HINTS ${PROJECT_BINARY_DIR}/deps/glyphy/build/src/.libs
 )
 
