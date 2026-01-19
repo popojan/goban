@@ -83,7 +83,6 @@ jobs:
           make -j$(sysctl -n hw.ncpu) || true
 
       - name: Build goban
-        continue-on-error: true  # Expected to fail until CMakeLists.txt is fixed for macOS
         run: |
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
@@ -120,11 +119,10 @@ jobs:
 
       - name: Build goban
         shell: cmd
-        continue-on-error: true
         run: |
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
-          cmake --build . --config Release --verbose
+          cmake --build . --config Release
 
       - name: Upload artifact
         if: success()
