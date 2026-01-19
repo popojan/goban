@@ -378,6 +378,9 @@ else()
         ${GLYPHY_SRC_FILES}
         ${RMLUI_BACKEND_SRC_FILES}
     )
+    if(WIN32)
+        target_sources(${PROJECT_NAME} PRIVATE src/goban.rc)
+    endif()
     target_include_directories(${PROJECT_NAME} PRIVATE
             ${glm_SOURCE_DIR}
             src
