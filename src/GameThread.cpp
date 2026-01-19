@@ -243,13 +243,10 @@ void GameThread::gameLoop() {
             bool kibitzed = false;
             bool doubleUndo = false;
             playerToMove = player;
-            if(!player->isTypeOf(Player::HUMAN)){
-                lock.lock();
-                locked = true;
-            }
             //cancel blocking wait for input if human player
             player->suggestMove(Move(Move::INVALID, model.state.colorToMove));
-            //blocking wait for move
+            //blocking wait for move - do NOT hold mutex during this wait
+            //to keep UI responsive (especially important for slow engines like KataGo loading models)
             Move move = player->genmove(model.state.colorToMove);
             if(move == Move::KIBITZED) {
                 move = kibitz->genmove(model.state.colorToMove);
@@ -257,10 +254,9 @@ void GameThread::gameLoop() {
             }
             spdlog::debug("MOVE to {}, valid = {}", move.toString(), (bool)move);
             playerToMove = nullptr;
-            if(player->isTypeOf(Player::HUMAN)){
-                lock.lock();
-                locked = true;
-            }
+            //lock mutex after genmove returns, before processing the move result
+            lock.lock();
+            locked = true;
             //TODO no direct access to model but via observers
             if (move == Move::UNDO) {
                 bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
