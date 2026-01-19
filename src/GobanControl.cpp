@@ -8,8 +8,7 @@
 #include "GobanControl.h"
 #include "EventHandlerFileChooser.h"
 #include "EventManager.h"
-#include <nlohmann/json.hpp>
-#include <fstream>
+#include "UserSettings.h"
 
 bool GobanControl::newGame(unsigned boardSize) {
     engine.interrupt();
@@ -97,20 +96,7 @@ bool GobanControl::command(const std::string& cmd) {
     else if (cmd == "toggle_fullscreen") {
         fullscreen = AppState::ToggleFullscreen();
         checked = fullscreen;
-
-        // Save fullscreen state to user.json
-        nlohmann::json user;
-        std::ifstream fin("user.json");
-        if (fin) {
-            try { fin >> user; } catch (...) {}
-            fin.close();
-        }
-        user["fullscreen"] = fullscreen;
-        std::ofstream fout("user.json");
-        if (fout) {
-            fout << user.dump(2);
-            fout.close();
-        }
+        UserSettings::instance().setFullscreen(fullscreen);
     }
     else if (cmd == "fps") {
         checked = view.toggleFpsLimit();
@@ -324,6 +310,13 @@ void GobanControl::switchPlayer(int which, int newPlayerIndex) {
 
 void GobanControl::switchShader(int newShaderIndex) {
     view.switchShader(newShaderIndex);
+
+    // Save shader name to user settings
+    auto shaders = config->data.value("shaders", nlohmann::json::array());
+    if (newShaderIndex >= 0 && newShaderIndex < static_cast<int>(shaders.size())) {
+        std::string shaderName = shaders[newShaderIndex].value("name", "");
+        UserSettings::instance().setShaderName(shaderName);
+    }
 }
 
 void GobanControl::destroy() {

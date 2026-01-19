@@ -4,8 +4,8 @@
 #include "ElementGame.h"
 
 #include <iostream>
-#include <fstream>
-#include <nlohmann/json.hpp>
+#include <cstdio>
+#include "UserSettings.h"
 
 GobanView::GobanView(GobanModel& m)
     :
@@ -78,46 +78,41 @@ void GobanView::endZoom() {
 }
 
 void GobanView::resetView() {
-    std::ifstream fin("user.json");
-    if(fin) {
-        try {
-            nlohmann::json user;
-            fin >> user;
-            fin.close();
+    auto& settings = UserSettings::instance();
 
-            if (user.contains("camera")) {
-                auto& camera = user["camera"];
-                if (camera.contains("rotation")) {
-                    auto& rot = camera["rotation"];
-                    cam.rLast[0] = rot.value("x", cam.rLast[0]);
-                    cam.rLast[1] = rot.value("y", cam.rLast[1]);
-                    cam.rLast[2] = rot.value("z", cam.rLast[2]);
-                    cam.rLast[3] = rot.value("w", cam.rLast[3]);
-                }
-                if (camera.contains("translation")) {
-                    auto& trans = camera["translation"];
-                    newTranslate[0] = trans.value("x", newTranslate[0]);
-                    newTranslate[1] = trans.value("y", newTranslate[1]);
-                    newTranslate[2] = trans.value("z", newTranslate[2]);
-                }
-            }
-            if (user.contains("shader")) {
-                auto& shader = user["shader"];
-                gobanShader.setEof(shader.value("eof", gobanShader.getEof()));
-                gobanShader.setDof(shader.value("dof", gobanShader.getDof()));
-                gobanShader.setGamma(shader.value("gamma", gobanShader.getGamma()));
-                gobanShader.setContrast(shader.value("contrast", gobanShader.getContrast()));
-            }
-            translate[0] = newTranslate[0];
-            translate[1] = newTranslate[1];
-            translate[2] = newTranslate[2];
-            updateFlag |= UPDATE_SHADER;
-        } catch (const std::exception& e) {
-            spdlog::warn("failed to parse user.json: {}", e.what());
-        }
-    } else {
-        spdlog::debug("no saved view found");
+    if (settings.hasCameraSettings()) {
+        cam.rLast[0] = settings.getCameraRotationX();
+        cam.rLast[1] = settings.getCameraRotationY();
+        cam.rLast[2] = settings.getCameraRotationZ();
+        cam.rLast[3] = settings.getCameraRotationW();
+        newTranslate[0] = settings.getCameraTranslationX();
+        newTranslate[1] = settings.getCameraTranslationY();
+        newTranslate[2] = settings.getCameraTranslationZ();
     }
+
+    if (settings.hasShaderSettings()) {
+        // Restore shader by name
+        std::string savedName = settings.getShaderName();
+        if (!savedName.empty()) {
+            auto shaders = config->data.value("shaders", nlohmann::json::array());
+            for (int i = 0; i < static_cast<int>(shaders.size()); i++) {
+                if (shaders[i].value("name", "") == savedName) {
+                    switchShader(i);
+                    break;
+                }
+            }
+        }
+        gobanShader.setEof(settings.getShaderEof());
+        gobanShader.setDof(settings.getShaderDof());
+        gobanShader.setGamma(settings.getShaderGamma());
+        gobanShader.setContrast(settings.getShaderContrast());
+    }
+
+    translate[0] = newTranslate[0];
+    translate[1] = newTranslate[1];
+    translate[2] = newTranslate[2];
+    updateFlag |= UPDATE_SHADER;
+
     lastTime = 0.0;
     startTime = static_cast<float>(glfwGetTime());
     animationRunning = true;
@@ -125,35 +120,17 @@ void GobanView::resetView() {
 }
 
 void GobanView::saveView() {
-    // Read existing user.json to preserve other settings (last_config, fullscreen, etc.)
-    nlohmann::json user;
-    std::ifstream fin("user.json");
-    if (fin) {
-        try { fin >> user; } catch (...) {}
-        fin.close();
-    }
+    auto& settings = UserSettings::instance();
 
-    user["camera"]["rotation"] = {
-        {"x", cam.rLast[0]},
-        {"y", cam.rLast[1]},
-        {"z", cam.rLast[2]},
-        {"w", cam.rLast[3]}
-    };
-    user["camera"]["translation"] = {
-        {"x", newTranslate[0]},
-        {"y", newTranslate[1]},
-        {"z", newTranslate[2]}
-    };
-    user["shader"] = {
-        {"eof", gobanShader.getEof()},
-        {"dof", gobanShader.getDof()},
-        {"gamma", gobanShader.getGamma()},
-        {"contrast", gobanShader.getContrast()}
-    };
+    settings.setCameraRotation(cam.rLast[0], cam.rLast[1], cam.rLast[2], cam.rLast[3]);
+    settings.setCameraTranslation(newTranslate[0], newTranslate[1], newTranslate[2]);
 
-    std::ofstream fout("user.json");
-    fout << user.dump(2);
-    fout.close();
+    settings.setShaderEof(gobanShader.getEof());
+    settings.setShaderDof(gobanShader.getDof());
+    settings.setShaderGamma(gobanShader.getGamma());
+    settings.setShaderContrast(gobanShader.getContrast());
+
+    settings.save();
 }
 
 void GobanView::clearView() {

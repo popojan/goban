@@ -71,7 +71,13 @@ void ElementGame::populateEngines() {
         std::string shaderIndex(ss.str());
         selectShader->Add(shaderName.c_str(),shaderIndex.c_str());
     }
-    selectShader->SetSelection(0);
+    // Sync shader menu to restored shader state
+    int currentShader = view.gobanShader.getCurrentProgram();
+    if (currentShader >= 0 && currentShader < static_cast<int>(shaders.size())) {
+        selectShader->SetSelection(currentShader);
+    } else {
+        selectShader->SetSelection(0);
+    }
 
     // Populate languages from config/*.json files
     auto selectLanguage = dynamic_cast<Rml::ElementFormControlSelect*>(

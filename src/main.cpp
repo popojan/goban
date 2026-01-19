@@ -50,6 +50,8 @@
 #include <memory>
 #include <fstream>
 
+#include "UserSettings.h"
+
 Rml::Context* context = nullptr;
 std::shared_ptr<Configuration> config;
 
@@ -59,23 +61,7 @@ static std::string g_pending_restart_config;
 
 void RequestRestart(const std::string& configFile) {
     g_pending_restart_config = configFile;
-
-    // Save last_config to user.json
-    nlohmann::json user;
-    std::ifstream fin("user.json");
-    if (fin) {
-        try {
-            fin >> user;
-        } catch (...) {}
-        fin.close();
-    }
-    user["last_config"] = configFile;
-    std::ofstream fout("user.json");
-    if (fout) {
-        fout << user.dump(2);
-        fout.close();
-    }
-
+    UserSettings::instance().setLastConfig(configFile);
     AppState::RequestExit();
 }
 
@@ -295,25 +281,10 @@ int main(int argc, char** argv)
     using namespace clipp;
     std::string logLevel("warning");
 
-    // Try to read user preferences from user.json
-    std::string configurationFile("./config/en.json");
-    bool startFullscreen = false;
-    {
-        std::ifstream fin("user.json");
-        if (fin) {
-            try {
-                nlohmann::json user;
-                fin >> user;
-                if (user.contains("last_config")) {
-                    configurationFile = user["last_config"].get<std::string>();
-                }
-                if (user.contains("fullscreen")) {
-                    startFullscreen = user["fullscreen"].get<bool>();
-                }
-            } catch (...) {}
-            fin.close();
-        }
-    }
+    // Load user preferences
+    UserSettings::instance().load();
+    std::string configurationFile = UserSettings::instance().getLastConfig();
+    bool startFullscreen = UserSettings::instance().getFullscreen();
 
     auto cli = (
         option("-v", "--verbosity") & word("level", logLevel),

@@ -369,6 +369,7 @@ else()
         src/glad/src/glad.c
         src/GameRecord.cpp
         src/AppState.cpp
+        src/UserSettings.cpp
     )
     target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
