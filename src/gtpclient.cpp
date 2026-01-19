@@ -42,14 +42,45 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
 
     ZeroMemory(&pi, sizeof(pi));
 
+    // Build environment block with workDir added to PATH
+    // This ensures child process can find DLLs in its working directory
+    // Windows searches PATH during process creation for DLL loading
+    std::string envBlock;
+    if (!workDir.empty()) {
+        char* currentEnv = GetEnvironmentStrings();
+        if (currentEnv) {
+            char* var = currentEnv;
+            bool pathFound = false;
+            while (*var) {
+                std::string varStr(var);
+                // Case-insensitive check for PATH (Windows env vars are case-insensitive)
+                std::string varUpper = varStr.substr(0, 5);
+                for (auto& c : varUpper) c = toupper(c);
+                if (varUpper == "PATH=") {
+                    // Prepend workDir to existing PATH
+                    envBlock += varStr.substr(0, varStr.find('=') + 1) + workDir + ";" + varStr.substr(varStr.find('=') + 1);
+                    pathFound = true;
+                } else {
+                    envBlock += varStr;
+                }
+                envBlock += '\0';
+                var += strlen(var) + 1;
+            }
+            if (!pathFound) {
+                envBlock += "PATH=" + workDir;
+                envBlock += '\0';
+            }
+            envBlock += '\0'; // Double null terminator
+            FreeEnvironmentStrings(currentEnv);
+        }
+    }
+
     // Create the child process
-    // CREATE_NO_WINDOW (0x08000000) is needed for console apps launched from GUI apps
-    // Without it, DLL initialization can fail with STATUS_DLL_INIT_FAILED (0xc0000142)
     if (!CreateProcessA(
         NULL,
         const_cast<char*>(cmdLine.c_str()),
-        NULL, NULL, TRUE, CREATE_NO_WINDOW,
-        NULL,
+        NULL, NULL, TRUE, 0,
+        envBlock.empty() ? NULL : const_cast<char*>(envBlock.c_str()),
         workDir.empty() ? NULL : workDir.c_str(),
         &si, &pi)) {
         CloseHandle(hStdinRead);
