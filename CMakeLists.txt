@@ -211,15 +211,17 @@ find_package(Threads)
 find_package(OpenGL REQUIRED)
 
 if(WIN32)
-    # Windows: use vcpkg for dependencies
+    # Windows: use vcpkg for dependencies (CONFIG mode for proper transitive deps)
     find_package(Freetype REQUIRED)
     find_package(Portaudio REQUIRED)
-    find_package(LibSndFile REQUIRED)
+    find_package(SndFile CONFIG REQUIRED)
+    set(SNDFILE_TARGET SndFile::sndfile)
 elseif(APPLE)
     # macOS: GLFW handles Cocoa, PortAudio handles CoreAudio
     find_package(Freetype REQUIRED)
     find_package(Portaudio REQUIRED)
     find_package(LibSndFile REQUIRED)
+    set(SNDFILE_TARGET ${LIBSNDFILE_LIBRARY})
     # macOS frameworks needed for GLFW/PortAudio
     find_library(COCOA_LIBRARY Cocoa REQUIRED)
     find_library(IOKIT_LIBRARY IOKit REQUIRED)
@@ -233,6 +235,7 @@ else()
     find_package(Freetype REQUIRED)
     find_package(Portaudio REQUIRED)
     find_package(LibSndFile REQUIRED)
+    set(SNDFILE_TARGET ${LIBSNDFILE_LIBRARY})
 endif()
 
 option(BuildPrerequisites "BuildPrerequisites" OFF)
@@ -394,7 +397,7 @@ else()
         rmlui
         glfw
         ${PORTAUDIO_LIBRARIES}
-        ${LIBSNDFILE_LIBRARY}
+        ${SNDFILE_TARGET}
         libsgfcplusplus
         spdlog
         clipp
