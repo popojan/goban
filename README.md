@@ -6,7 +6,7 @@ Requires at least one external GTP engine (GNU Go, KataGo, or any GTP-compliant 
 
 Targets Windows, Linux, and macOS.
 
-For Windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/goban).
+For Windows binaries and more screenshots see [hraj.si/goban](https://hraj.si/goban).
 
 Languages can be switched from within the app. Available: English, Chinese, Czech, Japanese, Korean. See [CREDITS.md](CREDITS.md) for translation credits.
 

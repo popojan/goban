@@ -4,7 +4,7 @@ Ray-traced 3D Go board with GLSL rendering.
 
 ## Easy Setup
 
-For ready-to-use bundles with pre-configured engines and all required assets, visit [hraj.si/goban](http://hraj.si/goban)
+For ready-to-use bundles with pre-configured engines and all required assets, visit [hraj.si/goban](https://hraj.si/goban)
 
 ## Advanced: Bare Executables
 
