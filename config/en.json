@@ -23,7 +23,7 @@
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata1-b28c512nbt-s9584861952-d4960414494.bin.gz -config ./default_gtp.cfg",
-      "enabled": 1,
+      "enabled": 0,
       "kibitz": 0,
       "messages": [
           {
