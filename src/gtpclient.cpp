@@ -316,18 +316,18 @@ void StderrReaderThread::readLoop() {
 // GtpClient implementation
 static std::string findExecutable(const std::string& exe, const std::string& path) {
     // Check if executable exists in provided path
-    // If found, return "./<exe>" since Process will chdir to path first
     std::string fullPath = path + "/" + exe;
 #ifdef _WIN32
-    std::string localExe = exe;
+    // On Windows, CreateProcessA searches for exe in parent's current directory,
+    // not in lpCurrentDirectory. So we must return the full path.
     if (exe.find('.') == std::string::npos) {
         std::string withExe = fullPath + ".exe";
         if (GetFileAttributesA(withExe.c_str()) != INVALID_FILE_ATTRIBUTES) {
-            return exe + ".exe";  // Return just the exe name, Process will set workDir
+            return withExe;  // Return full path including .exe
         }
     }
     if (GetFileAttributesA(fullPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        return exe;  // Return just the exe name
+        return fullPath;  // Return full path
     }
 #else
     if (access(fullPath.c_str(), X_OK) == 0) {
