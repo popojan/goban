@@ -6,13 +6,9 @@ Requires at least one external GTP engine (GNU Go, KataGo, or any GTP-compliant 
 
 Targets Windows, Linux, and macOS.
 
-For windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/goban).
+For Windows binaries and more screenshots see [hraj.si/goban](http://hraj.si/goban).
 
-Command to run Chinese translation with suppressed logging:
-
-```
-./goban --verbosity error --config data/zh/config.json
-```
+Languages can be switched from within the app. Available: English, Chinese, Czech, Japanese, Korean. See [CREDITS.md](CREDITS.md) for translation credits.
 
 ![screenshot](/res/screenshot.png)
 

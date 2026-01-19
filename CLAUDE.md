@@ -141,3 +141,11 @@ The application uses JSON configuration files:
 - Windows builds use vcpkg for dependency management (freetype, boost, portaudio, libsndfile)
 - Use the `x64-windows-static` triplet for static linking
 - **Patch file line endings**: Windows Git with `autocrlf=true` converts LF to CRLF on checkout, which corrupts patch files (like `deps/_patches/*.patch`). The `.gitattributes` file ensures patch files always use LF endings. The CMakeLists.txt also uses `git -c core.autocrlf=false apply --ignore-whitespace` to handle this robustly.
+
+### Release Checklist
+
+Before creating a version tag (e.g., `v0.1.0`):
+1. **Update VERSION in CMakeLists.txt** (line 6) - this appears in the About dialog
+2. **Update RELEASE_NOTES.md** if needed
+3. **Commit all changes** before tagging
+4. Push the tag to trigger automatic GitHub Release creation

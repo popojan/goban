@@ -138,4 +138,36 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: goban-windows-${{ matrix.arch }}
-          path: build/Release/goban.exe
+          path: build/**/goban.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          cp artifacts/goban-linux-x64/goban release/goban-linux-x64
+          cp artifacts/goban-macos-x64/goban release/goban-macos-x64 || true
+          find artifacts/goban-windows-x64 -name "goban.exe" -exec cp {} release/goban-windows-x64.exe \;
+          find artifacts/goban-windows-x86 -name "goban.exe" -exec cp {} release/goban-windows-x86.exe \;
+          ls -la release/
+
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          body_path: RELEASE_NOTES.md
+          draft: false
