@@ -277,7 +277,7 @@ void DoAllocConsole()
     ShowWindow(GetConsoleWindow(), SW_HIDE);
 }
 
-int APIENTRY WinMain(HINSTANCE RMLUI_UNUSED_PARAMETER(instance_handle), HINSTANCE RMLUI_UNUSED_PARAMETER(previous_instance_handle), char* RMLUI_UNUSED_PARAMETER(command_line), int RMLUI_UNUSED_PARAMETER(command_show))
+int APIENTRY WinMain(HINSTANCE instance_handle, HINSTANCE previous_instance_handle, char* command_line, int command_show)
 #else
 int main(int argc, char** argv)
 #endif

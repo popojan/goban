@@ -374,7 +374,7 @@ else()
             ${OPENGL_INCLUDE_DIRS}
             ${LIBGLYPHY_INCLUDE_DIR}
             ${FREETYPE_INCLUDE_DIRS}
-            ${SNDFILE_INCLUDE_DIRS}
+            ${LIBSNDFILE_INCLUDE_DIR}
             ${PORTAUDIO_INCLUDE_DIRS}
             ${libsgfcplusplus_inc_dir}
     )
@@ -390,11 +390,11 @@ else()
         ${CMAKE_DL_LIBS}
         ${OPENGL_LIBRARIES}
         libglyphy
-        freetype
+        ${FREETYPE_LIBRARIES}
         rmlui
         glfw
-        portaudio
-        sndfile
+        ${PORTAUDIO_LIBRARIES}
+        ${LIBSNDFILE_LIBRARY}
         libsgfcplusplus
         spdlog
         clipp
