@@ -205,6 +205,10 @@ public:
         }
     };
 
+    // Calculate territory using flood-fill from dead stones
+    // This is GTP-standard compliant (only needs 'dead' status, not gnugo extensions)
+    void calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones);
+
     explicit Board(int size = DEFAULT_SIZE);
 
     bool parseGtp(const std::vector<std::string>& lines);

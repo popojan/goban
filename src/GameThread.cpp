@@ -567,7 +567,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
             
             // Compare coach's calculated score with SGF result
             if (endedWithPasses) {
-                float coachScore = coach->final_score();
+                float coachScore = result.score;  // Already calculated by showterritory()
                 float sgfScore = 0.0f;
                 bool sgfScoreValid = false;
                 

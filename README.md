@@ -2,7 +2,7 @@
 
 Ray traced 3D igo/baduk/weiqi/go board and GUI rendered using GLSL.
 
-External GTP engines supported, GnuGo required as the main engine.
+Requires at least one external GTP engine (GNU Go, KataGo, or any GTP-compliant engine).
 
 Targets Windows, Linux, and macOS.
 

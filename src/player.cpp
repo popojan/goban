@@ -63,22 +63,38 @@ bool GtpEngine::undo() {
 bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
     bool success = true;
     if (finalize) {
-        spdlog::debug("Estimating final territory");
-        board.clearTerritory();
+        spdlog::debug("Estimating final territory (GTP-standard method)");
 
+        // Get dead stones using standard GTP command
         auto deadResult = GtpClient::issueCommand("final_status_list dead");
         spdlog::debug("final_status_list dead: {} response(s)", deadResult.size());
-        success &= setTerritory(deadResult, board, Color::EMPTY);
 
-        auto whiteResult = GtpClient::issueCommand("final_status_list white_territory");
-        spdlog::debug("final_status_list white_territory: {} response(s)", whiteResult.size());
-        success &= setTerritory(whiteResult, board, Color::WHITE);
+        // Parse dead stone positions
+        std::vector<Position> deadStones;
+        if (GtpClient::success(deadResult) && !deadResult.empty()) {
+            // Parse positions from response (format: "= A1 B2 C3 ..." or multi-line)
+            for (const auto& line : deadResult) {
+                std::istringstream ss(line);
+                // Skip leading '=' if present
+                char c = ss.peek();
+                if (c == '=') {
+                    ss.get();
+                }
+                Position pos;
+                while (ss >> pos) {
+                    if (pos.col() >= 0 && pos.row() >= 0) {
+                        deadStones.push_back(pos);
+                        spdlog::debug("Dead stone at: col={} row={}", pos.col(), pos.row());
+                    }
+                }
+            }
+        }
 
-        auto blackResult = GtpClient::issueCommand("final_status_list black_territory");
-        spdlog::debug("final_status_list black_territory: {} response(s)", blackResult.size());
-        success &= setTerritory(blackResult, board, Color::BLACK);
+        // Calculate territory using flood-fill from dead stones
+        board.calculateTerritoryFromDeadStones(deadStones);
+        success = true;
 
-        spdlog::debug("Territory estimation {}", success ? "succeeded" : "failed");
+        spdlog::debug("Territory estimation completed with {} dead stones", deadStones.size());
     }
     else {
         /*

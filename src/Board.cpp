@@ -481,3 +481,109 @@ int Board::placeCursor(const Position& coord, const Color& col) {
 
     return updateStone(pos, col);
 }
+
+void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones) {
+    clearTerritory();
+
+    // Create a working copy of stone colors, treating dead stones as empty
+    std::array<Color::Value, BOARD_SIZE> stoneState;
+    for (int col = 0; col < boardSize; ++col) {
+        for (int row = 0; row < boardSize; ++row) {
+            Position pos(col, row);
+            stoneState[ord(pos)] = points[ord(pos)].stone == Color::EMPTY
+                ? Color::EMPTY
+                : points[ord(pos)].stone == Color::BLACK ? Color::BLACK : Color::WHITE;
+        }
+    }
+
+    // Mark dead stones as empty (they'll become territory)
+    for (const auto& pos : deadStones) {
+        if (pos.col() >= 0 && pos.col() < boardSize &&
+            pos.row() >= 0 && pos.row() < boardSize) {
+            // Mark dead stone's position as territory for opponent
+            Color::Value deadColor = stoneState[ord(pos)];
+            if (deadColor != Color::EMPTY) {
+                points[ord(pos)].influence = Color::other(Color(deadColor));
+            }
+            stoneState[ord(pos)] = Color::EMPTY;
+        }
+    }
+
+    // Track which empty points have been visited
+    std::array<bool, BOARD_SIZE> visited;
+    visited.fill(false);
+
+    // Flood-fill to find territory regions
+    for (int col = 0; col < boardSize; ++col) {
+        for (int row = 0; row < boardSize; ++row) {
+            Position startPos(col, row);
+            int startIdx = ord(startPos);
+
+            // Skip if not empty or already visited
+            if (stoneState[startIdx] != Color::EMPTY || visited[startIdx]) {
+                continue;
+            }
+
+            // Flood-fill this empty region
+            std::vector<Position> region;
+            std::vector<Position> stack;
+            bool touchesBlack = false;
+            bool touchesWhite = false;
+
+            stack.push_back(startPos);
+
+            while (!stack.empty()) {
+                Position current = stack.back();
+                stack.pop_back();
+
+                int idx = ord(current);
+                if (visited[idx]) continue;
+                visited[idx] = true;
+
+                if (stoneState[idx] == Color::EMPTY) {
+                    region.push_back(current);
+
+                    // Check all 4 neighbors
+                    const int dc[] = {-1, 1, 0, 0};
+                    const int dr[] = {0, 0, -1, 1};
+
+                    for (int d = 0; d < 4; ++d) {
+                        int nc = current.col() + dc[d];
+                        int nr = current.row() + dr[d];
+
+                        if (nc >= 0 && nc < boardSize && nr >= 0 && nr < boardSize) {
+                            Position neighbor(nc, nr);
+                            int nIdx = ord(neighbor);
+
+                            if (stoneState[nIdx] == Color::EMPTY && !visited[nIdx]) {
+                                stack.push_back(neighbor);
+                            } else if (stoneState[nIdx] == Color::BLACK) {
+                                touchesBlack = true;
+                            } else if (stoneState[nIdx] == Color::WHITE) {
+                                touchesWhite = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Determine territory ownership
+            Color territoryColor;
+            if (touchesBlack && !touchesWhite) {
+                territoryColor = Color::BLACK;
+            } else if (touchesWhite && !touchesBlack) {
+                territoryColor = Color::WHITE;
+            } else {
+                // Dame (neutral) or touches both - no territory
+                territoryColor = Color::EMPTY;
+            }
+
+            // Mark all points in region as territory
+            for (const auto& pos : region) {
+                points[ord(pos)].influence = territoryColor;
+            }
+        }
+    }
+
+    spdlog::debug("Territory calculated from {} dead stones", deadStones.size());
+}
