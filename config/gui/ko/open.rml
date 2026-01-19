@@ -1,0 +1,59 @@
+<rml class="open">
+<head>
+    <link type="text/css" href="../base.rcss"/>
+    <link type="text/css" href="fonts.rcss"/>
+    <link type="text/css" href="../open.rcss"/>
+    <title>SGF 파일 열기</title>
+</head>
+<body id="open_dialog" class="open">
+    <div id="file_chooser" class="dialog">
+        <div class="content">
+            <div class="main_content">
+                <div class="file_list_container">
+                    <div class="section_title"><span class="sep path_display" id="current_path">data/sgf</span>의 기보</div>
+                    <div class="item_list" id="files_list">
+                    </div>
+                    <div class="pagination_controls">
+                        <span class="cmd pagination_button" id="files_prev" onmouseup="files_prev_page">이전</span>
+                        <span class="pagination_info" id="files_page_info">1 / 1 페이지</span>
+                        <span class="cmd pagination_button" id="files_next" onmouseup="files_next_page">다음</span>
+                    </div>
+                </div>
+
+                <div class="preview_container">
+                    <div class="section_title">파일 내용</div>
+                    <div class="item_list" id="games_list">
+                    </div>
+                    <div class="pagination_controls">
+                        <span class="cmd pagination_button" id="games_prev" onmouseup="games_prev_page">이전</span>
+                        <span class="pagination_info" id="games_page_info">1 / 1 페이지</span>
+                        <span class="cmd pagination_button" id="games_next" onmouseup="games_next_page">다음</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom">
+                <span class="cmd button" onmouseup="cancel">취소</span>
+                <span class="cmd button primary" id="open_button" onmouseup="open_file">열기</span>
+            </div>
+            <div class="bottomleft">
+                <span class="cmd button" onmouseup="refresh">새로고침</span>
+            </div>
+        </div>
+    </div>
+    <!-- Templates for C++ localization -->
+    <div class="template" id="tplDirectory">폴더</div>
+    <div class="template" id="tplSgfFile">SGF 파일</div>
+    <div class="template" id="tplUp">상위</div>
+    <div class="template" id="tplPageInfo">%d / %d 페이지</div>
+    <div class="template" id="tplGameInfo">대국 %d (%dx%d, %d수)</div>
+    <!-- Column headers for games table -->
+    <div class="template" id="tplColIndex">#</div>
+    <div class="template" id="tplColBoard">바둑판</div>
+    <div class="template" id="tplColBlack">흑</div>
+    <div class="template" id="tplColWhite">백</div>
+    <div class="template" id="tplColResult">결과</div>
+    <div class="template" id="tplColMoves">수</div>
+    <div class="template" id="tplColKomi">덤</div>
+    <div class="template" id="tplColPlayers">대국자</div>
+</body>
+</rml>

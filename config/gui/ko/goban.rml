@@ -1,0 +1,195 @@
+<rml>
+<head>
+	<link type="text/css" href="../base.rcss"/>
+	<link type="text/css" href="fonts.rcss"/>
+	<title>Window</title>
+</head>
+<body id="game_window">
+    <game id="game" onmousedown="mdown" onmouseup="mup">
+        <div class="menu hoverable top right">
+            <div class="menu show">
+                <div class="menuitem hoverable left">
+                    <span>파일</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">SGF</div>
+                            <div class="cmd" onmouseup="load">기보 불러오기...</div>
+                            <div class="cmd" onmouseup="save">저장</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">시스템</div>
+                            <div class="cmd" onmouseup="quit">종료</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>보기</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">외관</div>
+                            <div class="cmd">
+                                <select id="selectShader"
+                                        onchange="shader" onmousedown="nop"/>
+                            </div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">창</div>
+                            <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">전체화면</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">오버레이</div>
+                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">마지막 수</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">카메라</div>
+                            <div class="cmd" onmouseup="reset camera">초기화</div>
+                            <div class="cmd" onmouseup="animate">애니메이션</div>
+                            <div class="hr">카메라 프리셋</div>
+                            <div class="cmd" onmouseup="save camera">저장</div>
+                            <div class="cmd" onmouseup="delete camera">삭제</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>대국</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr" id="blackMoves">흑</div>
+                            <div class="cmd">
+                                <select id="selectBlack"
+                                        onchange="engine" onmousedown="nop"/>
+                            </div>
+                            <div class="hr"  id="whiteMoves">백</div>
+                            <div class="cmd">
+                                <select id="selectWhite" onchange="engine" onmousedown="nop"/>
+                            </div>
+                            <div class="hr">바둑판 크기</div>
+                            <div class="cmd">
+                                <select id="selBoard"
+                                        onmousedown="nop" onchange="boardsize">
+                                    <option value="19" selected>19×19</option>
+                                    <option value="17">17×17</option>
+                                    <option value="15">15×15</option>
+                                    <option value="13">13×13</option>
+                                    <option value="11">11×11</option>
+                                    <option value="9">9×9</option>
+                                </select>
+                            </div>
+                            <div class="hr">덤</div>
+                            <div class="cmd">
+                                <select id="selectKomi"
+                                        onmousedown="nop" onchange="komi">
+                                    <option value="0.5">0.5</option>
+                                    <option value="6.5">6.5</option>
+                                    <option value="7.5" selected>7.5</option>
+                                </select>
+                            </div>
+                            <div class="hr">접바둑</div>
+                            <div class="cmd">
+                                <select id="selectHandicap"
+                                        onchange="handicap" onmousedown="nop">
+                                    <option value="0" selected>호선</option>
+                                    <option value="2">2점</option>
+                                    <option value="3">3점</option>
+                                    <option value="4">4점</option>
+                                    <option value="5">5점</option>
+                                    <option value="6">6점</option>
+                                    <option value="7">7점</option>
+                                    <option value="8">8점</option>
+                                    <option value="9">9점</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>착수</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div id="grpGame">
+                            <div class="hr">대국</div>
+                            <div class="cmd" id="cmdStart" onmouseup="start">시작</div>
+                            <div class="cmd" id="cmdClear" onmouseup="clear">초기화</div>
+                            <div class="template" id="templateResignWhiteWon">백 불계승</div>
+                            <div class="template" id="templateResignBlackWon">흑 불계승</div>
+                            <div class="template" id="templateWhiteWon">백 %.1f집 승</div>
+                            <div class="template" id="templateBlackWon">흑 %.1f집 승</div>
+                            <div class="template" id="templateWhiteResigns">백 불계</div>
+                            <div class="template" id="templateBlackResigns">흑 불계</div>
+                            <div class="template" id="templateWhitePasses">백 패스</div>
+                            <div class="template" id="templateBlackPasses">흑 패스</div>
+                            <div class="template" id="templateCalculatingScore">계산 중...</div>
+                            </div>
+                            <div id="grpMoves">
+                            <div class="hr">착수</div>
+                            <div class="cmd" id="cmdPass" onmouseup="pass">패스</div>
+                            <div class="cmd" onmouseup="play once">검토</div>
+                            <div class="cmd" onmouseup="undo move">무르기</div>
+                            <div class="cmd" id="cmdResign" onmouseup="resign">불계</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>분석</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">GnuGo</div>
+                            <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">집</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">따낸 돌</div>
+                            <div class="template" id="templatePrisonersWhite">백: %d</div>
+                            <div class="template" id="templatePrisonersBlack">흑: %d</div>
+                            <div class="cmd" id="lblPrisonersWhite">백: 0</div>
+                            <div class="cmd" id="lblPrisonersBlack">흑: 0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable right">
+                    <span>정보</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">버전</div>
+                            <div class="cmd" onmouseup="about">Goban 0.0.3</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable right">
+                    <span>설정</span>
+                    <div class="menuitem show">
+                        <div class="grp">
+                            <div class="hr">언어</div>
+                            <div class="cmd">
+                                <select id="selectLanguage" onchange="language" onmousedown="nop">
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">프레임율</div>
+                            <div class="template" id="templateFPS">%.1f fps</div>
+                            <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="grpPlayers">
+            <div id="grpBlack" class="hoverable bottom left">
+                <div class="show bottom left">
+                  <div class="cmd" id="cntBlack" onmouseup="black">흑: 0</div>
+                </div>
+            </div>
+            <div id="grpWhite" class="hoverable top right">
+                <div class="show top right">
+                  <div class="cmd" id="cntWhite" onmouseup="white">백: 0</div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom">
+            <div class="cmd bottom center" id="lblMessage" onmouseup="msg"></div>
+        </div>
+    </game>
+</body>
+</rml>

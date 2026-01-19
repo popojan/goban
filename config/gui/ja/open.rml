@@ -1,0 +1,59 @@
+<rml class="open">
+<head>
+    <link type="text/css" href="../base.rcss"/>
+    <link type="text/css" href="fonts.rcss"/>
+    <link type="text/css" href="../open.rcss"/>
+    <title>SGFファイルを開く</title>
+</head>
+<body id="open_dialog" class="open">
+    <div id="file_chooser" class="dialog">
+        <div class="content">
+            <div class="main_content">
+                <div class="file_list_container">
+                    <div class="section_title"><span class="sep path_display" id="current_path">data/sgf</span>の棋譜</div>
+                    <div class="item_list" id="files_list">
+                    </div>
+                    <div class="pagination_controls">
+                        <span class="cmd pagination_button" id="files_prev" onmouseup="files_prev_page">前へ</span>
+                        <span class="pagination_info" id="files_page_info">1 / 1 ページ</span>
+                        <span class="cmd pagination_button" id="files_next" onmouseup="files_next_page">次へ</span>
+                    </div>
+                </div>
+
+                <div class="preview_container">
+                    <div class="section_title">ファイル内容</div>
+                    <div class="item_list" id="games_list">
+                    </div>
+                    <div class="pagination_controls">
+                        <span class="cmd pagination_button" id="games_prev" onmouseup="games_prev_page">前へ</span>
+                        <span class="pagination_info" id="games_page_info">1 / 1 ページ</span>
+                        <span class="cmd pagination_button" id="games_next" onmouseup="games_next_page">次へ</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom">
+                <span class="cmd button" onmouseup="cancel">キャンセル</span>
+                <span class="cmd button primary" id="open_button" onmouseup="open_file">開く</span>
+            </div>
+            <div class="bottomleft">
+                <span class="cmd button" onmouseup="refresh">更新</span>
+            </div>
+        </div>
+    </div>
+    <!-- Templates for C++ localization -->
+    <div class="template" id="tplDirectory">フォルダ</div>
+    <div class="template" id="tplSgfFile">SGFファイル</div>
+    <div class="template" id="tplUp">上へ</div>
+    <div class="template" id="tplPageInfo">%d / %d ページ</div>
+    <div class="template" id="tplGameInfo">対局 %d (%dx%d, %d手)</div>
+    <!-- Column headers for games table -->
+    <div class="template" id="tplColIndex">#</div>
+    <div class="template" id="tplColBoard">碁盤</div>
+    <div class="template" id="tplColBlack">黒</div>
+    <div class="template" id="tplColWhite">白</div>
+    <div class="template" id="tplColResult">結果</div>
+    <div class="template" id="tplColMoves">手数</div>
+    <div class="template" id="tplColKomi">コミ</div>
+    <div class="template" id="tplColPlayers">対局者</div>
+</body>
+</rml>

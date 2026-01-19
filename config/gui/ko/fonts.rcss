@@ -1,0 +1,12 @@
+/* Korean font configuration */
+
+body, html
+{
+  font-family: "Noto Sans CJK SC";
+}
+
+/* Smaller font for dialog - CJK characters need more vertical space */
+body.open
+{
+  font-size: 18pt;
+}
