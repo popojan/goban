@@ -1,5 +1,6 @@
 #include "ElementGame.h"
 #include "AppState.h"
+#include "version.h"
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Factory.h>
 #include <RmlUi/Core/Input.h>
@@ -125,6 +126,14 @@ void ElementGame::populateEngines() {
 
     // Sync fullscreen menu state with restored state
     OnMenuToggle("toggle_fullscreen", AppState::IsFullscreen());
+
+    // Populate version label (uses its own content as format string)
+    auto versionLabel = GetContext()->GetDocument("game_window")->GetElementById("lblVersion");
+    if (versionLabel) {
+        versionLabel->SetInnerRML(
+            Rml::CreateString(versionLabel->GetInnerRML().c_str(), GOBAN_VERSION).c_str()
+        );
+    }
 }
 
 void ElementGame::gameLoop() {

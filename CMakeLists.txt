@@ -248,6 +248,14 @@ else()
     message("Build Goban")
     add_custom_target(Rescan)
 
+    # Generate version header from template
+    configure_file(
+        ${PROJECT_SOURCE_DIR}/src/version.h.in
+        ${PROJECT_BINARY_DIR}/generated/version.h
+        @ONLY
+    )
+    include_directories(${PROJECT_BINARY_DIR}/generated)
+
     cmake_language(CALL find_libsgfcplusplus)
 
     add_executable(${PROJECT_NAME}

@@ -163,7 +163,7 @@
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Verze</div>
-                            <div class="cmd" onmouseup="about">Goban 0.0.3</div>
+                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
                         </div>
                     </div>
                 </div>
