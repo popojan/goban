@@ -315,10 +315,10 @@ int main(int argc, char** argv)
         option("-c", "--config") & value("file", configurationFile)
     );
 #ifdef RMLUI_PLATFORM_WIN32
-    RMLUI_UNUSED(instance_handle);
-    RMLUI_UNUSED(previous_instance_handle);
-    RMLUI_UNUSED(command_line);
-    RMLUI_UNUSED(command_show);
+    (void)instance_handle;
+    (void)previous_instance_handle;
+    (void)command_line;
+    (void)command_show;
     parse(__argc, __argv, cli);
 #else
     parse(argc, argv, cli);
