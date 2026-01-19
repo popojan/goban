@@ -177,7 +177,7 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
         board.toggleTerritoryAuto(true);
         isGameOver = true;
-        spdlog::debug("Main Over! Reason {}", state.reason);
+        spdlog::debug("Main Over! Reason {}", static_cast<int>(state.reason));
     }
     else if (move == Move::PASS) {
         state.msg = state.colorToMove == Color::BLACK

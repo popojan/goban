@@ -142,8 +142,8 @@ void GobanView::clearView() {
     translate[2] = newTranslate[2];
     gobanShader.setGamma(1.0);
     gobanShader.setContrast(0.0);
-    gobanShader.setEof(0.0775);
-    gobanShader.setDof(-0.0025);
+    gobanShader.setEof(0.0075);
+    gobanShader.setDof(0.01);
     updateFlag |= UPDATE_SHADER;
     saveView();
     requestRepaint();

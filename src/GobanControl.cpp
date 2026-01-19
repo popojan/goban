@@ -241,9 +241,19 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     (void) x;
     (void) y;
 
+    std::string cmd(config->getCommand(static_cast<Rml::Input::KeyIdentifier>(key)));
+
+    // Adjustment commands should trigger on key DOWN (enables key repeat)
+    if (downNotUp && !cmd.empty()) {
+        if (cmd.find("increase") == 0 || cmd.find("decrease") == 0) {
+            command(cmd);
+            return;
+        }
+    }
+
     if (!downNotUp) {
-        std::string cmd(config->getCommand(static_cast<Rml::Input::KeyIdentifier>(key)));
-        if (!cmd.empty()) {
+        // Other commands trigger on key UP (except adjustment commands which use key DOWN)
+        if (!cmd.empty() && cmd.find("increase") != 0 && cmd.find("decrease") != 0) {
             command(cmd);
             return;
         }

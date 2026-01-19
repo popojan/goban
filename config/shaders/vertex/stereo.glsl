@@ -29,29 +29,39 @@ void main() {
 
     vec3 tt = (mat4(col.x,0.0,col.z,0.0,0.0,1.0,0.0,0.0,-col.z,0.0,col.x,0.0,0.0,0.0,0.0,1.0)*vec4(iTranslate, 0.0)).xyz;
 
-    rool = (m*vec4(ro, 1.0)).xyz + tt;
-    rool += (m * (eoff / length(rool))).xyz;
-    roor = (m*vec4(ro, 1.0)).xyz + tt;
-    roor -= (m * (eoff / length(rool))).xyz;
+    // Compute effective camera distance along z-axis (independent of rotation)
+    // ro.z is negative (camera behind board), iTranslate.z positive = zoom in
+    float camDist = -ro.z - iTranslate.z;
+
+    // Scale stereo base to keep on-screen deviation bounded
+    // - At refDist or further: use full eof (user's tuned value)
+    // - Closer than refDist: reduce eof proportionally to maintain ~1/30 deviation
+    float refDist = 3.0;
+    float scaleFactor = min(1.0, camDist / refDist);
+    vec4 scaledEof = eoff * scaleFactor;
+
+    // Left eye at negative X, right eye at positive X
+    // (In OpenGL coords: X right, Y up, Z toward viewer)
+    rool = (m*vec4(ro-scaledEof.xyz, 1.0)).xyz+tt;  // Left eye: -X offset
+    roor = (m*vec4(ro+scaledEof.xyz, 1.0)).xyz+tt;  // Right eye: +X offset
 
     up = normalize((m*vec4(up, 1.0)).xyz);
 
-    vec3 roo = 0.5*(rool+roor);
-
-    vec3 tal = vec3(-dof / length(roo),0.0,0.0);
-    vec3 tar = vec3( dof / length(roo),0.0,0.0);
-
-    vec3 cwl = normalize(tt + tal - rool);
-    vec3 cul = normalize(cross(up,cwl));
-    vec3 cvl = cross(cwl, cul);
-    vec3 cwr = normalize(tt + tar - roor);
-    vec3 cur = normalize(cross(up,cwr));
-    vec3 cvr = cross(cwr, cur);
+    // Parallel cameras: both eyes look in the SAME direction
+    // Stereo effect comes from horizontal offset only, not from toe-in
+    // This is the correct approach - toe-in causes eye strain and distortion
+    vec3 roo = 0.5*(rool+roor);  // Center position
+    vec3 cw = normalize(tt - roo);  // Look at translated target (handles pan/zoom)
+    vec3 cu = normalize(cross(up, cw));
+    vec3 cv = cross(cw, cu);
 
     vec2 ratio = vec2(iResolution.x/iResolution.y, 1.0);
-
     vec2 q0 = (vertex.xy + (vec2(0.5,0.5))/iResolution) * ratio;
 
-    rdbl = normalize((q0.x*cul + q0.y*cvl + 3.0*cwl));
-    rdbr = normalize((q0.x*cur + q0.y*cvr + 3.0*cwr));
+    // Parallel cameras with horizontal image shift (HIT) for convergence control
+    // dof controls where zero parallax occurs (convergence plane)
+    // Positive dof = convergence closer, negative = convergence further
+    // At dof=0, convergence is at infinity (pure parallel)
+    rdbl = normalize((q0.x + dof)*cu + q0.y*cv + 3.0*cw);  // Left eye: point more right (converge)
+    rdbr = normalize((q0.x - dof)*cu + q0.y*cv + 3.0*cw);  // Right eye: point more left (converge)
 }
