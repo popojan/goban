@@ -3,6 +3,7 @@
 
 #include <RmlUi/Core/Platform.h>
 #if defined(RMLUI_PLATFORM_MACOSX)
+    #include <glad/glad.h>
 #elif defined(RMLUI_PLATFORM_LINUX)
     #include <glad/glad.h>
     #include <glad/glad_glx.h>
