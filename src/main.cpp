@@ -283,7 +283,12 @@ int main(int argc, char** argv)
 #endif
 {
     // Store executable path for potential restart
-#ifndef RMLUI_PLATFORM_WIN32
+#ifdef RMLUI_PLATFORM_WIN32
+    static char exe_path[MAX_PATH];
+    if (GetModuleFileNameA(NULL, exe_path, MAX_PATH) > 0) {
+        g_executable_path = exe_path;
+    }
+#else
     g_executable_path = argv[0];
 #endif
 

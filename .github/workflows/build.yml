@@ -97,6 +97,16 @@ jobs:
   build-windows:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' }}
     runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x86, x64]
+        include:
+          - arch: x86
+            cmake_arch: Win32
+            triplet: x86-windows-static
+          - arch: x64
+            cmake_arch: x64
+            triplet: x64-windows-static
     steps:
       - uses: actions/checkout@v4
         with:
@@ -106,26 +116,26 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Install dependencies via vcpkg
-        run: vcpkg install freetype portaudio libsndfile --triplet x64-windows-static
+        run: vcpkg install freetype portaudio libsndfile --triplet ${{ matrix.triplet }}
 
       - name: Build prerequisites
         shell: cmd
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          cmake .. -A ${{ matrix.cmake_arch }} -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
           cmake --build . --config Release --verbose
 
       - name: Build goban
         shell: cmd
         run: |
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          cmake .. -A ${{ matrix.cmake_arch }} -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
           cmake --build . --config Release
 
       - name: Upload artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: goban-windows-x64
+          name: goban-windows-${{ matrix.arch }}
           path: build/Release/goban.exe
