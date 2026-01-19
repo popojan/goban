@@ -369,6 +369,8 @@ int main(int argc, char** argv)
     // Apply saved fullscreen state
     if (startFullscreen) {
         AppState::SetFullscreen(true);
+        // Get actual window size after fullscreen switch
+        glfwGetFramebufferSize(window, &window_width, &window_height);
     }
 
     // Initialize glad

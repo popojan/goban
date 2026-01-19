@@ -111,15 +111,20 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
         success &= player->boardsize(boardSize);
         success &= player->clear();
     }
-    if(! success)
-        return false;
 
+    // Always notify observers of board size, even if engine failed
+    // This ensures the board renders correctly regardless of engine state
     std::for_each(
         gameObservers.begin(), gameObservers.end(),
         [boardSize](GameObserver* observer){
             observer->onBoardSized(boardSize);
         }
     );
+
+    if (!success) {
+        spdlog::warn("Engine initialization failed, but board will still render");
+    }
+
     setKomi(komi);
     setFixedHandicap(handicap);
     return success;

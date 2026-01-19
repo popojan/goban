@@ -43,10 +43,13 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
     ZeroMemory(&pi, sizeof(pi));
 
     // Create the child process
+    // CREATE_NO_WINDOW (0x08000000) is needed for console apps launched from GUI apps
+    // Without it, DLL initialization can fail with STATUS_DLL_INIT_FAILED (0xc0000142)
     if (!CreateProcessA(
         NULL,
         const_cast<char*>(cmdLine.c_str()),
-        NULL, NULL, TRUE, 0, NULL,
+        NULL, NULL, TRUE, CREATE_NO_WINDOW,
+        NULL,
         workDir.empty() ? NULL : workDir.c_str(),
         &si, &pi)) {
         CloseHandle(hStdinRead);

@@ -63,14 +63,22 @@ bool GtpEngine::undo() {
 bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
     bool success = true;
     if (finalize) {
-        spdlog::debug("initial territory");
+        spdlog::debug("Estimating final territory");
         board.clearTerritory();
-        spdlog::debug("dead");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list dead"), board, Color::EMPTY);
-        spdlog::debug("white");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list white_territory"), board, Color::WHITE);
-        spdlog::debug("black");
-        success |= setTerritory(GtpClient::issueCommand("final_status_list black_territory"), board, Color::BLACK);
+
+        auto deadResult = GtpClient::issueCommand("final_status_list dead");
+        spdlog::debug("final_status_list dead: {} response(s)", deadResult.size());
+        success &= setTerritory(deadResult, board, Color::EMPTY);
+
+        auto whiteResult = GtpClient::issueCommand("final_status_list white_territory");
+        spdlog::debug("final_status_list white_territory: {} response(s)", whiteResult.size());
+        success &= setTerritory(whiteResult, board, Color::WHITE);
+
+        auto blackResult = GtpClient::issueCommand("final_status_list black_territory");
+        spdlog::debug("final_status_list black_territory: {} response(s)", blackResult.size());
+        success &= setTerritory(blackResult, board, Color::BLACK);
+
+        spdlog::debug("Territory estimation {}", success ? "succeeded" : "failed");
     }
     else {
         /*

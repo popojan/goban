@@ -253,7 +253,12 @@ void EventHandlerFileChooser::populateFilesList() {
                 rowElement->SetAttribute("data-index", std::to_string(i));
 
                 // Mark as selected if this is the currently selected file
-                if (i == dataSource->GetSelectedFileIndex()) {
+                // Account for ".." row offset: row index != file index when parent exists
+                int expectedRowIndex = dataSource->GetSelectedFileIndex();
+                if (dataSource->GetCurrentPath().has_parent_path() && expectedRowIndex >= 0) {
+                    expectedRowIndex += 1; // ".." is row 0, first file is row 1
+                }
+                if (i == expectedRowIndex) {
                     rowElement->SetClass("selected", true);
                 }
 
