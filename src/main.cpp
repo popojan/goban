@@ -9,14 +9,16 @@
  *
  */
 
-#include <clipp.h>
-
+// Windows headers must come first to avoid conflicts
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <process.h>
 #else
 #include <unistd.h>
 #endif
+
+#include <clipp.h>
 
 #include "ElementGame.h"
 #include <RmlUi/Core.h>
