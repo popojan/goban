@@ -115,8 +115,8 @@
   },
   "fonts": {
     "gui": [
-       "./config/fonts/NotoSans-Regular.ttf",
-       "./config/fonts/NotoSansCJKsc-Regular.otf"
+       "./config/fonts/NotoSansCJKsc-Regular.otf",
+       "./config/fonts/NotoSans-Regular.ttf"
     ],
     "overlay": "./config/fonts/default-font.ttf"
   },
