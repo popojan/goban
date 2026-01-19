@@ -2,6 +2,7 @@
 #define GOBAN_GAMERECORD_H
 
 #include <memory>
+#include <algorithm>
 #include "Board.h"
 
 #include "SGF.h"

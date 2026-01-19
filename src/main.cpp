@@ -12,6 +12,7 @@
 // Windows headers must come first to avoid conflicts
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX  // Prevent windows.h from defining min/max macros
 #include <windows.h>
 #include <process.h>
 #else

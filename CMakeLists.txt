@@ -118,7 +118,7 @@ endfunction()
 function(fetch_spdlog)
     FetchContent_Declare(spdlog
             GIT_REPOSITORY https://github.com/gabime/spdlog.git
-            GIT_TAG v1.6.0)
+            GIT_TAG v1.12.0)
 
     FetchContent_GetProperties(spdlog)
     if(NOT spdlog_POPULATED)
