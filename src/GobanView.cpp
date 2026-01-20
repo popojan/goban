@@ -27,6 +27,9 @@ GobanView::GobanView(GobanModel& m)
     updateFlag |= GobanView::UPDATE_SHADER;
     gobanShader.setReady();
     gobanOverlay.setReady();
+
+    // Initialize to EMPTY so first OnUpdate() will sync with model and set .active class
+    state.colorToMove = Color::EMPTY;
 }
 
 void GobanView::initRotation(float x, float y) {
