@@ -37,12 +37,17 @@ void GameRecord::move(const Move& move)  {
 
     std::lock_guard<std::mutex> lock(mutex);
 
+    history.push_back(move);
+
+    // Skip SGF tree manipulation if game is null (e.g., finished/loaded game in navigation mode)
+    if (!game) {
+        return;
+    }
+
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
 
     using namespace LibSgfcPlusPlus;
-
-    history.push_back(move);
 
     std::vector<std::shared_ptr<ISgfcProperty> > properties;
 
@@ -253,8 +258,17 @@ void GameRecord::undo() {
 
     std::lock_guard<std::mutex> lock(mutex);
 
-    if(currentNode->HasParent()) {
+    spdlog::debug("GameRecord::undo() called, history.size()={}, viewPosition={}", history.size(), viewPosition);
+
+    if (!history.empty()) {
         history.pop_back();
+        // Sync navigation position
+        if (isNavigating() && viewPosition > 0) {
+            viewPosition--;
+            spdlog::debug("GameRecord::undo() decremented viewPosition to {}", viewPosition);
+        }
+    }
+    if (currentNode && currentNode->HasParent()) {
         currentNode = currentNode->GetParent();
     }
 }
@@ -380,23 +394,101 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
             node = node->GetFirstChild();
         }
 
-        // keep the loaded game for future record only if it is not finished
-        if (gameInfo.gameResult.IsValid) {
-            game = nullptr;
-            currentNode = nullptr;
-        } else {
-            game = loadedGame;
-        }
+        // Keep the game tree for all loaded games (enables adding variations)
+        game = loadedGame;
+        // Note: currentNode is already at the last move from the traversal above
         gameHasNewMoves = false;
+
+        // Preserve loaded moves for navigation
+        loadedMoves = history;  // Copy for navigation reference
+        viewPosition = history.size();  // Start at end (current position)
 
         boardSize.Columns = gameInfo.boardSize;
         boardSize.Rows = gameInfo.boardSize;
 
-        spdlog::info("Successfully loaded SGF file [{}] with {} moves", fileName, history.size());
+        spdlog::info("Successfully loaded SGF file [{}] with {} moves (navigation enabled)", fileName, loadedMoves.size());
         return true;
 
     } catch (const std::exception& ex) {
         spdlog::error("Error loading SGF file [{}]: {}", fileName, ex.what());
         return false;
     }
+}
+
+std::vector<Move> GameRecord::getVariations() const {
+    std::vector<Move> variations;
+
+    if (!currentNode) {
+        return variations;
+    }
+
+    // Get all children of current node
+    auto children = currentNode->GetChildren();
+    for (const auto& child : children) {
+        for (const auto& property : child->GetProperties()) {
+            if (property->GetPropertyType() == T::B || property->GetPropertyType() == T::W) {
+                auto moveValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcGoMovePropertyValue>(
+                    property->GetPropertyValue());
+                if (moveValue) {
+                    Color color = (property->GetPropertyType() == T::B) ? Color::BLACK : Color::WHITE;
+
+                    if (moveValue->GetGoMove()->IsPassMove()) {
+                        variations.push_back(Move(Move::PASS, color));
+                    } else {
+                        auto sgfPoint = moveValue->GetGoMove()->GetStoneLocation();
+                        Position pos = Position::fromSgf(
+                            sgfPoint->GetPosition(LibSgfcPlusPlus::SgfcGoPointNotation::Sgf),
+                            boardSize.Columns);
+                        variations.push_back(Move(pos, color));
+                    }
+                }
+                break;  // Only one move property per node
+            }
+        }
+    }
+
+    spdlog::debug("getVariations: found {} variations from current node", variations.size());
+    return variations;
+}
+
+bool GameRecord::navigateToChild(const Move& targetMove) {
+    if (!currentNode) {
+        return false;
+    }
+
+    auto children = currentNode->GetChildren();
+    for (const auto& child : children) {
+        for (const auto& property : child->GetProperties()) {
+            if (property->GetPropertyType() == T::B || property->GetPropertyType() == T::W) {
+                auto moveValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcGoMovePropertyValue>(
+                    property->GetPropertyValue());
+                if (moveValue) {
+                    Color color = (property->GetPropertyType() == T::B) ? Color::BLACK : Color::WHITE;
+                    Move childMove;
+
+                    if (moveValue->GetGoMove()->IsPassMove()) {
+                        childMove = Move(Move::PASS, color);
+                    } else {
+                        auto sgfPoint = moveValue->GetGoMove()->GetStoneLocation();
+                        Position pos = Position::fromSgf(
+                            sgfPoint->GetPosition(LibSgfcPlusPlus::SgfcGoPointNotation::Sgf),
+                            boardSize.Columns);
+                        childMove = Move(pos, color);
+                    }
+
+                    // Check if this child matches the target move
+                    if (childMove.pos == targetMove.pos && childMove.col == targetMove.col) {
+                        currentNode = child;
+                        spdlog::debug("navigateToChild: moved to child node for move {}",
+                            targetMove.toString());
+                        return true;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    spdlog::debug("navigateToChild: no matching child found for move {}", targetMove.toString());
+    return false;
 }

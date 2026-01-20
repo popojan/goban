@@ -5,6 +5,7 @@
 const float Board::mBlackArea = 2.0f;
 const float Board::mWhiteArea = 3.0f;
 const float Board::mEmpty = 0.0f;
+const float Board::mAnnotation = 1.0f;  // Empty point with hidden grid (for overlays)
 const float Board::mBlack = 5.0f;
 const float Board::mWhite = 6.0f;
 const float Board::mDeltaCaptured = 0.5f;
@@ -214,6 +215,49 @@ void Board::setOverlay(const Position& p, const std::string& text, const Color& 
     auto& overlay = (*this)[p].overlay;
     overlay.text = text;
     overlay.layer = c == Color::BLACK ? 1 : 2;
+}
+
+void Board::setBoardOverlay(const Position& p, const std::string& text) {
+    // Board-level overlay for empty points (e.g., ko capture position)
+    // Uses layer 0 and sets material to mAnnotation for grid hiding
+    auto& overlay = (*this)[p].overlay;
+    overlay.text = text;
+    overlay.layer = 0;  // Board level (rendered before stones)
+
+    // Set material to annotation to render board patch that hides grid
+    int i = p.row();
+    int j = p.col();
+    unsigned idx = ((boardSize * i + j) << 2u) + 2u;
+
+    // Only set annotation material if point is empty (no stone)
+    if ((*this)[p].stone == Color::EMPTY) {
+        glStones[idx + 0] = mAnnotation;
+        // Center the position at the grid intersection for the patch
+        glStones[idx - 2] = static_cast<float>(j) - 0.5f * static_cast<float>(boardSize) + 0.5f;
+        glStones[idx - 1] = static_cast<float>(i) - 0.5f * static_cast<float>(boardSize) + 0.5f;
+    }
+}
+
+void Board::removeBoardOverlay(const Position& p) {
+    auto& overlay = (*this)[p].overlay;
+
+    // Only clear if this is a board-level overlay (layer 0)
+    // Don't clear stone-level overlays (layers 1-2)
+    if (overlay.layer != 0) {
+        return;
+    }
+
+    overlay.text = std::string("");
+    overlay.layer = -1u;
+
+    // Reset material to empty if it was annotation
+    int i = p.row();
+    int j = p.col();
+    unsigned idx = ((boardSize * i + j) << 2u) + 2u;
+
+    if (glStones[idx + 0] == mAnnotation) {
+        glStones[idx + 0] = mEmpty;
+    }
 }
 
 int Board::updateStone(const Position& p, const Color& c) {

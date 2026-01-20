@@ -301,10 +301,13 @@ void GameThread::gameLoop() {
             else if (move == Move::UNDO) {
                 bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
                         && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
-                // Single undo if: both humans OR in Analysis mode
-                bool singleUndo = bothHumans || (gameMode == GameMode::ANALYSIS);
+                // Single undo if: both humans OR in Analysis mode OR navigating SGF
+                bool singleUndo = bothHumans || (gameMode == GameMode::ANALYSIS) || model.game.isNavigating();
+                spdlog::debug("UNDO: singleUndo={}, moveCount={}, isNavigating={}, bothHumans={}, gameMode={}",
+                    singleUndo, model.game.moveCount(), model.game.isNavigating(), bothHumans, static_cast<int>(gameMode));
                 if (singleUndo && model.game.moveCount() > 0) {
                     success = coach->undo();
+                    spdlog::debug("UNDO: coach->undo() returned {}", success);
                     model.game.undo();
                 } else if (currentPlayer()->isTypeOf(Player::HUMAN) && model.game.moveCount() > 1) {
                     // Double undo in Match mode: undo AI's response + human's move
@@ -411,6 +414,7 @@ void GameThread::gameLoop() {
 
 void GameThread::playLocalMove(const Move& move) {
     std::unique_lock<std::mutex> lock(playerMutex);
+    spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), playerToMove ? "set" : "null");
     if(playerToMove) playerToMove->suggestMove(move);
 }
 
@@ -418,6 +422,191 @@ void GameThread::playKibitzMove() {
     std::unique_lock<std::mutex> lock(playerMutex);
     Move kibitzed(Move::KIBITZED, model.state.colorToMove);
     if(playerToMove) playerToMove->suggestMove(kibitzed);
+}
+
+bool GameThread::navigateBack() {
+    if (!model.game.isNavigating() || !model.game.hasPreviousMove()) {
+        spdlog::debug("navigateBack: cannot navigate (isNavigating={}, hasPrev={})",
+            model.game.isNavigating(), model.game.hasPreviousMove());
+        return false;
+    }
+
+    Engine* coach = currentCoach();
+    if (!coach) return false;
+
+    bool success = false;
+
+    // Auto-skip PASS moves when navigating back (e.g., skip double-pass at end of game)
+    while (model.game.hasPreviousMove()) {
+        Move lastMove = model.game.lastMove();
+        bool isPass = (lastMove == Move::PASS);
+
+        if (!coach->undo()) break;
+
+        // Keep all engines in sync for continuation
+        for (auto player : players) {
+            if (player != reinterpret_cast<Player*>(coach)) {
+                player->undo();
+            }
+        }
+
+        model.game.undo();
+        success = true;
+
+        // Stop if we just undid a stone move (NORMAL), continue if it was a PASS
+        if (!isPass) break;
+        spdlog::debug("navigateBack: auto-skipping PASS move");
+    }
+
+    if (success) {
+        // Hide territory display when navigating (stale after undo)
+        model.board.toggleTerritoryAuto(false);
+
+        const Board& result = coach->showboard();
+        std::for_each(gameObservers.begin(), gameObservers.end(),
+            [result](GameObserver* observer) { observer->onBoardChange(result); });
+        spdlog::debug("navigateBack: success, now at move {}/{}",
+            model.game.getViewPosition(), model.game.getLoadedMovesCount());
+    }
+    return success;
+}
+
+bool GameThread::navigateForward() {
+    if (!model.game.isNavigating()) {
+        spdlog::debug("navigateForward: not in navigation mode");
+        return false;
+    }
+
+    // Use SGF tree to get variations instead of linear loadedMoves
+    auto variations = model.game.getVariations();
+    spdlog::debug("navigateForward: found {} variations", variations.size());
+
+    if (variations.empty()) {
+        spdlog::debug("navigateForward: no variations available");
+        return false;
+    }
+
+    // If multiple variations, user must click to choose (don't auto-play)
+    if (variations.size() > 1) {
+        spdlog::debug("navigateForward: multiple variations, user must click to choose");
+        return false;
+    }
+
+    // Single variation - auto-play it (skip passes)
+    Engine* coach = currentCoach();
+    if (!coach) {
+        spdlog::error("navigateForward: no coach engine!");
+        return false;
+    }
+
+    bool success = false;
+    Move lastPlayedMove;
+
+    // Auto-skip PASS moves when navigating forward
+    while (true) {
+        auto currentVariations = model.game.getVariations();
+        if (currentVariations.empty()) break;
+        if (currentVariations.size() > 1) break;  // Stop at branch points
+
+        Move nextMove = currentVariations[0];
+        bool isPass = (nextMove == Move::PASS);
+
+        spdlog::debug("navigateForward: playing move {}", nextMove.toString());
+        if (!coach->play(nextMove)) {
+            spdlog::warn("navigateForward: coach->play() failed for move {}", nextMove.toString());
+            break;
+        }
+
+        // Keep all engines in sync for continuation
+        for (auto player : players) {
+            if (player != reinterpret_cast<Player*>(coach)) {
+                player->play(nextMove);
+            }
+        }
+
+        // Navigate to child in SGF tree
+        bool foundExisting = model.game.navigateToChild(nextMove);
+        if (foundExisting) {
+            // Following existing branch - only update history, don't create new SGF node
+            model.game.pushHistory(nextMove);
+        } else {
+            // Creating new branch - this creates SGF node and updates history
+            model.game.move(nextMove);
+        }
+        model.game.advancePosition();
+        lastPlayedMove = nextMove;
+        success = true;
+
+        // Stop if we just played a stone move (NORMAL), continue if it was a PASS
+        if (!isPass) break;
+        spdlog::debug("navigateForward: auto-skipping PASS move");
+    }
+
+    if (success) {
+        const Board& result = coach->showboard();
+        spdlog::debug("navigateForward: notifying {} observers", gameObservers.size());
+        std::for_each(gameObservers.begin(), gameObservers.end(),
+            [result, lastPlayedMove](GameObserver* observer) {
+                observer->onBoardChange(result);
+                observer->onStonePlaced(lastPlayedMove);
+            });
+        spdlog::debug("navigateForward: done");
+    }
+    return success;
+}
+
+bool GameThread::navigateToVariation(const Move& move) {
+    spdlog::debug("navigateToVariation: entry, move={}", move.toString());
+
+    if (!model.game.isNavigating()) {
+        spdlog::debug("navigateToVariation: not in navigation mode");
+        return false;
+    }
+
+    Engine* coach = currentCoach();
+    if (!coach) {
+        spdlog::error("navigateToVariation: no coach engine!");
+        return false;
+    }
+
+    // Play the move on the coach
+    if (!coach->play(move)) {
+        spdlog::warn("navigateToVariation: coach->play() failed for move {}", move.toString());
+        return false;
+    }
+
+    // Keep all engines in sync for continuation
+    for (auto player : players) {
+        if (player != reinterpret_cast<Player*>(coach)) {
+            player->play(move);
+        }
+    }
+
+    // Navigate to the child node in the SGF tree
+    bool foundExisting = model.game.navigateToChild(move);
+    if (foundExisting) {
+        // Following existing branch - only update history, don't create new SGF node
+        spdlog::debug("navigateToVariation: following existing branch");
+        model.game.pushHistory(move);
+    } else {
+        // Creating new branch - this creates SGF node and updates history
+        spdlog::debug("navigateToVariation: creating new branch");
+        model.game.move(move);
+    }
+    model.game.advancePosition();
+
+    // Notify observers
+    const Board& result = coach->showboard();
+    Move moveCopy = move;
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [result, moveCopy](GameObserver* observer) {
+            observer->onBoardChange(result);
+            observer->onStonePlaced(moveCopy);
+        });
+
+    spdlog::debug("navigateToVariation: done, now at move {}/{}",
+        model.game.getViewPosition(), model.game.getLoadedMovesCount());
+    return true;
 }
 
 bool GameThread::setGameMode(GameMode mode) {

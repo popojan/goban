@@ -76,16 +76,34 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 	font_size = 0.8 / model.getBoardSize();
 
     auto& points = board.get();
+    int boardSize = board.getSize();
+    float halfN = 0.5f * (float)boardSize - 0.5f;
+
 	for (std::size_t layer = 0; layer < layers.size(); ++layer) {
 		int cnt = 0;
 		buffer[layer]->clear();
+		int idx = 0;
 		for (const auto & point : points) {
 			if (!point.overlay.text.empty() && point.overlay.layer == layer) {
-                glyphy_point_t pos = { model.metrics.squareSizeX * point.x, -model.metrics.squareSizeY * point.y };
+				float posX, posY;
+				if (layer == 0) {
+					// Board-level overlay: use exact grid position (no fuzzy offset)
+					// Points are indexed as ord(p) = col * MAX_BOARD + row
+					int col = idx / Board::MAX_BOARD;
+					int row = idx % Board::MAX_BOARD;
+					posX = (float)col - halfN;
+					posY = (float)row - halfN;
+				} else {
+					// Stone-level overlay: use fuzzy position (matches stone placement)
+					posX = point.x;
+					posY = point.y;
+				}
+                glyphy_point_t pos = { model.metrics.squareSizeX * posX, -model.metrics.squareSizeY * posY };
 				buffer[layer]->move_to(&pos);
 				buffer[layer]->add_text(point.overlay.text.c_str(), font, font_size);
 				cnt += 1;
 			}
+			idx++;
 		}
 		layers[layer].empty = cnt == 0;
 	}

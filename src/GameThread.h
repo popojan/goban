@@ -103,6 +103,11 @@ public:
 
     bool undo(Player * engine, bool doubleUndo);
 
+    // Navigation methods for SGF replay
+    bool navigateBack();   // Undo one move during navigation
+    bool navigateForward();  // Play next move during navigation (auto-skips passes)
+    bool navigateToVariation(const Move& move);  // Navigate to specific variation
+
     std::vector<Player*> getPlayers() { return players;}
 
     bool loadSGF(const std::string& fileName, int gameIndex = 0);

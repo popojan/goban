@@ -33,6 +33,24 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
+            // Check if clicking on a variation during navigation
+            if (model.game.isNavigating()) {
+                auto variations = model.game.getVariations();
+                for (const auto& move : variations) {
+                    if (move == Move::NORMAL && move.pos == coord) {
+                        spdlog::debug("Clicked on variation at ({},{})", coord.col(), coord.row());
+                        if (engine.navigateToVariation(move)) {
+                            view.updateNavigationOverlay();
+                        }
+                        return;
+                    }
+                }
+                // Clicked elsewhere during navigation - ignore to prevent accidental game reset
+                // User must use menu "Clear Board" or navigate to end to start new game
+                spdlog::debug("Clicked on non-variation position during navigation - ignoring");
+                return;
+            }
+
             bool playNow = true;
             if (model.isGameOver) {
                 newGame(model.getBoardSize());
@@ -270,6 +288,30 @@ bool GobanControl::command(const std::string& cmd) {
 void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     (void) x;
     (void) y;
+
+    // SGF Navigation keys (on key UP)
+    spdlog::debug("keyPress: key={}, downNotUp={}, isNavigating={}, viewPos={}/{}",
+        key, downNotUp, model.game.isNavigating(),
+        model.game.getViewPosition(), model.game.getLoadedMovesCount());
+
+    if (!downNotUp && model.game.isNavigating()) {
+        if (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT) {
+            if (engine.navigateForward()) {
+                spdlog::debug("Navigation: forward to move {}/{}",
+                    model.game.getViewPosition(), model.game.getLoadedMovesCount());
+                view.updateNavigationOverlay();
+            }
+            return;
+        }
+        if (key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK) {
+            if (engine.navigateBack()) {
+                spdlog::debug("Navigation: back to move {}/{}",
+                    model.game.getViewPosition(), model.game.getLoadedMovesCount());
+                view.updateNavigationOverlay();
+            }
+            return;
+        }
+    }
 
     std::string cmd(config->getCommand(static_cast<Rml::Input::KeyIdentifier>(key)));
 

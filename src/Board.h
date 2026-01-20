@@ -233,6 +233,8 @@ public:
     bool collides(int i, int j, int i0, int j0);
     void removeOverlay(const Position& p);
     void setOverlay(const Position& p, const std::string& text, const Color& c);
+    void setBoardOverlay(const Position& p, const std::string& text);  // Board-level overlay (layer 0)
+    void removeBoardOverlay(const Position& p);
     void setRandomStoneRotation() {
     	randomStoneRotation = 3.1415f * uDist(generator);
     }
@@ -276,6 +278,7 @@ private:
     bool invalidated;
 
     const static float mEmpty;
+    const static float mAnnotation;  // Empty point with hidden grid (for overlays)
     double randomStoneRotation{};
 
     double squareYtoXRatio;

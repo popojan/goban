@@ -95,6 +95,29 @@ private:
     std::mutex mutex;
     size_t numGames;
     bool gameHasNewMoves;
+
+    // SGF Navigation state
+    std::vector<Move> loadedMoves;  // Full SGF moves (preserved after load)
+    size_t viewPosition = 0;        // Current position in loadedMoves
+
+public:
+    // Navigation methods
+    [[nodiscard]] bool hasNextMove() const { return viewPosition < loadedMoves.size(); }
+    [[nodiscard]] bool hasPreviousMove() const { return viewPosition > 0; }
+    [[nodiscard]] const Move& getNextMove() const { return loadedMoves[viewPosition]; }
+    [[nodiscard]] size_t getViewPosition() const { return viewPosition; }
+    [[nodiscard]] size_t getLoadedMovesCount() const { return loadedMoves.size(); }
+    void advancePosition() { if (hasNextMove()) viewPosition++; }
+    void retreatPosition() { if (hasPreviousMove()) viewPosition--; }
+    void resetNavigation() { viewPosition = 0; loadedMoves.clear(); }
+    [[nodiscard]] bool isNavigating() const { return !loadedMoves.empty(); }
+
+    // Multi-variation support
+    [[nodiscard]] std::vector<Move> getVariations() const;
+    bool navigateToChild(const Move& move);  // Navigate to specific variation
+
+    // History-only update (for following existing branches without creating SGF nodes)
+    void pushHistory(const Move& move) { history.push_back(move); }
 };
 
 #endif //GOBAN_GAMERECORD_H

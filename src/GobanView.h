@@ -36,6 +36,7 @@ public:
 
     explicit GobanView(GobanModel& m);
 
+    void onStonePlaced(const Move& move) override;
     void onGameMove(const Move& move, const std::string& comment) override;
     void onBoardChange(const Board& board) override;
     void onBoardSized(int newBoardSize) override;
@@ -126,6 +127,7 @@ public:
     void moveCursor(float, float);
     void updateCursor();
     void updateLastMoveOverlay();
+    void updateNavigationOverlay();  // Show next move annotation during SGF navigation
 
 public:
     GobanShader gobanShader;
@@ -151,6 +153,8 @@ public:
     int currentProgram;
     bool showOverlay;
     Position lastMove;
+    Position koOverlay;  // Position of ko capture overlay (empty point showing captured move number)
+    std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     AudioPlayer player;
 
     void clearView();
