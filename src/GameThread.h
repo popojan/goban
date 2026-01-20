@@ -128,7 +128,7 @@ private:
     GobanModel& model;
     std::vector<Engine*> engines; //engines know the rules
     std::vector<Player*> players; //all players including engines, humans, spectators
-    std::thread* thread;
+    std::unique_ptr<std::thread> thread;
     std::mutex mutex2;
     std::atomic<bool> interruptRequested{false};
     std::atomic<bool> hasThreadRunning{false};

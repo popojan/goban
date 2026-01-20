@@ -86,12 +86,11 @@ void GameThread::setRole(size_t playerIndex, int role, bool add) {
 }
 
 void GameThread::interrupt() {
-    if(thread != nullptr) {
+    if (thread) {
         interruptRequested = true;
         playLocalMove(Move(Move::INTERRUPT, model.state.colorToMove));
         thread->join();
-        delete thread;
-        thread = nullptr;
+        thread.reset();
     }
 }
 
@@ -210,7 +209,7 @@ void GameThread::run() {
     std::unique_lock<std::mutex> lock(playerMutex);
     model.start();
     spdlog::debug("construct thread {}", (bool)model);
-    thread = new std::thread(&GameThread::gameLoop, this);
+    thread = std::make_unique<std::thread>(&GameThread::gameLoop, this);
     engineStarted.wait(lock);
 }
 
