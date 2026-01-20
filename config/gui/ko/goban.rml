@@ -134,6 +134,10 @@
                     <span>분석</span>
                     <div class="menuitem show">
                         <div class="grp">
+                            <div class="hr">모드</div>
+                            <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">분석 모드</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">GnuGo</div>
                             <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">집</div>
                         </div>

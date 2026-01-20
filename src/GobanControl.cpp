@@ -16,6 +16,8 @@ bool GobanControl::newGame(unsigned boardSize) {
 	if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         model.createNewRecord();
         view.animateIntro();
+        // Reset Analysis Mode menu toggle (new game starts in Match mode)
+        parent->OnMenuToggle("toggle_analysis_mode", false);
         return true;
 	}
     return false;
@@ -117,7 +119,35 @@ bool GobanControl::command(const std::string& cmd) {
 
     }
     else if (cmd == "play once") {
-        engine.playKibitzMove();
+        // In Analysis mode, "play once" triggers genmove if waiting; otherwise kibitz
+        if (engine.getGameMode() == GameMode::ANALYSIS && engine.isWaitingForGenmove()) {
+            engine.triggerGenmove();
+        } else {
+            engine.playKibitzMove();
+        }
+        view.requestRepaint();
+    }
+    else if (cmd == "toggle_analysis_mode") {
+        if (engine.getGameMode() == GameMode::MATCH) {
+            if (engine.setGameMode(GameMode::ANALYSIS)) {
+                checked = true;
+            }
+        } else {
+            if (engine.setGameMode(GameMode::MATCH)) {
+                checked = false;
+            }
+        }
+        view.requestRepaint();
+    }
+    else if (cmd == "genmove") {
+        // Trigger AI to play (when waiting for genmove in Analysis mode)
+        if (engine.isWaitingForGenmove()) {
+            engine.triggerGenmove();
+            view.requestRepaint();
+        }
+    }
+    else if (cmd == "toggle ai vs ai") {
+        engine.setAiVsAi(!engine.isAiVsAi());
         view.requestRepaint();
     }
     else if(cmd == "resign") {

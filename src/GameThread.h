@@ -13,6 +13,30 @@
 
 extern std::shared_ptr<Configuration> config;
 
+/** \brief Game mode determining player interaction behavior
+ */
+enum class GameMode {
+    MATCH,      ///< Default - strict turn alternation, assigned roles
+    ANALYSIS    ///< Sabaki-like - human plays either color, AI responds based on move source
+};
+
+/** \brief Source of a move for Analysis mode behavior
+ *
+ * Only used in Analysis mode to determine who plays next:
+ * - NONE: Initial state or after mode switch - human plays next
+ * - HUMAN: User clicked on board - AI will auto-respond
+ * - KIBITZ: Kibitz engine suggested - AI waits for explicit genmove (Space)
+ * - AI: AI just played - human plays next
+ *
+ * Not used in Match mode (player selection based on assigned roles).
+ */
+enum class MoveSource {
+    NONE,       ///< Initial/reset state - human plays next
+    HUMAN,      ///< User clicked on board - AI will auto-respond
+    KIBITZ,     ///< Kibitz engine suggested - AI waits for explicit genmove
+    AI          ///< AI's own genmove - human plays next
+};
+
 /** \brief Background thread responsible for rules enforcing
  *
  */
@@ -55,6 +79,14 @@ public:
     void playLocalMove(const Move& move);
     void playKibitzMove();
 
+    // Analysis mode support
+    bool setGameMode(GameMode mode);  // Returns true if mode change succeeded
+    GameMode getGameMode() const { return gameMode; }
+    void triggerGenmove();
+    bool isWaitingForGenmove() const { return waitingForGenmove; }
+    void setAiVsAi(bool enabled);
+    bool isAiVsAi() const { return aiVsAiMode; }
+
     void loadEngines(std::shared_ptr<Configuration> config);
 
 	size_t activatePlayer(int which, int delta = 1);
@@ -90,6 +122,13 @@ private:
 	std::array<std::size_t, 2> activePlayer;
     std::mutex playerMutex;
     std::condition_variable engineStarted;
+
+    // Analysis mode state
+    GameMode gameMode = GameMode::MATCH;
+    bool waitingForGenmove = false;
+    bool aiVsAiMode = false;
+    MoveSource lastMoveSource = MoveSource::NONE;
+    std::condition_variable genmoveTriggered;
 };
 
 #endif // GAMETHREAD_H

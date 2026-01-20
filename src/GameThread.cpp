@@ -105,6 +105,11 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
     this->komi = komi;
     this->handicap = handicap;*/
 
+    // Reset to Match mode on new game
+    gameMode = GameMode::MATCH;
+    waitingForGenmove = false;
+    lastMoveSource = MoveSource::NONE;
+
     bool success = true;
 
     for (auto player : players) {
@@ -235,8 +240,33 @@ void GameThread::gameLoop() {
     interruptRequested = false;
     while (model && !interruptRequested) {
         Engine* coach = currentCoach();
-        Engine* kibitz = currentKibitz();
+        Engine* kibitzEngine = currentKibitz();
         Player* player = currentPlayer();
+
+        // Analysis mode: determine player based on last move source
+        if (gameMode == GameMode::ANALYSIS && !aiVsAiMode) {
+            // If waiting for genmove trigger (after kibitz move), wait here
+            if (waitingForGenmove) {
+                spdlog::debug("Analysis mode: waiting for genmove trigger (Space key)");
+                // Use timeout-based wait to avoid deadlock with playLocalMove
+                // This allows periodic checking without holding mutex continuously
+                while (waitingForGenmove && !interruptRequested && gameMode == GameMode::ANALYSIS) {
+                    std::unique_lock<std::mutex> waitLock(playerMutex);
+                    genmoveTriggered.wait_for(waitLock, std::chrono::milliseconds(100));
+                }
+                if (interruptRequested || gameMode != GameMode::ANALYSIS) continue;
+            }
+
+            // Determine who plays this turn based on last move source
+            if (lastMoveSource == MoveSource::HUMAN || lastMoveSource == MoveSource::KIBITZ) {
+                // Human (click or kibitz) just played → kibitz engine responds
+                player = reinterpret_cast<Player*>(kibitzEngine);
+            } else {
+                // NONE (fresh start) or AI just responded → human plays
+                player = players[human];
+            }
+        }
+
         if(!hasThreadRunning) {
             hasThreadRunning = true;
             engineStarted.notify_all();
@@ -254,7 +284,7 @@ void GameThread::gameLoop() {
             //to keep UI responsive (especially important for slow engines like KataGo loading models)
             Move move = player->genmove(model.state.colorToMove);
             if(move == Move::KIBITZED) {
-                move = kibitz->genmove(model.state.colorToMove);
+                move = kibitzEngine->genmove(model.state.colorToMove);
                 kibitzed = true;
             }
             spdlog::debug("MOVE to {}, valid = {}", move.toString(), (bool)move);
@@ -263,25 +293,38 @@ void GameThread::gameLoop() {
             lock.lock();
             locked = true;
             //TODO no direct access to model but via observers
-            if (move == Move::UNDO) {
+            if (move == Move::INTERRUPT) {
+                // Mode switch or player change - skip this iteration and re-evaluate
+                spdlog::debug("INTERRUPT received, re-evaluating game state");
+                continue;
+            }
+            else if (move == Move::UNDO) {
                 bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
                         && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
-                if(bothHumans && model.game.moveCount() > 0) {
-                    success  = coach->undo();
+                // Single undo if: both humans OR in Analysis mode
+                bool singleUndo = bothHumans || (gameMode == GameMode::ANALYSIS);
+                if (singleUndo && model.game.moveCount() > 0) {
+                    success = coach->undo();
                     model.game.undo();
-                } else if(currentPlayer()->isTypeOf(Player::HUMAN) && model.game.moveCount() > 1) {
-                        success  = coach->undo();
-                        success &= coach->undo();
-                        model.game.undo();
-                        model.game.undo();
-                        model.changeTurn();
-                        doubleUndo = true;
+                } else if (currentPlayer()->isTypeOf(Player::HUMAN) && model.game.moveCount() > 1) {
+                    // Double undo in Match mode: undo AI's response + human's move
+                    success = coach->undo();
+                    success &= coach->undo();
+                    model.game.undo();
+                    model.game.undo();
+                    model.changeTurn();
+                    doubleUndo = true;
+                }
+                // In Analysis mode, after undo, human should play next (not AI)
+                if (success && gameMode == GameMode::ANALYSIS) {
+                    lastMoveSource = MoveSource::NONE;
+                    spdlog::debug("Analysis mode: undo complete, human plays next");
                 }
             }
             else if (move) {
                 // coach plays
                 success = player == coach
-                          || (kibitzed && kibitz == coach)
+                          || (kibitzed && kibitzEngine == coach)
                           || move == Move::RESIGN
                           || coach->play(move);
             }
@@ -290,7 +333,7 @@ void GameThread::gameLoop() {
                 //other engines play
                 if (!(move == Move::RESIGN)) {
                     for (auto p : players) {
-                        if (p != reinterpret_cast<Player *>(coach) && p != player && (!kibitzed || p != kibitz)) {
+                        if (p != reinterpret_cast<Player *>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
                             spdlog::debug("DEBUG play iter");
                             if (move == Move::UNDO) {
                                 undo(p, doubleUndo);
@@ -311,7 +354,7 @@ void GameThread::gameLoop() {
                         coach->showboard()
                 );
                 if(kibitzed)
-                    comment << GameRecord::eventNames[GameRecord::KIBITZ_MOVE] << kibitz->getName();
+                    comment << GameRecord::eventNames[GameRecord::KIBITZ_MOVE] << kibitzEngine->getName();
 
                 std::for_each(
                     gameObservers.begin(), gameObservers.end(),
@@ -342,6 +385,21 @@ void GameThread::gameLoop() {
                 break;
             }
 
+            // Track move source for Analysis mode
+            if (gameMode == GameMode::ANALYSIS && success && move != Move::INTERRUPT && move != Move::UNDO) {
+                if (player->isTypeOf(Player::ENGINE)) {
+                    lastMoveSource = MoveSource::AI;
+                    spdlog::debug("Analysis mode: AI played, human's turn next");
+                } else if (kibitzed) {
+                    lastMoveSource = MoveSource::KIBITZ;
+                    waitingForGenmove = true;
+                    spdlog::debug("Analysis mode: Kibitz played, waiting for Space to trigger AI");
+                } else {
+                    lastMoveSource = MoveSource::HUMAN;
+                    spdlog::debug("Analysis mode: Human played, AI will auto-respond");
+                }
+            }
+
             if(success && move != Move::INTERRUPT)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -360,6 +418,60 @@ void GameThread::playKibitzMove() {
     std::unique_lock<std::mutex> lock(playerMutex);
     Move kibitzed(Move::KIBITZED, model.state.colorToMove);
     if(playerToMove) playerToMove->suggestMove(kibitzed);
+}
+
+bool GameThread::setGameMode(GameMode mode) {
+    std::unique_lock<std::mutex> lock(playerMutex);
+
+    // Don't allow Analysis mode for human-human matches (no AI to respond)
+    if (mode == GameMode::ANALYSIS) {
+        bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
+                && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
+        if (bothHumans) {
+            spdlog::info("Analysis mode not available for human-human matches");
+            return false;
+        }
+    }
+
+    if (gameMode != mode) {
+        gameMode = mode;
+        spdlog::info("Game mode changed to: {}", mode == GameMode::MATCH ? "Match" : "Analysis");
+        // Reset waiting state when switching modes
+        if (mode == GameMode::MATCH) {
+            waitingForGenmove = false;
+            aiVsAiMode = false;
+        }
+        // Reset lastMoveSource so human plays first after mode switch
+        lastMoveSource = MoveSource::NONE;
+        // Interrupt any blocking human player so game loop re-evaluates with new mode
+        if (playerToMove != nullptr && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+            playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
+        }
+        // Also wake up if waiting for genmove trigger
+        genmoveTriggered.notify_all();
+        return true;
+    }
+    return false;  // No change (already in requested mode)
+}
+
+void GameThread::triggerGenmove() {
+    std::unique_lock<std::mutex> lock(playerMutex);
+    if (waitingForGenmove) {
+        spdlog::debug("Triggering genmove - AI will respond");
+        waitingForGenmove = false;
+        genmoveTriggered.notify_all();
+    }
+}
+
+void GameThread::setAiVsAi(bool enabled) {
+    std::unique_lock<std::mutex> lock(playerMutex);
+    aiVsAiMode = enabled;
+    spdlog::info("AI vs AI mode: {}", enabled ? "enabled" : "disabled");
+    if (enabled && waitingForGenmove) {
+        // If we're waiting for genmove and AI vs AI is enabled, trigger it
+        waitingForGenmove = false;
+        genmoveTriggered.notify_all();
+    }
 }
 
 void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {

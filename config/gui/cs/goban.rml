@@ -146,6 +146,10 @@
                     <span>Analýza</span>
                     <div class="menuitem show">
                         <div class="grp">
+                            <div class="hr">Režim</div>
+                            <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">Analytický režim</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">GnuGo</div>
                             <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">Území</div>
                         </div>

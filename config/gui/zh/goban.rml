@@ -146,6 +146,10 @@
                     <span>分析</span>
                     <div class="menuitem show">
                         <div class="grp">
+                            <div class="hr">模式</div>
+                            <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">分析模式</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">GnuGo</div>
                             <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">形势判断</div>
                         </div>
