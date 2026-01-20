@@ -4,7 +4,7 @@
 #include <cmath>
 
 GameThread::GameThread(GobanModel &m) :
-        model(m), thread(nullptr), interruptRequested(false), hasThreadRunning(false),
+        model(m), thread(nullptr),
         playerToMove(nullptr), human(0), sgf(0), coach(0), kibitz(0), numPlayers(0), activePlayer({0, 0})
 {
 
@@ -170,9 +170,13 @@ bool GameThread::setFixedHandicap(int handicap) {
     bool success = false;
     if (!model.started) {
         int lastSize = model.board.getSize();
-		Engine* coach = currentCoach();
+        Engine* coach = currentCoach();
+        if (!coach) {
+            spdlog::error("setFixedHandicap: no coach engine!");
+            return false;
+        }
         std::vector<Position> stones;
-		if (handicap >= 2) {
+        if (handicap >= 2) {
             coach->boardsize(lastSize);
             coach->clear();
             success = coach->fixed_handicap(handicap, stones);
@@ -194,12 +198,12 @@ bool GameThread::setFixedHandicap(int handicap) {
         if(success) {
             std::for_each(
                     gameObservers.begin(), gameObservers.end(),
-                    [stones](GameObserver* observer){observer->onHandicapChange(stones);}
+                    [&stones](GameObserver* observer){observer->onHandicapChange(stones);}
             );
         }
         model.state.handicap = handicap;
-		model.board.copyStateFrom(coach->showboard());
-	}
+        model.board.copyStateFrom(coach->showboard());
+    }
     return success;
 }
 void GameThread::run() {
@@ -284,8 +288,13 @@ void GameThread::gameLoop() {
             //to keep UI responsive (especially important for slow engines like KataGo loading models)
             Move move = player->genmove(model.state.colorToMove);
             if(move == Move::KIBITZED) {
-                move = kibitzEngine->genmove(model.state.colorToMove);
-                kibitzed = true;
+                if (kibitzEngine) {
+                    move = kibitzEngine->genmove(model.state.colorToMove);
+                    kibitzed = true;
+                } else {
+                    spdlog::warn("Kibitz requested but no kibitz engine available");
+                    move = Move(Move::INVALID, model.state.colorToMove);
+                }
             }
             spdlog::debug("MOVE to {}, valid = {}", move.toString(), (bool)move);
             playerToMove = nullptr;
@@ -361,7 +370,7 @@ void GameThread::gameLoop() {
 
                 std::for_each(
                     gameObservers.begin(), gameObservers.end(),
-                    [result, move, &comment](GameObserver* observer) {
+                    [&result, move, &comment](GameObserver* observer) {
                         observer->onGameMove(move, comment.str());
                         observer->onBoardChange(result);
                     }
@@ -380,7 +389,7 @@ void GameThread::gameLoop() {
                 );
                 std::for_each(
                     gameObservers.begin(), gameObservers.end(),
-                    [result](GameObserver* observer){observer->onBoardChange(result);}
+                    [&result](GameObserver* observer){observer->onBoardChange(result);}
                 );
             }
 
@@ -464,7 +473,7 @@ bool GameThread::navigateBack() {
 
         const Board& result = coach->showboard();
         std::for_each(gameObservers.begin(), gameObservers.end(),
-            [result](GameObserver* observer) { observer->onBoardChange(result); });
+            [&result](GameObserver* observer) { observer->onBoardChange(result); });
         spdlog::debug("navigateBack: success, now at move {}/{}",
             model.game.getViewPosition(), model.game.getLoadedMovesCount());
     }
@@ -546,7 +555,7 @@ bool GameThread::navigateForward() {
         const Board& result = coach->showboard();
         spdlog::debug("navigateForward: notifying {} observers", gameObservers.size());
         std::for_each(gameObservers.begin(), gameObservers.end(),
-            [result, lastPlayedMove](GameObserver* observer) {
+            [&result, lastPlayedMove](GameObserver* observer) {
                 observer->onBoardChange(result);
                 observer->onStonePlaced(lastPlayedMove);
             });
@@ -599,7 +608,7 @@ bool GameThread::navigateToVariation(const Move& move) {
     const Board& result = coach->showboard();
     Move moveCopy = move;
     std::for_each(gameObservers.begin(), gameObservers.end(),
-        [result, moveCopy](GameObserver* observer) {
+        [&result, moveCopy](GameObserver* observer) {
             observer->onBoardChange(result);
             observer->onStonePlaced(moveCopy);
         });
@@ -802,7 +811,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
         const Board& result = coach->showboard();
         std::for_each(
             gameObservers.begin(), gameObservers.end(),
-            [result](GameObserver* observer) {
+            [&result](GameObserver* observer) {
                 observer->onBoardChange(result);
             }
         );
@@ -861,7 +870,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
             // Do not update observers with the final board state
             /*std::for_each(
                 gameObservers.begin(), gameObservers.end(),
-                [result](GameObserver* observer) {
+                [&result](GameObserver* observer) {
                     observer->onBoardChange(result);
                 }
             );*/
@@ -951,7 +960,7 @@ void GameThread::setHandicapStones(const std::vector<Position>& stones) {
         const Board& result = coach->showboard();
         std::for_each(
             gameObservers.begin(), gameObservers.end(),
-            [result](GameObserver* observer) {
+            [&result](GameObserver* observer) {
                 observer->onBoardChange(result);
             }
         );

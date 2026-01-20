@@ -3,6 +3,7 @@
 
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include <string>
 
 #include "player.h"
@@ -120,7 +121,8 @@ private:
     std::vector<Player*> players; //all players including engines, humans, spectators
     std::thread* thread;
     std::mutex mutex2;
-    volatile bool interruptRequested, hasThreadRunning;
+    std::atomic<bool> interruptRequested{false};
+    std::atomic<bool> hasThreadRunning{false};
     Player* playerToMove;
 	std::size_t human, sgf, coach, kibitz;
 	std::size_t numPlayers;

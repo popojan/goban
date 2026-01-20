@@ -12,6 +12,37 @@ const std::array<std::string, GameRecord::LAST_EVENT> GameRecord::eventNames = {
         "switched_player:", "kibitz_move:"
 };
 
+std::optional<Move> GameRecord::extractMoveFromNode(
+    const std::shared_ptr<ISgfcNode>& node,
+    int boardSizeColumns)
+{
+    if (!node) return std::nullopt;
+
+    for (const auto& property : node->GetProperties()) {
+        if (property->GetPropertyType() == SgfcPropertyType::B ||
+            property->GetPropertyType() == SgfcPropertyType::W) {
+
+            auto moveValue = std::dynamic_pointer_cast<ISgfcGoMovePropertyValue>(
+                property->GetPropertyValue());
+            if (!moveValue) continue;
+
+            Color color = (property->GetPropertyType() == SgfcPropertyType::B)
+                ? Color::BLACK : Color::WHITE;
+
+            if (moveValue->GetGoMove()->IsPassMove()) {
+                return Move(Move::PASS, color);
+            } else {
+                auto sgfPoint = moveValue->GetGoMove()->GetStoneLocation();
+                Position pos = Position::fromSgf(
+                    sgfPoint->GetPosition(SgfcGoPointNotation::Sgf),
+                    boardSizeColumns);
+                return Move(pos, color);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 GameRecord::GameRecord():
         currentNode(nullptr),
         game(nullptr),
@@ -374,21 +405,8 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         
         auto node = rootNode->GetFirstChild();
         while (node) {
-            for (auto property : node->GetProperties()) {
-                if (property->GetPropertyType() == T::B || property->GetPropertyType() == T::W) {
-                    auto moveValue = std::dynamic_pointer_cast<ISgfcGoMovePropertyValue>(property->GetPropertyValue());
-                    if (moveValue) {
-                        Color color = (property->GetPropertyType() == T::B) ? Color::BLACK : Color::WHITE;
-                        
-                        if (moveValue->GetGoMove()->IsPassMove()) {
-                            history.push_back(Move(Move::PASS, color));
-                        } else {
-                            auto sgfPoint = moveValue->GetGoMove()->GetStoneLocation();
-                            Position pos = Position::fromSgf(sgfPoint->GetPosition(SgfcGoPointNotation::Sgf), gameInfo.boardSize);
-                            history.push_back(Move(pos, color));
-                        }
-                    }
-                }
+            if (auto move = extractMoveFromNode(node, gameInfo.boardSize)) {
+                history.push_back(*move);
             }
             currentNode = node;
             node = node->GetFirstChild();
@@ -425,25 +443,8 @@ std::vector<Move> GameRecord::getVariations() const {
     // Get all children of current node
     auto children = currentNode->GetChildren();
     for (const auto& child : children) {
-        for (const auto& property : child->GetProperties()) {
-            if (property->GetPropertyType() == T::B || property->GetPropertyType() == T::W) {
-                auto moveValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcGoMovePropertyValue>(
-                    property->GetPropertyValue());
-                if (moveValue) {
-                    Color color = (property->GetPropertyType() == T::B) ? Color::BLACK : Color::WHITE;
-
-                    if (moveValue->GetGoMove()->IsPassMove()) {
-                        variations.push_back(Move(Move::PASS, color));
-                    } else {
-                        auto sgfPoint = moveValue->GetGoMove()->GetStoneLocation();
-                        Position pos = Position::fromSgf(
-                            sgfPoint->GetPosition(LibSgfcPlusPlus::SgfcGoPointNotation::Sgf),
-                            boardSize.Columns);
-                        variations.push_back(Move(pos, color));
-                    }
-                }
-                break;  // Only one move property per node
-            }
+        if (auto move = extractMoveFromNode(child, boardSize.Columns)) {
+            variations.push_back(*move);
         }
     }
 
@@ -458,33 +459,13 @@ bool GameRecord::navigateToChild(const Move& targetMove) {
 
     auto children = currentNode->GetChildren();
     for (const auto& child : children) {
-        for (const auto& property : child->GetProperties()) {
-            if (property->GetPropertyType() == T::B || property->GetPropertyType() == T::W) {
-                auto moveValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcGoMovePropertyValue>(
-                    property->GetPropertyValue());
-                if (moveValue) {
-                    Color color = (property->GetPropertyType() == T::B) ? Color::BLACK : Color::WHITE;
-                    Move childMove;
-
-                    if (moveValue->GetGoMove()->IsPassMove()) {
-                        childMove = Move(Move::PASS, color);
-                    } else {
-                        auto sgfPoint = moveValue->GetGoMove()->GetStoneLocation();
-                        Position pos = Position::fromSgf(
-                            sgfPoint->GetPosition(LibSgfcPlusPlus::SgfcGoPointNotation::Sgf),
-                            boardSize.Columns);
-                        childMove = Move(pos, color);
-                    }
-
-                    // Check if this child matches the target move
-                    if (childMove.pos == targetMove.pos && childMove.col == targetMove.col) {
-                        currentNode = child;
-                        spdlog::debug("navigateToChild: moved to child node for move {}",
-                            targetMove.toString());
-                        return true;
-                    }
-                }
-                break;
+        if (auto childMove = extractMoveFromNode(child, boardSize.Columns)) {
+            // Check if this child matches the target move
+            if (childMove->pos == targetMove.pos && childMove->col == targetMove.col) {
+                currentNode = child;
+                spdlog::debug("navigateToChild: moved to child node for move {}",
+                    targetMove.toString());
+                return true;
             }
         }
     }

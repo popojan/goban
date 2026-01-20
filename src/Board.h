@@ -9,6 +9,7 @@
 #include <iostream>
 #include <random>
 #include <mutex>
+#include <atomic>
 #include <glm/glm.hpp>
 #include "Metrics.h"
 
@@ -50,7 +51,7 @@ public:
     [[nodiscard]] std::string toString() const;
 
 private:
-    volatile Value col;
+    Value col;  // Value type - no volatile needed (copied by value)
 
 };
 
@@ -284,13 +285,13 @@ private:
     double squareYtoXRatio;
 
 public:
-    volatile unsigned long positionNumber;
+    std::atomic<unsigned long> positionNumber{0};
     bool showTerritory;
     bool showTerritoryAuto;
     bool territoryReady;
 private:
     Position cursor;
-    volatile long moveNumber;
+    std::atomic<long> moveNumber{0};
 public:
     double collision;
     float score;

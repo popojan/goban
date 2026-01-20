@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <algorithm>
+#include <optional>
 #include "Board.h"
 
 #include "SGF.h"
@@ -78,6 +79,11 @@ public:
 private:
 
     void appendGameToDocument();
+
+    // Helper to extract Move from SGF node (reduces code duplication)
+    static std::optional<Move> extractMoveFromNode(
+        const std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>& node,
+        int boardSizeColumns);
 
     typedef LibSgfcPlusPlus::SgfcPlusPlusFactory F;
     typedef LibSgfcPlusPlus::SgfcPropertyType T;

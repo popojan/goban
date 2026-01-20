@@ -9,6 +9,7 @@
 #include "Board.h"
 #include "GameState.h"
 #include <spdlog/spdlog.h>
+#include <atomic>
 #include "AudioPlayer.hpp"
 #include "GameObserver.h"
 #include "GameRecord.h"
@@ -18,7 +19,7 @@ class ElementGame;
 class GobanModel: public GameObserver {
 public:
     GobanModel(ElementGame *p, int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
-            : parent(p), isGameOver(true), invalidated(false),
+            : parent(p), invalidated(false),
             calcCapturedBlack(0), calcCapturedWhite(0), cursor({0,0}) {
         spdlog::info("Preloading sounds...");
         //newGame(boardSize, handicap, komi);
@@ -76,7 +77,7 @@ public:
 
     Board board;
 
-    volatile bool isGameOver;
+    std::atomic<bool> isGameOver{true};
     bool started;
     GameState state;
 

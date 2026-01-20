@@ -401,9 +401,9 @@ void GobanView::Update() {
 	if (board.getSize() != model.board.getSize()) {
 		updateFlag |= UPDATE_BOARD | UPDATE_STONES;
 	}
-	if (board.positionNumber != model.board.positionNumber) {
+	if (board.positionNumber.load() != model.board.positionNumber.load()) {
 		updateFlag |= UPDATE_STONES | UPDATE_OVERLAY;
-		board.positionNumber = model.board.positionNumber;
+		board.positionNumber.store(model.board.positionNumber.load());
 	}
 }
 
