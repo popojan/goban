@@ -3,6 +3,7 @@
 /* === DO NOT CHANGE BELOW === */
 
 const int MAXSTONES = 19 * 19;
+const float cidAnnotation = 1.0;  // Empty point with hidden grid (for overlays)
 const float cidBlackArea = 2.0;
 const float cidWhiteArea = 3.0;
 const float cidCapturedBlackStone = 5.5;

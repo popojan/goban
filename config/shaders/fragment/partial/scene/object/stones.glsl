@@ -29,9 +29,11 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
                     IP rip;
                     rStoneY(ro, rd, dd, ret, rip, mm0, captured||last, NDIM*i+j);
                 }
-                else if (m0 == cidWhiteArea || m0 == cidBlackArea) {
+                else if (m0 == cidWhiteArea || m0 == cidBlackArea || m0 == cidAnnotation) {
                     vec3 dd = vec3(vec2(j, i) - vec2(0.5*fNDIM - 0.5), 0.0)*vec3(wwx, wwy, 0.0);
-                    vec2 w25 = vec2(0.25*wwx, dd.z);
+                    // Annotation patches are larger (0.4) to cover grid cross; territory patches are 0.25
+                    float patchSize = (m0 == cidAnnotation) ? 0.4 : 0.25;
+                    vec2 w25 = vec2(patchSize*wwx, dd.z);
                     vec3 minb = dd.xzy - w25.xyx;
                     vec3 maxb = dd.xzy + w25.xyx;
                     IP ipp;
@@ -41,10 +43,17 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
                     float r = boardbb*distance(ro, ip);
                     if (all(lessThanEqual(abs(ip.xz - dd.xy), w25.xx+r))) {
                         if(try_insert(ret, ipp)) {
-                            mm0 = ivec2(stone0.z == cidBlackArea ? idBlackArea : idWhiteArea);
+                            // Annotation uses board material; territory uses colored areas
+                            if (m0 == cidAnnotation) {
+                                mm0 = ivec2(idBoard);
+                            } else {
+                                mm0 = ivec2(stone0.z == cidBlackArea ? idBlackArea : idWhiteArea);
+                            }
                             ipp.pid = mm0.x;
                             ipp.oid = mm0.x;
-                            ipp.a = vec2(1.0);
+                            // For annotation (idBoard), use vec2(0.0) to match board shading exactly
+                            // Territory areas use vec2(1.0) for their colored appearance
+                            ipp.a = (m0 == cidAnnotation) ? vec2(0.0) : vec2(1.0);
                             vec3 bmin = vec3(dd.x - w25.x, 0.0, dd.y - w25.x);
                             vec3 bmax = vec3(dd.x + w25.x, 0.0, dd.y + w25.x);
                             mat3 ps = mat3(
