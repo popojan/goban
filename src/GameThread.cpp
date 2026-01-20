@@ -560,13 +560,8 @@ bool GameThread::navigateForward() {
         return false;
     }
 
-    // If multiple variations, user must click to choose (don't auto-play)
-    if (variations.size() > 1) {
-        spdlog::debug("navigateForward: multiple variations, user must click to choose");
-        return false;
-    }
-
-    // Single variation - play it (one move at a time, including passes)
+    // Play first variation (main line) - even if multiple variations exist
+    // User can click on variation markers to choose alternatives
     Engine* coach = currentCoach();
     if (!coach) {
         spdlog::error("navigateForward: no coach engine!");
