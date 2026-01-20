@@ -240,6 +240,41 @@ bool GameThread::undo(Player * engine, bool doubleUndo) {
     return success;
 }
 
+GameThread::UndoResult GameThread::processUndo(Engine* coach) {
+    UndoResult result;
+
+    bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
+            && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
+
+    // Single undo if: both humans OR in Analysis mode OR navigating SGF
+    bool singleUndo = bothHumans || (gameMode == GameMode::ANALYSIS) || model.game.isNavigating();
+
+    spdlog::debug("processUndo: singleUndo={}, moveCount={}, isNavigating={}, bothHumans={}, gameMode={}",
+        singleUndo, model.game.moveCount(), model.game.isNavigating(), bothHumans, static_cast<int>(gameMode));
+
+    if (singleUndo && model.game.moveCount() > 0) {
+        result.success = coach->undo();
+        spdlog::debug("processUndo: coach->undo() returned {}", result.success);
+        model.game.undo();
+    } else if (currentPlayer()->isTypeOf(Player::HUMAN) && model.game.moveCount() > 1) {
+        // Double undo in Match mode: undo AI's response + human's move
+        result.success = coach->undo();
+        result.success &= coach->undo();
+        model.game.undo();
+        model.game.undo();
+        model.changeTurn();
+        result.doubleUndo = true;
+    }
+
+    // In Analysis mode, after undo, human should play next (not AI)
+    if (result.success && gameMode == GameMode::ANALYSIS) {
+        lastMoveSource = MoveSource::NONE;
+        spdlog::debug("processUndo: Analysis mode undo complete, human plays next");
+    }
+
+    return result;
+}
+
 void GameThread::gameLoop() {
     interruptRequested = false;
     while (model && !interruptRequested) {
@@ -308,30 +343,9 @@ void GameThread::gameLoop() {
                 continue;
             }
             else if (move == Move::UNDO) {
-                bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
-                        && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
-                // Single undo if: both humans OR in Analysis mode OR navigating SGF
-                bool singleUndo = bothHumans || (gameMode == GameMode::ANALYSIS) || model.game.isNavigating();
-                spdlog::debug("UNDO: singleUndo={}, moveCount={}, isNavigating={}, bothHumans={}, gameMode={}",
-                    singleUndo, model.game.moveCount(), model.game.isNavigating(), bothHumans, static_cast<int>(gameMode));
-                if (singleUndo && model.game.moveCount() > 0) {
-                    success = coach->undo();
-                    spdlog::debug("UNDO: coach->undo() returned {}", success);
-                    model.game.undo();
-                } else if (currentPlayer()->isTypeOf(Player::HUMAN) && model.game.moveCount() > 1) {
-                    // Double undo in Match mode: undo AI's response + human's move
-                    success = coach->undo();
-                    success &= coach->undo();
-                    model.game.undo();
-                    model.game.undo();
-                    model.changeTurn();
-                    doubleUndo = true;
-                }
-                // In Analysis mode, after undo, human should play next (not AI)
-                if (success && gameMode == GameMode::ANALYSIS) {
-                    lastMoveSource = MoveSource::NONE;
-                    spdlog::debug("Analysis mode: undo complete, human plays next");
-                }
+                auto undoResult = processUndo(coach);
+                success = undoResult.success;
+                doubleUndo = undoResult.doubleUndo;
             }
             else if (move) {
                 // coach plays

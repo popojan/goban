@@ -438,20 +438,25 @@ void GobanView::updateLastMoveOverlay() {
 		lastMove = Position(-1, -1);
 	}
 
-	if (model.game.moveCount() > 0) {
+	// When navigating, use viewPosition for move number (not history size)
+	size_t moveNum = model.game.isNavigating()
+		? model.game.getViewPosition()
+		: model.game.moveCount();
+
+	if (moveNum > 0) {
 		auto [move, moveIndex] = model.game.lastStoneMoveIndex();
 		if (move == Move::NORMAL) {
 			std::ostringstream ss;
-			ss << moveIndex;
+			ss << moveNum;  // Use navigation-aware move number
 			lastMove = move.pos;
-			spdlog::debug("updateLastMoveOverlay: setting '{}' at ({},{}) color={}",
+			spdlog::debug("updateLastMoveOverlay: setting '{}' at ({},{}) color={} (navAware)",
 				ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
 			board.setOverlay(move.pos, ss.str(), move.col);
 		} else {
 			spdlog::debug("updateLastMoveOverlay: lastStoneMoveIndex returned non-NORMAL");
 		}
 	} else {
-		spdlog::debug("updateLastMoveOverlay: no moves in history");
+		spdlog::debug("updateLastMoveOverlay: no moves");
 	}
 }
 
@@ -496,7 +501,6 @@ void GobanView::updateNavigationOverlay() {
 void GobanView::onBoardSized(int newBoardSize) {
 	board.clear(newBoardSize);
 	lastMove = Position(-1, -1);
-	koOverlay = Position(-1, -1);
 	navOverlays.clear();
 }
 
@@ -514,11 +518,13 @@ void GobanView::onStonePlaced(const Move& move) {
         }
         lastMove = move.pos;
 
-        // Get move number from game history
-        size_t moveIndex = model.game.moveCount();
+        // Use navigation-aware move number
+        size_t moveIndex = model.game.isNavigating()
+            ? model.game.getViewPosition()
+            : model.game.moveCount();
         std::ostringstream ss;
         ss << moveIndex;
-        spdlog::debug("onStonePlaced: setting overlay '{}' at ({},{}) color={}",
+        spdlog::debug("onStonePlaced: setting overlay '{}' at ({},{}) color={} (navAware)",
             ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
         board.setOverlay(move.pos, ss.str(), move.col);
 
@@ -532,50 +538,7 @@ void GobanView::onGameMove(const Move& move, const std::string& comment) {
 }
 
 void GobanView::onBoardChange(const Board& newBoard) {
-	// Detect single-stone capture by comparing board states
-	// Find positions that changed from occupied to empty (captured stones)
-	Position capturedPos(-1, -1);
-	int captureCount = 0;
-
-	for (int col = 0; col < newBoard.getSize(); ++col) {
-		for (int row = 0; row < newBoard.getSize(); ++row) {
-			Position pos(col, row);
-			Color oldStone = this->board[pos].stone;
-			Color newStone = newBoard[pos].stone;
-			if (oldStone != Color::EMPTY && newStone == Color::EMPTY) {
-				// This position had a stone that is now gone (captured)
-				capturedPos = pos;
-				captureCount++;
-			}
-		}
-	}
-
-	// Show overlay for any capture (testing annotation feature)
-	Position koPos(-1, -1);
-	if (captureCount >= 1) {
-		koPos = capturedPos;  // For multi-capture, shows last found position
-		spdlog::info("Capture detected: {} stone(s), showing overlay at ({},{})",
-			captureCount, koPos.col(), koPos.row());
-	}
-
-	// Clear any previous ko overlay
-	if (koOverlay) {
-		this->board.removeBoardOverlay(koOverlay);
-	}
-
 	this->board.updateStones(newBoard);
 	updateLastMoveOverlay();
-
-	// Set ko capture overlay (show previous move number at captured position)
-	if (koPos) {
-		size_t moveNum = model.game.moveCount() - 1;  // Previous move number
-		std::ostringstream ss;
-		ss << moveNum;
-		this->board.setBoardOverlay(koPos, ss.str());
-		koOverlay = koPos;
-	} else {
-		koOverlay = Position(-1, -1);
-	}
-
 	requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);
 }

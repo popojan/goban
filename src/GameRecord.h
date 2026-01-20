@@ -117,6 +117,7 @@ public:
     void retreatPosition() { if (hasPreviousMove()) viewPosition--; }
     void resetNavigation() { viewPosition = 0; loadedMoves.clear(); }
     [[nodiscard]] bool isNavigating() const { return !loadedMoves.empty(); }
+    [[nodiscard]] bool isAtEndOfNavigation() const { return !loadedMoves.empty() && viewPosition >= loadedMoves.size(); }
 
     // Multi-variation support
     [[nodiscard]] std::vector<Move> getVariations() const;

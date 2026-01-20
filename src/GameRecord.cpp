@@ -169,6 +169,9 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
 
     history.clear();
+    // Reset SGF navigation state from any previously loaded game
+    loadedMoves.clear();
+    viewPosition = 0;
 
     boardSize.Columns = boardSizeInt;
     boardSize.Rows = boardSizeInt;
@@ -299,8 +302,12 @@ void GameRecord::undo() {
             spdlog::debug("GameRecord::undo() decremented viewPosition to {}", viewPosition);
         }
     }
+    spdlog::debug("GameRecord::undo() currentNode={}, HasParent={}",
+        currentNode ? "set" : "null",
+        (currentNode && currentNode->HasParent()) ? "yes" : "no");
     if (currentNode && currentNode->HasParent()) {
         currentNode = currentNode->GetParent();
+        spdlog::debug("GameRecord::undo() moved currentNode to parent");
     }
 }
 

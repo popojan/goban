@@ -153,7 +153,6 @@ public:
     int currentProgram;
     bool showOverlay;
     Position lastMove;
-    Position koOverlay;  // Position of ko capture overlay (empty point showing captured move number)
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     AudioPlayer player;
 

@@ -33,8 +33,8 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
-            // Check if clicking on a variation during navigation
-            if (model.game.isNavigating()) {
+            // Check if clicking on a variation during navigation (but not at the end)
+            if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
                 auto variations = model.game.getVariations();
                 for (const auto& move : variations) {
                     if (move == Move::NORMAL && move.pos == coord) {
@@ -46,7 +46,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     }
                 }
                 // Clicked elsewhere during navigation - ignore to prevent accidental game reset
-                // User must use menu "Clear Board" or navigate to end to start new game
+                // User must navigate to end to continue playing
                 spdlog::debug("Clicked on non-variation position during navigation - ignoring");
                 return;
             }
@@ -295,13 +295,15 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         model.game.getViewPosition(), model.game.getLoadedMovesCount());
 
     if (!downNotUp && model.game.isNavigating()) {
+        // Space/Right: navigate forward if possible, otherwise fall through to normal commands
         if (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT) {
-            if (engine.navigateForward()) {
+            if (model.game.hasNextMove() && engine.navigateForward()) {
                 spdlog::debug("Navigation: forward to move {}/{}",
                     model.game.getViewPosition(), model.game.getLoadedMovesCount());
                 view.updateNavigationOverlay();
+                return;
             }
-            return;
+            // At end of navigation - fall through to allow Space for kibitz
         }
         if (key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK) {
             if (engine.navigateBack()) {

@@ -114,6 +114,13 @@ public:
     bool loadSGF(const std::string& fileName, int gameIndex = 0);
 
 private:
+    // Undo processing result
+    struct UndoResult {
+        bool success = false;
+        bool doubleUndo = false;
+    };
+
+    UndoResult processUndo(Engine* coach);
     void setHandicapStones(const std::vector<Position>& stones);
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;
