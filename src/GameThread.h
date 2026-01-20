@@ -121,6 +121,8 @@ private:
     };
 
     UndoResult processUndo(Engine* coach);
+    void syncOtherEngines(const Move& move, Player* player, Engine* coach, Engine* kibitzEngine, bool kibitzed, bool doubleUndo);
+    void notifyMoveComplete(Engine* coach, const Move& move, Engine* kibitzEngine, bool kibitzed, const std::string& engineComments);
     void setHandicapStones(const std::vector<Position>& stones);
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;

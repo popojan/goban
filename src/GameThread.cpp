@@ -240,6 +240,38 @@ bool GameThread::undo(Player * engine, bool doubleUndo) {
     return success;
 }
 
+void GameThread::syncOtherEngines(const Move& move, Player* player, Engine* coach,
+                                   Engine* kibitzEngine, bool kibitzed, bool doubleUndo) {
+    for (auto p : players) {
+        if (p != reinterpret_cast<Player*>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
+            spdlog::debug("syncOtherEngines: syncing player {}", p->getName());
+            if (move == Move::UNDO) {
+                undo(p, doubleUndo);
+            } else {
+                p->play(move);
+            }
+        }
+    }
+}
+
+void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
+                                     Engine* kibitzEngine, bool kibitzed,
+                                     const std::string& engineComments) {
+    const Board& result = coach->showboard();
+
+    std::ostringstream comment;
+    comment << engineComments;
+    if (kibitzed) {
+        comment << GameRecord::eventNames[GameRecord::KIBITZ_MOVE] << kibitzEngine->getName();
+    }
+
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&result, move, &comment](GameObserver* observer) {
+            observer->onGameMove(move, comment.str());
+            observer->onBoardChange(result);
+        });
+}
+
 GameThread::UndoResult GameThread::processUndo(Engine* coach) {
     UndoResult result;
 
@@ -354,41 +386,25 @@ void GameThread::gameLoop() {
                           || move == Move::RESIGN
                           || coach->play(move);
             }
-            std::ostringstream comment;
             if(success) {
-                //other engines play
-                if (!(move == Move::RESIGN)) {
-                    for (auto p : players) {
-                        if (p != reinterpret_cast<Player *>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
-                            spdlog::debug("DEBUG play iter");
-                            if (move == Move::UNDO) {
-                                undo(p, doubleUndo);
-                            } else
-                                p->play(move);
-                        }
-                        //compose move comment
-                        if(p->isTypeOf(Player::ENGINE)) {
-                            std::string engineMsg(dynamic_cast<GtpEngine*>(p)->lastError());
-                            if(!engineMsg.empty())
-                                comment << engineMsg << " (" << p->getName() << ") ";
+                // Collect engine comments for annotation
+                std::ostringstream engineComments;
+                for (auto p : players) {
+                    if (p->isTypeOf(Player::ENGINE)) {
+                        std::string engineMsg(dynamic_cast<GtpEngine*>(p)->lastError());
+                        if (!engineMsg.empty()) {
+                            engineComments << engineMsg << " (" << p->getName() << ") ";
                         }
                     }
                 }
-                //update model
 
-                const Board& result(
-                        coach->showboard()
-                );
-                if(kibitzed)
-                    comment << GameRecord::eventNames[GameRecord::KIBITZ_MOVE] << kibitzEngine->getName();
+                // Sync other engines (not for resign)
+                if (!(move == Move::RESIGN)) {
+                    syncOtherEngines(move, player, coach, kibitzEngine, kibitzed, doubleUndo);
+                }
 
-                std::for_each(
-                    gameObservers.begin(), gameObservers.end(),
-                    [&result, move, &comment](GameObserver* observer) {
-                        observer->onGameMove(move, comment.str());
-                        observer->onBoardChange(result);
-                    }
-                );
+                // Notify observers
+                notifyMoveComplete(coach, move, kibitzEngine, kibitzed, engineComments.str());
             }
 
             //update territory if shown
