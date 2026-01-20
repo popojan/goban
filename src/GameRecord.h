@@ -109,6 +109,9 @@ public:
 
     // Get comment from current node (C property)
     [[nodiscard]] std::string getComment() const;
+
+    // Get markup annotations from current node (LB/TR/SQ/CR/MA properties)
+    [[nodiscard]] std::vector<BoardMarkup> getMarkup() const;
 };
 
 #endif //GOBAN_GAMERECORD_H

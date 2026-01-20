@@ -648,3 +648,63 @@ std::string GameRecord::getComment() const {
     }
     return "";
 }
+
+std::vector<BoardMarkup> GameRecord::getMarkup() const {
+    std::vector<BoardMarkup> result;
+    if (!currentNode) {
+        return result;
+    }
+
+    int boardSizeColumns = boardSize.Columns;
+
+    for (const auto& property : currentNode->GetProperties()) {
+        auto propType = property->GetPropertyType();
+        MarkupType markupType;
+
+        // Determine markup type from property type
+        if (propType == T::LB) {
+            markupType = MarkupType::LABEL;
+        } else if (propType == T::TR) {
+            markupType = MarkupType::TRIANGLE;
+        } else if (propType == T::SQ) {
+            markupType = MarkupType::SQUARE;
+        } else if (propType == T::CR) {
+            markupType = MarkupType::CIRCLE;
+        } else if (propType == T::MA) {
+            markupType = MarkupType::MARK;
+        } else {
+            continue;  // Not a markup property
+        }
+
+        // Process all values for this property
+        for (const auto& value : property->GetPropertyValues()) {
+            if (markupType == MarkupType::LABEL) {
+                // LB has composed value: point:text
+                if (value->IsComposedValue()) {
+                    auto composed = value->ToComposedValue();
+                    auto pointValue = composed->GetValue1();
+                    auto textValue = composed->GetValue2();
+                    if (pointValue && textValue) {
+                        std::string pointStr = pointValue->GetRawValue();
+                        std::string label = textValue->GetRawValue();
+                        Position pos = Position::fromSgf(pointStr, boardSizeColumns);
+                        if (pos) {
+                            result.emplace_back(pos, markupType, label);
+                        }
+                    }
+                }
+            } else {
+                // TR, SQ, CR, MA have simple point values
+                if (value->ToSingleValue()) {
+                    std::string pointStr = value->ToSingleValue()->GetRawValue();
+                    Position pos = Position::fromSgf(pointStr, boardSizeColumns);
+                    if (pos) {
+                        result.emplace_back(pos, markupType);
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}

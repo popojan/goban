@@ -61,7 +61,7 @@ bool GobanOverlay::init() {
         glyphy_point_t p = {.0, .0};
         b->move_to(&p);
         spdlog::debug("Adding text glyphs[{0}]", i);
-	    b->add_text("0123456789X", font, 12.0);
+	    b->add_text("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#^O", font, 12.0);
 		buffer[i] = b;
 	}
 

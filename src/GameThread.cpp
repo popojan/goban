@@ -535,6 +535,7 @@ bool GameThread::navigateBack() {
 
     // Update comment from current SGF node
     model.state.comment = model.game.getComment();
+    model.state.markup = model.game.getMarkup();
 
     // Show pass message if we just undid a pass (shows the state we're viewing)
     if (undoneMove == Move::PASS) {
@@ -630,6 +631,7 @@ bool GameThread::navigateForward() {
 
     // Update comment from current SGF node
     model.state.comment = model.game.getComment();
+    model.state.markup = model.game.getMarkup();
 
     // Show board update (territory display deferred to next forward press at end)
     const Board& result = coach->showboard();
@@ -689,6 +691,7 @@ bool GameThread::navigateToVariation(const Move& move) {
 
     // Update comment from current SGF node
     model.state.comment = model.game.getComment();
+    model.state.markup = model.game.getMarkup();
 
     // For new branches, switch to Analysis mode for flexible SGF editing
     if (newBranch) {
@@ -748,6 +751,7 @@ bool GameThread::navigateToStart() {
         model.board.toggleTerritoryAuto(false);
         model.state.colorToMove = model.game.getColorToMove();
         model.state.comment = model.game.getComment();
+    model.state.markup = model.game.getMarkup();
         model.state.msg = GameState::NONE;
 
         const Board& result = coach->showboard();
@@ -802,6 +806,7 @@ bool GameThread::navigateToEnd() {
     // Always show result at end (whether we played moves or were already there)
     model.state.colorToMove = model.game.getColorToMove();
     model.state.comment = model.game.getComment();
+    model.state.markup = model.game.getMarkup();
     model.state.msg = GameState::NONE;
 
     // Show territory at end
@@ -1025,9 +1030,9 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
         model.state.colorToMove = Color::BLACK;
     }
 
-    // Set initial comment from current SGF node
+    // Set initial comment and markup from current SGF node
     model.state.comment = model.game.getComment();
-    spdlog::info("loadSGF: initial comment = '{}'", model.state.comment.substr(0, 50));
+    model.state.markup = model.game.getMarkup();
 
     model.pause();
     

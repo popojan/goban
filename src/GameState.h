@@ -2,6 +2,27 @@
 #define GOBAN_VIEWSTATE_H
 
 #include "Board.h"
+#include <vector>
+#include <string>
+
+// SGF markup types for board annotations
+enum class MarkupType {
+    LABEL,      // LB - text label
+    TRIANGLE,   // TR - triangle marker
+    SQUARE,     // SQ - square marker
+    CIRCLE,     // CR - circle marker
+    MARK        // MA - X marker
+};
+
+// Single markup annotation on the board
+struct BoardMarkup {
+    Position pos;
+    MarkupType type;
+    std::string label;  // Only used for LABEL type
+
+    BoardMarkup(Position p, MarkupType t, const std::string& l = "")
+        : pos(p), type(t), label(l) {}
+};
 
 class GameState {
 public:
@@ -16,6 +37,7 @@ public:
     std::string cmd;
     std::string err;
     std::string comment;  // SGF comment for current move (C property)
+    std::vector<BoardMarkup> markup;  // SGF markup annotations (LB/TR/SQ/CR/MA)
     
     enum Message {
         NONE, WHITE_PASS, BLACK_PASS, WHITE_RESIGNS, BLACK_RESIGNS,

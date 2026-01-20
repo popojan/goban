@@ -21,6 +21,10 @@ public:
         view.requestRepaint();
     }
 
+    void updateNavigationOverlay() {
+        view.updateNavigationOverlay();
+    }
+
     bool isExiting() { return control.isExiting(); }
     void Reshape();
     void gameLoop();

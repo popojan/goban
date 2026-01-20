@@ -154,6 +154,7 @@ public:
     bool showOverlay;
     Position lastMove;
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
+    std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
     AudioPlayer player;
 
     void clearView();

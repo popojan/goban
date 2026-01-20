@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <cstdio>
+#include <set>
 #include "UserSettings.h"
 
 GobanView::GobanView(GobanModel& m)
@@ -467,6 +468,23 @@ void GobanView::updateNavigationOverlay() {
 	}
 	navOverlays.clear();
 
+	// Clear previous markup overlays (both board-level and stone-level)
+	for (const auto& pos : markupOverlays) {
+		if (pos) {
+			board.removeBoardOverlay(pos);  // Clears layer 0 (board)
+			board.removeOverlay(pos);        // Clears layers 1-2 (stones)
+		}
+	}
+	markupOverlays.clear();
+
+	// Collect positions with explicit markup (these take precedence over variations)
+	std::set<std::pair<int, int>> markupPositions;
+	for (const auto& markup : model.state.markup) {
+		if (markup.pos) {
+			markupPositions.insert({markup.pos.col(), markup.pos.row()});
+		}
+	}
+
 	// Get all variations (branches) from current position
 	if (model.game.isNavigating()) {
 		auto variations = model.game.getVariations();
@@ -481,6 +499,11 @@ void GobanView::updateNavigationOverlay() {
 		size_t idx = 0;
 		for (const auto& move : variations) {
 			if (move == Move::NORMAL) {
+				// Skip positions that have explicit markup (markup takes precedence)
+				if (markupPositions.count({move.pos.col(), move.pos.row()})) {
+					idx++;
+					continue;
+				}
 				std::ostringstream ss;
 				ss << nextMoveNum;
 				if (variations.size() > 1) {
@@ -497,13 +520,52 @@ void GobanView::updateNavigationOverlay() {
 		}
 	}
 
-	requestRepaint(UPDATE_OVERLAY);
+	// Render SGF markup annotations (explicit markup takes precedence over variations)
+	for (const auto& markup : model.state.markup) {
+		if (!markup.pos) continue;
+
+		std::string text;
+		switch (markup.type) {
+			case MarkupType::LABEL:
+				text = markup.label;
+				break;
+			case MarkupType::TRIANGLE:
+				text = "^";  // ASCII triangle approximation
+				break;
+			case MarkupType::SQUARE:
+				text = "#";  // ASCII square approximation
+				break;
+			case MarkupType::CIRCLE:
+				text = "O";  // ASCII circle
+				break;
+			case MarkupType::MARK:
+				text = "X";  // X marker
+				break;
+		}
+
+		if (!text.empty()) {
+			// Check if there's a stone at this position
+			Color stoneColor = board[markup.pos].stone;
+			if (stoneColor != Color::EMPTY) {
+				// Use stone-level overlay (renders on top of stone)
+				board.setOverlay(markup.pos, text, stoneColor);
+			} else {
+				// Use board-level overlay (renders on empty point with grid patch)
+				board.setBoardOverlay(markup.pos, text);
+			}
+			markupOverlays.push_back(markup.pos);
+		}
+	}
+
+	// UPDATE_STONES needed to upload mAnnotation material changes for grid patches
+	requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
 }
 
 void GobanView::onBoardSized(int newBoardSize) {
 	board.clear(newBoardSize);
 	lastMove = Position(-1, -1);
 	navOverlays.clear();
+	markupOverlays.clear();
 }
 
 void GobanView::onStonePlaced(const Move& move) {
