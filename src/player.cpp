@@ -136,6 +136,8 @@ bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
 }
 
 const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
+    // Refresh board state from GTP engine first (play/undo don't update internal board)
+    board.parseGtp(GtpClient::showboard());
     estimateTerritory(final, colorToMove);
     board.score = final ? final_score() : 0.0f;
     board.invalidate();

@@ -33,21 +33,32 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
-            // Check if clicking on a variation during navigation (but not at the end)
+            // During navigation (not at end), handle clicks specially
             if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
                 auto variations = model.game.getVariations();
                 for (const auto& move : variations) {
                     if (move == Move::NORMAL && move.pos == coord) {
-                        spdlog::debug("Clicked on variation at ({},{})", coord.col(), coord.row());
+                        spdlog::debug("Clicked on existing variation at ({},{})", coord.col(), coord.row());
                         if (engine.navigateToVariation(move)) {
                             view.updateNavigationOverlay();
                         }
                         return;
                     }
                 }
-                // Clicked elsewhere during navigation - ignore to prevent accidental game reset
-                // User must navigate to end to continue playing
-                spdlog::debug("Clicked on non-variation position during navigation - ignoring");
+                // Clicked on new position - create new variation via navigateToVariation
+                // Use SGF tree to determine correct color (model.state may be out of sync)
+                Color colorToMove = model.game.getColorToMove();
+                spdlog::debug("Clicked on new position during navigation - creating new variation (color={})",
+                    colorToMove == Color::BLACK ? "B" : "W");
+                Move newMove(coord, colorToMove);
+                if (engine.navigateToVariation(newMove)) {
+                    view.updateNavigationOverlay();
+                    // Start game loop for AI response (after navigateToVariation completes)
+                    if (!engine.isRunning()) {
+                        spdlog::debug("Starting game loop for AI auto-response");
+                        engine.run();
+                    }
+                }
                 return;
             }
 
@@ -203,6 +214,26 @@ bool GobanControl::command(const std::string& cmd) {
     else if (cmd == "undo move") {
         engine.playLocalMove(model.getUndoMove());
     }
+    else if (cmd == "navigate_start") {
+        if (engine.navigateToStart()) {
+            view.updateNavigationOverlay();
+        }
+    }
+    else if (cmd == "navigate_end") {
+        if (engine.navigateToEnd()) {
+            view.updateNavigationOverlay();
+        }
+    }
+    else if (cmd == "navigate_back") {
+        if (engine.navigateBack()) {
+            view.updateNavigationOverlay();
+        }
+    }
+    else if (cmd == "navigate_forward") {
+        if (engine.navigateForward()) {
+            view.updateNavigationOverlay();
+        }
+    }
     else if (cmd == "pan camera") {
         view.endPan();
     }
@@ -295,15 +326,20 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         model.game.getViewPosition(), model.game.getLoadedMovesCount());
 
     if (!downNotUp && model.game.isNavigating()) {
-        // Space/Right: navigate forward if possible, otherwise fall through to normal commands
+        // Space/Right: navigate forward (or show territory at end)
         if (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT) {
-            if (model.game.hasNextMove() && engine.navigateForward()) {
+            if (engine.navigateForward()) {
                 spdlog::debug("Navigation: forward to move {}/{}",
                     model.game.getViewPosition(), model.game.getLoadedMovesCount());
                 view.updateNavigationOverlay();
+                return;  // Handled navigation
+            }
+            // At end with no more moves - don't fall through to kibitz
+            if (!model.game.hasNextMove()) {
                 return;
             }
             // At end of navigation - fall through to allow Space for kibitz
+            spdlog::debug("Navigation: at end, Space falls through to kibitz");
         }
         if (key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK) {
             if (engine.navigateBack()) {

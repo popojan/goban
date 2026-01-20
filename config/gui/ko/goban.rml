@@ -127,6 +127,13 @@
                             <div class="cmd" onmouseup="undo move">무르기</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">불계</div>
                             </div>
+                            <div id="grpReplay">
+                            <div class="hr">재생</div>
+                            <div class="cmd" onmouseup="navigate_start">처음</div>
+                            <div class="cmd" onmouseup="navigate_back">이전</div>
+                            <div class="cmd" onmouseup="navigate_forward">다음</div>
+                            <div class="cmd" onmouseup="navigate_end">마지막</div>
+                            </div>
                         </div>
                     </div>
                 </div>

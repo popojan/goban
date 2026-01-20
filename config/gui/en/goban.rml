@@ -133,11 +133,18 @@
                             <div class="template" id="templateCalculatingScore">Calculating score...</div>
                             </div>
                             <div id="grpMoves">
-                            <div class="hr">Move</div>
+                            <div class="hr">Play</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">Pass</div>
                             <div class="cmd" onmouseup="play once">Kibitz move</div>
                             <div class="cmd" onmouseup="undo move">Undo</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">Resign</div>
+                            </div>
+                            <div id="grpReplay">
+                            <div class="hr">Replay</div>
+                            <div class="cmd" onmouseup="navigate_start">First</div>
+                            <div class="cmd" onmouseup="navigate_back">Previous</div>
+                            <div class="cmd" onmouseup="navigate_forward">Next</div>
+                            <div class="cmd" onmouseup="navigate_end">Last</div>
                             </div>
                         </div>
                     </div>

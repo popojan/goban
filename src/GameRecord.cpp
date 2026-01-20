@@ -43,6 +43,103 @@ std::optional<Move> GameRecord::extractMoveFromNode(
     return std::nullopt;
 }
 
+size_t GameRecord::getTreeDepth() const {
+    if (!game || !currentNode) return 0;
+
+    size_t depth = 0;
+    auto node = currentNode;
+    auto root = game->GetRootNode();
+
+    while (node && node != root) {
+        // Only count nodes that have moves (skip root/setup nodes)
+        if (extractMoveFromNode(node, boardSize.Columns).has_value()) {
+            depth++;
+        }
+        node = node->GetParent();
+    }
+    return depth;
+}
+
+std::vector<Move> GameRecord::getPathFromRoot() const {
+    std::vector<Move> path;
+    if (!game || !currentNode) return path;
+
+    // Collect nodes from currentNode back to root
+    std::vector<std::shared_ptr<ISgfcNode>> nodes;
+    auto node = currentNode;
+    auto root = game->GetRootNode();
+
+    while (node && node != root) {
+        nodes.push_back(node);
+        node = node->GetParent();
+    }
+
+    // Reverse to get root-to-current order, extract moves
+    for (auto it = nodes.rbegin(); it != nodes.rend(); ++it) {
+        if (auto move = extractMoveFromNode(*it, boardSize.Columns)) {
+            path.push_back(*move);
+        }
+    }
+    return path;
+}
+
+bool GameRecord::isAtRoot() const {
+    if (!game || !currentNode) return true;
+    auto root = game->GetRootNode();
+    // At root if currentNode IS root, or is first child of root (setup node)
+    return currentNode == root || currentNode->GetParent() == root;
+}
+
+Move GameRecord::lastMove() const {
+    if (auto move = extractMoveFromNode(currentNode, boardSize.Columns)) {
+        return *move;
+    }
+    return Move(Move::INVALID, Color::EMPTY);
+}
+
+Move GameRecord::lastStoneMove() const {
+    auto node = currentNode;
+    auto root = game ? game->GetRootNode() : nullptr;
+
+    while (node && node != root) {
+        if (auto move = extractMoveFromNode(node, boardSize.Columns)) {
+            if (*move == Move::NORMAL) {
+                return *move;
+            }
+        }
+        node = node->GetParent();
+    }
+    return Move(Move::INVALID, Color::EMPTY);
+}
+
+std::pair<Move, size_t> GameRecord::lastStoneMoveIndex() const {
+    auto node = currentNode;
+    auto root = game ? game->GetRootNode() : nullptr;
+    size_t depth = getTreeDepth();
+
+    while (node && node != root) {
+        if (auto move = extractMoveFromNode(node, boardSize.Columns)) {
+            if (*move == Move::NORMAL) {
+                return std::make_pair(*move, depth);
+            }
+        }
+        node = node->GetParent();
+        depth--;
+    }
+    return std::make_pair(Move(Move::INVALID, Color::EMPTY), 0);
+}
+
+Move GameRecord::secondLastMove() const {
+    if (!currentNode || !currentNode->HasParent()) {
+        return Move(Move::INVALID, Color::BLACK);
+    }
+    auto parent = currentNode->GetParent();
+    if (auto move = extractMoveFromNode(parent, boardSize.Columns)) {
+        return *move;
+    }
+    return Move(Move::INVALID, Color::BLACK);
+}
+
 GameRecord::GameRecord():
         currentNode(nullptr),
         game(nullptr),
@@ -68,11 +165,12 @@ void GameRecord::move(const Move& move)  {
 
     std::lock_guard<std::mutex> lock(mutex);
 
-    history.push_back(move);
-
-    // Skip SGF tree manipulation if game is null (e.g., finished/loaded game in navigation mode)
+    // SGF tree is the source of truth - no separate history vector needed
     if (!game) {
-        return;
+        spdlog::warn("GameRecord::move() called with no game - creating new game");
+        // Create a minimal game if none exists
+        game = F::CreateGame();
+        currentNode = game->GetRootNode();
     }
 
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
@@ -168,14 +266,10 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
 
-    history.clear();
-    // Reset SGF navigation state from any previously loaded game
-    loadedMoves.clear();
-    viewPosition = 0;
-
     boardSize.Columns = boardSizeInt;
     boardSize.Rows = boardSizeInt;
 
+    // Create fresh SGF game - this IS the reset (SGF tree is source of truth)
     game = F::CreateGame();
     currentNode = game->GetRootNode();
     gameHasNewMoves = false;
@@ -232,13 +326,13 @@ void GameRecord::finalizeGame(float scoreDelta) {
     auto type = T::RE;
     std::ostringstream ss;
     
-    // Check if the game ended by resignation
-    bool isResignation = !history.empty() && history.back() == Move::RESIGN;
-    
+    // Check if the game ended by resignation (use SGF tree)
+    Move last = lastMove();
+    bool isResignation = (last == Move::RESIGN);
+
     if (isResignation) {
         // For resignation, use R instead of score
-        Color resigningPlayer = history.back().col;
-        ss << (resigningPlayer == Color::BLACK ? "W+R" : "B+R");
+        ss << (last.col == Color::BLACK ? "W+R" : "B+R");
     } else {
         // Use sign convention since we still get the traditional scoreDelta
         ss << (scoreDelta < 0.0 ? "W+" : "B+");
@@ -247,9 +341,15 @@ void GameRecord::finalizeGame(float scoreDelta) {
 
     auto value (vF->CreateSimpleTextPropertyValue(ss.str()));
 
+    // Copy existing properties, excluding any existing RE (result) property
     std::vector<std::shared_ptr<ISgfcProperty> > properties;
     auto p = game->GetRootNode()->GetProperties();
-    std::copy(p.begin(), p.end(), std::back_inserter(properties));
+    for (const auto& prop : p) {
+        if (prop->GetPropertyType() != T::RE) {
+            properties.push_back(prop);
+        }
+    }
+    // Add the new result
     std::shared_ptr<ISgfcProperty> property(pF->CreateProperty(type, value));
     properties.push_back(property);
 
@@ -289,25 +389,21 @@ void GameRecord::saveAs(const std::string& fileName) {
 }
 
 void GameRecord::undo() {
-
     std::lock_guard<std::mutex> lock(mutex);
 
-    spdlog::debug("GameRecord::undo() called, history.size()={}, viewPosition={}", history.size(), viewPosition);
-
-    if (!history.empty()) {
-        history.pop_back();
-        // Sync navigation position
-        if (isNavigating() && viewPosition > 0) {
-            viewPosition--;
-            spdlog::debug("GameRecord::undo() decremented viewPosition to {}", viewPosition);
-        }
-    }
-    spdlog::debug("GameRecord::undo() currentNode={}, HasParent={}",
+    // SGF tree is source of truth - just move currentNode to parent
+    spdlog::debug("GameRecord::undo() called, treeDepth={}, currentNode={}, HasParent={}",
+        getTreeDepth(),
         currentNode ? "set" : "null",
         (currentNode && currentNode->HasParent()) ? "yes" : "no");
+
     if (currentNode && currentNode->HasParent()) {
-        currentNode = currentNode->GetParent();
-        spdlog::debug("GameRecord::undo() moved currentNode to parent");
+        auto root = game ? game->GetRootNode() : nullptr;
+        // Don't go past root
+        if (currentNode != root) {
+            currentNode = currentNode->GetParent();
+            spdlog::debug("GameRecord::undo() moved to parent, new depth={}", getTreeDepth());
+        }
     }
 }
 
@@ -408,36 +504,92 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
             }
         }
 
-        history.clear();
-        
-        auto node = rootNode->GetFirstChild();
-        while (node) {
-            if (auto move = extractMoveFromNode(node, gameInfo.boardSize)) {
-                history.push_back(*move);
-            }
-            currentNode = node;
-            node = node->GetFirstChild();
-        }
-
-        // Keep the game tree for all loaded games (enables adding variations)
+        // Keep the game tree (SGF is single source of truth)
         game = loadedGame;
-        // Note: currentNode is already at the last move from the traversal above
         gameHasNewMoves = false;
-
-        // Preserve loaded moves for navigation
-        loadedMoves = history;  // Copy for navigation reference
-        viewPosition = history.size();  // Start at end (current position)
 
         boardSize.Columns = gameInfo.boardSize;
         boardSize.Rows = gameInfo.boardSize;
 
-        spdlog::info("Successfully loaded SGF file [{}] with {} moves (navigation enabled)", fileName, loadedMoves.size());
+        // Traverse to end of main line - currentNode becomes the last move
+        currentNode = rootNode;
+        auto node = rootNode->GetFirstChild();
+        while (node) {
+            currentNode = node;
+            node = node->GetFirstChild();
+        }
+
+        spdlog::info("Successfully loaded SGF file [{}] with {} moves (navigation enabled)", fileName, getTreeDepth());
         return true;
 
     } catch (const std::exception& ex) {
         spdlog::error("Error loading SGF file [{}]: {}", fileName, ex.what());
         return false;
     }
+}
+
+bool GameRecord::hasGameResult() const {
+    if (!game) return false;
+    auto root = game->GetRootNode();
+    if (!root) return false;
+
+    for (const auto& prop : root->GetProperties()) {
+        if (prop->GetPropertyType() == T::RE) {
+            return true;
+        }
+    }
+    return false;
+}
+
+Color GameRecord::getColorToMove() const {
+    Move last = lastMove();
+    if (last == Move::INVALID) {
+        // No moves yet - check if there are handicap stones (AB property)
+        if (game && game->GetRootNode()) {
+            for (const auto& prop : game->GetRootNode()->GetProperties()) {
+                if (prop->GetPropertyType() == T::AB) {
+                    // Handicap stones present - White moves first
+                    return Color::WHITE;
+                }
+            }
+        }
+        return Color::BLACK;  // Default: Black moves first
+    }
+    // Opposite of last move's color
+    return (last.col == Color::BLACK) ? Color::WHITE : Color::BLACK;
+}
+
+size_t GameRecord::getLoadedMovesCount() const {
+    // Total moves on main line from root to end
+    if (!game) return 0;
+
+    size_t count = 0;
+    auto node = game->GetRootNode();
+    while (node) {
+        if (extractMoveFromNode(node, boardSize.Columns).has_value()) {
+            count++;
+        }
+        auto children = node->GetChildren();
+        node = children.empty() ? nullptr : children[0];
+    }
+    return count;
+}
+
+bool GameRecord::hasNextMove() const {
+    if (!currentNode) return false;
+    auto children = currentNode->GetChildren();
+    return !children.empty();
+}
+
+Move GameRecord::getNextMove() const {
+    if (!currentNode) return Move(Move::INVALID, Color::EMPTY);
+    auto children = currentNode->GetChildren();
+    if (children.empty()) return Move(Move::INVALID, Color::EMPTY);
+    // Return first child's move (main line)
+    if (auto move = extractMoveFromNode(children[0], boardSize.Columns)) {
+        return *move;
+    }
+    return Move(Move::INVALID, Color::EMPTY);
 }
 
 std::vector<Move> GameRecord::getVariations() const {

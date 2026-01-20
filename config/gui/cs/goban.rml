@@ -133,11 +133,18 @@
                             <div class="template" id="templateCalculatingScore">Počítám skóre...</div>
                             </div>
                             <div id="grpMoves">
-                            <div class="hr">Tah</div>
+                            <div class="hr">Hrát</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">Pas</div>
                             <div class="cmd" onmouseup="play once">Nápověda</div>
                             <div class="cmd" onmouseup="undo move">Zpět</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">Vzdát se</div>
+                            </div>
+                            <div id="grpReplay">
+                            <div class="hr">Přehrát</div>
+                            <div class="cmd" onmouseup="navigate_start">Na začátek</div>
+                            <div class="cmd" onmouseup="navigate_back">Předchozí</div>
+                            <div class="cmd" onmouseup="navigate_forward">Další</div>
+                            <div class="cmd" onmouseup="navigate_end">Na konec</div>
                             </div>
                         </div>
                     </div>

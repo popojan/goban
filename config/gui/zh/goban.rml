@@ -139,6 +139,13 @@
                             <div class="cmd" onmouseup="undo move">悔棋</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">认输</div>
                             </div>
+                            <div id="grpReplay">
+                            <div class="hr">回放</div>
+                            <div class="cmd" onmouseup="navigate_start">第一手</div>
+                            <div class="cmd" onmouseup="navigate_back">上一手</div>
+                            <div class="cmd" onmouseup="navigate_forward">下一手</div>
+                            <div class="cmd" onmouseup="navigate_end">最后一手</div>
+                            </div>
                         </div>
                     </div>
                 </div>

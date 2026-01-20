@@ -106,8 +106,10 @@ public:
 
     // Navigation methods for SGF replay
     bool navigateBack();   // Undo one move during navigation
-    bool navigateForward();  // Play next move during navigation (auto-skips passes)
+    bool navigateForward();  // Play next move during navigation
     bool navigateToVariation(const Move& move);  // Navigate to specific variation
+    bool navigateToStart();  // Go to beginning of game
+    bool navigateToEnd();    // Go to end of game (main line)
 
     std::vector<Player*> getPlayers() { return players;}
 

@@ -149,3 +149,88 @@ Before creating a version tag (e.g., `v0.1.0`):
 2. **Update RELEASE_NOTES.md** if needed
 3. **Commit all changes** before tagging
 4. Push the tag to trigger automatic GitHub Release creation
+
+## Ray-Traced Rendering - Coordinate System and Shaders
+
+The Go board is rendered using ray tracing in GLSL fragment shaders. The vertex shaders set up the camera and compute ray origins/directions for each pixel.
+
+### World Coordinate System
+
+- **Origin (0, 0, 0)**: Center of the Go board
+- **Y-axis**: Points UP (board surface is at y ≈ 0)
+- **Z-axis**: Points toward viewer (camera is at negative z)
+- **X-axis**: Points right (completes right-handed system)
+
+### Mono Vertex Shader (`config/shaders/vertex/mono.glsl`)
+
+Sets up a single camera for standard rendering.
+
+**Key variables:**
+- `ro = (0, 0, -3)`: Base camera position, 3 units back on z-axis
+- `ta = (0, 0, 0)`: Target/look-at point (board center)
+- `up = (0, 1, 0)`: World up vector
+- `m`: Model-view matrix (includes user rotation via `glModelViewMatrix` and intro animation)
+- `tt`: Translation from `iTranslate` (pan/zoom offset)
+
+**Camera setup:**
+```
+roo = m * ro + tt          // Final camera position in world space
+ta = ta + tt               // Translated target point
+cw = normalize(ta - roo)   // Forward direction (toward target)
+cu = normalize(cross(up, cw))  // Right direction
+cv = cross(cw, cu)         // Up direction (orthogonal to cw, cu)
+```
+
+**Ray direction:**
+```
+q0 = vertex.xy * aspectRatio   // Screen coordinate (-1 to 1, aspect corrected)
+rdb = normalize(q0.x*cu + q0.y*cv + 3.0*cw)
+```
+The `3.0` is the focal length - rays spread from camera through a virtual screen at distance 3.0.
+
+### Stereo Vertex Shader (`config/shaders/vertex/stereo.glsl`)
+
+Sets up two cameras (left/right eyes) for stereoscopic 3D rendering (anaglyph, etc.).
+
+**Additional uniforms:**
+- `eof`: Eye offset factor (stereo base = 2 × eof)
+- `dof`: Unused (kept for compatibility)
+
+**Stereo camera setup (parallel cameras):**
+```
+// Constant stereo base, like human IPD
+// Left eye at -X, right eye at +X in camera space
+rool = (m * vec4(ro - eoff.xyz, 1.0)).xyz + tt  // Left eye
+roor = (m * vec4(ro + eoff.xyz, 1.0)).xyz + tt  // Right eye
+
+// Parallel cameras: both eyes share the same view direction
+roo = 0.5 * (rool + roor)      // Center position
+cw = normalize(tt - roo)       // Shared view direction (toward target)
+cu = normalize(cross(up, cw))  // Shared right vector
+cv = cross(cw, cu)             // Shared up vector
+
+// Same ray direction for both eyes, different origins
+rd = normalize(q0.x*cu + q0.y*cv + 3.0*cw)
+rdbl = rdbr = rd
+```
+
+### Stereoscopic Deviation Theory
+
+**On-screen deviation formula:**
+```
+deviation = stereo_base * focal_length / object_distance
+```
+
+**Maximum comfortable deviation:** 1/30th (3.3%) of screen width
+
+**Why parallel cameras (not toe-in):**
+- Toe-in convergence causes keystone distortion and eye strain
+- Parallel cameras are physically correct (like human eyes at distance)
+- Zero parallax at infinity; objects closer have increasing parallax
+- Stereo effect naturally decreases with distance (correct for depth perception)
+
+**Parameters:**
+- `eof` (default 0.025): Eye offset factor. Stereo base = 2 × eof.
+  - 0.025 gives ~1/40 screen deviation at default zoom (conservative, comfortable)
+  - 0.017 would give exactly 1/30 (maximum recommended)
+  - Adjust to taste based on display and viewing distance

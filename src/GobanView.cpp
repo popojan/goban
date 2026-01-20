@@ -438,18 +438,16 @@ void GobanView::updateLastMoveOverlay() {
 		lastMove = Position(-1, -1);
 	}
 
-	// When navigating, use viewPosition for move number (not history size)
-	size_t moveNum = model.game.isNavigating()
-		? model.game.getViewPosition()
-		: model.game.moveCount();
+	// Get current move number from SGF tree depth
+	size_t moveNum = model.game.moveCount();
 
 	if (moveNum > 0) {
 		auto [move, moveIndex] = model.game.lastStoneMoveIndex();
 		if (move == Move::NORMAL) {
 			std::ostringstream ss;
-			ss << moveNum;  // Use navigation-aware move number
+			ss << moveIndex;  // Use the stone's actual move index, not total depth (which includes passes)
 			lastMove = move.pos;
-			spdlog::debug("updateLastMoveOverlay: setting '{}' at ({},{}) color={} (navAware)",
+			spdlog::debug("updateLastMoveOverlay: setting '{}' at ({},{}) color={}",
 				ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
 			board.setOverlay(move.pos, ss.str(), move.col);
 		} else {
@@ -478,20 +476,24 @@ void GobanView::updateNavigationOverlay() {
 		spdlog::debug("updateNavigationOverlay: viewPos={}, found {} variations",
 			viewPos, variations.size());
 
-		char variantLetter = 'a';
+		// Label variations: no letter if single child, otherwise newest gets highest letter
+		// child[0]=newest/main → 'c', child[1] → 'b', child[2]=oldest → 'a'
+		size_t idx = 0;
 		for (const auto& move : variations) {
 			if (move == Move::NORMAL) {
 				std::ostringstream ss;
 				ss << nextMoveNum;
-				// Add letter suffix if multiple variations (e.g., "42a", "42b")
 				if (variations.size() > 1) {
-					ss << variantLetter++;
+					// Reverse: first child (newest) gets highest letter
+					char letter = 'a' + static_cast<char>(variations.size() - 1 - idx);
+					ss << letter;
 				}
 				board.setBoardOverlay(move.pos, ss.str());
 				navOverlays.push_back(move.pos);
 				spdlog::debug("Navigation overlay: {} at ({},{})",
 					ss.str(), move.pos.col(), move.pos.row());
 			}
+			idx++;
 		}
 	}
 
@@ -518,10 +520,8 @@ void GobanView::onStonePlaced(const Move& move) {
         }
         lastMove = move.pos;
 
-        // Use navigation-aware move number
-        size_t moveIndex = model.game.isNavigating()
-            ? model.game.getViewPosition()
-            : model.game.moveCount();
+        // Get move number from SGF tree depth
+        size_t moveIndex = model.game.moveCount();
         std::ostringstream ss;
         ss << moveIndex;
         spdlog::debug("onStonePlaced: setting overlay '{}' at ({},{}) color={} (navAware)",

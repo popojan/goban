@@ -127,6 +127,13 @@
                             <div class="cmd" onmouseup="undo move">待った</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">投了</div>
                             </div>
+                            <div id="grpReplay">
+                            <div class="hr">再生</div>
+                            <div class="cmd" onmouseup="navigate_start">最初</div>
+                            <div class="cmd" onmouseup="navigate_back">前へ</div>
+                            <div class="cmd" onmouseup="navigate_forward">次へ</div>
+                            <div class="cmd" onmouseup="navigate_end">最後</div>
+                            </div>
                         </div>
                     </div>
                 </div>

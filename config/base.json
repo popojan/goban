@@ -99,12 +99,14 @@
     {"key": 45, "command": "decrease gamma"},
     {"key": 39, "command": "increase contrast"},
     {"key": 41, "command": "decrease contrast"},
-    {"key": 89, "command": "reset contrast and gamma"},
+    {"key": 46, "command": "reset contrast and gamma"},
     {"key": 19, "command": "increase eof"},
     {"key": 23, "command": "decrease eof"},
     {"key": 21, "command": "increase dof"},
     {"key": 22, "command": "decrease dof"},
-    {"key": 72, "command": "toggle_analysis_mode"}
+    {"key": 72, "command": "toggle_analysis_mode"},
+    {"key": 89, "command": "navigate_start"},
+    {"key": 88, "command": "navigate_end"}
   ],
   "sounds": {
     "move": "./config/sound/stone.wav",
