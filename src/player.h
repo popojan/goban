@@ -16,8 +16,8 @@
 class Player
 {
 public:
-    enum Role { NONE = 0, WHITE = 1, BLACK = 2, COACH = 4, SPECTATOR = 8, KIBITZ = 16};
-    enum Type { LOCAL = 1, HUMAN = 2, ENGINE = 4 };
+    enum Role { NONE = 0, WHITE = 1, BLACK = 2, COACH = 4, SPECTATOR = 8, KIBITZ = 16 };
+    enum Type { LOCAL = 1, HUMAN = 2, ENGINE = 4, SGF_PLAYER = 8 };
 
     Player(std::string  name, int role, int type) : name(std::move(name)), role(role), type(type) {
 
@@ -38,7 +38,8 @@ public:
     }
     [[nodiscard]] int getRole() const {return role;}
     virtual void suggestMove(const Move& move) { (void)move; }
-    [[nodiscard]] bool isTypeOf(int t) const { return (type & t) != 0;}
+    [[nodiscard]] bool isTypeOf(int t) const { return (type & t) != 0; }
+    void addType(int t) { type |= t; }
     virtual ~Player() = default;
 protected:
     std::string name;

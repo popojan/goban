@@ -169,16 +169,19 @@ div.template {
 
 #lblMessage {
   display: block;
-  position: absolute;
-  bottom: 0px;
-  left: 0px;
-  right: 0px;
   text-align: center;
   padding: 0.25rem;
+  white-space: pre-wrap;
+  height: 30%;
+  overflow: auto;
 }
 
 /* Positioning utilities */
 .bottom { position: absolute; bottom: 0px; left: 0px; right: 0px; }
+
+/* Message container */
+.message-container {
+}
 .left { position: absolute; left: 0px; }
 .center { text-align: center; }
 .right { position: absolute; right: 0px; }

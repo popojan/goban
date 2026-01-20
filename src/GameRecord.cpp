@@ -632,3 +632,19 @@ bool GameRecord::navigateToChild(const Move& targetMove) {
     spdlog::debug("navigateToChild: no matching child found for move {}", targetMove.toString());
     return false;
 }
+
+std::string GameRecord::getComment() const {
+    if (!currentNode) {
+        return "";
+    }
+
+    for (const auto& property : currentNode->GetProperties()) {
+        if (property->GetPropertyType() == T::C) {
+            auto val = property->GetPropertyValue();
+            if (val && val->ToSingleValue()) {
+                return val->ToSingleValue()->GetRawValue();
+            }
+        }
+    }
+    return "";
+}

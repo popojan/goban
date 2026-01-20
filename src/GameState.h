@@ -15,6 +15,7 @@ public:
     float result;
     std::string cmd;
     std::string err;
+    std::string comment;  // SGF comment for current move (C property)
     
     enum Message {
         NONE, WHITE_PASS, BLACK_PASS, WHITE_RESIGNS, BLACK_RESIGNS,

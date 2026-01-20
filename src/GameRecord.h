@@ -106,6 +106,9 @@ public:
     // Multi-variation support
     [[nodiscard]] std::vector<Move> getVariations() const;
     bool navigateToChild(const Move& move);  // Navigate to specific variation
+
+    // Get comment from current node (C property)
+    [[nodiscard]] std::string getComment() const;
 };
 
 #endif //GOBAN_GAMERECORD_H

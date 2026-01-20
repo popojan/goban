@@ -210,8 +210,8 @@
                 </div>
             </div>
         </div>
-        <div class="bottom">
-            <div class="cmd bottom center" id="lblMessage" onmouseup="msg"></div>
+        <div class="bottom message-container">
+            <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
     </game>
 </body>

@@ -25,6 +25,7 @@ public:
     void Reshape();
     void gameLoop();
     void populateEngines();
+    void refreshPlayerDropdowns();  // Clear and repopulate player dropdowns
     GobanControl& getController() { return control; }
     GameThread& getGameThread() { return engine; }
     void OnMenuToggle(const std::string& cmd, bool checked);

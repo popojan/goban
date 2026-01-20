@@ -142,6 +142,48 @@ void ElementGame::populateEngines() {
     }
 }
 
+void ElementGame::refreshPlayerDropdowns() {
+    auto selectBlack = dynamic_cast<Rml::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
+    auto selectWhite = dynamic_cast<Rml::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
+
+    if (!selectBlack || !selectWhite) {
+        spdlog::warn("refreshPlayerDropdowns: missing dropdown elements");
+        return;
+    }
+
+    // Save target selections BEFORE clearing (Remove() triggers change events that modify activePlayer)
+    const auto targetBlack = static_cast<int>(engine.getActivePlayer(0));
+    const auto targetWhite = static_cast<int>(engine.getActivePlayer(1));
+
+    // Clear existing options (remove from end to avoid index shifting)
+    while (selectBlack->GetNumOptions() > 0) {
+        selectBlack->Remove(selectBlack->GetNumOptions() - 1);
+    }
+    while (selectWhite->GetNumOptions() > 0) {
+        selectWhite->Remove(selectWhite->GetNumOptions() - 1);
+    }
+
+    // Repopulate from current players list
+    const auto players = engine.getPlayers();
+    for (unsigned i = 0; i < players.size(); ++i) {
+        std::ostringstream ss;
+        ss << i;
+        std::string playerName(players[i]->getName());
+        std::string playerIndex(ss.str());
+        selectBlack->Add(playerName.c_str(), playerIndex.c_str());
+        selectWhite->Add(playerName.c_str(), playerIndex.c_str());
+    }
+
+    // Set selection using saved values
+    selectBlack->SetSelection(targetBlack);
+    selectWhite->SetSelection(targetWhite);
+
+    spdlog::debug("refreshPlayerDropdowns: {} players, black={}, white={}",
+        players.size(), targetBlack, targetWhite);
+}
+
 void ElementGame::gameLoop() {
     static int cnt = 0;
     static float lastTime = -1;
@@ -415,8 +457,21 @@ void ElementGame::OnUpdate()
         requestRepaint();
         view.state.msg = model.state.msg;
     }
-    if(view.state.msg == GameState::NONE) {
-        //compose move comment
+    // Show SGF comment if available (takes priority over other NONE-state content)
+    if (view.state.comment != model.state.comment) {
+        spdlog::debug("Comment changed: '{}' -> '{}'", view.state.comment.substr(0, 30), model.state.comment.substr(0, 30));
+        if (!model.state.comment.empty()) {
+            msg->SetInnerRML(model.state.comment.c_str());
+            // Scroll to bottom to show latest content
+            msg->SetScrollTop(msg->GetScrollHeight() - msg->GetClientHeight());
+        } else if (view.state.msg == GameState::NONE) {
+            msg->SetInnerRML("");
+        }
+        view.state.comment = model.state.comment;
+        requestRepaint();
+    }
+    // Only show engine errors if no comment is displayed and msg is NONE
+    else if(view.state.msg == GameState::NONE && model.state.comment.empty()) {
         for(auto &p: engine.getPlayers()) {
             if(p->isTypeOf(Player::ENGINE)) {
                 std::string newMsg(dynamic_cast<GtpEngine*>(p)->lastError());

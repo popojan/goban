@@ -98,6 +98,27 @@ void GameThread::interrupt() {
  *
  * @param boardSize
  */
+void GameThread::removeSgfPlayers() {
+    // Remove players with SGF_PLAYER type (created during SGF loading)
+    // Iterate backwards to avoid index shifting issues
+    for (int i = static_cast<int>(players.size()) - 1; i >= 0; --i) {
+        if (players[i]->isTypeOf(Player::SGF_PLAYER)) {
+            spdlog::info("Removing SGF player '{}' at index {}", players[i]->getName(), i);
+            delete players[i];
+            players.erase(players.begin() + i);
+        }
+    }
+
+    // Reset active players to defaults (human for black, coach for white)
+    // These indices should be valid after removing SGF players
+    activePlayer[0] = human;  // Black
+    activePlayer[1] = coach;  // White
+    numPlayers = players.size();
+
+    spdlog::debug("removeSgfPlayers: {} players remaining, activePlayer=[{}, {}]",
+        numPlayers, activePlayer[0], activePlayer[1]);
+}
+
 bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
     /*this->boardSize = boardSize;
@@ -512,6 +533,9 @@ bool GameThread::navigateBack() {
     // Keep colorToMove in sync with SGF tree position
     model.state.colorToMove = model.game.getColorToMove();
 
+    // Update comment from current SGF node
+    model.state.comment = model.game.getComment();
+
     // Show pass message if we just undid a pass (shows the state we're viewing)
     if (undoneMove == Move::PASS) {
         model.state.msg = (undoneMove.col == Color::BLACK)
@@ -604,6 +628,9 @@ bool GameThread::navigateForward() {
     // Keep colorToMove in sync with SGF tree position
     model.state.colorToMove = model.game.getColorToMove();
 
+    // Update comment from current SGF node
+    model.state.comment = model.game.getComment();
+
     // Show board update (territory display deferred to next forward press at end)
     const Board& result = coach->showboard();
     spdlog::debug("navigateForward: notifying {} observers, colorToMove={}",
@@ -659,6 +686,9 @@ bool GameThread::navigateToVariation(const Move& move) {
 
     // Keep colorToMove in sync with SGF tree position
     model.state.colorToMove = model.game.getColorToMove();
+
+    // Update comment from current SGF node
+    model.state.comment = model.game.getComment();
 
     // For new branches, switch to Analysis mode for flexible SGF editing
     if (newBranch) {
@@ -717,6 +747,7 @@ bool GameThread::navigateToStart() {
     if (success) {
         model.board.toggleTerritoryAuto(false);
         model.state.colorToMove = model.game.getColorToMove();
+        model.state.comment = model.game.getComment();
         model.state.msg = GameState::NONE;
 
         const Board& result = coach->showboard();
@@ -770,6 +801,7 @@ bool GameThread::navigateToEnd() {
 
     // Always show result at end (whether we played moves or were already there)
     model.state.colorToMove = model.game.getColorToMove();
+    model.state.comment = model.game.getComment();
     model.state.msg = GameState::NONE;
 
     // Show territory at end
@@ -925,7 +957,10 @@ Move GameThread::getLocalMove(const Move::Special move) const {
 
 bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     //std::unique_lock<std::mutex> lock(mutex2);
-    
+
+    // Remove any SGF players from previous load
+    removeSgfPlayers();
+
     // Auto-save current game if it has moves before replacing it
     if (model.game.moveCount() > 0) {
         try {
@@ -943,17 +978,6 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     }
 
     interrupt();
-    
-    if (sgf == static_cast<size_t>(-1)) {
-        auto sgfPlayer = new SGFPlayer("SGF Player");
-        sgf = addPlayer(sgfPlayer);
-    }
-    
-    auto sgfPlayer = dynamic_cast<SGFPlayer*>(players[sgf]);
-    if (!sgfPlayer) {
-        spdlog::error("Failed to get SGF player");
-        return false;
-    }
     
     if (!clearGame(gameInfo.boardSize, gameInfo.komi, gameInfo.handicap)) {
         spdlog::error("Failed to clear game for SGF loading");
@@ -1000,6 +1024,10 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     } else {
         model.state.colorToMove = Color::BLACK;
     }
+
+    // Set initial comment from current SGF node
+    model.state.comment = model.game.getComment();
+    spdlog::info("loadSGF: initial comment = '{}'", model.state.comment.substr(0, 50));
 
     model.pause();
     
@@ -1096,9 +1124,54 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
         }
     }
     
+    // Match SGF player names to loaded players (engines)
+    // If a name matches an engine exactly, activate that engine; otherwise create a temporary SGF player
+    auto matchPlayerName = [this](const std::string& sgfName, int role) {
+        int which = (role == Player::BLACK) ? 0 : 1;
+        spdlog::info("matchPlayerName: sgfName='{}', role={}, which={}, current activePlayer[{}]={}",
+            sgfName, role, which, which, activePlayer[which]);
+
+        // Search for matching player name (skip SGF_PLAYER types from previous loads)
+        for (size_t i = 0; i < players.size(); i++) {
+            spdlog::debug("  checking player[{}]='{}' type={}", i, players[i]->getName(),
+                players[i]->isTypeOf(Player::SGF_PLAYER) ? "SGF" : "normal");
+            if (players[i]->getName() == sgfName && !players[i]->isTypeOf(Player::SGF_PLAYER)) {
+                // Found matching engine - activate it
+                activePlayer[which] = i;
+                spdlog::info("Matched SGF player '{}' to existing player at index {}", sgfName, i);
+                std::for_each(gameObservers.begin(), gameObservers.end(),
+                    [role, &sgfName](GameObserver* observer) {
+                        observer->onPlayerChange(role, sgfName);
+                    });
+                return;
+            }
+        }
+
+        // No match - create a temporary SGF player
+        auto* sgfPlayer = new LocalHumanPlayer(sgfName);
+        sgfPlayer->addType(Player::SGF_PLAYER);  // Mark as SGF player for cleanup
+        size_t newIndex = addPlayer(sgfPlayer);
+        activePlayer[which] = newIndex;
+
+        spdlog::info("Created SGF player '{}' at index {}, activePlayer[{}] now = {}",
+            sgfName, newIndex, which, activePlayer[which]);
+        std::for_each(gameObservers.begin(), gameObservers.end(),
+            [role, &sgfName](GameObserver* observer) {
+                observer->onPlayerChange(role, sgfName);
+            });
+    };
+
+    spdlog::info("loadSGF: matching players - Black='{}', White='{}', players.size={}",
+        gameInfo.blackPlayer, gameInfo.whitePlayer, players.size());
+    matchPlayerName(gameInfo.blackPlayer, Player::BLACK);
+    matchPlayerName(gameInfo.whitePlayer, Player::WHITE);
+    numPlayers = players.size();  // Update numPlayers after adding SGF players
+    spdlog::info("loadSGF: after matching - activePlayer=[{}, {}], players.size={}",
+        activePlayer[0], activePlayer[1], players.size());
+
     spdlog::info("SGF file [{}] (game index {}) loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
                  fileName, gameIndex, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, model.game.moveCount());
-    
+
     return true;
 }
 

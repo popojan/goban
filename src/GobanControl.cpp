@@ -13,13 +13,15 @@
 bool GobanControl::newGame(unsigned boardSize) {
     engine.interrupt();
     engine.reset();
-	if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
+    engine.removeSgfPlayers();  // Remove temporary SGF players from previous load
+    if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         model.createNewRecord();
         view.animateIntro();
         // Reset Analysis Mode menu toggle (new game starts in Match mode)
         parent->OnMenuToggle("toggle_analysis_mode", false);
+        parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
         return true;
-	}
+    }
     return false;
 }
 

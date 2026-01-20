@@ -73,6 +73,8 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
                     auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
                     if (gameElement) {
                         gameElement->getGameThread().loadSGF(filePath, gameIndex);
+                        gameElement->refreshPlayerDropdowns();  // Update dropdowns with SGF player names
+                        gameElement->requestRepaint();  // Ensure UI updates
                     }
                 }
             }

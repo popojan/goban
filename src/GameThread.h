@@ -65,6 +65,8 @@ public:
 
     bool clearGame(int boardSize, float komi, int handicap);
 
+    void removeSgfPlayers();  // Remove temporary players created from SGF loading
+
     void setKomi(float komi);
 
     bool setFixedHandicap(int handicap);
