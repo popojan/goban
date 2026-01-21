@@ -5,10 +5,12 @@
 #include <mutex>
 #include <atomic>
 #include <string>
+#include <memory>
 
 #include "player.h"
 #include "GobanModel.h"
 #include "GameObserver.h"
+#include "GameNavigator.h"
 #include "Board.h"
 #include "Configuration.h"
 
@@ -153,8 +155,8 @@ private:
     MoveSource lastMoveSource = MoveSource::NONE;
     std::condition_variable genmoveTriggered;
 
-    // Navigation synchronization - prevents genmove during active navigation
-    std::atomic<bool> navigationInProgress{false};
+    // Navigation (extracted to separate class)
+    std::unique_ptr<GameNavigator> navigator;
 };
 
 #endif // GAMETHREAD_H

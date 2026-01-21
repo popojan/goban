@@ -3,18 +3,17 @@
 #include <nlohmann/json.hpp>
 #include <cmath>
 
-// Scope guard to set/clear navigationInProgress flag
-struct NavigationGuard {
-    std::atomic<bool>& flag;
-    NavigationGuard(std::atomic<bool>& f) : flag(f) { flag = true; }
-    ~NavigationGuard() { flag = false; }
-};
-
 GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr),
         playerToMove(nullptr), human(0), sgf(0), coach(0), kibitz(0), numPlayers(0), activePlayer({0, 0})
 {
-
+    // Initialize navigator with callbacks to access GameThread resources
+    navigator = std::make_unique<GameNavigator>(
+        model,
+        [this]() { return currentCoach(); },
+        players,
+        gameObservers
+    );
 }
 
 void GameThread::reset() {
@@ -398,7 +397,7 @@ void GameThread::gameLoop() {
         // 1. Navigation operation is in progress (atomic flag)
         // 2. Navigating through history (not at the end position)
         // This prevents AI from playing on an old board state during SGF review
-        if (navigationInProgress) {
+        if (navigator->isNavigating()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             continue;
         }
@@ -533,209 +532,18 @@ void GameThread::playKibitzMove() {
 }
 
 bool GameThread::navigateBack() {
-    if (!model.game.isNavigating() || !model.game.hasPreviousMove()) {
-        spdlog::debug("navigateBack: cannot navigate (isNavigating={}, hasPrev={})",
-            model.game.isNavigating(), model.game.hasPreviousMove());
-        return false;
-    }
-
-    Engine* coach = currentCoach();
-    if (!coach) return false;
-
-    NavigationGuard guard(navigationInProgress);
-
-    // Capture the move we're about to undo (for pass message display)
-    Move undoneMove = model.game.lastMove();
-
-    // Undo one move (including passes - step through them individually)
-    if (!coach->undo()) {
-        spdlog::warn("navigateBack: coach->undo() failed");
-        return false;
-    }
-
-    // Keep all engines in sync for continuation
-    for (auto player : players) {
-        if (player != reinterpret_cast<Player*>(coach)) {
-            player->undo();
-        }
-    }
-
-    model.game.undo();
-
-    // Hide territory display when navigating (stale after undo)
-    model.board.toggleTerritoryAuto(false);
-
-    // Keep colorToMove in sync with SGF tree position
-    model.state.colorToMove = model.game.getColorToMove();
-
-    // Update comment from current SGF node
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
-
-    // Show pass message if we just undid a pass (shows the state we're viewing)
-    if (undoneMove == Move::PASS) {
-        model.state.msg = (undoneMove.col == Color::BLACK)
-            ? GameState::BLACK_PASS
-            : GameState::WHITE_PASS;
-    } else {
-        model.state.msg = GameState::NONE;
-    }
-
-    const Board& result = coach->showboard();
-    std::for_each(gameObservers.begin(), gameObservers.end(),
-        [&result](GameObserver* observer) { observer->onBoardChange(result); });
-    spdlog::debug("navigateBack: success, undid {}, now at move {}/{}, colorToMove={}",
-        undoneMove.toString(),
-        model.game.getViewPosition(), model.game.getLoadedMovesCount(),
-        model.state.colorToMove == Color::BLACK ? "B" : "W");
-
-    return true;
+    return navigator->navigateBack();
 }
 
 bool GameThread::navigateForward() {
-    if (!model.game.isNavigating()) {
-        spdlog::debug("navigateForward: not in navigation mode");
-        return false;
-    }
-
-    // Get variations from SGF tree (children of current node)
-    auto variations = model.game.getVariations();
-    spdlog::debug("navigateForward: found {} variations", variations.size());
-
-    NavigationGuard guard(navigationInProgress);
-
-    if (variations.empty()) {
-        // At end of branch - only show territory if game is actually finished
-        if (model.game.isGameFinished()) {
-            spdlog::debug("navigateForward: at end of finished game, showing territory");
-            Engine* coach = currentCoach();
-            if (coach) {
-                model.board.toggleTerritoryAuto(true);
-                model.state.msg = GameState::NONE;  // Clear pass message
-                const Board& result = coach->showterritory(true, model.game.lastStoneMove().col);
-                std::for_each(gameObservers.begin(), gameObservers.end(),
-                    [&result](GameObserver* observer) {
-                        observer->onBoardChange(result);
-                    });
-                return true;  // We did something - trigger UI update
-            }
-        }
-        spdlog::debug("navigateForward: at end of branch, nothing to do");
-        return false;
-    }
-
-    // Play first variation (main line) - even if multiple variations exist
-    // User can click on variation markers to choose alternatives
-    Engine* coach = currentCoach();
-    if (!coach) {
-        spdlog::error("navigateForward: no coach engine!");
-        return false;
-    }
-
-    Move nextMove = variations[0];
-    bool isPass = (nextMove == Move::PASS);
-
-    spdlog::debug("navigateForward: playing move {}", nextMove.toString());
-    if (!coach->play(nextMove)) {
-        spdlog::warn("navigateForward: coach->play() failed for move {}", nextMove.toString());
-        return false;
-    }
-
-    // Keep all engines in sync for continuation
-    for (auto player : players) {
-        if (player != reinterpret_cast<Player*>(coach)) {
-            player->play(nextMove);
-        }
-    }
-
-    // Navigate to child in SGF tree (navigateToChild moves currentNode)
-    // If child doesn't exist, create a new branch
-    if (!model.game.navigateToChild(nextMove)) {
-        // Creating new branch - this creates SGF node and moves currentNode
-        model.game.move(nextMove);
-    }
-
-    // Set message for pass moves, clear for stone moves
-    if (isPass) {
-        model.state.msg = (nextMove.col == Color::BLACK)
-            ? GameState::BLACK_PASS
-            : GameState::WHITE_PASS;
-        spdlog::debug("navigateForward: showing pass message for {}", nextMove.col == Color::BLACK ? "Black" : "White");
-    } else {
-        model.state.msg = GameState::NONE;
-    }
-
-    // Keep colorToMove in sync with SGF tree position
-    model.state.colorToMove = model.game.getColorToMove();
-
-    // Update comment from current SGF node
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
-
-    // Show board update (territory display deferred to next forward press at end)
-    const Board& result = coach->showboard();
-    spdlog::debug("navigateForward: notifying {} observers, colorToMove={}",
-        gameObservers.size(), model.state.colorToMove == Color::BLACK ? "B" : "W");
-    std::for_each(gameObservers.begin(), gameObservers.end(),
-        [&result, nextMove](GameObserver* observer) {
-            observer->onBoardChange(result);
-            observer->onStonePlaced(nextMove);
-        });
-    spdlog::debug("navigateForward: done");
-
-    return true;
+    return navigator->navigateForward();
 }
 
 bool GameThread::navigateToVariation(const Move& move) {
-    spdlog::debug("navigateToVariation: entry, move={}", move.toString());
+    auto result = navigator->navigateToVariation(move);
 
-    if (!model.game.isNavigating()) {
-        spdlog::debug("navigateToVariation: not in navigation mode");
-        return false;
-    }
-
-    Engine* coach = currentCoach();
-    if (!coach) {
-        spdlog::error("navigateToVariation: no coach engine!");
-        return false;
-    }
-
-    NavigationGuard guard(navigationInProgress);
-
-    // Play the move on the coach
-    if (!coach->play(move)) {
-        spdlog::warn("navigateToVariation: coach->play() failed for move {}", move.toString());
-        return false;
-    }
-
-    // Keep all engines in sync for continuation
-    for (auto player : players) {
-        if (player != reinterpret_cast<Player*>(coach)) {
-            player->play(move);
-        }
-    }
-
-    // Navigate to the child node in the SGF tree (navigateToChild moves currentNode)
-    // If child doesn't exist, create a new branch
-    bool newBranch = !model.game.navigateToChild(move);
-    if (newBranch) {
-        spdlog::debug("navigateToVariation: creating new branch");
-        model.game.move(move);
-        // Clear game over flag - we're continuing the game in a new branch
-        model.isGameOver = false;
-    } else {
-        spdlog::debug("navigateToVariation: following existing branch");
-    }
-
-    // Keep colorToMove in sync with SGF tree position
-    model.state.colorToMove = model.game.getColorToMove();
-
-    // Update comment from current SGF node
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
-
-    // For new branches, switch to Analysis mode for flexible SGF editing
-    if (newBranch) {
+    // Handle Analysis mode switching for new branches (GameThread responsibility)
+    if (result.success && result.newBranch) {
         if (gameMode == GameMode::MATCH) {
             spdlog::info("navigateToVariation: switching to Analysis mode for SGF editing");
             setGameMode(GameMode::ANALYSIS);
@@ -747,126 +555,15 @@ bool GameThread::navigateToVariation(const Move& move) {
             isRunning());
     }
 
-    // Notify observers first (before starting game loop to avoid race)
-    const Board& result = coach->showboard();
-    Move moveCopy = move;
-    std::for_each(gameObservers.begin(), gameObservers.end(),
-        [&result, moveCopy](GameObserver* observer) {
-            observer->onBoardChange(result);
-            observer->onStonePlaced(moveCopy);
-        });
-
-    spdlog::debug("navigateToVariation: done, now at move {}/{}, colorToMove={}, needsGameLoop={}",
-        model.game.getViewPosition(), model.game.getLoadedMovesCount(),
-        model.state.colorToMove == Color::BLACK ? "B" : "W",
-        newBranch && !isRunning());
-
-    // Don't start game loop here - let caller do it to avoid race condition
-    return true;
+    return result.success;
 }
 
 bool GameThread::navigateToStart() {
-    if (!model.game.isNavigating()) {
-        spdlog::debug("navigateToStart: not in navigation mode");
-        return false;
-    }
-
-    Engine* coach = currentCoach();
-    if (!coach) return false;
-
-    NavigationGuard guard(navigationInProgress);
-
-    bool success = false;
-    while (model.game.hasPreviousMove()) {
-        if (!coach->undo()) break;
-
-        // Keep all engines in sync
-        for (auto player : players) {
-            if (player != reinterpret_cast<Player*>(coach)) {
-                player->undo();
-            }
-        }
-        model.game.undo();
-        success = true;
-    }
-
-    if (success) {
-        model.board.toggleTerritoryAuto(false);
-        model.state.colorToMove = model.game.getColorToMove();
-        model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
-        model.state.msg = GameState::NONE;
-
-        const Board& result = coach->showboard();
-        std::for_each(gameObservers.begin(), gameObservers.end(),
-            [&result](GameObserver* observer) { observer->onBoardChange(result); });
-        spdlog::debug("navigateToStart: at beginning, colorToMove={}",
-            model.state.colorToMove == Color::BLACK ? "B" : "W");
-    }
-    return success;
+    return navigator->navigateToStart();
 }
 
 bool GameThread::navigateToEnd() {
-    if (!model.game.isNavigating()) {
-        spdlog::debug("navigateToEnd: not in navigation mode");
-        return false;
-    }
-
-    Engine* coach = currentCoach();
-    if (!coach) return false;
-
-    NavigationGuard guard(navigationInProgress);
-
-    bool playedMoves = false;
-    Move lastMove;
-
-    // Play all moves on main line (first child at each branch)
-    while (true) {
-        auto variations = model.game.getVariations();
-        if (variations.empty()) break;
-
-        Move nextMove = variations[0];  // Always take main line (first variation)
-        spdlog::debug("navigateToEnd: playing {}", nextMove.toString());
-
-        if (!coach->play(nextMove)) {
-            spdlog::warn("navigateToEnd: coach->play failed for {}", nextMove.toString());
-            break;
-        }
-
-        // Keep all engines in sync
-        for (auto player : players) {
-            if (player != reinterpret_cast<Player*>(coach)) {
-                player->play(nextMove);
-            }
-        }
-
-        if (!model.game.navigateToChild(nextMove)) {
-            spdlog::warn("navigateToEnd: navigateToChild failed, this shouldn't happen");
-            break;  // Don't create new moves, something is wrong
-        }
-        lastMove = nextMove;
-        playedMoves = true;
-    }
-
-    // Always show result at end (whether we played moves or were already there)
-    model.state.colorToMove = model.game.getColorToMove();
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
-    model.state.msg = GameState::NONE;
-
-    // Only show territory if at a finished game position (resign or double pass)
-    // Otherwise just update the board display
-    const Board& result = model.game.isGameFinished()
-        ? (model.board.toggleTerritoryAuto(true), coach->showterritory(true, model.game.lastStoneMove().col))
-        : coach->showboard();
-    std::for_each(gameObservers.begin(), gameObservers.end(),
-        [&result](GameObserver* observer) { observer->onBoardChange(result); });
-
-    spdlog::debug("navigateToEnd: at end, move {}/{}, colorToMove={}, playedMoves={}",
-        model.game.getViewPosition(), model.game.getLoadedMovesCount(),
-        model.state.colorToMove == Color::BLACK ? "B" : "W", playedMoves);
-
-    return true;  // Always return true - we're at the end now
+    return navigator->navigateToEnd();
 }
 
 bool GameThread::setGameMode(GameMode mode) {

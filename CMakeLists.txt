@@ -348,6 +348,7 @@ else()
         src/EventHandlerFileChooser.cpp
         src/EventInstancer.cpp
         src/EventManager.cpp
+        src/GameNavigator.cpp
         src/GameThread.cpp
         src/gtpclient.cpp
         src/main.cpp
