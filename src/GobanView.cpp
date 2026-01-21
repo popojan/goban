@@ -235,7 +235,11 @@ void GobanView::reshape(int width, int height) {
 }
 
 void GobanView::requestRepaint(int what) {
+    bool wasIdle = (updateFlag == UPDATE_NONE && !animationRunning);
     updateFlag |= what;
+    if (wasIdle) {
+        glfwPostEmptyEvent();  // Wake the event loop only if it was idle
+    }
 }
 
 void GobanView::shadeIt(float time, GobanShader& shader) const {
@@ -259,14 +263,6 @@ void GobanView::Render(int w, int h)
 	if(!gobanShader.isReady())
         return;
 
-	// Ensure viewport is set correctly (RmlUi may have changed it)
-	glViewport(0, 0, w, h);
-
-    glDisable(GL_BLEND);
-	glClear(GL_DEPTH_BUFFER_BIT);
-	glEnable(GL_DEPTH_TEST);
-
-
 	float time = static_cast<float>(glfwGetTime());
 
 	if (WINDOW_HEIGHT != h || WINDOW_WIDTH != w) {
@@ -275,7 +271,14 @@ void GobanView::Render(int w, int h)
 		lastTime = 0.0;
 		animationRunning = true;
 		updateFlag = UPDATE_ALL;
+    // Ensure viewport is set correctly (RmlUi may have changed it)
 	}
+
+  glDisable(GL_BLEND);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST);
+
+
     if(updateFlag & UPDATE_SOUND_STONE) {
         updateFlag &= ~UPDATE_SOUND_STONE;
         player.play("move", 1.0);

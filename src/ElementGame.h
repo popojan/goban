@@ -25,6 +25,10 @@ public:
         view.updateNavigationOverlay();
     }
 
+    bool needsRender() const {
+        return view.needsRender();
+    }
+
     bool isExiting() { return control.isExiting(); }
     void Reshape();
     void gameLoop();

@@ -278,7 +278,7 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
         setMetrics(model.metrics);
     }
 
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
 
     if (view.animationRunning) {
         glUniform1f(iTime, view.lastTime + time - view.startTime);
@@ -292,7 +292,7 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
         glUniform1i(iWhiteCapturedCount, view.state.capturedWhite);
         glUniform1i(iBlackReservoirCount,  static_cast<int>(view.state.reservoirBlack / 2));
         glUniform1i(iWhiteReservoirCount, static_cast<int>(view.state.reservoirWhite / 2));
-		glUniform4fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);
+        glUniform4fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);
 
         glBindBuffer(GL_UNIFORM_BUFFER, bufStones);
         glBufferData(GL_UNIFORM_BUFFER, view.board.getSizeOf(), view.board.getStones(), GL_DYNAMIC_DRAW);
@@ -308,17 +308,18 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
             //stoneSound(true);
         //}
     }
+
     glUniform3fv(iTranslate, 1, glm::value_ptr(view.newTranslate));
 
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, (void*)nullptr);
-	glEnableVertexAttribArray(iVertex);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
-	glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, (void*)nullptr);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, (void*)nullptr);
+    glEnableVertexAttribArray(iVertex);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, (void*)nullptr);
     glDisableVertexAttribArray(iVertex);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
+    glUseProgram(0);
 
     glPopAttrib();
 }

@@ -137,13 +137,26 @@ static RenderInterface_GL2 render_interface;
 
 // GLFW callbacks
 static void GlfwErrorCallback(int error, const char* description) {
-    spdlog::error("GLFW Error {}: {}", error, description);
+    // Wayland doesn't support window positioning - demote to debug
+    if (error == GLFW_FEATURE_UNAVAILABLE) {
+        spdlog::debug("GLFW: {}", description);
+    } else {
+        spdlog::warn("GLFW Error {}: {}", error, description);
+    }
 }
 
 static void GlfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
     (void)window;
     if (context) {
         context->SetDimensions(Rml::Vector2i(width, height));
+        // Trigger repaint on window resize
+        auto gameDoc = context->GetDocument("game_window");
+        if (gameDoc) {
+            auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
+            if (gameElement) {
+                gameElement->requestRepaint();
+            }
+        }
     }
     render_interface.SetViewport(width, height);
 }
@@ -386,6 +399,13 @@ int main(int argc, char** argv)
         return -1;
     }
 
+    // Ensure dimensions are set correctly at startup (callback not called on init)
+    {
+        int w, h;
+        glfwGetWindowSize(window, &w, &h);
+        GlfwWindowSizeCallback(window, w, h);
+    }
+
     Rml::Debugger::Initialise(context);
 
     // Load fonts
@@ -413,31 +433,31 @@ int main(int argc, char** argv)
     if (windowLoaded) {
         // Main loop
         while (!glfwWindowShouldClose(window) && !AppState::ExitRequested()) {
-            glfwPollEvents();
-
-            // Get game element and run game loop
+            // Get game element
             auto gameDoc = context->GetDocument("game_window");
+            ElementGame* gameElement = nullptr;
             if (gameDoc) {
-                auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
-                if (gameElement) {
-                    gameElement->gameLoop();
-                }
+                gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
             }
 
-            // Clear and render
-            int fb_width, fb_height;
-            glfwGetFramebufferSize(window, &fb_width, &fb_height);
-            glViewport(0, 0, fb_width, fb_height);
+            // Process events
+            glfwPollEvents();
 
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            // Run game loop (processes RmlUi events)
+            if (gameElement) {
+                gameElement->gameLoop();
+            }
 
-            // RmlUi rendering
-            render_interface.BeginFrame();
-            context->Render();
-            render_interface.EndFrame();
-
-            glfwSwapBuffers(window);
+            // Render if needed (check AFTER event processing)
+            if (!gameElement || gameElement->needsRender()) {
+                render_interface.BeginFrame();
+                context->Render();
+                render_interface.EndFrame();
+                glfwSwapBuffers(window);
+            } else {
+                // Nothing to render - wait for next event instead of busy-polling
+                glfwWaitEvents();
+            }
         }
     } else {
         spdlog::critical("Cannot create window, exiting immediately");

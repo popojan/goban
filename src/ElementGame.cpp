@@ -185,49 +185,60 @@ void ElementGame::refreshPlayerDropdowns() {
 }
 
 void ElementGame::gameLoop() {
-    static int cnt = 0;
+    static int frames = 0;
+    static int lastFrames = -1;
     static float lastTime = -1;
     auto context = GetContext();
 
     float currentTime = static_cast<float>(glfwGetTime());
     if (currentTime - lastTime >= 1.0) {
-        static int frames = 1;
         auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
         auto fpsTemplate = context->GetDocument("game_window")->GetElementById("templateFPS");
-        const Rml::String sFps = Rml::CreateString(fpsTemplate->GetInnerRML().c_str(), (float)cnt / (currentTime - lastTime));
-        if (debugElement != nullptr) {
+        const Rml::String sFps = Rml::CreateString(fpsTemplate->GetInnerRML().c_str(), (float)frames / (currentTime - lastTime));
+        if (debugElement != nullptr && lastFrames != frames) {
             debugElement->SetInnerRML(sFps.c_str());
             view.requestRepaint();
+            lastFrames = frames;
         }
+        frames = 0;
         spdlog::debug(sFps.c_str());
-        //if(frames % 10 == 0)
-        frames += 1;
         lastTime = currentTime;
-        cnt = 0;
+
+        // Release audio resources if stream finished playing
+        view.stopAudioIfInactive();
     }
     ElementGame* game = dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"));
     if (game != nullptr && game->isExiting()) {
         return;
     }
+    // Always update RmlUi for event processing (hover states, etc.)
     context->Update();
     if (view.animationRunning || view.MAX_FPS) {
         view.requestRepaint();
     }
     if (view.updateFlag) {
         // Rendering is managed in the main loop - just count frames here
-        cnt++;
+        frames++;
     }
-    if (!view.MAX_FPS){
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+    //if (!view.MAX_FPS){
+    //    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    //}
 }
 ElementGame::~ElementGame() = default;
 
 void ElementGame::ProcessEvent(Rml::Event& event)
 {
     spdlog::debug("ElementGame processes event: {}", event.GetType().c_str());
-    // RmlUi doesn't have Element::ProcessEvent - event handling is different
-    if(event.GetTargetElement() != this && !(event == "mousemove")) {
+
+    // Handle hover state changes - repaint only for styled elements (those with classes)
+    if (event == "mouseover" || event == "mouseout") {
+        auto* target = event.GetTargetElement();
+        if (target && !target->GetClassNames().empty()) {
+            view.requestRepaint();
+        }
+    }
+    // Repaint for non-mousemove events on UI elements (not game board)
+    else if (event.GetTargetElement() != this && !(event == "mousemove")) {
         view.requestRepaint();
     }
 
@@ -535,5 +546,7 @@ void ElementGame::OnChildAdd(Rml::Element* element)
         GetOwnerDocument()->AddEventListener("mousescroll", this);
         GetOwnerDocument()->AddEventListener("keydown", this);
         GetOwnerDocument()->AddEventListener("keyup", this);
+        GetOwnerDocument()->AddEventListener("mouseover", this);
+        GetOwnerDocument()->AddEventListener("mouseout", this);
     }
 }
