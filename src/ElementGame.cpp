@@ -378,7 +378,9 @@ void ElementGame::OnUpdate()
         }
     }
     Rml::Element* msg = context->GetDocument("game_window")->GetElementById("lblMessage");
-    if (view.state.msg != model.state.msg) {
+    // Update message when msg changes OR when a new game is loaded (detected by positionNumber change)
+    if (view.state.msg != model.state.msg
+        || view.board.positionNumber.load() != model.board.positionNumber.load()) {
         switch (model.state.msg) {
         case GameState::CALCULATING_SCORE:
             msg->SetInnerRML(
@@ -461,6 +463,7 @@ void ElementGame::OnUpdate()
         }
         requestRepaint();
         view.state.msg = model.state.msg;
+        view.board.positionNumber.store(model.board.positionNumber.load());
     }
     // Show SGF comment if available (takes priority over other NONE-state content)
     if (view.state.comment != model.state.comment) {

@@ -196,19 +196,27 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
 
 void PlayerManager::removeSgfPlayers() {
     // Remove players with SGF_PLAYER type (created during SGF loading)
+    // Track if active players were SGF players before removal
+    bool blackWasSgf = players[activePlayer[0]]->isTypeOf(Player::SGF_PLAYER);
+    bool whiteWasSgf = players[activePlayer[1]]->isTypeOf(Player::SGF_PLAYER);
+
     // Iterate backwards to avoid index shifting issues
     for (int i = static_cast<int>(players.size()) - 1; i >= 0; --i) {
         if (players[i]->isTypeOf(Player::SGF_PLAYER)) {
             spdlog::info("Removing SGF player '{}' at index {}", players[i]->getName(), i);
+            // Adjust active player indices if they point to players after this one
+            if (static_cast<size_t>(i) < activePlayer[0]) activePlayer[0]--;
+            if (static_cast<size_t>(i) < activePlayer[1]) activePlayer[1]--;
             delete players[i];
             players.erase(players.begin() + i);
         }
     }
 
-    // Reset active players to defaults (human for black, coach for white)
-    activePlayer[0] = human;
-    activePlayer[1] = coach;
     numPlayers = players.size();
+
+    // Only reset to defaults if the active player was an SGF player that got removed
+    if (blackWasSgf) activePlayer[0] = human;
+    if (whiteWasSgf) activePlayer[1] = coach;
 
     spdlog::debug("removeSgfPlayers: {} players remaining, activePlayer=[{}, {}]",
         numPlayers, activePlayer[0], activePlayer[1]);

@@ -708,9 +708,11 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
             model.state.capturedWhite = model.board.capturedCount(Color::WHITE);
 
             if (endedByResignation) {
-                // For resigned games, create a resignation move based on SGF game result
-                Color resigningPlayer = Color((gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin)
-                                        ? Color::WHITE : Color::BLACK);
+                // For resigned games, set winner based on SGF result and create resignation move
+                // BlackWin means white resigned, WhiteWin means black resigned
+                bool blackWon = (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin);
+                model.state.winner = blackWon ? Color::BLACK : Color::WHITE;
+                Color resigningPlayer = blackWon ? Color::WHITE : Color::BLACK;
                 Move resignationMove(Move::RESIGN, resigningPlayer);
                 model.result(resignationMove);
             } else {

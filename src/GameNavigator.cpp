@@ -36,6 +36,10 @@ void GameNavigator::notifyBoardChangeWithMove(const Board& result, const Move& m
 }
 
 bool GameNavigator::navigateBack() {
+    spdlog::debug("navigateBack: isNavigating={}, hasPrev={}, isGameOver={}, moveCount={}",
+        model.game.isNavigating(), model.game.hasPreviousMove(),
+        model.isGameOver.load(), model.game.moveCount());
+
     if (!model.game.isNavigating() || !model.game.hasPreviousMove()) {
         spdlog::debug("navigateBack: cannot navigate (isNavigating={}, hasPrev={})",
             model.game.isNavigating(), model.game.hasPreviousMove());
@@ -43,7 +47,10 @@ bool GameNavigator::navigateBack() {
     }
 
     Engine* coach = getCoach();
-    if (!coach) return false;
+    if (!coach) {
+        spdlog::warn("navigateBack: no coach engine available");
+        return false;
+    }
 
     NavigationGuard guard(navigationInProgress);
 
@@ -228,13 +235,20 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
 }
 
 bool GameNavigator::navigateToStart() {
+    spdlog::debug("navigateToStart: isNavigating={}, hasPrev={}, isGameOver={}, moveCount={}",
+        model.game.isNavigating(), model.game.hasPreviousMove(),
+        model.isGameOver.load(), model.game.moveCount());
+
     if (!model.game.isNavigating()) {
         spdlog::debug("navigateToStart: not in navigation mode");
         return false;
     }
 
     Engine* coach = getCoach();
-    if (!coach) return false;
+    if (!coach) {
+        spdlog::warn("navigateToStart: no coach engine available");
+        return false;
+    }
 
     NavigationGuard guard(navigationInProgress);
 

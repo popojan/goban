@@ -44,9 +44,13 @@ float GobanModel::result(const Move& lastMove) {
         state.winner = Color(state.scoreDelta < 0.0 ? Color::WHITE : Color::BLACK);
         state.msg = state.winner == Color::WHITE ? GameState::WHITE_WON : GameState::BLACK_WON;
     }
-    else if(state.reason == GameState::RESIGNATION){
-        bool blackResigned = lastMove == Color::BLACK;
-        state.winner = Color(blackResigned ? Color::WHITE : Color::BLACK);
+    else if (state.reason == GameState::RESIGNATION) {
+        // Winner may be set in onGameMove (live game) or derived from lastMove (SGF loading)
+        if (state.winner == Color::EMPTY) {
+            // SGF loading path: derive from the resignation move color
+            state.winner = (lastMove.col == Color::BLACK) ? Color::WHITE : Color::BLACK;
+        }
+        bool blackResigned = (state.winner == Color::WHITE);
         state.msg = blackResigned ? GameState::BLACK_RESIGNED : GameState::WHITE_RESIGNED;
         state.scoreDelta = blackResigned ? -1.0 : 1.0;
     }
@@ -175,6 +179,10 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     
     if (isDoublePass || move == Move::RESIGN) {
         state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
+        if (move == Move::RESIGN) {
+            // Set winner immediately - opposite of who resigned
+            state.winner = (move.col == Color::BLACK) ? Color::WHITE : Color::BLACK;
+        }
         board.toggleTerritoryAuto(true);
         isGameOver = true;
         spdlog::debug("Main Over! Reason {}", static_cast<int>(state.reason));

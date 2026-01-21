@@ -231,6 +231,8 @@ bool GobanControl::command(const std::string& cmd) {
     else if (cmd == "navigate_start" || cmd == "navigate_end" ||
              cmd == "navigate_back" || cmd == "navigate_forward") {
         // Block navigation while engine is thinking - would corrupt state
+        spdlog::debug("Navigation command '{}': isThinking={}, isRunning={}, isGameOver={}",
+            cmd, engine.isThinking(), engine.isRunning(), model.isGameOver.load());
         if (engine.isThinking()) {
             spdlog::debug("Navigation command '{}' blocked - engine is thinking", cmd);
         }

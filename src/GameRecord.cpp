@@ -182,16 +182,16 @@ void GameRecord::move(const Move& move)  {
 
     auto newNode(F::CreateNode());
 
-    if (move == Move::NORMAL || move == Move::PASS){
+    if (move == Move::NORMAL || move == Move::PASS) {
         auto col = move.col == Color::BLACK ? SgfcColor::Black : SgfcColor::White;
         auto type = (move.col == Color::BLACK ? T::B : T::W);
         std::shared_ptr<ISgfcPropertyValue> value{nullptr};
 
-        if(move == Move::NORMAL) {
+        if (move == Move::NORMAL) {
             auto pos = move.pos.toSgf(boardSize.Columns);
             value = vF->CreateGoMovePropertyValue(pos, boardSize, col);
         } else {
-            value =  vF->CreateGoMovePropertyValue(col);
+            value = vF->CreateGoMovePropertyValue(col);
         }
 
         std::shared_ptr<ISgfcProperty> property(pF->CreateProperty(type, value));
@@ -199,10 +199,33 @@ void GameRecord::move(const Move& move)  {
         newNode->SetProperties(properties);
         game->GetTreeBuilder()->InsertChild(currentNode, newNode, currentNode->GetFirstChild());
         currentNode = newNode;
-        if(!gameHasNewMoves) {
+        if (!gameHasNewMoves) {
             gameHasNewMoves = true;
             appendGameToDocument();
         }
+    }
+    else if (move == Move::RESIGN) {
+        // Resignation: set RE property in root node (W+R or B+R)
+        // Black resigning means White wins, and vice versa
+        std::string result = (move.col == Color::BLACK) ? "W+R" : "B+R";
+        auto value = vF->CreateSimpleTextPropertyValue(result);
+        auto property = pF->CreateProperty(T::RE, value);
+
+        // Replace existing properties, removing any old RE
+        std::vector<std::shared_ptr<ISgfcProperty>> rootProps;
+        for (const auto& prop : game->GetRootNode()->GetProperties()) {
+            if (prop->GetPropertyType() != T::RE) {
+                rootProps.push_back(prop);
+            }
+        }
+        rootProps.push_back(property);
+        game->GetRootNode()->SetProperties(rootProps);
+
+        if (!gameHasNewMoves) {
+            gameHasNewMoves = true;
+            appendGameToDocument();
+        }
+        spdlog::info("Resignation recorded: {} ({})", result, move.col == Color::BLACK ? "black resigned" : "white resigned");
     }
 }
 
@@ -345,38 +368,36 @@ void GameRecord::finalizeGame(float scoreDelta) {
 
     std::lock_guard<std::mutex> lock(mutex);
 
+    // Check if there's already a resignation result - don't overwrite
+    for (const auto& prop : game->GetRootNode()->GetProperties()) {
+        if (prop->GetPropertyType() == T::RE) {
+            auto val = prop->GetPropertyValue()->ToSingleValue()->GetRawValue();
+            if (val.find("+R") != std::string::npos) {
+                spdlog::debug("finalizeGame: resignation result already set ({}), skipping", val);
+                return;
+            }
+        }
+    }
+
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
 
-    auto type = T::RE;
+    // Score-based result
     std::ostringstream ss;
-    
-    // Check if the game ended by resignation (use SGF tree)
-    Move last = lastMove();
-    bool isResignation = (last == Move::RESIGN);
+    ss << (scoreDelta < 0.0 ? "W+" : "B+");
+    ss << std::abs(scoreDelta);
 
-    if (isResignation) {
-        // For resignation, use R instead of score
-        ss << (last.col == Color::BLACK ? "W+R" : "B+R");
-    } else {
-        // Use sign convention since we still get the traditional scoreDelta
-        ss << (scoreDelta < 0.0 ? "W+" : "B+");
-        ss << std::abs(scoreDelta);
-    }
-
-    auto value (vF->CreateSimpleTextPropertyValue(ss.str()));
+    auto value(vF->CreateSimpleTextPropertyValue(ss.str()));
 
     // Copy existing properties, excluding any existing RE (result) property
-    std::vector<std::shared_ptr<ISgfcProperty> > properties;
-    auto p = game->GetRootNode()->GetProperties();
-    for (const auto& prop : p) {
+    std::vector<std::shared_ptr<ISgfcProperty>> properties;
+    for (const auto& prop : game->GetRootNode()->GetProperties()) {
         if (prop->GetPropertyType() != T::RE) {
             properties.push_back(prop);
         }
     }
     // Add the new result
-    std::shared_ptr<ISgfcProperty> property(pF->CreateProperty(type, value));
-    properties.push_back(property);
+    properties.push_back(pF->CreateProperty(T::RE, value));
 
     game->GetRootNode()->SetProperties(properties);
 }
@@ -600,6 +621,16 @@ bool GameRecord::isGameFinished() const {
 bool GameRecord::isMainLineFinished() const {
     if (!game) return false;
 
+    // Check if RE property indicates resignation (W+R or B+R)
+    for (const auto& prop : game->GetRootNode()->GetProperties()) {
+        if (prop->GetPropertyType() == T::RE) {
+            auto val = prop->GetPropertyValue()->ToSingleValue()->GetRawValue();
+            if (val.find("+R") != std::string::npos) {
+                return true;  // Game ended by resignation
+            }
+        }
+    }
+
     // Traverse main line (following first children) to find the end
     auto node = game->GetRootNode();
     std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> lastMoveNode = nullptr;
@@ -621,11 +652,6 @@ bool GameRecord::isMainLineFinished() const {
     auto lastMove = extractMoveFromNode(lastMoveNode, boardSize.Columns);
     if (!lastMove) {
         return false;
-    }
-
-    // Check for resignation
-    if (*lastMove == Move::RESIGN) {
-        return true;
     }
 
     // Check for double pass
