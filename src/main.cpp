@@ -61,7 +61,7 @@ class HoverRepaintListener : public Rml::EventListener {
 public:
     void ProcessEvent(Rml::Event& event) override {
         (void)event;
-        // Trigger repaint on hover state changes from ANY document
+        // Trigger repaint on CSS state changes from ANY document
         // The repaint trigger (ElementGame) lives in game_window
         if (context) {
             auto doc = context->GetDocument("game_window");
@@ -87,8 +87,12 @@ static void EnsureHoverListenersForAllDocuments() {
     for (int i = 0; i < context->GetNumDocuments(); ++i) {
         auto doc = context->GetDocument(i);
         if (doc && g_documentsWithHoverListener.find(doc) == g_documentsWithHoverListener.end()) {
+            // Events that can change CSS visual state and need repaint:
+            // :hover -> mouseover/mouseout (shows submenus via CSS)
+            // click  -> complete click cycle (RmlUi select dropdowns)
             doc->AddEventListener(Rml::EventId::Mouseover, &g_hoverListener);
             doc->AddEventListener(Rml::EventId::Mouseout, &g_hoverListener);
+            doc->AddEventListener(Rml::EventId::Click, &g_hoverListener);
             g_documentsWithHoverListener.insert(doc);
             spdlog::debug("Added hover listeners to document: {}", doc->GetSourceURL().c_str());
         }
