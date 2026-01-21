@@ -81,8 +81,8 @@ void PlayerManager::setRole(size_t playerIndex, int role, bool add) {
 size_t PlayerManager::activatePlayer(int which, int delta) {
     std::lock_guard<std::mutex> lock(mutex);
 
-    std::size_t oldp = activePlayer[which];
-    std::size_t newp = (oldp + delta) % numPlayers;
+    size_t oldp = activePlayer[which];
+    size_t newp = (oldp + delta) % numPlayers;
 
     activePlayer[which] = newp;
 
@@ -138,7 +138,7 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
 
                 if (!command.empty()) {
                     auto engine = new GtpEngine(command, parameters, path, name, messages);
-                    std::size_t id = addEngine(engine);
+                    size_t id = addEngine(engine);
 
                     if (main) {
                         if (!hasCoach) {

@@ -130,44 +130,34 @@ size_t GameThread::activatePlayer(int which, int delta) {
 }
 
 bool GameThread::setFixedHandicap(int handicap) {
-    bool success = false;
-    if (!model.started) {
-        int lastSize = model.board.getSize();
-        Engine* coach = currentCoach();
-        if (!coach) {
-            spdlog::error("setFixedHandicap: no coach engine!");
-            return false;
-        }
-        std::vector<Position> stones;
-        if (handicap >= 2) {
-            coach->boardsize(lastSize);
-            coach->clear();
-            success = coach->fixed_handicap(handicap, stones);
-            if (!success) {
-                return setFixedHandicap(0);
-            }
-            for (auto player : playerManager->getPlayers()) {
-                if (player != coach && player->getRole() != Player::NONE) {
-                    player->boardsize(lastSize);
-                    player->clear();
-                    for (auto & stone : stones)
-                        success &= player->play(Move(stone, Color::BLACK));
-                }
-                model.state.colorToMove = Color::WHITE;
-            }
-        } else {
-            success = true;
-        }
-        if(success) {
-            std::for_each(
-                    gameObservers.begin(), gameObservers.end(),
-                    [&stones](GameObserver* observer){observer->onHandicapChange(stones);}
-            );
-        }
-        model.state.handicap = handicap;
-        model.board.copyStateFrom(coach->showboard());
+    if (model.started) {
+        return false;
     }
-    return success;
+
+    Engine* coach = currentCoach();
+    if (!coach) {
+        spdlog::error("setFixedHandicap: no coach engine!");
+        return false;
+    }
+
+    std::vector<Position> stones;
+    if (handicap >= 2) {
+        int boardSize = model.board.getSize();
+        coach->boardsize(boardSize);
+        coach->clear();
+        if (!coach->fixed_handicap(handicap, stones)) {
+            return setFixedHandicap(0);  // Fall back to no handicap
+        }
+        applyHandicapStonesToEngines(stones, coach);
+    }
+
+    model.state.handicap = handicap;
+    model.board.copyStateFrom(coach->showboard());
+
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&stones](GameObserver* observer) { observer->onHandicapChange(stones); });
+
+    return true;
 }
 void GameThread::run() {
     std::unique_lock<std::mutex> lock(playerMutex);
@@ -786,41 +776,46 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     return true;
 }
 
-void GameThread::setHandicapStones(const std::vector<Position>& stones) {
-    Engine* coach = currentCoach();
-    if (coach && !stones.empty()) {
-        coach->boardsize(model.getBoardSize());
-        coach->clear();
-
-        for (const auto& stone : stones) {
-            coach->play(Move(stone, Color::BLACK));
-        }
-
-        for (auto player : playerManager->getPlayers()) {
-            if (player != coach) {
-                player->boardsize(model.getBoardSize());
-                player->clear();
-                for (const auto& stone : stones) {
-                    player->play(Move(stone, Color::BLACK));
-                }
+void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, Engine* coach) {
+    int boardSize = model.getBoardSize();
+    for (auto player : playerManager->getPlayers()) {
+        if (player != coach && player->getRole() != Player::NONE) {
+            player->boardsize(boardSize);
+            player->clear();
+            for (const auto& stone : stones) {
+                player->play(Move(stone, Color::BLACK));
             }
         }
-        
-        model.state.colorToMove = Color::WHITE;
-        
-        const Board& result = coach->showboard();
-        std::for_each(
-            gameObservers.begin(), gameObservers.end(),
-            [&result](GameObserver* observer) {
-                observer->onBoardChange(result);
-            }
-        );
-        
-        std::for_each(
-            gameObservers.begin(), gameObservers.end(),
-            [stones](GameObserver* observer) {
-                observer->onHandicapChange(stones);
-            }
-        );
     }
+    model.state.colorToMove = Color::WHITE;
+}
+
+void GameThread::setHandicapStones(const std::vector<Position>& stones) {
+    if (stones.empty()) {
+        return;
+    }
+
+    Engine* coach = currentCoach();
+    if (!coach) {
+        return;
+    }
+
+    // Play stones to coach
+    int boardSize = model.getBoardSize();
+    coach->boardsize(boardSize);
+    coach->clear();
+    for (const auto& stone : stones) {
+        coach->play(Move(stone, Color::BLACK));
+    }
+
+    // Sync to other engines
+    applyHandicapStonesToEngines(stones, coach);
+
+    // Notify observers
+    const Board& result = coach->showboard();
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&result](GameObserver* observer) { observer->onBoardChange(result); });
+
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&stones](GameObserver* observer) { observer->onHandicapChange(stones); });
 }

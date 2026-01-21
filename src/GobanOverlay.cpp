@@ -55,7 +55,7 @@ bool GobanOverlay::init() {
 
     font = std::make_shared<GlyphyFont>(ft_face, st->get_atlas());
 
-	for (std::size_t i = 0; i < layers.size(); ++i) {
+	for (size_t i = 0; i < layers.size(); ++i) {
 		spdlog::debug("Creating overlay buffer[{0}]", i);
 	    auto b = std::make_shared<GlyphyBuffer>();
         glyphy_point_t p = {.0, .0};
@@ -79,7 +79,7 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
     int boardSize = board.getSize();
     float halfN = 0.5f * (float)boardSize - 0.5f;
 
-	for (std::size_t layer = 0; layer < layers.size(); ++layer) {
+	for (size_t layer = 0; layer < layers.size(); ++layer) {
 		int cnt = 0;
 		buffer[layer]->clear();
 		int idx = 0;
@@ -132,7 +132,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 
 	st->set_depth(which < 1 ? 0.6 : 0.4);
 
-	for (std::size_t layer = which; layer < (which == 0 ? 1 : layers.size()); ++layer) {
+	for (size_t layer = which; layer < (which == 0 ? 1 : layers.size()); ++layer) {
 
 		if (layers[layer].empty)
 			continue;

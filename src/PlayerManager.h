@@ -75,12 +75,12 @@ private:
     std::vector<Engine*> engines;
     std::vector<Player*> players;
 
-    std::size_t human{0};
-    std::size_t sgf{0};
-    std::size_t coach{0};
-    std::size_t kibitz{0};
-    std::size_t numPlayers{0};
-    std::array<std::size_t, 2> activePlayer{0, 0};
+    size_t human{0};
+    size_t sgf{0};
+    size_t coach{0};
+    size_t kibitz{0};
+    size_t numPlayers{0};
+    std::array<size_t, 2> activePlayer{0, 0};
 
     mutable std::mutex mutex;
     InterruptCallback interruptPlayer;

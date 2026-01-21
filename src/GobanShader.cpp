@@ -99,7 +99,7 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
         char *log;
 
         glGetProgramiv(gobanProgram, GL_INFO_LOG_LENGTH, &length);
-        log = (char*)malloc(static_cast<std::size_t>(length));
+        log = (char*)malloc(static_cast<size_t>(length));
         glGetProgramInfoLog(gobanProgram, length, &result, log);
 
         spdlog::error("sceneInit(): Program linking failed: {0}", log);
