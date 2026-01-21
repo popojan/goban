@@ -137,13 +137,26 @@ static RenderInterface_GL2 render_interface;
 
 // GLFW callbacks
 static void GlfwErrorCallback(int error, const char* description) {
-    spdlog::error("GLFW Error {}: {}", error, description);
+    // Wayland doesn't support window positioning - demote to debug
+    if (error == GLFW_FEATURE_UNAVAILABLE) {
+        spdlog::debug("GLFW: {}", description);
+    } else {
+        spdlog::warn("GLFW Error {}: {}", error, description);
+    }
 }
 
 static void GlfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
     (void)window;
     if (context) {
         context->SetDimensions(Rml::Vector2i(width, height));
+        // Trigger repaint on window resize
+        auto gameDoc = context->GetDocument("game_window");
+        if (gameDoc) {
+            auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
+            if (gameElement) {
+                gameElement->requestRepaint();
+            }
+        }
     }
     render_interface.SetViewport(width, height);
 }

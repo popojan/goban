@@ -99,6 +99,7 @@ bool GobanControl::command(const std::string& cmd) {
         fullscreen = AppState::ToggleFullscreen();
         checked = fullscreen;
         UserSettings::instance().setFullscreen(fullscreen);
+        view.requestRepaint();
     }
     else if (cmd == "fps") {
         checked = view.toggleFpsLimit();
