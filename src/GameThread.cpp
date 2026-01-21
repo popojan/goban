@@ -4,14 +4,23 @@
 #include <cmath>
 
 GameThread::GameThread(GobanModel &m) :
-        model(m), thread(nullptr),
-        playerToMove(nullptr), human(0), sgf(0), coach(0), kibitz(0), numPlayers(0), activePlayer({0, 0})
+        model(m), thread(nullptr), playerToMove(nullptr)
 {
+    // Initialize player manager
+    playerManager = std::make_unique<PlayerManager>(gameObservers);
+
+    // Set interrupt callback for player manager
+    playerManager->setInterruptCallback([this]() {
+        if (playerToMove != nullptr && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+            playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
+        }
+    });
+
     // Initialize navigator with callbacks to access GameThread resources
     navigator = std::make_unique<GameNavigator>(
         model,
         [this]() { return currentCoach(); },
-        players,
+        playerManager->getPlayers(),
         gameObservers
     );
 }
@@ -25,70 +34,31 @@ void GameThread::reset() {
 GameThread::~GameThread() {
     std::unique_lock<std::mutex> lock(mutex2);
     interrupt();
-    for(auto & player : players) {
-        delete player;
-    }
-    players.clear();
+    // PlayerManager destructor handles player cleanup
 }
 
 size_t GameThread::addEngine(Engine* engine) {
-    engines.push_back(engine);
-    players.push_back(engine);
-    return players.size() - 1;
+    return playerManager->addEngine(engine);
 }
 
 size_t GameThread::addPlayer(Player* player) {
-    players.push_back(player);
-    return players.size() - 1;
+    return playerManager->addPlayer(player);
 }
 
 Engine* GameThread::currentCoach() {
-    for(auto & engine : engines) {
-        if(engine->hasRole(Player::COACH)) return engine;
-    }
-    return nullptr;
+    return playerManager->currentCoach();
 }
 
 Engine* GameThread::currentKibitz() {
-    for(auto & engine : engines) {
-        if(engine->hasRole(Player::KIBITZ)) return engine;
-    }
-    return nullptr;
+    return playerManager->currentKibitz();
 }
 
 Player* GameThread::currentPlayer() {
-    int roleToMove = model.state.colorToMove == Color::BLACK ? Player::BLACK : Player::WHITE;
-    for(auto & player : players) {
-        if(player->hasRole(roleToMove)) return player;
-    }
-    return nullptr;
+    return playerManager->currentPlayer(model.state.colorToMove);
 }
 
 void GameThread::setRole(size_t playerIndex, int role, bool add) {
-    if(players.size() > playerIndex) {
-        std::unique_lock<std::mutex> lock(mutex2);
-        Player* player = players[playerIndex];
-        player->setRole(role, add);
-        spdlog::debug("Player[{}] newType = [human = {}, computer = {}] newRole = [black = {}, white = {}]",
-            playerIndex,
-            player->isTypeOf(Player::HUMAN),
-            player->isTypeOf(Player::ENGINE),
-            player->hasRole(Player::BLACK),
-            player->hasRole(Player::WHITE)
-        );
-        if(!add && playerToMove != nullptr && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
-            playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
-        }
-        if(add) {
-            std::for_each(
-                    gameObservers.begin(), gameObservers.end(),
-                    [player, role](GameObserver *observer) {
-                        observer->onPlayerChange(role, player->getName());
-                    }
-            );
-        }
-
-    }
+    playerManager->setRole(playerIndex, role, add);
 }
 
 void GameThread::interrupt() {
@@ -100,29 +70,8 @@ void GameThread::interrupt() {
     }
 }
 
-/** \brief Clears the board and resets both komi and handicap.
- *
- * @param boardSize
- */
 void GameThread::removeSgfPlayers() {
-    // Remove players with SGF_PLAYER type (created during SGF loading)
-    // Iterate backwards to avoid index shifting issues
-    for (int i = static_cast<int>(players.size()) - 1; i >= 0; --i) {
-        if (players[i]->isTypeOf(Player::SGF_PLAYER)) {
-            spdlog::info("Removing SGF player '{}' at index {}", players[i]->getName(), i);
-            delete players[i];
-            players.erase(players.begin() + i);
-        }
-    }
-
-    // Reset active players to defaults (human for black, coach for white)
-    // These indices should be valid after removing SGF players
-    activePlayer[0] = human;  // Black
-    activePlayer[1] = coach;  // White
-    numPlayers = players.size();
-
-    spdlog::debug("removeSgfPlayers: {} players remaining, activePlayer=[{}, {}]",
-        numPlayers, activePlayer[0], activePlayer[1]);
+    playerManager->removeSgfPlayers();
 }
 
 bool GameThread::clearGame(int boardSize, float komi, int handicap) {
@@ -138,7 +87,7 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
     bool success = true;
 
-    for (auto player : players) {
+    for (auto player : playerManager->getPlayers()) {
         success &= player->boardsize(boardSize);
         success &= player->clear();
     }
@@ -167,29 +116,17 @@ void GameThread::setKomi(float komi) {
         gameObservers.begin(), gameObservers.end(),
         [komi](GameObserver* observer){observer->onKomiChange(komi);}
     );
-    for (auto player : players) {
+    for (auto player : playerManager->getPlayers()) {
         player->komi(komi);
     }
 }
 
 size_t GameThread::getActivePlayer(int which) {
-    return activePlayer[which];
+    return playerManager->getActivePlayer(which);
 }
 
 size_t GameThread::activatePlayer(int which, int delta) {
-    std::lock_guard<std::mutex> lock(playerMutex);
-
-    std::size_t oldp = activePlayer[which];
-    std::size_t newp = (oldp + delta) %  numPlayers;
-
-    activePlayer[which] = newp;
-
-    int role = which == 0 ? Player::BLACK : Player::WHITE;
-
-    setRole(oldp, role, false);
-    setRole(newp, role, true);
-
-    return newp;
+    return playerManager->activatePlayer(which, delta);
 }
 
 bool GameThread::setFixedHandicap(int handicap) {
@@ -209,7 +146,7 @@ bool GameThread::setFixedHandicap(int handicap) {
             if (!success) {
                 return setFixedHandicap(0);
             }
-            for (auto player : players) {
+            for (auto player : playerManager->getPlayers()) {
                 if (player != coach && player->getRole() != Player::NONE) {
                     player->boardsize(lastSize);
                     player->clear();
@@ -289,7 +226,7 @@ bool GameThread::undo(Player * engine, bool doubleUndo) {
 
 void GameThread::syncOtherEngines(const Move& move, Player* player, Engine* coach,
                                    Engine* kibitzEngine, bool kibitzed, bool doubleUndo) {
-    for (auto p : players) {
+    for (auto p : playerManager->getPlayers()) {
         if (p != reinterpret_cast<Player*>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
             spdlog::debug("syncOtherEngines: syncing player {}", p->getName());
             if (move == Move::UNDO) {
@@ -322,8 +259,7 @@ void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
 GameThread::UndoResult GameThread::processUndo(Engine* coach) {
     UndoResult result;
 
-    bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
-            && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
+    bool bothHumans = playerManager->areBothPlayersHuman();
 
     // Single undo if: both humans OR in Analysis mode OR reviewing (not at end of game)
     // hasNextMove() = true means we're stepped back in history, reviewing moves
@@ -382,7 +318,7 @@ void GameThread::gameLoop() {
                 player = reinterpret_cast<Player*>(kibitzEngine);
             } else {
                 // NONE (fresh start) or AI just responded → human plays
-                player = players[human];
+                player = playerManager->getPlayers()[playerManager->getHumanIndex()];
             }
         }
 
@@ -455,7 +391,7 @@ void GameThread::gameLoop() {
             if(success) {
                 // Collect engine comments for annotation
                 std::ostringstream engineComments;
-                for (auto p : players) {
+                for (auto p : playerManager->getPlayers()) {
                     if (p->isTypeOf(Player::ENGINE)) {
                         std::string engineMsg(dynamic_cast<GtpEngine*>(p)->lastError());
                         if (!engineMsg.empty()) {
@@ -571,9 +507,7 @@ bool GameThread::setGameMode(GameMode mode) {
 
     // Don't allow Analysis mode for human-human matches (no AI to respond)
     if (mode == GameMode::ANALYSIS) {
-        bool bothHumans = players[activePlayer[0]]->isTypeOf(Player::HUMAN)
-                && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
-        if (bothHumans) {
+        if (playerManager->areBothPlayersHuman()) {
             spdlog::info("Analysis mode not available for human-human matches");
             return false;
         }
@@ -621,79 +555,7 @@ void GameThread::setAiVsAi(bool enabled) {
 }
 
 void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
-    auto bots = config->data.find("bots");
-    if(bots != config->data.end()) {
-        bool hasCoach(false);
-        bool hasKibitz(false);
-        for(auto it = bots->begin(); it != bots->end(); ++it) {
-            auto enabled = it->value("enabled", 1);
-            if(enabled) {
-                auto path = it->value("path", "" );
-                auto name = it->value("name", "");
-                auto command = it->value("command", "");
-                auto parameters = it->value("parameters", "");
-                auto main = it->value("main", 0);
-                auto kibitz = it->value("kibitz", 0);
-                auto messages = it->value("messages", nlohmann::json::array());
-
-                int role = Player::SPECTATOR;
-
-                if(!command.empty()) {
-                    auto engine = new GtpEngine(command, parameters, path, name, messages);
-                    std::size_t id = addEngine(engine);
-
-                    if (main) {
-                        if(!hasCoach) {
-                          role |= Player::COACH;
-                          hasCoach = true;
-                          coach = id;
-                          spdlog::info("Setting [{}] engine as coach and referee.",
-                                  players[id]->getName());
-                        } else {
-                          spdlog::warn("Ignoring coach flag for [{}] engine, coach has already been set to [{}].",
-                                  players[id]->getName(),
-                                  players[coach]->getName());
-                        }
-                    }
-                    if (kibitz) {
-                        if(!hasKibitz) {
-                            role |= Player::KIBITZ;
-                            hasKibitz = true;
-                            kibitz = id;
-                            spdlog::info("Setting [{}] engine as trusted kibitz.",
-                                         players[id]->getName());
-                        } else {
-                            spdlog::warn("Ignoring kibitz flag for [{}] engine, kibitz has already been set to [{}].",
-                                         players[id]->getName(),
-                                         players[coach]->getName());
-                        }
-                    }
-                    setRole(id, role, true);
-                }
-            }
-        }
-        if(!hasKibitz) {
-            kibitz = coach;
-            spdlog::info("No kibitz set. Defaulting to [{}] coach engine.",
-                         players[kibitz]->getName());
-            players[coach]->setRole(players[coach]->getRole() | Player::KIBITZ);
-        }
-    }
-
-    sgf = -1;
-
-    auto humans = config->data.find("humans");
-    if(humans != config->data.end()) {
-        for(auto & it : *humans) {
-            human = addPlayer(new LocalHumanPlayer(it));
-        }
-    } else {
-        human = addPlayer(new LocalHumanPlayer("Human"));
-    }
-
-    numPlayers = human + 1;
-    activePlayer[0] = human;
-    activePlayer[1] = coach;
+    playerManager->loadEngines(config);
 }
 
 Move GameThread::getLocalMove(const Position& coord) const {
@@ -741,7 +603,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     if (coach) {
         model.game.replay([&](const Move& move) {
             coach->play(move);
-            for (auto player : players) {
+            for (auto player : playerManager->getPlayers()) {
                 if (player != coach) {
                     player->play(move);
                 }
@@ -877,8 +739,9 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     // If a name matches an engine exactly, activate that engine; otherwise create a temporary SGF player
     auto matchPlayerName = [this](const std::string& sgfName, int role) {
         int which = (role == Player::BLACK) ? 0 : 1;
+        auto players = playerManager->getPlayers();
         spdlog::info("matchPlayerName: sgfName='{}', role={}, which={}, current activePlayer[{}]={}",
-            sgfName, role, which, which, activePlayer[which]);
+            sgfName, role, which, which, playerManager->getActivePlayer(which));
 
         // Search for matching player name (skip SGF_PLAYER types from previous loads)
         for (size_t i = 0; i < players.size(); i++) {
@@ -886,7 +749,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
                 players[i]->isTypeOf(Player::SGF_PLAYER) ? "SGF" : "normal");
             if (players[i]->getName() == sgfName && !players[i]->isTypeOf(Player::SGF_PLAYER)) {
                 // Found matching engine - activate it
-                activePlayer[which] = i;
+                playerManager->setActivePlayer(which, i);
                 spdlog::info("Matched SGF player '{}' to existing player at index {}", sgfName, i);
                 std::for_each(gameObservers.begin(), gameObservers.end(),
                     [role, &sgfName](GameObserver* observer) {
@@ -900,10 +763,10 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
         auto* sgfPlayer = new LocalHumanPlayer(sgfName);
         sgfPlayer->addType(Player::SGF_PLAYER);  // Mark as SGF player for cleanup
         size_t newIndex = addPlayer(sgfPlayer);
-        activePlayer[which] = newIndex;
+        playerManager->setActivePlayer(which, newIndex);
 
         spdlog::info("Created SGF player '{}' at index {}, activePlayer[{}] now = {}",
-            sgfName, newIndex, which, activePlayer[which]);
+            sgfName, newIndex, which, playerManager->getActivePlayer(which));
         std::for_each(gameObservers.begin(), gameObservers.end(),
             [role, &sgfName](GameObserver* observer) {
                 observer->onPlayerChange(role, sgfName);
@@ -911,12 +774,11 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     };
 
     spdlog::info("loadSGF: matching players - Black='{}', White='{}', players.size={}",
-        gameInfo.blackPlayer, gameInfo.whitePlayer, players.size());
+        gameInfo.blackPlayer, gameInfo.whitePlayer, playerManager->getNumPlayers());
     matchPlayerName(gameInfo.blackPlayer, Player::BLACK);
     matchPlayerName(gameInfo.whitePlayer, Player::WHITE);
-    numPlayers = players.size();  // Update numPlayers after adding SGF players
     spdlog::info("loadSGF: after matching - activePlayer=[{}, {}], players.size={}",
-        activePlayer[0], activePlayer[1], players.size());
+        playerManager->getActivePlayer(0), playerManager->getActivePlayer(1), playerManager->getNumPlayers());
 
     spdlog::info("SGF file [{}] (game index {}) loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
                  fileName, gameIndex, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, model.game.moveCount());
@@ -929,12 +791,12 @@ void GameThread::setHandicapStones(const std::vector<Position>& stones) {
     if (coach && !stones.empty()) {
         coach->boardsize(model.getBoardSize());
         coach->clear();
-        
+
         for (const auto& stone : stones) {
             coach->play(Move(stone, Color::BLACK));
         }
-        
-        for (auto player : players) {
+
+        for (auto player : playerManager->getPlayers()) {
             if (player != coach) {
                 player->boardsize(model.getBoardSize());
                 player->clear();

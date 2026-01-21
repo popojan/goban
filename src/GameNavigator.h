@@ -34,7 +34,7 @@ public:
     };
 
     GameNavigator(GobanModel& model, CoachProvider getCoach,
-                  PlayerList& players, ObserverList& observers);
+                  const PlayerList& players, ObserverList& observers);
 
     // Navigation methods for SGF replay
     bool navigateBack();
@@ -63,7 +63,7 @@ private:
 
     GobanModel& model;
     CoachProvider getCoach;
-    PlayerList& players;
+    const PlayerList& players;
     ObserverList& gameObservers;
     std::atomic<bool> navigationInProgress{false};
 };

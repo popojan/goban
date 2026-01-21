@@ -11,6 +11,7 @@
 #include "GobanModel.h"
 #include "GameObserver.h"
 #include "GameNavigator.h"
+#include "PlayerManager.h"
 #include "Board.h"
 #include "Configuration.h"
 
@@ -61,7 +62,7 @@ public:
 
     void setRole(size_t playerIndex, int role, bool add = false);
 
-    std::string getName(size_t id) { return players[id]->getName(); }
+    std::string getName(size_t id) { return playerManager->getName(id); }
 
     void interrupt();
 
@@ -118,7 +119,7 @@ public:
     bool navigateToStart();  // Go to beginning of game
     bool navigateToEnd();    // Go to end of game (main line)
 
-    std::vector<Player*> getPlayers() { return players;}
+    std::vector<Player*> getPlayers() { return playerManager->getPlayers(); }
 
     bool loadSGF(const std::string& fileName, int gameIndex = 0);
 
@@ -135,18 +136,16 @@ private:
     void setHandicapStones(const std::vector<Position>& stones);
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;
-    std::vector<Engine*> engines; //engines know the rules
-    std::vector<Player*> players; //all players including engines, humans, spectators
     std::unique_ptr<std::thread> thread;
     std::mutex mutex2;
     std::atomic<bool> interruptRequested{false};
     std::atomic<bool> hasThreadRunning{false};
     Player* playerToMove;
-	std::size_t human, sgf, coach, kibitz;
-	std::size_t numPlayers;
-	std::array<std::size_t, 2> activePlayer;
     mutable std::mutex playerMutex;
     std::condition_variable engineStarted;
+
+    // Player management (extracted to separate class)
+    std::unique_ptr<PlayerManager> playerManager;
 
     // Analysis mode state
     GameMode gameMode = GameMode::MATCH;

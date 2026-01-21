@@ -5,7 +5,7 @@
 #include <algorithm>
 
 GameNavigator::GameNavigator(GobanModel& model, CoachProvider getCoach,
-                             PlayerList& players, ObserverList& observers)
+                             const PlayerList& players, ObserverList& observers)
     : model(model), getCoach(std::move(getCoach)), players(players), gameObservers(observers)
 {
 }

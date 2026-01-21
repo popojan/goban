@@ -319,7 +319,8 @@ else()
         src/EventManager.h
         src/GameThread.h
         src/GameObserver.h
-        src/GameThread.h
+        src/GameNavigator.h
+        src/PlayerManager.h
         src/gtpclient.h
         src/player.h
         src/Quaternion.h
@@ -350,6 +351,7 @@ else()
         src/EventManager.cpp
         src/GameNavigator.cpp
         src/GameThread.cpp
+        src/PlayerManager.cpp
         src/gtpclient.cpp
         src/main.cpp
         src/player.cpp
