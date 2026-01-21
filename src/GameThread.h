@@ -63,6 +63,9 @@ public:
 
     void interrupt();
 
+    // Check if genmove is in progress (engine is thinking)
+    bool isThinking() const;
+
     bool clearGame(int boardSize, float komi, int handicap);
 
     void removeSgfPlayers();  // Remove temporary players created from SGF loading
@@ -140,7 +143,7 @@ private:
 	std::size_t human, sgf, coach, kibitz;
 	std::size_t numPlayers;
 	std::array<std::size_t, 2> activePlayer;
-    std::mutex playerMutex;
+    mutable std::mutex playerMutex;
     std::condition_variable engineStarted;
 
     // Analysis mode state
@@ -149,6 +152,9 @@ private:
     bool aiVsAiMode = false;
     MoveSource lastMoveSource = MoveSource::NONE;
     std::condition_variable genmoveTriggered;
+
+    // Navigation synchronization - prevents genmove during active navigation
+    std::atomic<bool> navigationInProgress{false};
 };
 
 #endif // GAMETHREAD_H

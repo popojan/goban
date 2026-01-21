@@ -103,6 +103,15 @@ public:
     // Check if game has a result (RE property in SGF)
     [[nodiscard]] bool hasGameResult() const;
 
+    // Check if current position is a finished game state (resign or double pass)
+    [[nodiscard]] bool isGameFinished() const;
+
+    // Check if main line (following first children) ends in a finished state
+    [[nodiscard]] bool isMainLineFinished() const;
+
+    // Remove RE (result) property from root node
+    void removeGameResult();
+
     // Multi-variation support
     [[nodiscard]] std::vector<Move> getVariations() const;
     bool navigateToChild(const Move& move);  // Navigate to specific variation

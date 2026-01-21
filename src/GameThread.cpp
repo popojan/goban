@@ -3,6 +3,13 @@
 #include <nlohmann/json.hpp>
 #include <cmath>
 
+// Scope guard to set/clear navigationInProgress flag
+struct NavigationGuard {
+    std::atomic<bool>& flag;
+    NavigationGuard(std::atomic<bool>& f) : flag(f) { flag = true; }
+    ~NavigationGuard() { flag = false; }
+};
+
 GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr),
         playerToMove(nullptr), human(0), sgf(0), coach(0), kibitz(0), numPlayers(0), activePlayer({0, 0})
@@ -251,6 +258,12 @@ void GameThread::run() {
 
 bool GameThread::isRunning() const { return hasThreadRunning;}
 
+bool GameThread::isThinking() const {
+    std::unique_lock<std::mutex> lock(playerMutex);
+    // Only block for engine thinking, not for human waiting for input
+    return playerToMove != nullptr && playerToMove->isTypeOf(Player::ENGINE);
+}
+
 bool GameThread::humanToMove() {
     std::unique_lock<std::mutex> lock(playerMutex);
     if(playerToMove) {
@@ -380,6 +393,23 @@ void GameThread::gameLoop() {
         }
         std::unique_lock<std::mutex> lock(playerMutex, std::defer_lock);
         bool locked = false;
+
+        // Skip genmove if:
+        // 1. Navigation operation is in progress (atomic flag)
+        // 2. Navigating through history (not at the end position)
+        // This prevents AI from playing on an old board state during SGF review
+        if (navigationInProgress) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            continue;
+        }
+        bool navigatingHistory = model.game.isNavigating() && !model.game.isAtEndOfNavigation();
+        if (navigatingHistory) {
+            spdlog::debug("Game loop: skipping genmove during navigation (view pos {}/{})",
+                model.game.getViewPosition(), model.game.getLoadedMovesCount());
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+
         if(coach && player && !interruptRequested) {
             bool success = false;
             bool kibitzed = false;
@@ -400,14 +430,15 @@ void GameThread::gameLoop() {
                 }
             }
             spdlog::debug("MOVE to {}, valid = {}", move.toString(), (bool)move);
-            playerToMove = nullptr;
             //lock mutex after genmove returns, before processing the move result
+            //NOTE: keep playerToMove set until processing complete to block navigation
             lock.lock();
             locked = true;
             //TODO no direct access to model but via observers
             if (move == Move::INTERRUPT) {
                 // Mode switch or player change - skip this iteration and re-evaluate
                 spdlog::debug("INTERRUPT received, re-evaluating game state");
+                playerToMove = nullptr;  // Clear before continue
                 continue;
             }
             else if (move == Move::UNDO) {
@@ -481,6 +512,8 @@ void GameThread::gameLoop() {
             if(success && move != Move::INTERRUPT)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
+        // Clear playerToMove while still holding lock - signals processing complete
+        playerToMove = nullptr;
         if(locked) lock.unlock();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
@@ -508,6 +541,8 @@ bool GameThread::navigateBack() {
 
     Engine* coach = currentCoach();
     if (!coach) return false;
+
+    NavigationGuard guard(navigationInProgress);
 
     // Capture the move we're about to undo (for pass message display)
     Move undoneMove = model.game.lastMove();
@@ -567,21 +602,25 @@ bool GameThread::navigateForward() {
     auto variations = model.game.getVariations();
     spdlog::debug("navigateForward: found {} variations", variations.size());
 
+    NavigationGuard guard(navigationInProgress);
+
     if (variations.empty()) {
-        // Already at end - show territory on this "extra" forward press
-        spdlog::debug("navigateForward: at end, showing territory");
-        Engine* coach = currentCoach();
-        if (coach) {
-            model.board.toggleTerritoryAuto(true);
-            model.state.msg = GameState::NONE;  // Clear pass message
-            const Board& result = coach->showterritory(true, model.game.lastStoneMove().col);
-            std::for_each(gameObservers.begin(), gameObservers.end(),
-                [&result](GameObserver* observer) {
-                    observer->onBoardChange(result);
-                });
-            return true;  // We did something - trigger UI update
+        // At end of branch - only show territory if game is actually finished
+        if (model.game.isGameFinished()) {
+            spdlog::debug("navigateForward: at end of finished game, showing territory");
+            Engine* coach = currentCoach();
+            if (coach) {
+                model.board.toggleTerritoryAuto(true);
+                model.state.msg = GameState::NONE;  // Clear pass message
+                const Board& result = coach->showterritory(true, model.game.lastStoneMove().col);
+                std::for_each(gameObservers.begin(), gameObservers.end(),
+                    [&result](GameObserver* observer) {
+                        observer->onBoardChange(result);
+                    });
+                return true;  // We did something - trigger UI update
+            }
         }
-        spdlog::debug("navigateForward: no variations available, no coach");
+        spdlog::debug("navigateForward: at end of branch, nothing to do");
         return false;
     }
 
@@ -661,6 +700,8 @@ bool GameThread::navigateToVariation(const Move& move) {
         return false;
     }
 
+    NavigationGuard guard(navigationInProgress);
+
     // Play the move on the coach
     if (!coach->play(move)) {
         spdlog::warn("navigateToVariation: coach->play() failed for move {}", move.toString());
@@ -733,6 +774,8 @@ bool GameThread::navigateToStart() {
     Engine* coach = currentCoach();
     if (!coach) return false;
 
+    NavigationGuard guard(navigationInProgress);
+
     bool success = false;
     while (model.game.hasPreviousMove()) {
         if (!coach->undo()) break;
@@ -772,6 +815,8 @@ bool GameThread::navigateToEnd() {
     Engine* coach = currentCoach();
     if (!coach) return false;
 
+    NavigationGuard guard(navigationInProgress);
+
     bool playedMoves = false;
     Move lastMove;
 
@@ -809,9 +854,11 @@ bool GameThread::navigateToEnd() {
     model.state.markup = model.game.getMarkup();
     model.state.msg = GameState::NONE;
 
-    // Show territory at end
-    model.board.toggleTerritoryAuto(true);
-    const Board& result = coach->showterritory(true, model.game.lastStoneMove().col);
+    // Only show territory if at a finished game position (resign or double pass)
+    // Otherwise just update the board display
+    const Board& result = model.game.isGameFinished()
+        ? (model.board.toggleTerritoryAuto(true), coach->showterritory(true, model.game.lastStoneMove().col))
+        : coach->showboard();
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&result](GameObserver* observer) { observer->onBoardChange(result); });
 

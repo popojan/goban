@@ -230,17 +230,24 @@ void GobanModel::onKomiChange(float newKomi) {
 }
 
 void GobanModel::onPlayerChange(int role, const std::string& name) {
-    std::ostringstream val;
-    val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
     if(role & Player::BLACK) {
         state.black = name;
-        val << "black=" << name;
-
     }
     if(role & Player::WHITE) {
         state.white = name;
-        val << "white=" << name;
     }
-    val << " ";
-    game.annotate(val.str());
+
+    // Only annotate player switches during active gameplay, not during SGF loading
+    if (started) {
+        std::ostringstream val;
+        val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
+        if(role & Player::BLACK) {
+            val << "black=" << name;
+        }
+        if(role & Player::WHITE) {
+            val << "white=" << name;
+        }
+        val << " ";
+        game.annotate(val.str());
+    }
 }

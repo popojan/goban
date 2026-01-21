@@ -37,6 +37,11 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
         if (button == 0 && state == 1) {
             // During navigation (not at end), handle clicks specially
             if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
+                // Block navigation while engine is thinking - would corrupt state
+                if (engine.isThinking()) {
+                    spdlog::debug("Navigation click blocked - engine is thinking");
+                    return;
+                }
                 auto variations = model.game.getVariations();
                 for (const auto& move : variations) {
                     if (move == Move::NORMAL && move.pos == coord) {
@@ -217,24 +222,23 @@ bool GobanControl::command(const std::string& cmd) {
     else if (cmd == "undo move") {
         engine.playLocalMove(model.getUndoMove());
     }
-    else if (cmd == "navigate_start") {
-        if (engine.navigateToStart()) {
-            view.updateNavigationOverlay();
+    else if (cmd == "navigate_start" || cmd == "navigate_end" ||
+             cmd == "navigate_back" || cmd == "navigate_forward") {
+        // Block navigation while engine is thinking - would corrupt state
+        if (engine.isThinking()) {
+            spdlog::debug("Navigation command '{}' blocked - engine is thinking", cmd);
         }
-    }
-    else if (cmd == "navigate_end") {
-        if (engine.navigateToEnd()) {
-            view.updateNavigationOverlay();
+        else if (cmd == "navigate_start") {
+            if (engine.navigateToStart()) view.updateNavigationOverlay();
         }
-    }
-    else if (cmd == "navigate_back") {
-        if (engine.navigateBack()) {
-            view.updateNavigationOverlay();
+        else if (cmd == "navigate_end") {
+            if (engine.navigateToEnd()) view.updateNavigationOverlay();
         }
-    }
-    else if (cmd == "navigate_forward") {
-        if (engine.navigateForward()) {
-            view.updateNavigationOverlay();
+        else if (cmd == "navigate_back") {
+            if (engine.navigateBack()) view.updateNavigationOverlay();
+        }
+        else if (cmd == "navigate_forward") {
+            if (engine.navigateForward()) view.updateNavigationOverlay();
         }
     }
     else if (cmd == "pan camera") {
@@ -329,7 +333,16 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         model.game.getViewPosition(), model.game.getLoadedMovesCount());
 
     if (!downNotUp && model.game.isNavigating()) {
-        // Space/Right: navigate forward (or show territory at end)
+        // Navigation keys - only check isThinking() for these specific keys
+        bool isNavKey = (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT ||
+                         key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK);
+
+        if (isNavKey && engine.isThinking()) {
+            spdlog::debug("Navigation blocked - engine is thinking");
+            return;
+        }
+
+        // Space/Right: navigate forward (or trigger kibitz at end of unfinished branch)
         if (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT) {
             if (engine.navigateForward()) {
                 spdlog::debug("Navigation: forward to move {}/{}",
@@ -337,12 +350,12 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
                 view.updateNavigationOverlay();
                 return;  // Handled navigation
             }
-            // At end with no more moves - don't fall through to kibitz
-            if (!model.game.hasNextMove()) {
+            // At end of finished game - nothing more to do
+            if (!model.game.hasNextMove() && model.game.isGameFinished()) {
                 return;
             }
-            // At end of navigation - fall through to allow Space for kibitz
-            spdlog::debug("Navigation: at end, Space falls through to kibitz");
+            // At end of unfinished branch - fall through to allow Space for kibitz
+            spdlog::debug("Navigation: at end of branch, Space falls through to kibitz");
         }
         if (key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK) {
             if (engine.navigateBack()) {
@@ -355,6 +368,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     }
 
     std::string cmd(config->getCommand(static_cast<Rml::Input::KeyIdentifier>(key)));
+    spdlog::debug("keyPress: key={} mapped to cmd='{}'", key, cmd);
 
     // Adjustment commands should trigger on key DOWN (enables key repeat)
     if (downNotUp && !cmd.empty()) {

@@ -377,6 +377,16 @@ void GameRecord::saveAs(const std::string& fileName) {
     if(doc == nullptr || doc->GetGames().empty())
         return;
 
+    // If game was modified, check if main line is still finished
+    // If not, remove the RE (result) property to maintain invariant
+    if (gameHasNewMoves && game) {
+        bool mainLineFinished = isMainLineFinished();
+        if (!mainLineFinished && hasGameResult()) {
+            spdlog::info("Removing game result - main line is unfinished after modifications");
+            removeGameResult();
+        }
+    }
+
     std::string fn(fileName.length() > 0 ? fileName : defaultFileName);
 
     std::shared_ptr<LibSgfcPlusPlus::ISgfcDocumentWriter> writer(F::CreateDocumentWriter());
@@ -539,6 +549,84 @@ bool GameRecord::hasGameResult() const {
         }
     }
     return false;
+}
+
+bool GameRecord::isGameFinished() const {
+    Move last = lastMove();
+
+    // Game finished by resignation
+    if (last == Move::RESIGN) {
+        return true;
+    }
+
+    // Game finished by double pass
+    if (last == Move::PASS && currentNode && currentNode->HasParent()) {
+        auto parent = currentNode->GetParent();
+        if (auto prevMove = extractMoveFromNode(parent, boardSize.Columns)) {
+            if (*prevMove == Move::PASS) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool GameRecord::isMainLineFinished() const {
+    if (!game) return false;
+
+    // Traverse main line (following first children) to find the end
+    auto node = game->GetRootNode();
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> lastMoveNode = nullptr;
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> secondLastMoveNode = nullptr;
+
+    while (node) {
+        if (extractMoveFromNode(node, boardSize.Columns).has_value()) {
+            secondLastMoveNode = lastMoveNode;
+            lastMoveNode = node;
+        }
+        auto children = node->GetChildren();
+        node = children.empty() ? nullptr : children[0];  // Follow first child (main line)
+    }
+
+    if (!lastMoveNode) {
+        return false;  // No moves at all
+    }
+
+    auto lastMove = extractMoveFromNode(lastMoveNode, boardSize.Columns);
+    if (!lastMove) {
+        return false;
+    }
+
+    // Check for resignation
+    if (*lastMove == Move::RESIGN) {
+        return true;
+    }
+
+    // Check for double pass
+    if (*lastMove == Move::PASS && secondLastMoveNode) {
+        auto secondLastMove = extractMoveFromNode(secondLastMoveNode, boardSize.Columns);
+        if (secondLastMove && *secondLastMove == Move::PASS) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void GameRecord::removeGameResult() {
+    if (!game) return;
+
+    auto root = game->GetRootNode();
+    if (!root) return;
+
+    std::vector<std::shared_ptr<LibSgfcPlusPlus::ISgfcProperty>> properties;
+    for (const auto& prop : root->GetProperties()) {
+        if (prop->GetPropertyType() != T::RE) {
+            properties.push_back(prop);
+        }
+    }
+    root->SetProperties(properties);
 }
 
 Color GameRecord::getColorToMove() const {
