@@ -36,6 +36,8 @@ public:
 
     void initGame(int boardSize, float komi, int handicap, const std::string& blackPlayer, const std::string& whitePlayer);
 
+    void updatePlayers(const std::string& blackPlayer, const std::string& whitePlayer);
+
     void saveAs(const std::string& fileName);
 
     void setHandicapStones(const std::vector<Position>& stones);

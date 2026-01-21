@@ -315,6 +315,31 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
 
 }
 
+void GameRecord::updatePlayers(const std::string& blackPlayer, const std::string& whitePlayer) {
+    std::lock_guard<std::mutex> lock(mutex);
+
+    if (!game) return;
+    auto root = game->GetRootNode();
+    if (!root) return;
+
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
+
+    // Copy existing properties, replacing PB and PW
+    std::vector<std::shared_ptr<LibSgfcPlusPlus::ISgfcProperty>> properties;
+    for (const auto& prop : root->GetProperties()) {
+        if (prop->GetPropertyType() != T::PB && prop->GetPropertyType() != T::PW) {
+            properties.push_back(prop);
+        }
+    }
+
+    // Add updated player names
+    properties.push_back(pF->CreateProperty(T::PB, vF->CreateSimpleTextPropertyValue(blackPlayer)));
+    properties.push_back(pF->CreateProperty(T::PW, vF->CreateSimpleTextPropertyValue(whitePlayer)));
+
+    root->SetProperties(properties);
+}
+
 void GameRecord::finalizeGame(float scoreDelta) {
     using namespace LibSgfcPlusPlus;
 

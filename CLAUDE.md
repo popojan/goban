@@ -150,6 +150,81 @@ Before creating a version tag (e.g., `v0.1.0`):
 3. **Commit all changes** before tagging
 4. Push the tag to trigger automatic GitHub Release creation
 
+## Design Invariants
+
+These invariants must be maintained to prevent race conditions and ensure consistent behavior:
+
+### Navigation & Engine Synchronization
+- **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
+- **Block navigation while engine thinking**: `isThinking()` returns true only for ENGINE types (not human players). Navigation keys are blocked when engine is processing.
+- **Navigation in bot-bot matches**: Requires switching to Analysis mode first (pauses genmove loop).
+
+### SGF Game Record Consistency
+- **PB/PW updated on first move**: Player names in SGF header are updated when the first move is made, capturing actual players after setup.
+- **Annotations only after first move**: Player switch annotations (`switched_player:`) only recorded after `moveCount() > 0`. Setup changes are silent.
+- **No annotations during SGF loading**: `started` flag must be false during SGF load to prevent spurious annotations.
+- **Result removed if main line unfinished**: When saving a modified SGF, if the main line (first children) doesn't end in resign/double-pass, remove the RE property.
+
+### Game State
+- **isGameFinished()**: True only for resign or double-pass (two consecutive passes).
+- **Territory display**: Only shown at finished game positions, not at end of unfinished variations.
+
+## Test Scenarios
+
+Known error-prone sequences that should be regression tested:
+
+### Navigation During Engine Play
+```
+new_game 13
+switch_player black gnugo
+switch_player white gnugo
+start
+wait 500ms
+navigate_home          # Should be blocked or queue safely
+navigate_back          # Should be blocked or queue safely
+```
+
+### Player Switch During Navigation
+```
+load_sgf famous_game.sgf
+navigate_home
+navigate_forward 10
+switch_player black gnugo
+space                  # Should trigger AI response
+navigate_back          # Should work after AI responds
+```
+
+### Space Key at Branch End
+```
+load_sgf famous_game.sgf
+navigate_home
+navigate_forward 5
+click_board 4 4        # Create new variation
+space                  # Should trigger kibitz (not block)
+```
+
+### SGF Modification and Save
+```
+load_sgf game_with_result.sgf
+navigate_home
+navigate_forward 3
+click_board 5 5        # New variation becomes main line
+save                   # RE property should be removed (unfinished)
+```
+
+### Analysis Mode Workflow
+```
+new_game 19
+switch_player black gnugo
+switch_player white gnugo
+start
+wait 2000ms
+toggle_analysis_mode   # Pause genmove
+navigate_home          # Should work immediately
+navigate_end
+toggle_analysis_mode   # Resume match
+```
+
 ## Ray-Traced Rendering - Coordinate System and Shaders
 
 The Go board is rendered using ray tracing in GLSL fragment shaders. The vertex shaders set up the camera and compute ray origins/directions for each pixel.

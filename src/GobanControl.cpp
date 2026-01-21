@@ -156,13 +156,19 @@ bool GobanControl::command(const std::string& cmd) {
 
     }
     else if (cmd == "play once") {
+        // Start engine if not running (consistent with board click behavior)
+        if (!engine.isRunning() && !model.isGameOver) {
+            engine.run();
+            view.requestRepaint();
+        }
         // In Analysis mode, "play once" triggers genmove if waiting; otherwise kibitz
-        if (engine.getGameMode() == GameMode::ANALYSIS && engine.isWaitingForGenmove()) {
+        else if (engine.getGameMode() == GameMode::ANALYSIS && engine.isWaitingForGenmove()) {
             engine.triggerGenmove();
+            view.requestRepaint();
         } else {
             engine.playKibitzMove();
+            view.requestRepaint();
         }
-        view.requestRepaint();
     }
     else if (cmd == "toggle_analysis_mode") {
         if (engine.getGameMode() == GameMode::MATCH) {

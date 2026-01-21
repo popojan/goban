@@ -194,6 +194,10 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
         }
     }
     if(!(move == Move::UNDO)) {
+        // On first move, update PB/PW to capture actual players after setup
+        if (game.moveCount() == 0) {
+            game.updatePlayers(state.black, state.white);
+        }
         game.move(move);
         if(!comment.empty()) {
             game.annotate(comment);
@@ -237,8 +241,8 @@ void GobanModel::onPlayerChange(int role, const std::string& name) {
         state.white = name;
     }
 
-    // Only annotate player switches during active gameplay, not during SGF loading
-    if (started) {
+    // Only annotate player switches after first move (ignore setup changes)
+    if (started && game.moveCount() > 0) {
         std::ostringstream val;
         val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
         if(role & Player::BLACK) {
