@@ -38,19 +38,11 @@ game {
   z-index: 100;
 }
 
-.menu.hoverable {
-  background-color: transparent;
-}
-
-.menu.hoverable:hover {
-  background-color: #00000040;
-}
-
 /* Menu bar items (File, View, Game, etc.) */
 .menuitem.hoverable {
   display: inline-block;
   position: relative;
-  padding: 0.25rem 0.5rem;
+  padding: 0.2rem 0.5rem;
   color: #ffffffa0;
 }
 
@@ -63,7 +55,7 @@ game {
 }
 
 .menuitem.hoverable:hover {
-  background-color: #00000080;
+  background-color: #00000040;
   color: #ffffffff;
 }
 
@@ -144,7 +136,11 @@ select selectbox {
   position: absolute;
   left: 100%;
   top: 0px;
-  margin-left: -0.5rem;
+  margin-left: 0.25rem;
+  /*
+  border-left-width: 0.1rem;
+  border-color: #00000050;
+  */
   padding: 0.25rem;
   background-color: #00000040;
 }
@@ -204,8 +200,4 @@ div.show { display: block; }
 /* Active move indicator */
 .active {
   text-decoration: underline;
-}
-
-#blackMoves {
-  border-right: 0.05rem #ffffff40;
 }
