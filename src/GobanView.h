@@ -4,6 +4,7 @@
 
 #include <utility>
 #include <string>
+#include <atomic>
 #include "GobanOverlay.h"
 #include <RmlUi/Core/Types.h>
 #include <RmlUi/Core/Texture.h>
@@ -151,7 +152,7 @@ public:
 
     GameState state;
 
-    int updateFlag;
+    std::atomic<int> updateFlag;  // Thread-safe: accessed from main thread and GameThread
     int currentProgram;
     bool showOverlay;
     Position lastMove;
