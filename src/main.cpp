@@ -49,11 +49,51 @@
 
 #include <memory>
 #include <fstream>
+#include <set>
 
 #include "UserSettings.h"
 
 Rml::Context* context = nullptr;
+
+// Global hover listener that triggers repaint for any document
+// This ensures hover states work correctly with event-driven rendering
+class HoverRepaintListener : public Rml::EventListener {
+public:
+    void ProcessEvent(Rml::Event& event) override {
+        (void)event;
+        // Trigger repaint on hover state changes from ANY document
+        // The repaint trigger (ElementGame) lives in game_window
+        if (context) {
+            auto doc = context->GetDocument("game_window");
+            if (doc) {
+                auto gameElement = dynamic_cast<ElementGame*>(doc->GetElementById("game"));
+                if (gameElement) {
+                    gameElement->requestRepaint();
+                }
+            }
+        }
+    }
+};
+
+static HoverRepaintListener g_hoverListener;
+static std::set<Rml::ElementDocument*> g_documentsWithHoverListener;
 std::shared_ptr<Configuration> config;
+
+// Add hover listeners to any new documents in the context
+// This ensures all dialogs (current and future) have hover responsiveness
+static void EnsureHoverListenersForAllDocuments() {
+    if (!context) return;
+
+    for (int i = 0; i < context->GetNumDocuments(); ++i) {
+        auto doc = context->GetDocument(i);
+        if (doc && g_documentsWithHoverListener.find(doc) == g_documentsWithHoverListener.end()) {
+            doc->AddEventListener(Rml::EventId::Mouseover, &g_hoverListener);
+            doc->AddEventListener(Rml::EventId::Mouseout, &g_hoverListener);
+            g_documentsWithHoverListener.insert(doc);
+            spdlog::debug("Added hover listeners to document: {}", doc->GetSourceURL().c_str());
+        }
+    }
+}
 
 // For application restart with different config
 static char* g_executable_path = nullptr;
@@ -443,6 +483,9 @@ int main(int argc, char** argv)
             // Process events
             glfwPollEvents();
 
+            // Ensure all documents have hover listeners for proper repaint triggering
+            EnsureHoverListenersForAllDocuments();
+
             // Run game loop (processes RmlUi events)
             if (gameElement) {
                 gameElement->gameLoop();
@@ -482,6 +525,9 @@ int main(int argc, char** argv)
     }
 
     EventManager::Shutdown();
+
+    // Clear document tracking before RmlUi cleanup
+    g_documentsWithHoverListener.clear();
 
     spdlog::debug("Before context destroy");
 

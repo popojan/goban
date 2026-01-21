@@ -188,15 +188,9 @@ void ElementGame::ProcessEvent(Rml::Event& event)
 {
     spdlog::debug("ElementGame processes event: {}", event.GetType().c_str());
 
-    // Handle hover state changes - repaint only for styled elements (those with classes)
-    if (event == "mouseover" || event == "mouseout") {
-        auto* target = event.GetTargetElement();
-        if (target && !target->GetClassNames().empty()) {
-            view.requestRepaint();
-        }
-    }
     // Repaint for non-mousemove events on UI elements (not game board)
-    else if (event.GetTargetElement() != this && !(event == "mousemove")) {
+    // Note: mouseover/mouseout are handled by global HoverRepaintListener in main.cpp
+    if (event.GetTargetElement() != this && !(event == "mousemove")) {
         view.requestRepaint();
     }
 
@@ -491,7 +485,6 @@ void ElementGame::OnChildAdd(Rml::Element* element)
         GetOwnerDocument()->AddEventListener("mousescroll", this);
         GetOwnerDocument()->AddEventListener("keydown", this);
         GetOwnerDocument()->AddEventListener("keyup", this);
-        GetOwnerDocument()->AddEventListener("mouseover", this);
-        GetOwnerDocument()->AddEventListener("mouseout", this);
+        // Note: mouseover/mouseout handled by global HoverRepaintListener in main.cpp
     }
 }
