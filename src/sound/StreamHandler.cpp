@@ -19,9 +19,9 @@
         char * msg = nullptr;
         if (vasprintf(&msg, fmt, args) >= 0 && msg) {
             if(err >= SND_ERROR_BEGIN)
-                spdlog::error("Alsa error {} in {} at {}:{}: {}", err, function, file, line, msg);
+                spdlog::warn("Alsa error {} in {} at {}:{}: {}", err, function, file, line, msg);
             else
-                spdlog::warn("Alsa info {} in {} at {}:{}: {}", err, function, file, line, msg);
+                spdlog::debug("Alsa info {} in {} at {}:{}: {}", err, function, file, line, msg);
             free(msg);
         }
         va_end(args);
@@ -112,6 +112,11 @@ int StreamHandler::PortAudioCallback(const void * input,
                 }
         }
 	delete [] outputBuffer;
+
+        // Stop stream when no more audio to play
+        if (handler->data.empty()) {
+                return paComplete;
+        }
         return paContinue;
 }
 
@@ -119,9 +124,24 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
 {
         switch (audioEventType) {
         case start:
-                if (Pa_IsStreamStopped(stream))
+                ensureInitialized();
+                if (!initialized) {
+                        spdlog::warn("Audio: init failed, skipping sound");
+                        return;
+                }
+
+                // Use !Pa_IsStreamActive() instead of Pa_IsStreamStopped() because
+                // stream can be in "complete" state (not stopped, but not active either)
+                if (!Pa_IsStreamActive(stream))
                 {
-                        Pa_StartStream(stream);
+                        // If stream is in "complete" state (not stopped), stop it first
+                        if (!Pa_IsStreamStopped(stream)) {
+                                Pa_StopStream(stream);
+                        }
+                        PaError err = Pa_StartStream(stream);
+                        if (err != paNoError) {
+                                spdlog::warn("Audio: Pa_StartStream failed: {}", Pa_GetErrorText(err));
+                        }
                 }
                 data.push_back(new Playback {
                         audioFile,
@@ -131,7 +151,9 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
                 });
                 break;
         case stop:
-                Pa_StopStream(stream);
+                if (initialized && stream) {
+                        Pa_StopStream(stream);
+                }
                 for (auto instance : data)
                 {
                         delete instance;
@@ -144,15 +166,35 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
 StreamHandler::StreamHandler()
         : data() {
 }
-void StreamHandler::init() {
-#if defined (__linux__)
-        ;//char latency[] = "PULSE_LATENCY_MSEC=20\0";
-        //putenv(latency);
-#endif
 
+void StreamHandler::stopIfInactive() {
+        // Only shutdown if stream finished AND no pending playbacks (allow overlapping sounds)
+        if (initialized && stream && data.empty() && !Pa_IsStreamActive(stream)) {
+                shutdown();
+        }
+}
+
+void StreamHandler::shutdown() {
+        if (!initialized) return;
+
+        if (stream) {
+                Pa_StopStream(stream);
+                Pa_CloseStream(stream);
+                stream = nullptr;
+        }
+        Pa_Terminate();
+        initialized = false;
+}
+
+void StreamHandler::init() {
 #if defined(RMLUI_PLATFORM_LINUX)
         snd_lib_error_set_handler(alsa_error_callback);
 #endif
+        // Don't initialize PortAudio here - lazy init on first sound
+}
+
+void StreamHandler::ensureInitialized() {
+        if (initialized) return;
 
         Pa_Initialize();
         PaError errorCode;
@@ -171,26 +213,23 @@ void StreamHandler::init() {
                                   paNoFlag,
                                   &PortAudioCallback,
                                   this);
-        Pa_StartStream(stream);
 
         if (errorCode)
         {
                 Pa_Terminate();
-
                 stringstream error;
                 error << "Unable to open stream for output. Portaudio error code: " << errorCode;
                 spdlog::error(error.str());
-                throw error.str();
+                return;  // Don't throw - just disable audio
         }
+        initialized = true;
 }
 
 StreamHandler::~StreamHandler()
 {
-        spdlog::debug("PortAudio Termination in progress..");
-        Pa_CloseStream(stream);
         for (auto wrapper : data)
         {
                 delete wrapper;
         }
-        Pa_Terminate();
+        shutdown();
 }

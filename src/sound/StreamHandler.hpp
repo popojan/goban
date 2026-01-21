@@ -50,11 +50,16 @@ class StreamHandler
                                      PaStreamCallbackFlags statusFlags,
                                      void * userData);
         size_t playbackCount() {  std::lock_guard<std::mutex> lock(mut); return data.size(); }
+        void stopIfInactive();  // Stop stream if it finished playing (releases pipewire connection)
     private:
+        void ensureInitialized();  // Lazy init of PortAudio
+        void shutdown();           // Full shutdown of PortAudio
+
         const int CHANNEL_COUNT = 2;
         const int SAMPLE_RATE = 44100;
         const PaStreamParameters * NO_INPUT = nullptr;
-        PaStream * stream;
+        PaStream * stream = nullptr;
         vector<Playback *> data;
         std::mutex mut;
+        bool initialized = false;
 };

@@ -16,6 +16,7 @@ public:
     void init();
     void preload(const std::shared_ptr<Configuration> config);
     size_t playbackCount() { return streamHandler.playbackCount(); }
+    void stopIfInactive() { streamHandler.stopIfInactive(); }
 private:
     FileHandler fileHandler;
     StreamHandler streamHandler;

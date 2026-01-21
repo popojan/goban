@@ -120,6 +120,8 @@ public:
     void animateIntro();
 
     void requestRepaint(int what = UPDATE_SOME);
+    bool needsRender() const { return updateFlag != UPDATE_NONE || animationRunning; }
+    void stopAudioIfInactive() { player.stopIfInactive(); }
     bool toggleOverlay();
 
     void Update();
