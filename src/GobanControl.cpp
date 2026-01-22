@@ -127,7 +127,7 @@ bool GobanControl::command(const std::string& cmd) {
 
     bool checked = false;
     if(cmd == "quit") {
-        model.game.saveAs("");
+        saveCurrentGame();  // Saves game and stores path for restore on next start
         exit = true;
         AppState::RequestExit();
     }
@@ -473,4 +473,11 @@ void GobanControl::switchShader(int newShaderIndex) {
 void GobanControl::destroy() {
     spdlog::debug("GAME DESTRUCT");
     engine.interrupt();
+}
+
+void GobanControl::saveCurrentGame() {
+    if (model.game.moveCount() > 0) {
+        model.game.saveAs("");
+        UserSettings::instance().setLastSgfPath(model.game.getDefaultFileName());
+    }
 }

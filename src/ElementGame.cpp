@@ -295,6 +295,16 @@ void ElementGame::ProcessEvent(Rml::Event& event)
         //control.Initialise();
         spdlog::debug("Load");
         populateEngines();
+
+        // Resume last game if saved (e.g., after language switch restart)
+        std::string lastSgf = UserSettings::instance().getLastSgfPath();
+        if (!lastSgf.empty() && std::filesystem::exists(lastSgf)) {
+            spdlog::info("Resuming last game from: {}", lastSgf);
+            engine.loadSGF(lastSgf);
+            // Continue saving to the same file (preserves daily session)
+            model.game.setDefaultFileName(lastSgf);
+            UserSettings::instance().setLastSgfPath("");  // Clear after loading
+        }
     }
 }
 

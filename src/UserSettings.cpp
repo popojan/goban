@@ -33,6 +33,10 @@ void UserSettings::load() {
             soundEnabled = user["sound_enabled"].get<bool>();
         }
 
+        if (user.contains("last_sgf_path")) {
+            lastSgfPath = user["last_sgf_path"].get<std::string>();
+        }
+
         if (user.contains("shader")) {
             shaderLoaded = true;
             auto& shader = user["shader"];
@@ -75,6 +79,9 @@ void UserSettings::save() {
     user["last_config"] = lastConfig;
     user["fullscreen"] = fullscreen;
     user["sound_enabled"] = soundEnabled;
+    if (!lastSgfPath.empty()) {
+        user["last_sgf_path"] = lastSgfPath;
+    }
 
     user["shader"] = {
         {"name", shaderName},
@@ -119,6 +126,11 @@ void UserSettings::setFullscreen(bool value) {
 
 void UserSettings::setSoundEnabled(bool value) {
     soundEnabled = value;
+    save();
+}
+
+void UserSettings::setLastSgfPath(const std::string& value) {
+    lastSgfPath = value;
     save();
 }
 

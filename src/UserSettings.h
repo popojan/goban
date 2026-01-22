@@ -23,6 +23,10 @@ public:
     bool getSoundEnabled() const { return soundEnabled; }
     void setSoundEnabled(bool value);
 
+    // Last SGF (for resuming after restart)
+    std::string getLastSgfPath() const { return lastSgfPath; }
+    void setLastSgfPath(const std::string& value);
+
     // Shader
     std::string getShaderName() const { return shaderName; }
     void setShaderName(const std::string& value);
@@ -76,6 +80,9 @@ private:
 
     // Sound
     bool soundEnabled = true;
+
+    // Last SGF
+    std::string lastSgfPath;
 
     // Shader
     std::string shaderName;

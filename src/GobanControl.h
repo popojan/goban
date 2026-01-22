@@ -33,6 +33,7 @@ public:
     bool setHandicap(int);
     bool setKomi(float);
     bool command(const std::string& cmd);
+    void saveCurrentGame();
 
 private:
     ElementGame* parent;

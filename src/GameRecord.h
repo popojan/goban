@@ -40,6 +40,9 @@ public:
 
     void saveAs(const std::string& fileName);
 
+    [[nodiscard]] std::string getDefaultFileName() const { return defaultFileName; }
+    void setDefaultFileName(const std::string& fileName) { defaultFileName = fileName; }
+
     void setHandicapStones(const std::vector<Position>& stones);
 
     void finalizeGame(float scoreDelta);

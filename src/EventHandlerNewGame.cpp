@@ -111,6 +111,7 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         }
 
         spdlog::info("Switching to language: {} (config: {})", lang, configFile);
+        controller.saveCurrentGame();
         RequestRestart(configFile);
     }
     else {

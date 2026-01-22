@@ -157,7 +157,7 @@ GameRecord::GameRecord():
     std::tm time {};
     time = *std::localtime(&t);
     std::ostringstream ss;
-    ss << gamesPath << "/" << std::put_time(&time, "%Y-%m-%dT%H-%M-%S") << ".sgf";
+    ss << gamesPath << "/" << std::put_time(&time, "%Y-%m-%d") << ".sgf";
     defaultFileName = ss.str();
 }
 
@@ -293,6 +293,26 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
 
     std::lock_guard<std::mutex> lock(mutex);
 
+    // Check if day changed since app start (or last game) - update daily session file
+    {
+        std::time_t t = std::time(nullptr);
+        std::tm time {};
+        time = *std::localtime(&t);
+        std::ostringstream ss;
+        ss << std::put_time(&time, "%Y-%m-%d");
+        std::string today = ss.str();
+
+        // If defaultFileName doesn't contain today's date, update it
+        if (defaultFileName.find(today) == std::string::npos) {
+            std::string gamesPath = "./games";
+            if (config && config->data.contains("sgf_dialog")) {
+                gamesPath = config->data["sgf_dialog"].value("games_path", "./games");
+            }
+            defaultFileName = gamesPath + "/" + today + ".sgf";
+            spdlog::info("Day changed, new session file: {}", defaultFileName);
+        }
+    }
+
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
 
@@ -327,7 +347,7 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
         std::time_t t = std::time(nullptr);
         std::tm time {};
         time = *std::localtime(&t);
-        ss << std::put_time(&time, "%Y-%m-%d");
+        ss << std::put_time(&time, "%Y-%m-%d %H:%M:%S");
         val = ss.str();
     }
 
