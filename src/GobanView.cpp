@@ -334,7 +334,22 @@ void GobanView::Render(int w, int h)
 
 bool GobanView::toggleOverlay() {
     showOverlay = !showOverlay;
-    updateFlag |= UPDATE_OVERLAY;
+    if (!showOverlay) {
+        // Clear board patches (grid cutouts) when hiding overlay
+        for (const auto& pos : navOverlays) {
+            if (pos) board.removeBoardOverlay(pos);
+        }
+        for (const auto& pos : markupOverlays) {
+            if (pos) {
+                board.removeBoardOverlay(pos);
+                board.removeOverlay(pos);
+            }
+        }
+        updateFlag |= UPDATE_OVERLAY | UPDATE_STONES;
+    } else {
+        // Rebuild patches when showing overlay
+        updateNavigationOverlay();
+    }
     return showOverlay;
 }
 void GobanView::updateTranslation() {
@@ -510,11 +525,13 @@ void GobanView::updateNavigationOverlay() {
 				std::ostringstream ss;
 				ss << nextMoveNum;
 				if (variations.size() > 1) {
-					// Reverse: first child (newest) gets highest letter
-					char letter = 'a' + static_cast<char>(variations.size() - 1 - idx);
+					// First child (main line) gets 'a', consistent with SGF convention
+					char letter = 'a' + static_cast<char>(idx);
 					ss << letter;
 				}
-				board.setBoardOverlay(move.pos, ss.str());
+				if (showOverlay) {
+					board.setBoardOverlay(move.pos, ss.str());
+				}
 				navOverlays.push_back(move.pos);
 				spdlog::debug("Navigation overlay: {} at ({},{})",
 					ss.str(), move.pos.col(), move.pos.row());
@@ -547,14 +564,16 @@ void GobanView::updateNavigationOverlay() {
 		}
 
 		if (!text.empty()) {
-			// Check if there's a stone at this position
-			Color stoneColor = board[markup.pos].stone;
-			if (stoneColor != Color::EMPTY) {
-				// Use stone-level overlay (renders on top of stone)
-				board.setOverlay(markup.pos, text, stoneColor);
-			} else {
-				// Use board-level overlay (renders on empty point with grid patch)
-				board.setBoardOverlay(markup.pos, text);
+			if (showOverlay) {
+				// Check if there's a stone at this position
+				Color stoneColor = board[markup.pos].stone;
+				if (stoneColor != Color::EMPTY) {
+					// Use stone-level overlay (renders on top of stone)
+					board.setOverlay(markup.pos, text, stoneColor);
+				} else {
+					// Use board-level overlay (renders on empty point with grid patch)
+					board.setBoardOverlay(markup.pos, text);
+				}
 			}
 			markupOverlays.push_back(markup.pos);
 		}
@@ -605,5 +624,6 @@ void GobanView::onGameMove(const Move& move, const std::string& comment) {
 void GobanView::onBoardChange(const Board& newBoard) {
 	this->board.updateStones(newBoard);
 	updateLastMoveOverlay();
+	updateNavigationOverlay();
 	requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);
 }

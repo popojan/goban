@@ -67,6 +67,10 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 Move newMove(coord, colorToMove);
                 if (engine.navigateToVariation(newMove)) {
                     view.updateNavigationOverlay();
+                    // Sync analysis mode menu if mode changed
+                    if (engine.getGameMode() == GameMode::ANALYSIS) {
+                        parent->OnMenuToggle("toggle_analysis_mode", true);
+                    }
                     // Start game loop for AI response (after navigateToVariation completes)
                     if (!engine.isRunning()) {
                         spdlog::debug("Starting game loop for AI auto-response");

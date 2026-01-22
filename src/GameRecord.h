@@ -31,6 +31,7 @@ public:
     [[nodiscard]] std::pair<Move, size_t> lastStoneMoveIndex() const;
 
     void move(const Move& move);
+    void branchFromFinishedGame(const Move& move);  // Copy path and branch (preserves original)
 
     void annotate(const std::string& comment);
 
@@ -95,6 +96,7 @@ private:
     std::mutex mutex;
     size_t numGames;
     bool gameHasNewMoves;
+    bool gameInDocument;  // True when game is already part of doc (prevent re-append)
 
 public:
     // Navigation methods (SGF tree-based)
@@ -135,7 +137,8 @@ public:
 
     // Multi-variation support
     [[nodiscard]] std::vector<Move> getVariations() const;
-    bool navigateToChild(const Move& move);  // Navigate to specific variation
+    bool navigateToChild(const Move& move, bool promoteToMainLine = false);
+    void promoteCurrentPathToMainLine();
 
     // Get comment from current node (C property)
     [[nodiscard]] std::string getComment() const;

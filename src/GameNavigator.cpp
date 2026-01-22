@@ -206,10 +206,18 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
 
     // Navigate to the child node in the SGF tree
     // If child doesn't exist, create a new branch
-    result.newBranch = !model.game.navigateToChild(move);
+    // promoteToMainLine=true: promote existing variations when user has new moves
+    result.newBranch = !model.game.navigateToChild(move, true);
     if (result.newBranch) {
         spdlog::debug("navigateToVariation: creating new branch");
-        model.game.move(move);
+        if (model.game.hasGameResult()) {
+            // Finished game: create a fresh copy to preserve the historical record
+            model.game.branchFromFinishedGame(move);
+        } else {
+            // In-progress game: modify tree in place
+            model.game.move(move);
+            model.game.promoteCurrentPathToMainLine();
+        }
         // Clear game over state - we're continuing the game in a new branch
         model.isGameOver = false;
         model.state.reason = GameState::NO_REASON;

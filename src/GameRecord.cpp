@@ -146,7 +146,8 @@ GameRecord::GameRecord():
         game(nullptr),
         doc(nullptr),
         numGames(0u),
-        gameHasNewMoves(false)
+        gameHasNewMoves(false),
+        gameInDocument(false)
 {
     // Read games path from config
     std::string gamesPath = "./games";
@@ -237,6 +238,105 @@ void GameRecord::move(const Move& move)  {
     }
 }
 
+void GameRecord::branchFromFinishedGame(const Move& move) {
+    std::lock_guard<std::mutex> lock(mutex);
+
+    if (!game || !currentNode) return;
+
+    using namespace LibSgfcPlusPlus;
+
+    spdlog::info("branchFromFinishedGame: creating fresh game copy from finished game");
+
+    // Collect path from root to currentNode
+    std::vector<std::shared_ptr<ISgfcNode>> path;
+    auto node = currentNode;
+    auto rootNode = game->GetRootNode();
+    while (node && node != rootNode) {
+        path.push_back(node);
+        node = node->GetParent();
+    }
+    std::reverse(path.begin(), path.end());
+
+    // Create new game
+    auto newGame = F::CreateGame();
+    auto newRoot = newGame->GetRootNode();
+
+    // Copy root properties (except RE - this is a new unfinished game)
+    std::vector<std::shared_ptr<ISgfcProperty>> rootProps;
+    for (const auto& prop : rootNode->GetProperties()) {
+        if (prop->GetPropertyType() == T::RE) continue;
+        // Update date to now
+        if (prop->GetPropertyType() == T::DT) {
+            std::time_t t = std::time(nullptr);
+            std::tm time {};
+            time = *std::localtime(&t);
+            char buf[64];
+            std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &time);
+            auto vF = F::CreatePropertyValueFactory();
+            auto pF = F::CreatePropertyFactory();
+            rootProps.push_back(pF->CreateProperty(T::DT, vF->CreateSimpleTextPropertyValue(buf)));
+            continue;
+        }
+        rootProps.push_back(prop);
+    }
+    // Update game name
+    {
+        auto vF = F::CreatePropertyValueFactory();
+        auto pF = F::CreatePropertyFactory();
+        // Remove old GN if present
+        rootProps.erase(std::remove_if(rootProps.begin(), rootProps.end(),
+            [](const auto& p) { return p->GetPropertyType() == SgfcPropertyType::GN; }),
+            rootProps.end());
+        std::string gnStr = "Game #" + std::to_string(numGames + 1);
+        rootProps.push_back(pF->CreateProperty(T::GN, vF->CreateSimpleTextPropertyValue(gnStr)));
+    }
+    newRoot->SetProperties(rootProps);
+
+    // Copy moves along the path
+    auto vF = F::CreatePropertyValueFactory();
+    auto pF = F::CreatePropertyFactory();
+    auto prevNode = newRoot;
+    for (const auto& pathNode : path) {
+        auto newMoveNode = F::CreateNode();
+        // Copy move properties (B/W) and other properties from the path node
+        std::vector<std::shared_ptr<ISgfcProperty>> nodeProps;
+        for (const auto& prop : pathNode->GetProperties()) {
+            nodeProps.push_back(prop);
+        }
+        newMoveNode->SetProperties(nodeProps);
+        newGame->GetTreeBuilder()->AppendChild(prevNode, newMoveNode);
+        prevNode = newMoveNode;
+    }
+
+    // Add the new move
+    auto newMoveNode = F::CreateNode();
+    {
+        auto col = move.col == Color::BLACK ? SgfcColor::Black : SgfcColor::White;
+        auto type = (move.col == Color::BLACK ? T::B : T::W);
+        std::shared_ptr<ISgfcPropertyValue> value{nullptr};
+        if (move == Move::NORMAL) {
+            auto pos = move.pos.toSgf(boardSize.Columns);
+            value = vF->CreateGoMovePropertyValue(pos, boardSize, col);
+        } else {
+            value = vF->CreateGoMovePropertyValue(col);
+        }
+        std::vector<std::shared_ptr<ISgfcProperty>> moveProps;
+        moveProps.push_back(pF->CreateProperty(type, value));
+        newMoveNode->SetProperties(moveProps);
+    }
+    newGame->GetTreeBuilder()->AppendChild(prevNode, newMoveNode);
+
+    // Switch to the new game
+    game = newGame;
+    currentNode = newMoveNode;
+    gameHasNewMoves = true;
+    gameInDocument = false;
+    appendGameToDocument();
+
+    spdlog::info("branchFromFinishedGame: created new game with {} moves + new branch",
+        path.size());
+}
+
 void GameRecord::annotate(const std::string& comment) {
     if(currentNode == nullptr)
         return;
@@ -324,6 +424,7 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
     game = F::CreateGame();
     currentNode = game->GetRootNode();
     gameHasNewMoves = false;
+    gameInDocument = false;
     
     using namespace LibSgfcPlusPlus;
     std::vector<std::shared_ptr<ISgfcProperty> > properties;
@@ -462,15 +563,29 @@ void GameRecord::appendGameToDocument() {
         return;
     }
 
+    if (gameInDocument) {
+        spdlog::debug("appendGameToDocument: game already tracked in doc, skipping");
+        return;
+    }
+
     if (doc == nullptr) {
         doc = F::CreateDocument(game);
         spdlog::info("appendGameToDocument: created new doc with first game (numGames={})", numGames);
     } else {
+        // Safety check: verify game isn't already in the document
+        auto existingGames = doc->GetGames();
+        for (const auto& g : existingGames) {
+            if (g == game) {
+                spdlog::warn("appendGameToDocument: game already in doc, skipping");
+                gameInDocument = true;
+                return;
+            }
+        }
         doc->AppendGame(game);
         ++numGames;
         spdlog::info("appendGameToDocument: appended game #{} to existing doc", numGames);
     }
-
+    gameInDocument = true;
 }
 
 void GameRecord::saveAs(const std::string& fileName) {
@@ -636,6 +751,7 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         // Keep the game tree (SGF is single source of truth)
         game = loadedGame;
         gameHasNewMoves = false;
+        gameInDocument = false;
 
         // Only preserve doc when loading daily session file (for appending)
         // External SGFs are ephemeral - if modified, they become part of daily session
@@ -644,6 +760,7 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         if (fileName == defaultFileName) {
             doc = loadedDoc->GetDocument();
             numGames = games.size();
+            gameInDocument = true;  // Game is already in doc, prevent re-append
             spdlog::debug("loadFromSGF: paths match - preserving doc with {} games", numGames);
         } else {
             // keep existing doc (daily session), game is just for viewing/navigation
@@ -904,16 +1021,22 @@ std::vector<Move> GameRecord::getVariations() const {
     return variations;
 }
 
-bool GameRecord::navigateToChild(const Move& targetMove) {
+bool GameRecord::navigateToChild(const Move& targetMove, bool promoteToMainLine) {
     if (!currentNode) {
         return false;
     }
 
     auto children = currentNode->GetChildren();
-    for (const auto& child : children) {
+    for (size_t idx = 0; idx < children.size(); ++idx) {
+        const auto& child = children[idx];
         if (auto childMove = extractMoveFromNode(child, boardSize.Columns)) {
             // Check if this child matches the target move
             if (childMove->pos == targetMove.pos && childMove->col == targetMove.col) {
+                // Promote to first child if requested, user has new moves, and not already first
+                if (promoteToMainLine && gameHasNewMoves && idx > 0 && game) {
+                    game->GetTreeBuilder()->InsertChild(currentNode, child, children[0]);
+                    spdlog::debug("navigateToChild: promoted variation to main line");
+                }
                 currentNode = child;
                 spdlog::debug("navigateToChild: moved to child node for move {}",
                     targetMove.toString());
@@ -924,6 +1047,32 @@ bool GameRecord::navigateToChild(const Move& targetMove) {
 
     spdlog::debug("navigateToChild: no matching child found for move {}", targetMove.toString());
     return false;
+}
+
+void GameRecord::promoteCurrentPathToMainLine() {
+    if (!game || !currentNode) return;
+
+    auto treeBuilder = game->GetTreeBuilder();
+    auto rootNode = game->GetRootNode();
+
+    // Collect path from root to currentNode
+    std::vector<std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>> path;
+    auto node = currentNode;
+    while (node && node != rootNode) {
+        path.push_back(node);
+        node = node->GetParent();
+    }
+
+    // Promote each node to be the first child of its parent
+    for (auto it = path.rbegin(); it != path.rend(); ++it) {
+        auto child = *it;
+        auto parent = child->GetParent();
+        if (!parent) continue;
+        auto siblings = parent->GetChildren();
+        if (siblings.empty() || siblings[0] == child) continue;  // Already first
+        treeBuilder->InsertChild(parent, child, siblings[0]);
+        spdlog::debug("promoteCurrentPathToMainLine: promoted node to first child");
+    }
 }
 
 std::string GameRecord::getComment() const {
