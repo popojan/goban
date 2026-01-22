@@ -109,9 +109,9 @@ bool GameNavigator::navigateForward() {
     NavigationGuard guard(navigationInProgress);
 
     if (variations.empty()) {
-        // At end of branch - only show territory if game is actually finished
-        if (model.game.isGameFinished()) {
-            spdlog::debug("navigateForward: at end of finished game, showing territory");
+        // At end of branch - show territory if this is a scored game ending
+        if (model.game.shouldShowTerritory()) {
+            spdlog::debug("navigateForward: at end of scored game, showing territory");
             Engine* coach = getCoach();
             if (coach) {
                 model.board.toggleTerritoryAuto(true);
@@ -135,9 +135,11 @@ bool GameNavigator::navigateForward() {
     Move nextMove = variations[0];
     bool isPass = (nextMove == Move::PASS);
 
-    spdlog::debug("navigateForward: playing move {}", nextMove.toString());
+    spdlog::info("navigateForward: playing move {} (color={})",
+        nextMove.toString(), nextMove.col == Color::BLACK ? "B" : "W");
     if (!coach->play(nextMove)) {
-        spdlog::warn("navigateForward: coach->play() failed for move {}", nextMove.toString());
+        spdlog::warn("navigateForward: coach->play() failed for move {} - engine out of sync?",
+            nextMove.toString());
         return false;
     }
 
@@ -208,8 +210,9 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
     if (result.newBranch) {
         spdlog::debug("navigateToVariation: creating new branch");
         model.game.move(move);
-        // Clear game over flag - we're continuing the game in a new branch
+        // Clear game over state - we're continuing the game in a new branch
         model.isGameOver = false;
+        model.state.reason = GameState::NO_REASON;
     } else {
         spdlog::debug("navigateToVariation: following existing branch");
     }
@@ -296,10 +299,12 @@ bool GameNavigator::navigateToEnd() {
         if (variations.empty()) break;
 
         Move nextMove = variations[0];  // Always take main line (first variation)
-        spdlog::debug("navigateToEnd: playing {}", nextMove.toString());
+        spdlog::info("navigateToEnd: playing {} (color={})",
+            nextMove.toString(), nextMove.col == Color::BLACK ? "B" : "W");
 
         if (!coach->play(nextMove)) {
-            spdlog::warn("navigateToEnd: coach->play failed for {}", nextMove.toString());
+            spdlog::warn("navigateToEnd: coach->play failed for {} - engine out of sync?",
+                nextMove.toString());
             break;
         }
 
@@ -317,10 +322,17 @@ bool GameNavigator::navigateToEnd() {
     model.state.colorToMove = model.game.getColorToMove();
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
-    model.state.msg = GameState::NONE;
 
-    // Only show territory if at a finished game position (resign or double pass)
-    const Board& result = model.game.isGameFinished()
+    // Set resignation message if game has resignation result
+    // (RE property is cleared when creating new variations, so it's always valid here)
+    if (model.game.isResignationResult()) {
+        model.state.msg = model.game.getResultMessage();
+    } else {
+        model.state.msg = GameState::NONE;
+    }
+
+    // Show territory if at a scored game ending (not resignation)
+    const Board& result = model.game.shouldShowTerritory()
         ? (model.board.toggleTerritoryAuto(true), coach->showterritory(true, model.game.lastStoneMove().col))
         : coach->showboard();
     notifyBoardChange(result);

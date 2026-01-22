@@ -183,6 +183,13 @@ void GameRecord::move(const Move& move)  {
     auto newNode(F::CreateNode());
 
     if (move == Move::NORMAL || move == Move::PASS) {
+        // If creating a branch (existing children), invalidate old result
+        // RE property reflects result of main line only
+        if (currentNode->GetFirstChild() && hasGameResult()) {
+            spdlog::debug("Removing game result - creating new main line branch");
+            removeGameResult();
+        }
+
         auto col = move.col == Color::BLACK ? SgfcColor::Black : SgfcColor::White;
         auto type = (move.col == Color::BLACK ? T::B : T::W);
         std::shared_ptr<ISgfcPropertyValue> value{nullptr};
@@ -663,6 +670,74 @@ bool GameRecord::isMainLineFinished() const {
     }
 
     return false;
+}
+
+bool GameRecord::isResignationResult() const {
+    if (!game) return false;
+    for (const auto& prop : game->GetRootNode()->GetProperties()) {
+        if (prop->GetPropertyType() == T::RE) {
+            auto val = prop->GetPropertyValue()->ToSingleValue()->GetRawValue();
+            return val.find("+R") != std::string::npos;
+        }
+    }
+    return false;
+}
+
+bool GameRecord::isAtFinishedGame() const {
+    // Current position is a game-ending move (resign or double-pass)
+    if (isGameFinished()) return true;
+
+    // At end of game with any result
+    // RE property is valid - it's cleared when creating new variations
+    if (isAtEndOfNavigation() && hasGameResult()) return true;
+
+    return false;
+}
+
+bool GameRecord::shouldShowTerritory() const {
+    if (!isAtEndOfNavigation()) return false;
+
+    // Double-pass at current position (not resign)
+    if (isGameFinished() && lastMove() == Move::PASS) return true;
+
+    // Has point result (not resignation)
+    // RE property is valid - it's cleared when creating new variations
+    if (hasGameResult() && !isResignationResult()) return true;
+
+    return false;
+}
+
+GameState::Message GameRecord::getResultMessage() const {
+    if (!game) return GameState::NONE;
+
+    // Check RE property for result type
+    for (const auto& prop : game->GetRootNode()->GetProperties()) {
+        if (prop->GetPropertyType() == T::RE) {
+            auto val = prop->GetPropertyValue()->ToSingleValue()->GetRawValue();
+            if (val.empty() || val == "?" || val == "Void") {
+                return GameState::NONE;
+            }
+            // Resignation: B+R or W+R
+            if (val.find("+R") != std::string::npos) {
+                // B+R means black resigned, white wins
+                return (val[0] == 'W') ? GameState::BLACK_RESIGNED : GameState::WHITE_RESIGNED;
+            }
+            // Point result: B+5.5, W+3, etc.
+            if (val[0] == 'B') {
+                return GameState::BLACK_WON;
+            } else if (val[0] == 'W') {
+                return GameState::WHITE_WON;
+            }
+        }
+    }
+
+    // Fallback: check for double-pass at current position
+    if (isGameFinished() && lastMove() == Move::PASS) {
+        // Would need score to determine winner, return generic
+        return GameState::NONE;
+    }
+
+    return GameState::NONE;
 }
 
 void GameRecord::removeGameResult() {

@@ -111,6 +111,18 @@ public:
     // Check if main line (following first children) ends in a finished state
     [[nodiscard]] bool isMainLineFinished() const;
 
+    // Check if RE property indicates resignation (+R)
+    [[nodiscard]] bool isResignationResult() const;
+
+    // Unified check: at a finished game position (resign, double-pass, or has result at end)
+    [[nodiscard]] bool isAtFinishedGame() const;
+
+    // Check if territory should be displayed (at end of scored game, not resignation)
+    [[nodiscard]] bool shouldShowTerritory() const;
+
+    // Get result message type based on RE property
+    [[nodiscard]] GameState::Message getResultMessage() const;
+
     // Remove RE (result) property from root node
     void removeGameResult();
 

@@ -416,6 +416,7 @@ void GameThread::gameLoop() {
             }
 
             if(model.isGameOver) {
+                playerToMove = nullptr;  // Clear before breaking to allow navigation
                 break;
             }
 

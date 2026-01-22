@@ -359,7 +359,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
                 return;  // Handled navigation
             }
             // At end of finished game - nothing more to do
-            if (!model.game.hasNextMove() && model.game.isGameFinished()) {
+            if (!model.game.hasNextMove() && model.game.isAtFinishedGame()) {
                 return;
             }
             // At end of unfinished branch - fall through to allow Space for kibitz
