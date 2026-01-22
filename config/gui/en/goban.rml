@@ -15,6 +15,7 @@
                             <div class="hr">SGF</div>
                             <div class="cmd" onmouseup="load">Load game...</div>
                             <div class="cmd" onmouseup="save">Save now</div>
+                            <div class="cmd" onmouseup="archive">Archive</div>
                         </div>
                         <div class="grp">
                             <div class="hr">System</div>

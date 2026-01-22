@@ -9,6 +9,9 @@
 #include "EventHandlerFileChooser.h"
 #include "EventManager.h"
 #include "UserSettings.h"
+#include <ctime>
+#include <sstream>
+#include <iomanip>
 
 bool GobanControl::newGame(unsigned boardSize) {
     engine.interrupt();
@@ -20,6 +23,8 @@ bool GobanControl::newGame(unsigned boardSize) {
         // Reset Analysis Mode menu toggle (new game starts in Match mode)
         parent->OnMenuToggle("toggle_analysis_mode", false);
         parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
+        // Save board size to user settings
+        UserSettings::instance().setBoardSize(static_cast<int>(boardSize));
         return true;
     }
     return false;
@@ -315,8 +320,44 @@ bool GobanControl::command(const std::string& cmd) {
         view.cam.setHorizontalLock(!view.cam.lock);
     }
     else if(cmd == "save") {
-        //dynamic_cast<GtpEngine*>(engine.currentCoach())->issueCommand("printsgf ./lastgame.sgf");
         model.game.saveAs("");
+        // Show feedback with filename
+        auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
+        if (msg) {
+            msg->SetInnerRML(model.game.getDefaultFileName().c_str());
+        }
+    }
+    else if(cmd == "archive") {
+        // Only archive if there are games or moves to archive
+        if (model.game.getNumGames() == 0 && model.game.moveCount() == 0) {
+            auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
+            if (msg) {
+                msg->SetInnerRML("Nothing to archive");
+            }
+            return true;
+        }
+        // Save current game and remember the archived filename
+        std::string archivedFile = model.game.getDefaultFileName();
+        model.game.saveAs("");
+        // Create new timestamped filename for next session
+        std::time_t t = std::time(nullptr);
+        std::tm time {};
+        time = *std::localtime(&t);
+        std::ostringstream ss;
+        std::string gamesPath = "./games";
+        if (config && config->data.contains("sgf_dialog")) {
+            gamesPath = config->data["sgf_dialog"].value("games_path", "./games");
+        }
+        ss << gamesPath << "/" << std::put_time(&time, "%Y-%m-%dT%H-%M-%S") << ".sgf";
+        model.game.setDefaultFileName(ss.str());
+        // Save new session path so it's used after restart
+        UserSettings::instance().setLastSgfPath(model.game.getDefaultFileName());
+        // Show feedback with archived filename (where games went)
+        auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
+        if (msg) {
+            msg->SetInnerRML(archivedFile.c_str());
+        }
+        spdlog::info("Archived to {}, new session: {}", archivedFile, model.game.getDefaultFileName());
     }
     else if(cmd == "load") {
         // Get the file chooser handler and show the dialog
@@ -431,6 +472,7 @@ bool GobanControl::setKomi(float komi) {
     if(!isRunning) {
         engine.setKomi(komi);
         model.state.komi = komi;
+        UserSettings::instance().setKomi(komi);
         return true;
     }
     return false;
@@ -443,6 +485,9 @@ bool GobanControl::setHandicap(int handicap){
     if(!isRunning && !isOver) {
         model.state.handicap = handicap;
         success = newGame(model.getBoardSize());
+        if (success) {
+            UserSettings::instance().setHandicap(handicap);
+        }
     }
     view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
     return success;
@@ -451,12 +496,29 @@ bool GobanControl::setHandicap(int handicap){
 void GobanControl::togglePlayer(int which, int delta) {
     engine.activatePlayer(which, delta);
     model.state.holdsStone = false;
+    // Save player to user settings
+    std::string playerName = engine.getName(engine.getActivePlayer(which));
+    if (which == 0) {
+        UserSettings::instance().setBlackPlayer(playerName);
+    } else {
+        UserSettings::instance().setWhitePlayer(playerName);
+    }
 }
 
 void GobanControl::switchPlayer(int which, int newPlayerIndex) {
     int idx = engine.getActivePlayer(which);
     engine.activatePlayer(which, newPlayerIndex - idx);
     model.state.holdsStone = false;
+    // Save player to user settings (skip during initialization)
+    if (!initializingPlayers) {
+        std::string playerName = engine.getName(engine.getActivePlayer(which));
+        spdlog::info("switchPlayer: which={}, newIdx={}, oldIdx={}, playerName='{}'", which, newPlayerIndex, idx, playerName);
+        if (which == 0) {
+            UserSettings::instance().setBlackPlayer(playerName);
+        } else {
+            UserSettings::instance().setWhitePlayer(playerName);
+        }
+    }
 }
 
 void GobanControl::switchShader(int newShaderIndex) {

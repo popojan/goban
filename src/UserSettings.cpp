@@ -37,6 +37,20 @@ void UserSettings::load() {
             lastSgfPath = user["last_sgf_path"].get<std::string>();
         }
 
+        if (user.contains("game")) {
+            gameSettingsLoaded = true;
+            auto& game = user["game"];
+            boardSize = game.value("board_size", boardSize);
+            komi = game.value("komi", komi);
+            handicap = game.value("handicap", handicap);
+            if (game.contains("black_player")) {
+                blackPlayer = game["black_player"].get<std::string>();
+            }
+            if (game.contains("white_player")) {
+                whitePlayer = game["white_player"].get<std::string>();
+            }
+        }
+
         if (user.contains("shader")) {
             shaderLoaded = true;
             auto& shader = user["shader"];
@@ -82,6 +96,14 @@ void UserSettings::save() {
     if (!lastSgfPath.empty()) {
         user["last_sgf_path"] = lastSgfPath;
     }
+
+    user["game"] = {
+        {"board_size", boardSize},
+        {"komi", komi},
+        {"handicap", handicap},
+        {"black_player", blackPlayer},
+        {"white_player", whitePlayer}
+    };
 
     user["shader"] = {
         {"name", shaderName},
@@ -166,4 +188,29 @@ void UserSettings::setCameraTranslation(float x, float y, float z) {
     cameraTransX = x;
     cameraTransY = y;
     cameraTransZ = z;
+}
+
+void UserSettings::setBoardSize(int value) {
+    boardSize = value;
+    save();
+}
+
+void UserSettings::setKomi(float value) {
+    komi = value;
+    save();
+}
+
+void UserSettings::setHandicap(int value) {
+    handicap = value;
+    save();
+}
+
+void UserSettings::setBlackPlayer(const std::string& value) {
+    blackPlayer = value;
+    save();
+}
+
+void UserSettings::setWhitePlayer(const std::string& value) {
+    whitePlayer = value;
+    save();
 }

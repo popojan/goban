@@ -45,6 +45,10 @@ private:
     bool exit;
     float mouseX, mouseY;
     bool fullscreen;
+    bool initializingPlayers = true;  // Suppress player saves during startup
+
+public:
+    void finishInitialization() { initializingPlayers = false; }
 };
 
 

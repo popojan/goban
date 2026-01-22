@@ -27,6 +27,19 @@ public:
     std::string getLastSgfPath() const { return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
 
+    // Game settings
+    int getBoardSize() const { return boardSize; }
+    void setBoardSize(int value);
+    float getKomi() const { return komi; }
+    void setKomi(float value);
+    int getHandicap() const { return handicap; }
+    void setHandicap(int value);
+    std::string getBlackPlayer() const { return blackPlayer; }
+    void setBlackPlayer(const std::string& value);
+    std::string getWhitePlayer() const { return whitePlayer; }
+    void setWhitePlayer(const std::string& value);
+    bool hasGameSettings() const { return gameSettingsLoaded; }
+
     // Shader
     std::string getShaderName() const { return shaderName; }
     void setShaderName(const std::string& value);
@@ -71,6 +84,7 @@ private:
     bool settingsLoaded = false;
     bool cameraLoaded = false;
     bool shaderLoaded = false;
+    bool gameSettingsLoaded = false;
 
     // Config
     std::string lastConfig = "./config/en.json";
@@ -83,6 +97,13 @@ private:
 
     // Last SGF
     std::string lastSgfPath;
+
+    // Game settings
+    int boardSize = 19;
+    float komi = 6.5f;
+    int handicap = 0;
+    std::string blackPlayer = "Human";
+    std::string whitePlayer = "Human";
 
     // Shader
     std::string shaderName;

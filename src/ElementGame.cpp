@@ -22,8 +22,7 @@ ElementGame::ElementGame(const Rml::String& tag)
 
     engine.clearGame(19, 0.5, 0);
     model.createNewRecord();
-    control.togglePlayer(0, 0);
-    control.togglePlayer(1, 0);
+    // Player initialization moved to "load" event (from SGF or user settings)
 }
 
 void ElementGame::populateEngines() {
@@ -296,15 +295,71 @@ void ElementGame::ProcessEvent(Rml::Event& event)
         spdlog::debug("Load");
         populateEngines();
 
-        // Resume last game if saved (e.g., after language switch restart)
+        // Resume last session (e.g., after language switch or archive)
         std::string lastSgf = UserSettings::instance().getLastSgfPath();
-        if (!lastSgf.empty() && std::filesystem::exists(lastSgf)) {
-            spdlog::info("Resuming last game from: {}", lastSgf);
-            engine.loadSGF(lastSgf);
-            // Continue saving to the same file (preserves daily session)
+        bool sgfLoaded = false;
+        if (!lastSgf.empty()) {
+            if (std::filesystem::exists(lastSgf)) {
+                // File exists - load the game (SGF settings take precedence)
+                spdlog::info("Resuming last game from: {}", lastSgf);
+                engine.loadSGF(lastSgf);
+                sgfLoaded = true;
+            } else {
+                // File doesn't exist yet (new session after archive) - just set as active
+                spdlog::info("Starting new session: {}", lastSgf);
+            }
+            // Use this file for future saves
             model.game.setDefaultFileName(lastSgf);
-            UserSettings::instance().setLastSgfPath("");  // Clear after loading
+            UserSettings::instance().setLastSgfPath("");  // Clear after processing
         }
+
+        // Apply user settings if no SGF was loaded
+        if (!sgfLoaded) {
+            auto& settings = UserSettings::instance();
+
+            if (settings.hasGameSettings()) {
+                spdlog::info("Applying saved game settings: {}x{}, komi={}, handicap={}",
+                    settings.getBoardSize(), settings.getBoardSize(), settings.getKomi(), settings.getHandicap());
+
+                // Apply board size, komi, handicap
+                model.state.komi = settings.getKomi();
+                model.state.handicap = settings.getHandicap();
+                if (settings.getBoardSize() != 19) {
+                    control.newGame(settings.getBoardSize());
+                }
+            }
+
+            // Find and activate players by name (or defaults if no settings)
+            auto players = engine.getPlayers();
+            auto findPlayer = [&players](const std::string& name) -> int {
+                for (size_t i = 0; i < players.size(); i++) {
+                    if (players[i]->getName() == name) {
+                        return static_cast<int>(i);
+                    }
+                }
+                return -1;
+            };
+
+            std::string blackName = settings.hasGameSettings() ? settings.getBlackPlayer() : "Human";
+            std::string whiteName = settings.hasGameSettings() ? settings.getWhitePlayer() : "Human";
+
+            int blackIdx = findPlayer(blackName);
+            int whiteIdx = findPlayer(whiteName);
+            spdlog::debug("Restoring players: black='{}' (idx={}), white='{}' (idx={})",
+                blackName, blackIdx, whiteName, whiteIdx);
+            if (blackIdx >= 0) {
+                control.switchPlayer(0, blackIdx);
+            }
+            if (whiteIdx >= 0) {
+                control.switchPlayer(1, whiteIdx);
+            }
+
+            // Sync dropdown UI with engine state after player settings applied
+            refreshPlayerDropdowns();
+        }
+
+        // Initialization complete - enable player settings persistence
+        control.finishInitialization();
     }
 }
 

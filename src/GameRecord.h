@@ -42,6 +42,7 @@ public:
 
     [[nodiscard]] std::string getDefaultFileName() const { return defaultFileName; }
     void setDefaultFileName(const std::string& fileName) { defaultFileName = fileName; }
+    [[nodiscard]] size_t getNumGames() const { return numGames; }
 
     void setHandicapStones(const std::vector<Position>& stones);
 
