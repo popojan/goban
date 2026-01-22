@@ -503,7 +503,13 @@ int main(int argc, char** argv)
                 glfwSwapBuffers(window);
             } else {
                 // Nothing to render - wait for next event instead of busy-polling
-                glfwWaitEvents();
+                // Use timeout if FPS display needs one more update to show "0"
+                double timeout = gameElement ? gameElement->getIdleTimeout() : -1.0;
+                if (timeout > 0) {
+                    glfwWaitEventsTimeout(timeout);
+                } else {
+                    glfwWaitEvents();
+                }
             }
         }
     } else {

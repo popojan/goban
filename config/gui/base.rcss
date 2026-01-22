@@ -75,10 +75,11 @@ game {
   position: absolute;
   top: 1.6rem;
   left: 0px;
-  width: 10rem;
+  width: 9.9rem;
   background-color: #00000040;
   padding: 0.25rem;
   z-index: 200;
+  overflow: hidden;
 }
 
 /* Right-aligned menu dropdowns */
@@ -97,6 +98,7 @@ div.cmd {
   display: block;
   height: 1.25rem;
   color: #ffffff80;
+  border-right: 0.2rem #ffffff00;
 }
 
 div.cmd:hover {
@@ -133,11 +135,11 @@ select option:hover {
 
 select selectbox {
   width: auto;
-  min-width: 6rem;
+  min-width: 10rem;
   position: absolute;
   left: 100%;
   top: 0px;
-  margin-left: 0.25rem;
+  margin-left: 0.45rem;
   padding: 0.25rem;
   background-color: #00000040;
 }
@@ -146,7 +148,7 @@ select selectbox {
 .menuitem.hoverable.right select selectbox {
   left: auto;
   right: 100%;
-  margin-left: 0;
+  margin-left: 0.0rem;
   margin-right: 0.25rem;
 }
 
@@ -195,14 +197,13 @@ div.template {
 .bottom.left { position: absolute; bottom: 0px; left: 0px; }
 
 /* State indicators */
-div.selected { border-right: 0.2rem #ffffff80; }
-div.unselected { border-right: 0.2rem #ffffff20; }
+div.selected {
+  border-right: 0.2rem #ffffff80;
+}
+div.unselected {
+  border-right: 0.2rem #ffffff20;
+}
 
 /* Hide/Show utilities */
 div.hide { display: none; }
 div.show { display: block; }
-
-/* Active move indicator */
-.active {
-  text-decoration: underline;
-}

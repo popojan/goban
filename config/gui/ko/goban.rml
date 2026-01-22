@@ -54,13 +54,13 @@
                     <span>대국</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr" id="blackMoves">흑</div>
-                            <div class="cmd">
+                            <div class="hr">흑</div>
+                            <div class="cmd toggle_black_player unselected">
                                 <select id="selectBlack"
                                         onchange="engine" onmousedown="nop"/>
                             </div>
-                            <div class="hr"  id="whiteMoves">백</div>
-                            <div class="cmd">
+                            <div class="hr">백</div>
+                            <div class="cmd toggle_white_player unselected">
                                 <select id="selectWhite" onchange="engine" onmousedown="nop"/>
                             </div>
                             <div class="hr">바둑판 크기</div>

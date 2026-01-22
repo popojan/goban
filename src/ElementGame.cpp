@@ -193,29 +193,31 @@ void ElementGame::refreshPlayerDropdowns() {
         players.size(), targetBlack, targetWhite);
 }
 
+// File-scope statics for FPS tracking (shared between gameLoop and getIdleTimeout)
+static int s_fpsFrames = 0;
+static int s_fpsLastDisplayed = -1;
+static float s_fpsLastTime = -1;
+static bool s_fpsSkipFrameCount = false;
+
 void ElementGame::gameLoop() {
-    static int frames = 0;
-    static int lastFrames = -1;
-    static float lastTime = -1;
-    static bool skipFrameCount = false;  // Don't count repaint for showing 0 fps
     auto context = GetContext();
 
     float currentTime = static_cast<float>(glfwGetTime());
-    if (currentTime - lastTime >= 1.0) {
+    if (currentTime - s_fpsLastTime >= 1.0) {
         auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
         auto fpsTemplate = context->GetDocument("game_window")->GetElementById("templateFPS");
-        const Rml::String sFps = Rml::CreateString(fpsTemplate->GetInnerRML().c_str(), (float)frames / (currentTime - lastTime));
-        if (debugElement != nullptr && lastFrames != frames) {
+        const Rml::String sFps = Rml::CreateString(fpsTemplate->GetInnerRML().c_str(), (float)s_fpsFrames / (currentTime - s_fpsLastTime));
+        if (debugElement != nullptr && s_fpsLastDisplayed != s_fpsFrames) {
             debugElement->SetInnerRML(sFps.c_str());
-            if (frames == 0) {
-                skipFrameCount = true;  // The repaint to show "0 fps" shouldn't count
+            if (s_fpsFrames < 1) {
+                s_fpsSkipFrameCount = true;  // Don't count FPS update render when idle
             }
             view.requestRepaint();
-            lastFrames = frames;
+            s_fpsLastDisplayed = s_fpsFrames;
         }
-        frames = 0;
+        s_fpsFrames = 0;
         spdlog::debug(sFps.c_str());
-        lastTime = currentTime;
+        s_fpsLastTime = currentTime;
 
         // Release audio resources if stream finished playing
         view.stopAudioIfInactive();
@@ -231,21 +233,36 @@ void ElementGame::gameLoop() {
     }
     if (view.updateFlag) {
         // Rendering is managed in the main loop - just count frames here
-        if (skipFrameCount) {
-            skipFrameCount = false;
+        if (s_fpsSkipFrameCount) {
+            s_fpsSkipFrameCount = false;
         } else {
-            frames++;
+            s_fpsFrames++;
         }
     }
     //if (!view.MAX_FPS){
     //    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     //}
 }
+
+double ElementGame::getIdleTimeout() const {
+    // If we displayed non-zero FPS, we need one more wake-up to show "0 fps"
+    if (s_fpsLastDisplayed > 0) {
+        float currentTime = static_cast<float>(glfwGetTime());
+        double remaining = (s_fpsLastTime + 1.0) - currentTime;
+        return (remaining > 0) ? remaining : 0.001;  // Small positive to wake immediately if overdue
+    }
+    return -1.0;  // Already showing 0 or never displayed - sleep forever
+}
+
 ElementGame::~ElementGame() = default;
 
 void ElementGame::ProcessEvent(Rml::Event& event)
 {
-    spdlog::debug("ElementGame processes event: {}", event.GetType().c_str());
+    if (event == "mousemove") {
+        spdlog::trace("ElementGame processes event: {}", event.GetType().c_str());
+    } else {
+        spdlog::debug("ElementGame processes event: {}", event.GetType().c_str());
+    }
 
     // Repaint for non-mousemove events on UI elements (not game board)
     // Note: mouseover/mouseout are handled by global HoverRepaintListener in main.cpp
@@ -320,18 +337,11 @@ void ElementGame::OnUpdate()
 
     if (view.state.colorToMove != model.state.colorToMove) {
         bool blackMove = model.state.colorToMove == Color::BLACK;
-        Rml::Element* elBlack = context->GetDocument("game_window")->GetElementById("blackMoves");
-        Rml::Element* elWhite = context->GetDocument("game_window")->GetElementById("whiteMoves");
-        if (elBlack != nullptr) {
-            elBlack->SetClass("active", blackMove);
-            view.state.colorToMove = model.state.colorToMove;
-            requestRepaint();
-        }
-        if (elWhite != nullptr) {
-            elWhite->SetClass("active", !blackMove);
-            view.state.colorToMove = model.state.colorToMove;
-            requestRepaint();
-        }
+        // Update player select dropdown toggle indicators
+        OnMenuToggle("toggle_black_player", blackMove);
+        OnMenuToggle("toggle_white_player", !blackMove);
+        view.state.colorToMove = model.state.colorToMove;
+        requestRepaint();
     }
     if ((view.state.capturedBlack != model.state.capturedBlack)
         || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */

@@ -29,6 +29,9 @@ public:
         return view.needsRender();
     }
 
+    // Returns timeout for idle sleep: >0 = seconds to wait, -1 = wait forever
+    double getIdleTimeout() const;
+
     bool isExiting() { return control.isExiting(); }
     void Reshape();
     void gameLoop();

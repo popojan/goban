@@ -29,7 +29,7 @@ GobanView::GobanView(GobanModel& m)
     gobanShader.setReady();
     gobanOverlay.setReady();
 
-    // Initialize to EMPTY so first OnUpdate() will sync with model and set .active class
+    // Initialize to EMPTY so first OnUpdate() will sync with model and update player toggle indicators
     state.colorToMove = Color::EMPTY;
 }
 

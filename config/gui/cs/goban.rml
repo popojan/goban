@@ -65,13 +65,13 @@
                     <span>Hra</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr" id="blackMoves">Černý hráč</div>
-                            <div class="cmd">
+                            <div class="hr">Černý hráč</div>
+                            <div class="cmd toggle_black_player unselected">
                                 <select id="selectBlack"
                                         onchange="engine" onmousedown="nop"/>
                             </div>
-                            <div class="hr"  id="whiteMoves">Bílý hráč</div>
-                            <div class="cmd">
+                            <div class="hr">Bílý hráč</div>
+                            <div class="cmd toggle_white_player unselected">
                                 <select id="selectWhite" onchange="engine" onmousedown="nop"/>
                             </div>
                             <div class="hr">Velikost desky</div>

@@ -65,13 +65,13 @@
                     <span>游戏</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr" id="blackMoves">黑棋</div>
-                            <div class="cmd">
+                            <div class="hr">黑棋</div>
+                            <div class="cmd toggle_black_player unselected">
                                 <select id="selectBlack"
                                         onchange="engine" onmousedown="nop"/>
                             </div>
-                            <div class="hr"  id="whiteMoves">白棋</div>
-                            <div class="cmd">
+                            <div class="hr">白棋</div>
+                            <div class="cmd toggle_white_player unselected">
                                 <select id="selectWhite" onchange="engine" onmousedown="nop"/>
                             </div>
                             <div class="hr">棋盘大小</div>

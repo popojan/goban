@@ -65,13 +65,13 @@
                     <span>Game</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr" id="blackMoves">Black player</div>
-                            <div class="cmd">
+                            <div class="hr">Black player</div>
+                            <div class="cmd toggle_black_player unselected">
                                 <select id="selectBlack"
                                         onchange="engine" onmousedown="nop"/>
                             </div>
-                            <div class="hr"  id="whiteMoves">White player</div>
-                            <div class="cmd">
+                            <div class="hr">White player</div>
+                            <div class="cmd toggle_white_player unselected">
                                 <select id="selectWhite" onchange="engine" onmousedown="nop"/>
                             </div>
                             <div class="hr">Board size</div>
