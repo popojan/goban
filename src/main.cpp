@@ -524,12 +524,13 @@ int main(int argc, char** argv)
 
     fileChooserHandler->UnloadDialog(context);
 
-    // Stop game thread before destroying RmlUi elements
+    // Save current game and stop thread before destroying RmlUi elements
     spdlog::debug("Stopping game thread");
     auto gameDoc = context->GetDocument("game_window");
     if (gameDoc) {
         auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
         if (gameElement) {
+            gameElement->getController().saveCurrentGame();
             gameElement->getGameThread().interrupt();
         }
     }

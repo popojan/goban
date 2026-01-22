@@ -29,11 +29,14 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
 
     if (value == "boardsize") {
         std::istringstream ss(event.GetParameter<Rml::String>("value", "19").c_str());
-        float boardSize = 19;
+        int boardSize = 19;
         ss >> boardSize;
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selBoard"));
-        if(!controller.newGame(boardSize)) {
+        if (controller.isSyncingUI()) {
+            // Just syncing UI to match state, don't trigger action
+            if (select) lastBoardSelection = select->GetSelection();
+        } else if(!controller.newGame(boardSize)) {
             spdlog::error("setting boardsize failed");
             select->SetSelection(lastBoardSelection);
         } else {
@@ -53,13 +56,15 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         }
         // If event came from a menu element, don't forward to board controller
     }
-      else if (value == "handicap") {
+    else if (value == "handicap") {
         std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
-        float handicap = 0;
+        int handicap = 0;
         ss >> handicap;
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectHandicap"));
-        if(!controller.setHandicap(handicap)) {
+        if (controller.isSyncingUI()) {
+            if (select) lastHandicapSelection = select->GetSelection();
+        } else if(!controller.setHandicap(handicap)) {
             spdlog::error("setting handicap failed");
             select->SetSelection(lastHandicapSelection);
         } else {
@@ -85,17 +90,19 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         controller.switchShader(index);
     }
     else if (value == "komi") {
-      std::istringstream ss(event.GetParameter<Rml::String>("value", "0.5").c_str());
-      float komi = 0.5;
-      ss >> komi;
+        std::istringstream ss(event.GetParameter<Rml::String>("value", "0.5").c_str());
+        float komi = 0.5;
+        ss >> komi;
 
-      auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
-      if(!controller.setKomi(komi)) {
-          spdlog::error("setting komi failed");
-          select->SetSelection(lastKomiSelection);
-      } else {
-          lastKomiSelection = select->GetSelection();
-      }
+        auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
+        if (controller.isSyncingUI()) {
+            if (select) lastKomiSelection = select->GetSelection();
+        } else if(!controller.setKomi(komi)) {
+            spdlog::error("setting komi failed");
+            select->SetSelection(lastKomiSelection);
+        } else {
+            lastKomiSelection = select->GetSelection();
+        }
     }
     else if (value == "language") {
         // Get selected language from select element

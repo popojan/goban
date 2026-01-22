@@ -2,6 +2,7 @@
 #include "Configuration.h"
 #include <iomanip>
 #include <chrono>
+#include <filesystem>
 #include <spdlog/spdlog.h>
 
 extern std::shared_ptr<Configuration> config;
@@ -390,6 +391,31 @@ void GameRecord::updatePlayers(const std::string& blackPlayer, const std::string
     root->SetProperties(properties);
 }
 
+void GameRecord::updateKomi(float komi) {
+    std::lock_guard<std::mutex> lock(mutex);
+
+    if (!game) return;
+    auto root = game->GetRootNode();
+    if (!root) return;
+
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
+
+    // Copy existing properties, replacing KM
+    std::vector<std::shared_ptr<LibSgfcPlusPlus::ISgfcProperty>> properties;
+    for (const auto& prop : root->GetProperties()) {
+        if (prop->GetPropertyType() != T::KM) {
+            properties.push_back(prop);
+        }
+    }
+
+    // Add updated komi
+    properties.push_back(pF->CreateProperty(T::KM, vF->CreateRealPropertyValue(komi)));
+
+    root->SetProperties(properties);
+    spdlog::debug("Updated game record komi to {}", komi);
+}
+
 void GameRecord::finalizeGame(float scoreDelta) {
     using namespace LibSgfcPlusPlus;
 
@@ -432,14 +458,17 @@ void GameRecord::finalizeGame(float scoreDelta) {
 void GameRecord::appendGameToDocument() {
 
     if (game == nullptr) {
+        spdlog::warn("appendGameToDocument: game is null, skipping");
         return;
     }
-    
+
     if (doc == nullptr) {
         doc = F::CreateDocument(game);
+        spdlog::info("appendGameToDocument: created new doc with first game (numGames={})", numGames);
     } else {
         doc->AppendGame(game);
         ++numGames;
+        spdlog::info("appendGameToDocument: appended game #{} to existing doc", numGames);
     }
 
 }
@@ -461,6 +490,19 @@ void GameRecord::saveAs(const std::string& fileName) {
     }
 
     std::string fn(fileName.length() > 0 ? fileName : defaultFileName);
+
+    // Create backup before overwriting (protection against disk issues)
+    if (std::filesystem::exists(fn)) {
+        std::string backupPath = fn + ".bak";
+        try {
+            std::filesystem::copy_file(fn, backupPath,
+                std::filesystem::copy_options::overwrite_existing);
+            spdlog::debug("Created backup: {}", backupPath);
+        } catch (const std::filesystem::filesystem_error& e) {
+            spdlog::warn("Could not create backup {}: {}", backupPath, e.what());
+            // Continue with save anyway - backup failure shouldn't block save
+        }
+    }
 
     std::shared_ptr<LibSgfcPlusPlus::ISgfcDocumentWriter> writer(F::CreateDocumentWriter());
     try {
@@ -510,12 +552,16 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
             return false;
         }
         
-        if (gameIndex < 0 || gameIndex >= static_cast<int>(games.size())) {
-            spdlog::error("Invalid game index {} for SGF file [{}] (contains {} games)", 
+        // Handle special index -1 as "last game"
+        if (gameIndex < 0) {
+            gameIndex = static_cast<int>(games.size()) - 1;
+        }
+        if (gameIndex >= static_cast<int>(games.size())) {
+            spdlog::error("Invalid game index {} for SGF file [{}] (contains {} games)",
                          gameIndex, fileName, games.size());
             return false;
         }
-        
+
         auto loadedGame = games[gameIndex];
         auto rootNode = loadedGame->GetRootNode();
         
@@ -590,6 +636,19 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         // Keep the game tree (SGF is single source of truth)
         game = loadedGame;
         gameHasNewMoves = false;
+
+        // Only preserve doc when loading daily session file (for appending)
+        // External SGFs are ephemeral - if modified, they become part of daily session
+        spdlog::debug("loadFromSGF: comparing fileName='{}' with defaultFileName='{}'",
+            fileName, defaultFileName);
+        if (fileName == defaultFileName) {
+            doc = loadedDoc->GetDocument();
+            numGames = games.size();
+            spdlog::debug("loadFromSGF: paths match - preserving doc with {} games", numGames);
+        } else {
+            // keep existing doc (daily session), game is just for viewing/navigation
+            spdlog::debug("loadFromSGF: paths differ - external SGF viewing (doc unchanged)");
+        }
 
         boardSize.Columns = gameInfo.boardSize;
         boardSize.Rows = gameInfo.boardSize;

@@ -38,11 +38,14 @@ public:
 
     void updatePlayers(const std::string& blackPlayer, const std::string& whitePlayer);
 
+    void updateKomi(float komi);
+
     void saveAs(const std::string& fileName);
 
     [[nodiscard]] std::string getDefaultFileName() const { return defaultFileName; }
     void setDefaultFileName(const std::string& fileName) { defaultFileName = fileName; }
     [[nodiscard]] size_t getNumGames() const { return numGames; }
+    [[nodiscard]] bool hasNewMoves() const { return gameHasNewMoves; }
 
     void setHandicapStones(const std::vector<Position>& stones);
 

@@ -192,6 +192,34 @@ void ElementGame::refreshPlayerDropdowns() {
         players.size(), targetBlack, targetWhite);
 }
 
+void ElementGame::refreshGameSettingsDropdowns() {
+    auto doc = GetContext()->GetDocument("game_window");
+    if (!doc) return;
+
+    // Helper to sync dropdown selection by value
+    auto setSelectByValue = [doc](const char* elementId, const std::string& value) {
+        auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById(elementId));
+        if (!select) return;
+        for (int i = 0; i < select->GetNumOptions(); i++) {
+            if (select->GetOption(i)->GetAttribute("value", Rml::String()) == value) {
+                select->SetSelection(i);
+                break;
+            }
+        }
+    };
+
+    control.setSyncingUI(true);
+    setSelectByValue("selBoard", std::to_string(model.getBoardSize()));
+    std::ostringstream komiStr;
+    komiStr << model.state.komi;
+    setSelectByValue("selectKomi", komiStr.str());
+    setSelectByValue("selectHandicap", std::to_string(model.state.handicap));
+    control.setSyncingUI(false);
+
+    spdlog::info("refreshGameSettingsDropdowns: board={}, komi={}, handicap={}",
+        model.getBoardSize(), model.state.komi, model.state.handicap);
+}
+
 // File-scope statics for FPS tracking (shared between gameLoop and getIdleTimeout)
 static int s_fpsFrames = 0;
 static int s_fpsLastDisplayed = -1;
@@ -296,25 +324,45 @@ void ElementGame::ProcessEvent(Rml::Event& event)
         populateEngines();
 
         // Resume last session (e.g., after language switch or archive)
-        std::string lastSgf = UserSettings::instance().getLastSgfPath();
+        // Skip auto-loading if user cleared board before quitting
         bool sgfLoaded = false;
-        if (!lastSgf.empty()) {
-            if (std::filesystem::exists(lastSgf)) {
-                // File exists - load the game (SGF settings take precedence)
-                spdlog::info("Resuming last game from: {}", lastSgf);
-                engine.loadSGF(lastSgf);
-                sgfLoaded = true;
+        if (UserSettings::instance().getStartFresh()) {
+            spdlog::info("Starting fresh (board was cleared last session)");
+            UserSettings::instance().setStartFresh(false);  // Clear flag after processing
+        } else {
+            std::string lastSgf = UserSettings::instance().getLastSgfPath();
+            if (!lastSgf.empty()) {
+                // Set defaultFileName BEFORE loading so path comparison in loadFromSGF succeeds
+                // This ensures doc is preserved (not lost) when loading daily session across restarts
+                model.game.setDefaultFileName(lastSgf);
+                UserSettings::instance().setLastSgfPath("");  // Clear after processing
+
+                if (std::filesystem::exists(lastSgf)) {
+                    // File exists - load the game (SGF settings take precedence)
+                    spdlog::info("Resuming last game from: {}", lastSgf);
+                    engine.loadSGF(lastSgf, -1);  // Load last game in file
+                    sgfLoaded = true;
+                } else {
+                    // File doesn't exist yet (new session after archive) - just set as active
+                    spdlog::info("Starting new session: {}", lastSgf);
+                }
             } else {
-                // File doesn't exist yet (new session after archive) - just set as active
-                spdlog::info("Starting new session: {}", lastSgf);
+                // No explicit last SGF - check for today's daily session file
+                std::string dailyFile = model.game.getDefaultFileName();
+                if (std::filesystem::exists(dailyFile)) {
+                    spdlog::info("Loading today's session file: {}", dailyFile);
+                    engine.loadSGF(dailyFile, -1);  // Load last game in file
+                    sgfLoaded = true;
+                }
             }
-            // Use this file for future saves
-            model.game.setDefaultFileName(lastSgf);
-            UserSettings::instance().setLastSgfPath("");  // Clear after processing
         }
 
-        // Apply user settings if no SGF was loaded
-        if (!sgfLoaded) {
+        if (sgfLoaded) {
+            // Sync dropdowns with SGF game settings
+            refreshPlayerDropdowns();
+            refreshGameSettingsDropdowns();
+        } else {
+            // Apply user settings if no SGF was loaded
             auto& settings = UserSettings::instance();
 
             if (settings.hasGameSettings()) {
@@ -356,27 +404,8 @@ void ElementGame::ProcessEvent(Rml::Event& event)
 
             // Sync dropdown UI with engine state after player settings applied
             refreshPlayerDropdowns();
-
-            // Sync board size, komi, handicap dropdowns with loaded settings
-            auto setSelectByValue = [this](const char* elementId, const std::string& value) {
-                auto select = dynamic_cast<Rml::ElementFormControlSelect*>(
-                    GetContext()->GetDocument("game_window")->GetElementById(elementId));
-                if (!select) return;
-                for (int i = 0; i < select->GetNumOptions(); i++) {
-                    if (select->GetOption(i)->GetAttribute("value", Rml::String()) == value) {
-                        select->SetSelection(i);
-                        break;
-                    }
-                }
-            };
-
             if (settings.hasGameSettings()) {
-                setSelectByValue("selBoard", std::to_string(settings.getBoardSize()));
-                // Format komi without trailing zeros (6.500000 -> 6.5)
-                std::ostringstream komiStr;
-                komiStr << settings.getKomi();
-                setSelectByValue("selectKomi", komiStr.str());
-                setSelectByValue("selectHandicap", std::to_string(settings.getHandicap()));
+                refreshGameSettingsDropdowns();
             }
         }
 

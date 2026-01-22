@@ -580,11 +580,17 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     }
 
     interrupt();
-    
+    model.pause();  // Must pause before clearGame so onKomiChange/onHandicapChange take effect
+
     if (!clearGame(gameInfo.boardSize, gameInfo.komi, gameInfo.handicap)) {
         spdlog::error("Failed to clear game for SGF loading");
         return false;
     }
+
+    // Ensure SGF values are set in model state (setFixedHandicap may have failed if no coach)
+    spdlog::info("loadSGF: setting model.state from SGF - komi={}, handicap={}", gameInfo.komi, gameInfo.handicap);
+    model.state.komi = gameInfo.komi;
+    model.state.handicap = gameInfo.handicap;
 
     if (!gameInfo.handicapStones.empty()) {
         setHandicapStones(gameInfo.handicapStones);
@@ -631,8 +637,6 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
-    model.pause();
-    
     // Check if the loaded game is finished and trigger final scoring
     if (gameInfo.gameResult.IsValid && 
         (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin ||

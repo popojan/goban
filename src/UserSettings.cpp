@@ -37,6 +37,10 @@ void UserSettings::load() {
             lastSgfPath = user["last_sgf_path"].get<std::string>();
         }
 
+        if (user.contains("start_fresh")) {
+            startFresh = user["start_fresh"].get<bool>();
+        }
+
         if (user.contains("game")) {
             gameSettingsLoaded = true;
             auto& game = user["game"];
@@ -96,6 +100,7 @@ void UserSettings::save() {
     if (!lastSgfPath.empty()) {
         user["last_sgf_path"] = lastSgfPath;
     }
+    user["start_fresh"] = startFresh;
 
     user["game"] = {
         {"board_size", boardSize},
@@ -153,6 +158,11 @@ void UserSettings::setSoundEnabled(bool value) {
 
 void UserSettings::setLastSgfPath(const std::string& value) {
     lastSgfPath = value;
+    save();
+}
+
+void UserSettings::setStartFresh(bool value) {
+    startFresh = value;
     save();
 }
 

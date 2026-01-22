@@ -27,6 +27,10 @@ public:
     std::string getLastSgfPath() const { return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
 
+    // Start fresh (skip auto-loading when user cleared board)
+    bool getStartFresh() const { return startFresh; }
+    void setStartFresh(bool value);
+
     // Game settings
     int getBoardSize() const { return boardSize; }
     void setBoardSize(int value);
@@ -97,6 +101,7 @@ private:
 
     // Last SGF
     std::string lastSgfPath;
+    bool startFresh = false;
 
     // Game settings
     int boardSize = 19;

@@ -4,6 +4,7 @@
 #include "EventManager.h"
 #include "FileChooserDataSource.h"
 #include "Configuration.h"
+#include "UserSettings.h"
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Event.h>
@@ -74,6 +75,7 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
                     if (gameElement) {
                         gameElement->getGameThread().loadSGF(filePath, gameIndex);
                         gameElement->refreshPlayerDropdowns();  // Update dropdowns with SGF player names
+                        gameElement->refreshGameSettingsDropdowns();  // Sync board/komi/handicap with SGF
                         gameElement->updateNavigationOverlay();  // Update markup and variation overlays
                         gameElement->requestRepaint();  // Ensure UI updates
                     }

@@ -23,8 +23,10 @@ bool GobanControl::newGame(unsigned boardSize) {
         // Reset Analysis Mode menu toggle (new game starts in Match mode)
         parent->OnMenuToggle("toggle_analysis_mode", false);
         parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
-        // Save board size to user settings
+        // Save game settings so fresh start uses these values
         UserSettings::instance().setBoardSize(static_cast<int>(boardSize));
+        UserSettings::instance().setKomi(model.state.komi);
+        UserSettings::instance().setHandicap(model.state.handicap);
         return true;
     }
     return false;
@@ -472,6 +474,7 @@ bool GobanControl::setKomi(float komi) {
     if(!isRunning) {
         engine.setKomi(komi);
         model.state.komi = komi;
+        model.game.updateKomi(komi);  // Keep game record in sync
         UserSettings::instance().setKomi(komi);
         return true;
     }
@@ -509,8 +512,8 @@ void GobanControl::switchPlayer(int which, int newPlayerIndex) {
     int idx = engine.getActivePlayer(which);
     engine.activatePlayer(which, newPlayerIndex - idx);
     model.state.holdsStone = false;
-    // Save player to user settings (skip during initialization)
-    if (!initializingPlayers) {
+    // Save player to user settings (skip during UI sync)
+    if (!syncingUI) {
         std::string playerName = engine.getName(engine.getActivePlayer(which));
         spdlog::info("switchPlayer: which={}, newIdx={}, oldIdx={}, playerName='{}'", which, newPlayerIndex, idx, playerName);
         if (which == 0) {
@@ -541,5 +544,9 @@ void GobanControl::saveCurrentGame() {
     if (model.game.moveCount() > 0) {
         model.game.saveAs("");
         UserSettings::instance().setLastSgfPath(model.game.getDefaultFileName());
+        UserSettings::instance().setStartFresh(false);
+    } else {
+        // Board was cleared, start fresh on next launch
+        UserSettings::instance().setStartFresh(true);
     }
 }

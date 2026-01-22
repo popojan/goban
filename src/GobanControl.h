@@ -45,10 +45,12 @@ private:
     bool exit;
     float mouseX, mouseY;
     bool fullscreen;
-    bool initializingPlayers = true;  // Suppress player saves during startup
+    bool syncingUI = true;  // Suppress game actions when syncing UI to match state
 
 public:
-    void finishInitialization() { initializingPlayers = false; }
+    void finishInitialization() { syncingUI = false; }
+    bool isSyncingUI() const { return syncingUI; }
+    void setSyncingUI(bool syncing) { syncingUI = syncing; }
 };
 
 
