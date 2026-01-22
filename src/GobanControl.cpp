@@ -137,7 +137,13 @@ bool GobanControl::command(const std::string& cmd) {
         UserSettings::instance().setFullscreen(fullscreen);
         view.requestRepaint();
     }
-    else if (cmd == "fps") {
+    else if (cmd == "toggle_sound") {
+        bool soundEnabled = view.player.isMuted();  // Was muted, now enable
+        view.player.setMuted(!soundEnabled);
+        checked = soundEnabled;
+        UserSettings::instance().setSoundEnabled(soundEnabled);
+    }
+    else if (cmd == "toggle_fps") {
         checked = view.toggleFpsLimit();
     }
     else if (cmd == "animate") {

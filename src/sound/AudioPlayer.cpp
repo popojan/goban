@@ -13,11 +13,13 @@ void AudioPlayer::init() {
 
 void AudioPlayer::play(const std::string& id, double volume)
 {
+    if (muted) return;
     streamHandler.processEvent(AudioEventType::start, &fileHandler.getSound(id), volume);
 }
 
 void AudioPlayer::loop(const std::string& id, double volume)
 {
+    if (muted) return;
     streamHandler.processEvent(AudioEventType::start, &fileHandler.getSound(id), volume, true);
 }
 

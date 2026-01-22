@@ -180,9 +180,13 @@
                             </div>
                         </div>
                         <div class="grp">
+                            <div class="hr">Sound</div>
+                            <div class="cmd toggle_sound selected" id="cmdSound" onmouseup="toggle_sound">Sound</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">Framerate</div>
                             <div class="template" id="templateFPS">%.1f fps</div>
-                            <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                            <div class="cmd toggle_fps unselected" id="lblFPS" onmouseup="toggle_fps"></div>
                         </div>
                         <div class="grp">
                             <div class="hr">Version</div>

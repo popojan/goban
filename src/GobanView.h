@@ -104,6 +104,7 @@ public:
     }
 
     bool toggleFpsLimit() {MAX_FPS = !MAX_FPS; return MAX_FPS;}
+    bool isFpsLimitEnabled() const { return MAX_FPS; }
 
     void switchShader(int idx)  {
         updateFlag |= GobanView::UPDATE_ALL;

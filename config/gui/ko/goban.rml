@@ -168,9 +168,13 @@
                             </div>
                         </div>
                         <div class="grp">
+                            <div class="hr">소리</div>
+                            <div class="cmd toggle_sound selected" id="cmdSound" onmouseup="toggle_sound">소리</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">프레임율</div>
                             <div class="template" id="templateFPS">%.1f fps</div>
-                            <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                            <div class="cmd toggle_fps unselected" id="lblFPS" onmouseup="toggle_fps"></div>
                         </div>
                         <div class="grp">
                             <div class="hr">버전</div>

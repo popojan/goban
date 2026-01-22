@@ -17,8 +17,12 @@ public:
     void preload(const std::shared_ptr<Configuration> config);
     size_t playbackCount() { return streamHandler.playbackCount(); }
     void stopIfInactive() { streamHandler.stopIfInactive(); }
+
+    void setMuted(bool muted) { this->muted = muted; }
+    bool isMuted() const { return muted; }
 private:
     FileHandler fileHandler;
     StreamHandler streamHandler;
+    bool muted = false;
 };
 #endif

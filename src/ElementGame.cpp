@@ -1,5 +1,6 @@
 #include "ElementGame.h"
 #include "AppState.h"
+#include "UserSettings.h"
 #include "version.h"
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Factory.h>
@@ -133,6 +134,14 @@ void ElementGame::populateEngines() {
     // Sync fullscreen menu state with restored state
     OnMenuToggle("toggle_fullscreen", AppState::IsFullscreen());
 
+    // Sync sound state with user settings
+    bool soundEnabled = UserSettings::instance().getSoundEnabled();
+    view.player.setMuted(!soundEnabled);
+    OnMenuToggle("toggle_sound", soundEnabled);
+
+    // Sync FPS/VSync toggle state (MAX_FPS defaults to false = event-driven)
+    OnMenuToggle("toggle_fps", view.isFpsLimitEnabled());
+
     // Populate version label (uses its own content as format string)
     auto versionLabel = GetContext()->GetDocument("game_window")->GetElementById("lblVersion");
     if (versionLabel) {
@@ -188,6 +197,7 @@ void ElementGame::gameLoop() {
     static int frames = 0;
     static int lastFrames = -1;
     static float lastTime = -1;
+    static bool skipFrameCount = false;  // Don't count repaint for showing 0 fps
     auto context = GetContext();
 
     float currentTime = static_cast<float>(glfwGetTime());
@@ -197,6 +207,9 @@ void ElementGame::gameLoop() {
         const Rml::String sFps = Rml::CreateString(fpsTemplate->GetInnerRML().c_str(), (float)frames / (currentTime - lastTime));
         if (debugElement != nullptr && lastFrames != frames) {
             debugElement->SetInnerRML(sFps.c_str());
+            if (frames == 0) {
+                skipFrameCount = true;  // The repaint to show "0 fps" shouldn't count
+            }
             view.requestRepaint();
             lastFrames = frames;
         }
@@ -218,7 +231,11 @@ void ElementGame::gameLoop() {
     }
     if (view.updateFlag) {
         // Rendering is managed in the main loop - just count frames here
-        frames++;
+        if (skipFrameCount) {
+            skipFrameCount = false;
+        } else {
+            frames++;
+        }
     }
     //if (!view.MAX_FPS){
     //    std::this_thread::sleep_for(std::chrono::milliseconds(1000));

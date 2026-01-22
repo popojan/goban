@@ -19,6 +19,10 @@ public:
     bool getFullscreen() const { return fullscreen; }
     void setFullscreen(bool value);
 
+    // Sound
+    bool getSoundEnabled() const { return soundEnabled; }
+    void setSoundEnabled(bool value);
+
     // Shader
     std::string getShaderName() const { return shaderName; }
     void setShaderName(const std::string& value);
@@ -69,6 +73,9 @@ private:
 
     // Fullscreen
     bool fullscreen = false;
+
+    // Sound
+    bool soundEnabled = true;
 
     // Shader
     std::string shaderName;

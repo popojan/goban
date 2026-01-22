@@ -29,6 +29,10 @@ void UserSettings::load() {
             fullscreen = user["fullscreen"].get<bool>();
         }
 
+        if (user.contains("sound_enabled")) {
+            soundEnabled = user["sound_enabled"].get<bool>();
+        }
+
         if (user.contains("shader")) {
             shaderLoaded = true;
             auto& shader = user["shader"];
@@ -70,6 +74,7 @@ void UserSettings::save() {
 
     user["last_config"] = lastConfig;
     user["fullscreen"] = fullscreen;
+    user["sound_enabled"] = soundEnabled;
 
     user["shader"] = {
         {"name", shaderName},
@@ -109,6 +114,11 @@ void UserSettings::setLastConfig(const std::string& value) {
 
 void UserSettings::setFullscreen(bool value) {
     fullscreen = value;
+    save();
+}
+
+void UserSettings::setSoundEnabled(bool value) {
+    soundEnabled = value;
     save();
 }
 
