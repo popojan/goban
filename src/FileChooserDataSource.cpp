@@ -191,7 +191,7 @@ void FileChooserDataSource::refreshFileList() {
                 
                 if (fileEntry.isDirectory) {
                     fileEntry.type = strDirectory;
-                } else if (fileEntry.name.find(".sgf") != std::string::npos) {
+                } else if (fileEntry.fullPath.extension() == ".sgf") {
                     fileEntry.type = strSgfFile;
                 } else {
                     // Skip non-SGF files
@@ -224,7 +224,7 @@ void FileChooserDataSource::SelectFile(int fileIndex) {
     if (file.isDirectory) {
         // Navigate to directory
         SetCurrentPath(file.fullPath);
-    } else if (file.name.find(".sgf") != std::string::npos) {
+    } else if (file.fullPath.extension() == ".sgf") {
         // Load games for the selected SGF file
         LoadSelectedFileGames();
     }
@@ -273,7 +273,7 @@ int FileChooserDataSource::FindFileByPath(const std::string& path) const {
 
 void FileChooserDataSource::LoadSelectedFileGames() {
     const FileEntry* file = GetSelectedFile();
-    if (file && !file->isDirectory && file->name.find(".sgf") != std::string::npos) {
+    if (file && !file->isDirectory && file->fullPath.extension() == ".sgf") {
         previewSGF(file->fullPath.string());
     }
 }

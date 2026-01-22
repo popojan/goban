@@ -340,6 +340,8 @@ void ElementGame::ProcessEvent(Rml::Event& event)
                 if (std::filesystem::exists(lastSgf)) {
                     // File exists - load the game (SGF settings take precedence)
                     spdlog::info("Resuming last game from: {}", lastSgf);
+                    // Initialize view metrics before loading to ensure fuzzy stone placement
+                    view.board.updateMetrics(model.metrics);
                     engine.loadSGF(lastSgf, -1);  // Load last game in file
                     sgfLoaded = true;
                 } else {
@@ -351,6 +353,8 @@ void ElementGame::ProcessEvent(Rml::Event& event)
                 std::string dailyFile = model.game.getDefaultFileName();
                 if (std::filesystem::exists(dailyFile)) {
                     spdlog::info("Loading today's session file: {}", dailyFile);
+                    // Initialize view metrics before loading to ensure fuzzy stone placement
+                    view.board.updateMetrics(model.metrics);
                     engine.loadSGF(dailyFile, -1);  // Load last game in file
                     sgfLoaded = true;
                 }

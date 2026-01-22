@@ -211,8 +211,12 @@ void EventHandlerFileChooser::ShowDialog() {
             }
             // Update visual selection for file
             auto filesList = dialogDocument->GetElementById("files_list");
-            if (filesList && newIndex < filesList->GetNumChildren()) {
-                filesList->GetChild(newIndex)->SetClass("selected", true);
+            int rowIndex = newIndex;
+            if (dataSource->GetCurrentPath().has_parent_path()) {
+                rowIndex += 1;  // Account for ".." row at index 0
+            }
+            if (filesList && rowIndex < filesList->GetNumChildren()) {
+                filesList->GetChild(rowIndex)->SetClass("selected", true);
             }
         }
     }
