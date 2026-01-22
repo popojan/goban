@@ -170,15 +170,6 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable right">
-                    <span>O programu</span>
-                    <div class="menuitem show">
-                        <div class="grp">
-                            <div class="hr">Verze</div>
-                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="menuitem hoverable right">
                     <span>Možnosti</span>
                     <div class="menuitem show">
                         <div class="grp">
@@ -192,6 +183,10 @@
                             <div class="hr">Snímková frekvence</div>
                             <div class="template" id="templateFPS">%.1f fps</div>
                             <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">Verze</div>
+                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
                         </div>
                     </div>
                 </div>

@@ -158,15 +158,6 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable right">
-                    <span>情報</span>
-                    <div class="menuitem show">
-                        <div class="grp">
-                            <div class="hr">バージョン</div>
-                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="menuitem hoverable right">
                     <span>設定</span>
                     <div class="menuitem show">
                         <div class="grp">
@@ -180,6 +171,10 @@
                             <div class="hr">フレームレート</div>
                             <div class="template" id="templateFPS">%.1f fps</div>
                             <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">バージョン</div>
+                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
                         </div>
                     </div>
                 </div>

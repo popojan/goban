@@ -158,15 +158,6 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable right">
-                    <span>정보</span>
-                    <div class="menuitem show">
-                        <div class="grp">
-                            <div class="hr">버전</div>
-                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="menuitem hoverable right">
                     <span>설정</span>
                     <div class="menuitem show">
                         <div class="grp">
@@ -180,6 +171,10 @@
                             <div class="hr">프레임율</div>
                             <div class="template" id="templateFPS">%.1f fps</div>
                             <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">버전</div>
+                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
                         </div>
                     </div>
                 </div>

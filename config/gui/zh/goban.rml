@@ -170,15 +170,6 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable right">
-                    <span>关于我们</span>
-                    <div class="menuitem show">
-                        <div class="grp">
-                            <div class="hr">版本</div>
-                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="menuitem hoverable right">
                     <span>选项</span>
                     <div class="menuitem show">
                         <div class="grp">
@@ -192,6 +183,10 @@
                             <div class="hr">帧率</div>
                             <div class="template" id="templateFPS">%.1f 帧/秒</div>
                             <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">版本</div>
+                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
                         </div>
                     </div>
                 </div>
