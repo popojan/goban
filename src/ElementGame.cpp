@@ -356,6 +356,28 @@ void ElementGame::ProcessEvent(Rml::Event& event)
 
             // Sync dropdown UI with engine state after player settings applied
             refreshPlayerDropdowns();
+
+            // Sync board size, komi, handicap dropdowns with loaded settings
+            auto setSelectByValue = [this](const char* elementId, const std::string& value) {
+                auto select = dynamic_cast<Rml::ElementFormControlSelect*>(
+                    GetContext()->GetDocument("game_window")->GetElementById(elementId));
+                if (!select) return;
+                for (int i = 0; i < select->GetNumOptions(); i++) {
+                    if (select->GetOption(i)->GetAttribute("value", Rml::String()) == value) {
+                        select->SetSelection(i);
+                        break;
+                    }
+                }
+            };
+
+            if (settings.hasGameSettings()) {
+                setSelectByValue("selBoard", std::to_string(settings.getBoardSize()));
+                // Format komi without trailing zeros (6.500000 -> 6.5)
+                std::ostringstream komiStr;
+                komiStr << settings.getKomi();
+                setSelectByValue("selectKomi", komiStr.str());
+                setSelectByValue("selectHandicap", std::to_string(settings.getHandicap()));
+            }
         }
 
         // Initialization complete - enable player settings persistence
