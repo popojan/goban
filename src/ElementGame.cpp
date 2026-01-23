@@ -455,6 +455,15 @@ void ElementGame::OnUpdate()
         view.state.cmd = gameState;
     }
 
+    // Sync territory menu toggle with model state (auto-territory, T key, navigation)
+    {
+        std::vector<Rml::Element*> els;
+        context->GetDocument("game_window")->GetElementsByClassName(els, "toggle_territory");
+        if (!els.empty() && els[0]->IsClassSet("selected") != model.board.showTerritory) {
+            OnMenuToggle("toggle_territory", model.board.showTerritory);
+        }
+    }
+
     if (view.state.colorToMove != model.state.colorToMove) {
         bool blackMove = model.state.colorToMove == Color::BLACK;
         // Update player select dropdown toggle indicators
