@@ -66,8 +66,9 @@ bool GameNavigator::navigateBack() {
     syncEngines(Move(), coach, true);
     model.game.undo();
 
-    // Hide territory display when navigating (stale after undo)
-    model.board.toggleTerritoryAuto(false);
+    // Hide territory unconditionally when navigating back (stale after undo)
+    model.board.showTerritory = false;
+    model.board.showTerritoryAuto = false;
 
     // Keep colorToMove in sync with SGF tree position
     model.state.colorToMove = model.game.getColorToMove();
@@ -109,19 +110,6 @@ bool GameNavigator::navigateForward() {
     NavigationGuard guard(navigationInProgress);
 
     if (variations.empty()) {
-        // At end of branch - show territory if this is a scored game ending
-        if (model.game.shouldShowTerritory()) {
-            spdlog::debug("navigateForward: at end of scored game, showing territory");
-            Engine* coach = getCoach();
-            if (coach) {
-                model.board.toggleTerritoryAuto(true);
-                model.state.msg = GameState::NONE;  // Clear pass message
-                const Board& result = coach->showterritory(true, model.game.lastStoneMove().col);
-                notifyBoardChange(result);
-                return true;  // We did something - trigger UI update
-            }
-        }
-        spdlog::debug("navigateForward: at end of branch, nothing to do");
         return false;
     }
 
@@ -169,7 +157,7 @@ bool GameNavigator::navigateForward() {
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
-    // Show board update
+    // Show board update (territory handled by executeNavCommand after forward returns)
     const Board& result = coach->showboard();
     spdlog::debug("navigateForward: notifying {} observers, colorToMove={}",
         gameObservers.size(), model.state.colorToMove == Color::BLACK ? "B" : "W");
@@ -273,7 +261,8 @@ bool GameNavigator::navigateToStart() {
     }
 
     if (success) {
-        model.board.toggleTerritoryAuto(false);
+        model.board.showTerritory = false;
+        model.board.showTerritoryAuto = false;
         model.state.colorToMove = model.game.getColorToMove();
         model.state.comment = model.game.getComment();
         model.state.markup = model.game.getMarkup();
@@ -331,15 +320,9 @@ bool GameNavigator::navigateToEnd() {
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
-    // Set resignation message if game has resignation result
-    // (RE property is cleared when creating new variations, so it's always valid here)
-    if (model.game.isResignationResult()) {
-        model.state.msg = model.game.getResultMessage();
-    } else {
-        model.state.msg = GameState::NONE;
-    }
+    model.state.msg = GameState::NONE;
 
-    // Show territory if at a scored game ending (not resignation)
+    // Show territory if at a scored game ending; model handles result/resignation messages
     const Board& result = model.game.shouldShowTerritory()
         ? (model.board.toggleTerritoryAuto(true), coach->showterritory(true, model.game.lastStoneMove().col))
         : coach->showboard();

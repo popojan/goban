@@ -221,10 +221,18 @@ void GobanModel::onBoardChange(const Board& result) {
 
     spdlog::debug("over {} ready {}", isGameOver, result.territoryReady);
 
-    if(isGameOver && result.territoryReady) {
+    if (result.territoryReady && game.shouldShowTerritory()) {
+        // At end of scored game - compute result message
+        state.reason = GameState::DOUBLE_PASS;
         this->result(game.lastMove());
-        game.finalizeGame(state.scoreDelta);
-        game.saveAs("");
+        // Finalize and save only once (live game ending, result not yet written)
+        if (isGameOver && !game.hasGameResult()) {
+            game.finalizeGame(state.scoreDelta);
+            game.saveAs("");
+        }
+    } else if (game.isAtEndOfNavigation() && game.isResignationResult()) {
+        // At end of resigned game - show resignation message
+        state.msg = game.getResultMessage();
     }
 }
 
@@ -242,8 +250,8 @@ void GobanModel::onPlayerChange(int which, const std::string& name) {
         state.white = name;
     }
 
-    // Only annotate player switches after first move (ignore setup changes)
-    if (started && game.moveCount() > 0) {
+    // Only annotate player switches after first move, and not on finished games
+    if (started && game.moveCount() > 0 && !game.hasGameResult()) {
         std::ostringstream val;
         val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
         if (which == 0) {

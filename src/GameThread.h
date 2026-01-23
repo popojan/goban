@@ -6,6 +6,9 @@
 #include <atomic>
 #include <string>
 #include <memory>
+#include <queue>
+#include <future>
+#include <condition_variable>
 
 #include "player.h"
 #include "GobanModel.h"
@@ -16,6 +19,20 @@
 #include "Configuration.h"
 
 extern std::shared_ptr<Configuration> config;
+
+/** \brief Result of a navigation command executed on the game thread */
+struct NavResult {
+    bool success = false;
+    bool newBranch = false;
+};
+
+/** \brief Navigation command queued for execution on the game thread */
+struct NavCommand {
+    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION };
+    Type type;
+    Move move;  // For TO_VARIATION
+    std::shared_ptr<std::promise<NavResult>> resultPromise;
+};
 
 /** \brief Game mode determining player interaction behavior
  */
@@ -125,6 +142,16 @@ private:
 
     // Navigation (extracted to separate class)
     std::unique_ptr<GameNavigator> navigator;
+
+    // Navigation command queue (UI thread -> game thread)
+    std::queue<NavCommand> navQueue;
+    std::mutex navQueueMutex;
+    std::condition_variable navQueueCV;
+
+    void processNavigationQueue();
+    NavResult executeNavCommand(const NavCommand& cmd);
+    void wakeGameThread();
+    void waitForCommandOrTimeout(int ms);
 };
 
 #endif // GAMETHREAD_H

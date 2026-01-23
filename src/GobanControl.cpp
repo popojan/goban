@@ -74,6 +74,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     // Start game loop for AI response (after navigateToVariation completes)
                     if (!engine.isRunning()) {
                         spdlog::debug("Starting game loop for AI auto-response");
+                        model.start();
                         engine.run();
                     }
                 }
@@ -86,6 +87,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 playNow = false;
             }
             else if(!engine.isRunning() && !model.isGameOver) {
+               model.start();
                engine.run();
             }
             spdlog::debug("engine.isRunning() = {}", engine.isRunning());
@@ -164,8 +166,11 @@ bool GobanControl::command(const std::string& cmd) {
         view.requestRepaint();
     }
     else if (cmd == "toggle_territory") {
-        checked = model.board.toggleTerritory();
-        view.requestRepaint();
+        // Only allow territory toggle at end of a scored game (not resignation)
+        if (model.game.shouldShowTerritory()) {
+            checked = model.board.toggleTerritory();
+            view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
+        }
     }
     else if (cmd == "toggle_overlay") {
         checked = view.toggleOverlay();
@@ -175,6 +180,7 @@ bool GobanControl::command(const std::string& cmd) {
     else if (cmd == "play once") {
         // Start game loop if not running (needed for kibitz to work)
         if (!engine.isRunning() && !model.isGameOver) {
+            model.start();
             engine.run();
         }
         engine.playKibitzMove();
@@ -218,6 +224,7 @@ bool GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "start") {
         if(!engine.isRunning() && !model.isGameOver) {
+            model.start();
             engine.run();
         }
     }

@@ -60,6 +60,7 @@ Player* GameThread::currentPlayer() {
 void GameThread::interrupt() {
     if (thread) {
         interruptRequested = true;
+        navQueueCV.notify_one();
         playLocalMove(Move(Move::INTERRUPT, model.state.colorToMove));
         thread->join();
         thread.reset();
@@ -170,8 +171,6 @@ void GameThread::run() {
         return;
     }
 
-    model.start();
-    spdlog::debug("construct thread {}", (bool)model);
     thread = std::make_unique<std::thread>(&GameThread::gameLoop, this);
     engineStarted.wait(lock);
 }
@@ -221,18 +220,25 @@ void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
 
 void GameThread::gameLoop() {
     interruptRequested = false;
-    while (model && !interruptRequested) {
-        Engine* coach = currentCoach();
-        Engine* kibitzEngine = currentKibitz();
-        Player* player = currentPlayer();
-
-        // In both Match and Analysis mode, player is determined by role + colorToMove
-        // (currentPlayer() already handles this correctly)
-
+    while (!interruptRequested) {
         if(!hasThreadRunning) {
             hasThreadRunning = true;
             engineStarted.notify_all();
         }
+
+        processNavigationQueue();
+        if (interruptRequested) break;
+
+        // When model is inactive or game is over, just wait for nav commands
+        if (!model || model.isGameOver) {
+            waitForCommandOrTimeout(100);
+            continue;
+        }
+
+        Engine* coach = currentCoach();
+        Engine* kibitzEngine = currentKibitz();
+        Player* player = currentPlayer();
+
         std::unique_lock<std::mutex> lock(playerMutex, std::defer_lock);
         bool locked = false;
 
@@ -241,7 +247,7 @@ void GameThread::gameLoop() {
         // 2. Navigating through history (not at the end position)
         // This prevents AI from playing on an old board state during SGF review
         if (navigator->isNavigating()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            waitForCommandOrTimeout(50);
             continue;
         }
         bool navigatingHistory = model.game.isNavigating() && !model.game.isAtEndOfNavigation();
@@ -250,7 +256,7 @@ void GameThread::gameLoop() {
             // Human players must still enter genmove (blocking wait) to accept undo/moves.
             spdlog::debug("Game loop: skipping engine genmove during navigation (view pos {}/{})",
                 model.game.getViewPosition(), model.game.getLoadedMovesCount());
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            waitForCommandOrTimeout(100);
             continue;
         }
 
@@ -329,8 +335,8 @@ void GameThread::gameLoop() {
             }
 
             if(model.isGameOver) {
-                playerToMove = nullptr;  // Clear before breaking to allow navigation
-                break;
+                playerToMove = nullptr;
+                continue;
             }
 
 
@@ -340,7 +346,7 @@ void GameThread::gameLoop() {
         // Clear playerToMove while still holding lock - signals processing complete
         playerToMove = nullptr;
         if(locked) lock.unlock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        waitForCommandOrTimeout(50);
     }
     hasThreadRunning = false;
 }
@@ -358,33 +364,129 @@ void GameThread::playKibitzMove() {
 }
 
 bool GameThread::navigateBack() {
-    return navigator->navigateBack();
+    auto promise = std::make_shared<std::promise<NavResult>>();
+    auto future = promise->get_future();
+    {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        navQueue.push({NavCommand::BACK, Move(), promise});
+    }
+    wakeGameThread();
+    return future.get().success;
 }
 
 bool GameThread::navigateForward() {
-    return navigator->navigateForward();
+    auto promise = std::make_shared<std::promise<NavResult>>();
+    auto future = promise->get_future();
+    {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        navQueue.push({NavCommand::FORWARD, Move(), promise});
+    }
+    wakeGameThread();
+    return future.get().success;
 }
 
 bool GameThread::navigateToVariation(const Move& move) {
-    auto result = navigator->navigateToVariation(move);
+    auto promise = std::make_shared<std::promise<NavResult>>();
+    auto future = promise->get_future();
+    {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        navQueue.push({NavCommand::TO_VARIATION, move, promise});
+    }
+    wakeGameThread();
+    NavResult result = future.get();
 
-    // Handle Analysis mode switching for new branches (GameThread responsibility)
-    if (result.success && result.newBranch) {
-        if (gameMode == GameMode::MATCH) {
-            spdlog::info("navigateToVariation: switching to Analysis mode for SGF editing");
-            setGameMode(GameMode::ANALYSIS);
-        }
+    // Analysis mode switch (no GTP needed, safe on UI thread)
+    if (result.success && result.newBranch && gameMode == GameMode::MATCH) {
+        spdlog::info("navigateToVariation: switching to Analysis mode for SGF editing");
+        setGameMode(GameMode::ANALYSIS);
     }
 
     return result.success;
 }
 
 bool GameThread::navigateToStart() {
-    return navigator->navigateToStart();
+    auto promise = std::make_shared<std::promise<NavResult>>();
+    auto future = promise->get_future();
+    {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        navQueue.push({NavCommand::TO_START, Move(), promise});
+    }
+    wakeGameThread();
+    return future.get().success;
 }
 
 bool GameThread::navigateToEnd() {
-    return navigator->navigateToEnd();
+    auto promise = std::make_shared<std::promise<NavResult>>();
+    auto future = promise->get_future();
+    {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        navQueue.push({NavCommand::TO_END, Move(), promise});
+    }
+    wakeGameThread();
+    return future.get().success;
+}
+
+void GameThread::waitForCommandOrTimeout(int ms) {
+    std::unique_lock<std::mutex> lock(navQueueMutex);
+    navQueueCV.wait_for(lock, std::chrono::milliseconds(ms),
+        [this]() { return !navQueue.empty() || interruptRequested.load(); });
+}
+
+void GameThread::wakeGameThread() {
+    navQueueCV.notify_one();
+    std::lock_guard<std::mutex> lock(playerMutex);
+    if (playerToMove && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+        playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
+    }
+}
+
+void GameThread::processNavigationQueue() {
+    while (true) {
+        NavCommand cmd;
+        {
+            std::lock_guard<std::mutex> lock(navQueueMutex);
+            if (navQueue.empty()) return;
+            cmd = std::move(navQueue.front());
+            navQueue.pop();
+        }
+        NavResult result = executeNavCommand(cmd);
+        cmd.resultPromise->set_value(result);
+    }
+}
+
+NavResult GameThread::executeNavCommand(const NavCommand& cmd) {
+    NavResult result;
+    switch (cmd.type) {
+        case NavCommand::BACK:
+            result.success = navigator->navigateBack();
+            break;
+        case NavCommand::FORWARD:
+            result.success = navigator->navigateForward();
+            // Territory consolidation: if at scored game end, show territory atomically
+            if (result.success && model.game.isAtEndOfNavigation()
+                && model.game.shouldShowTerritory()) {
+                Engine* coach = currentCoach();
+                if (coach) {
+                    model.board.toggleTerritoryAuto(true);
+                    const Board& territory = coach->showterritory(true, model.game.lastStoneMove().col);
+                    navigator->notifyBoardChange(territory);
+                }
+            }
+            break;
+        case NavCommand::TO_START:
+            result.success = navigator->navigateToStart();
+            break;
+        case NavCommand::TO_END:
+            result.success = navigator->navigateToEnd();
+            break;
+        case NavCommand::TO_VARIATION: {
+            auto varResult = navigator->navigateToVariation(cmd.move);
+            result.success = varResult.success;
+            result.newBranch = varResult.newBranch;
+            break;
+        }
+    }
+    return result;
 }
 
 bool GameThread::setGameMode(GameMode mode) {
@@ -639,6 +741,9 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
 
     spdlog::info("SGF file [{}] (game index {}) loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
                  fileName, gameIndex, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, model.game.moveCount());
+
+    // Start game thread for navigation command processing
+    run();
 
     return true;
 }

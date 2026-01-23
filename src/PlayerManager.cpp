@@ -204,6 +204,18 @@ void PlayerManager::removeSgfPlayers() {
         activePlayer[1] = coach;
     }
 
+    // Notify observers so state.black/state.white reflect the new active players
+    if (blackWasSgf) {
+        for (auto* observer : gameObservers) {
+            observer->onPlayerChange(0, players[activePlayer[0]]->getName());
+        }
+    }
+    if (whiteWasSgf) {
+        for (auto* observer : gameObservers) {
+            observer->onPlayerChange(1, players[activePlayer[1]]->getName());
+        }
+    }
+
     spdlog::debug("removeSgfPlayers: {} players remaining, activePlayer=[{}, {}]",
         numPlayers, activePlayer[0], activePlayer[1]);
 }
