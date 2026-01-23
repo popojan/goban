@@ -17,7 +17,7 @@ public:
     virtual void onHandicapChange(const std::vector<Position>& newHandicapStones) {}
     virtual void onBoardSized(int newBoardSize) {}
     virtual void onBoardChange(const Board& board) {}
-    virtual void onPlayerChange(int role, const std::string& name) {}
+    virtual void onPlayerChange(int which, const std::string& name) {}
     //void onGameEnd() {}
 };
 

@@ -24,22 +24,6 @@ enum class GameMode {
     ANALYSIS    ///< Sabaki-like - human plays either color, AI responds based on move source
 };
 
-/** \brief Source of a move for Analysis mode behavior
- *
- * Only used in Analysis mode to determine who plays next:
- * - NONE: Initial state or after mode switch - human plays next
- * - HUMAN: User clicked on board - AI will auto-respond
- * - KIBITZ: Kibitz engine suggested - AI waits for explicit genmove (Space)
- * - AI: AI just played - human plays next
- *
- * Not used in Match mode (player selection based on assigned roles).
- */
-enum class MoveSource {
-    NONE,       ///< Initial/reset state - human plays next
-    HUMAN,      ///< User clicked on board - AI will auto-respond
-    KIBITZ,     ///< Kibitz engine suggested - AI waits for explicit genmove
-    AI          ///< AI's own genmove - human plays next
-};
 
 /** \brief Background thread responsible for rules enforcing
  *
@@ -59,8 +43,6 @@ public:
     Engine* currentKibitz();
 
     Player* currentPlayer();
-
-    void setRole(size_t playerIndex, int role, bool add = false);
 
     std::string getName(size_t id) { return playerManager->getName(id); }
 
@@ -91,14 +73,12 @@ public:
     // Analysis mode support
     bool setGameMode(GameMode mode);  // Returns true if mode change succeeded
     GameMode getGameMode() const { return gameMode; }
-    void triggerGenmove();
-    bool isWaitingForGenmove() const { return waitingForGenmove; }
     void setAiVsAi(bool enabled);
     bool isAiVsAi() const { return aiVsAiMode; }
 
     void loadEngines(std::shared_ptr<Configuration> config);
 
-	size_t activatePlayer(int which, int delta = 1);
+	size_t activatePlayer(int which, size_t newIndex);
 
 	size_t getActivePlayer(int which);
 
@@ -109,8 +89,6 @@ public:
     void addGameObserver(GameObserver* pobserver) {
         gameObservers.push_back(pobserver);
     }
-
-    bool undo(Player * engine, bool doubleUndo);
 
     // Navigation methods for SGF replay
     bool navigateBack();   // Undo one move during navigation
@@ -124,14 +102,7 @@ public:
     bool loadSGF(const std::string& fileName, int gameIndex = 0);
 
 private:
-    // Undo processing result
-    struct UndoResult {
-        bool success = false;
-        bool doubleUndo = false;
-    };
-
-    UndoResult processUndo(Engine* coach);
-    void syncOtherEngines(const Move& move, Player* player, Engine* coach, Engine* kibitzEngine, bool kibitzed, bool doubleUndo);
+    void syncOtherEngines(const Move& move, Player* player, Engine* coach, Engine* kibitzEngine, bool kibitzed);
     void notifyMoveComplete(Engine* coach, const Move& move, Engine* kibitzEngine, bool kibitzed, const std::string& engineComments);
     void setHandicapStones(const std::vector<Position>& stones);
     void applyHandicapStonesToEngines(const std::vector<Position>& stones, Engine* coach);
@@ -150,10 +121,7 @@ private:
 
     // Analysis mode state
     GameMode gameMode = GameMode::MATCH;
-    bool waitingForGenmove = false;
     bool aiVsAiMode = false;
-    MoveSource lastMoveSource = MoveSource::NONE;
-    std::condition_variable genmoveTriggered;
 
     // Navigation (extracted to separate class)
     std::unique_ptr<GameNavigator> navigator;

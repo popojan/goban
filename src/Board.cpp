@@ -66,9 +66,6 @@ std::ostream& operator<< (std::ostream& stream, const Move& move) {
     if(move.spec == Move::PASS) {
         stream << "PASS";
     }
-    else if(move.spec == Move::UNDO) {
-        stream << "UNDO";
-    }
     else if (move.spec == Move::NORMAL){
         stream << move.pos;
     }

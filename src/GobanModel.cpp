@@ -157,10 +157,6 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
 
 }
 
-Move GobanModel::getUndoMove() const {
-    return {Move::UNDO, state.colorToMove};
-}
-
 void GobanModel::onHandicapChange(const std::vector<Position>& stones) {
     handicapStones = stones;
 }
@@ -201,15 +197,13 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
                 state.reservoirWhite -= 1;
         }
     }
-    if(!(move == Move::UNDO)) {
-        // On first move, update PB/PW to capture actual players after setup
-        if (game.moveCount() == 0) {
-            game.updatePlayers(state.black, state.white);
-        }
-        game.move(move);
-        if(!comment.empty()) {
-            game.annotate(comment);
-        }
+    // On first move, update PB/PW to capture actual players after setup
+    if (game.moveCount() == 0) {
+        game.updatePlayers(state.black, state.white);
+    }
+    game.move(move);
+    if(!comment.empty()) {
+        game.annotate(comment);
     }
     state.holdsStone = false;
     changeTurn();
@@ -241,11 +235,10 @@ void GobanModel::onKomiChange(float newKomi) {
     }
 }
 
-void GobanModel::onPlayerChange(int role, const std::string& name) {
-    if(role & Player::BLACK) {
+void GobanModel::onPlayerChange(int which, const std::string& name) {
+    if (which == 0) {
         state.black = name;
-    }
-    if(role & Player::WHITE) {
+    } else {
         state.white = name;
     }
 
@@ -253,10 +246,9 @@ void GobanModel::onPlayerChange(int role, const std::string& name) {
     if (started && game.moveCount() > 0) {
         std::ostringstream val;
         val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
-        if(role & Player::BLACK) {
+        if (which == 0) {
             val << "black=" << name;
-        }
-        if(role & Player::WHITE) {
+        } else {
             val << "white=" << name;
         }
         val << " ";

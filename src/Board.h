@@ -99,7 +99,7 @@ class Move {
 
 public:
 
-    enum Special { INVALID, INTERRUPT, NORMAL, PASS, UNDO, RESIGN, KIBITZED};
+    enum Special { INVALID, INTERRUPT, NORMAL, PASS, RESIGN, KIBITZED};
 
     Move(): spec(INVALID), col(Color::EMPTY) {}
 

@@ -57,10 +57,6 @@ Player* GameThread::currentPlayer() {
     return playerManager->currentPlayer(model.state.colorToMove);
 }
 
-void GameThread::setRole(size_t playerIndex, int role, bool add) {
-    playerManager->setRole(playerIndex, role, add);
-}
-
 void GameThread::interrupt() {
     if (thread) {
         interruptRequested = true;
@@ -82,8 +78,6 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
     // Reset to Match mode on new game
     gameMode = GameMode::MATCH;
-    waitingForGenmove = false;
-    lastMoveSource = MoveSource::NONE;
 
     bool success = true;
 
@@ -125,8 +119,8 @@ size_t GameThread::getActivePlayer(int which) {
     return playerManager->getActivePlayer(which);
 }
 
-size_t GameThread::activatePlayer(int which, int delta) {
-    return playerManager->activatePlayer(which, delta);
+size_t GameThread::activatePlayer(int which, size_t newIndex) {
+    return playerManager->activatePlayer(which, newIndex);
 }
 
 bool GameThread::setFixedHandicap(int handicap) {
@@ -197,33 +191,12 @@ bool GameThread::humanToMove() {
     }
     return false;
 }
-bool GameThread::undo(Player * engine, bool doubleUndo) {
-    bool success = engine->undo();
-    if(success && doubleUndo) {
-        success &= engine->undo();
-    }
-    if (!success) {
-        spdlog::debug("Undo not supported. Replaying game from the beginning.");
-        success = engine->clear() || engine->boardsize(model.getBoardSize());
-        model.game.replay(
-            [&](const Move &move) {
-                success &= engine->play(move);
-            }
-        );
-    }
-    return success;
-}
-
 void GameThread::syncOtherEngines(const Move& move, Player* player, Engine* coach,
-                                   Engine* kibitzEngine, bool kibitzed, bool doubleUndo) {
+                                   Engine* kibitzEngine, bool kibitzed) {
     for (auto p : playerManager->getPlayers()) {
         if (p != reinterpret_cast<Player*>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
             spdlog::debug("syncOtherEngines: syncing player {}", p->getName());
-            if (move == Move::UNDO) {
-                undo(p, doubleUndo);
-            } else {
-                p->play(move);
-            }
+            p->play(move);
         }
     }
 }
@@ -246,41 +219,6 @@ void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
         });
 }
 
-GameThread::UndoResult GameThread::processUndo(Engine* coach) {
-    UndoResult result;
-
-    bool bothHumans = playerManager->areBothPlayersHuman();
-
-    // Single undo if: both humans OR in Analysis mode OR reviewing (not at end of game)
-    // hasNextMove() = true means we're stepped back in history, reviewing moves
-    bool singleUndo = bothHumans || (gameMode == GameMode::ANALYSIS) || model.game.hasNextMove();
-
-    spdlog::debug("processUndo: singleUndo={}, moveCount={}, isNavigating={}, bothHumans={}, gameMode={}",
-        singleUndo, model.game.moveCount(), model.game.isNavigating(), bothHumans, static_cast<int>(gameMode));
-
-    if (singleUndo && model.game.moveCount() > 0) {
-        result.success = coach->undo();
-        spdlog::debug("processUndo: coach->undo() returned {}", result.success);
-        model.game.undo();
-    } else if (currentPlayer()->isTypeOf(Player::HUMAN) && model.game.moveCount() > 1) {
-        // Double undo in Match mode: undo AI's response + human's move
-        result.success = coach->undo();
-        result.success &= coach->undo();
-        model.game.undo();
-        model.game.undo();
-        model.changeTurn();
-        result.doubleUndo = true;
-    }
-
-    // In Analysis mode, after undo, human should play next (not AI)
-    if (result.success && gameMode == GameMode::ANALYSIS) {
-        lastMoveSource = MoveSource::NONE;
-        spdlog::debug("processUndo: Analysis mode undo complete, human plays next");
-    }
-
-    return result;
-}
-
 void GameThread::gameLoop() {
     interruptRequested = false;
     while (model && !interruptRequested) {
@@ -288,29 +226,8 @@ void GameThread::gameLoop() {
         Engine* kibitzEngine = currentKibitz();
         Player* player = currentPlayer();
 
-        // Analysis mode: determine player based on last move source
-        if (gameMode == GameMode::ANALYSIS && !aiVsAiMode) {
-            // If waiting for genmove trigger (after kibitz move), wait here
-            if (waitingForGenmove) {
-                spdlog::debug("Analysis mode: waiting for genmove trigger (Space key)");
-                // Use timeout-based wait to avoid deadlock with playLocalMove
-                // This allows periodic checking without holding mutex continuously
-                while (waitingForGenmove && !interruptRequested && gameMode == GameMode::ANALYSIS) {
-                    std::unique_lock<std::mutex> waitLock(playerMutex);
-                    genmoveTriggered.wait_for(waitLock, std::chrono::milliseconds(100));
-                }
-                if (interruptRequested || gameMode != GameMode::ANALYSIS) continue;
-            }
-
-            // Determine who plays this turn based on last move source
-            if (lastMoveSource == MoveSource::HUMAN || lastMoveSource == MoveSource::KIBITZ) {
-                // Human (click or kibitz) just played → kibitz engine responds
-                player = reinterpret_cast<Player*>(kibitzEngine);
-            } else {
-                // NONE (fresh start) or AI just responded → human plays
-                player = playerManager->getPlayers()[playerManager->getHumanIndex()];
-            }
-        }
+        // In both Match and Analysis mode, player is determined by role + colorToMove
+        // (currentPlayer() already handles this correctly)
 
         if(!hasThreadRunning) {
             hasThreadRunning = true;
@@ -328,8 +245,10 @@ void GameThread::gameLoop() {
             continue;
         }
         bool navigatingHistory = model.game.isNavigating() && !model.game.isAtEndOfNavigation();
-        if (navigatingHistory) {
-            spdlog::debug("Game loop: skipping genmove during navigation (view pos {}/{})",
+        if (navigatingHistory && player && !player->isTypeOf(Player::HUMAN)) {
+            // Only block engine genmove at historical positions.
+            // Human players must still enter genmove (blocking wait) to accept undo/moves.
+            spdlog::debug("Game loop: skipping engine genmove during navigation (view pos {}/{})",
                 model.game.getViewPosition(), model.game.getLoadedMovesCount());
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
@@ -338,7 +257,6 @@ void GameThread::gameLoop() {
         if(coach && player && !interruptRequested) {
             bool success = false;
             bool kibitzed = false;
-            bool doubleUndo = false;
             playerToMove = player;
             //cancel blocking wait for input if human player
             player->suggestMove(Move(Move::INVALID, model.state.colorToMove));
@@ -366,11 +284,6 @@ void GameThread::gameLoop() {
                 playerToMove = nullptr;  // Clear before continue
                 continue;
             }
-            else if (move == Move::UNDO) {
-                auto undoResult = processUndo(coach);
-                success = undoResult.success;
-                doubleUndo = undoResult.doubleUndo;
-            }
             else if (move) {
                 // coach plays
                 success = player == coach
@@ -392,7 +305,7 @@ void GameThread::gameLoop() {
 
                 // Sync other engines (not for resign)
                 if (!(move == Move::RESIGN)) {
-                    syncOtherEngines(move, player, coach, kibitzEngine, kibitzed, doubleUndo);
+                    syncOtherEngines(move, player, coach, kibitzEngine, kibitzed);
                 }
 
                 // Notify observers
@@ -420,20 +333,6 @@ void GameThread::gameLoop() {
                 break;
             }
 
-            // Track move source for Analysis mode
-            if (gameMode == GameMode::ANALYSIS && success && move != Move::INTERRUPT && move != Move::UNDO) {
-                if (player->isTypeOf(Player::ENGINE)) {
-                    lastMoveSource = MoveSource::AI;
-                    spdlog::debug("Analysis mode: AI played, human's turn next");
-                } else if (kibitzed) {
-                    lastMoveSource = MoveSource::KIBITZ;
-                    waitingForGenmove = true;
-                    spdlog::debug("Analysis mode: Kibitz played, waiting for Space to trigger AI");
-                } else {
-                    lastMoveSource = MoveSource::HUMAN;
-                    spdlog::debug("Analysis mode: Human played, AI will auto-respond");
-                }
-            }
 
             if(success && move != Move::INTERRUPT)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -475,11 +374,6 @@ bool GameThread::navigateToVariation(const Move& move) {
             spdlog::info("navigateToVariation: switching to Analysis mode for SGF editing");
             setGameMode(GameMode::ANALYSIS);
         }
-        // Mark as human move so AI auto-responds, clear any waiting state
-        lastMoveSource = MoveSource::HUMAN;
-        waitingForGenmove = false;
-        spdlog::debug("navigateToVariation: Analysis mode - AI should auto-respond, isRunning={}",
-            isRunning());
     }
 
     return result.success;
@@ -507,42 +401,22 @@ bool GameThread::setGameMode(GameMode mode) {
     if (gameMode != mode) {
         gameMode = mode;
         spdlog::info("Game mode changed to: {}", mode == GameMode::MATCH ? "Match" : "Analysis");
-        // Reset waiting state when switching modes
         if (mode == GameMode::MATCH) {
-            waitingForGenmove = false;
             aiVsAiMode = false;
         }
-        // Reset lastMoveSource so human plays first after mode switch
-        lastMoveSource = MoveSource::NONE;
         // Interrupt any blocking human player so game loop re-evaluates with new mode
         if (playerToMove != nullptr && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
             playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
         }
-        // Also wake up if waiting for genmove trigger
-        genmoveTriggered.notify_all();
         return true;
     }
     return false;  // No change (already in requested mode)
-}
-
-void GameThread::triggerGenmove() {
-    std::unique_lock<std::mutex> lock(playerMutex);
-    if (waitingForGenmove) {
-        spdlog::debug("Triggering genmove - AI will respond");
-        waitingForGenmove = false;
-        genmoveTriggered.notify_all();
-    }
 }
 
 void GameThread::setAiVsAi(bool enabled) {
     std::unique_lock<std::mutex> lock(playerMutex);
     aiVsAiMode = enabled;
     spdlog::info("AI vs AI mode: {}", enabled ? "enabled" : "disabled");
-    if (enabled && waitingForGenmove) {
-        // If we're waiting for genmove and AI vs AI is enabled, trigger it
-        waitingForGenmove = false;
-        genmoveTriggered.notify_all();
-    }
 }
 
 void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
@@ -734,46 +608,32 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     
     // Match SGF player names to loaded players (engines)
     // If a name matches an engine exactly, activate that engine; otherwise create a temporary SGF player
-    auto matchPlayerName = [this](const std::string& sgfName, int role) {
-        int which = (role == Player::BLACK) ? 0 : 1;
+    auto matchPlayerName = [this](const std::string& sgfName, int which) {
         auto players = playerManager->getPlayers();
-        spdlog::info("matchPlayerName: sgfName='{}', role={}, which={}, current activePlayer[{}]={}",
-            sgfName, role, which, which, playerManager->getActivePlayer(which));
+        spdlog::info("matchPlayerName: sgfName='{}', which={}, current activePlayer[{}]={}",
+            sgfName, which, which, playerManager->getActivePlayer(which));
 
         // Search for matching player name (skip SGF_PLAYER types from previous loads)
         for (size_t i = 0; i < players.size(); i++) {
-            spdlog::debug("  checking player[{}]='{}' type={}", i, players[i]->getName(),
-                players[i]->isTypeOf(Player::SGF_PLAYER) ? "SGF" : "normal");
             if (players[i]->getName() == sgfName && !players[i]->isTypeOf(Player::SGF_PLAYER)) {
-                // Found matching engine - activate it
-                playerManager->setActivePlayer(which, i);
                 spdlog::info("Matched SGF player '{}' to existing player at index {}", sgfName, i);
-                std::for_each(gameObservers.begin(), gameObservers.end(),
-                    [role, &sgfName](GameObserver* observer) {
-                        observer->onPlayerChange(role, sgfName);
-                    });
+                playerManager->setActivePlayer(which, i);
                 return;
             }
         }
 
-        // No match - create a temporary SGF player
+        // No match found - create a temporary SGF player (acts as human)
         auto* sgfPlayer = new LocalHumanPlayer(sgfName);
-        sgfPlayer->addType(Player::SGF_PLAYER);  // Mark as SGF player for cleanup
+        sgfPlayer->addType(Player::SGF_PLAYER);
         size_t newIndex = addPlayer(sgfPlayer);
         playerManager->setActivePlayer(which, newIndex);
-
-        spdlog::info("Created SGF player '{}' at index {}, activePlayer[{}] now = {}",
-            sgfName, newIndex, which, playerManager->getActivePlayer(which));
-        std::for_each(gameObservers.begin(), gameObservers.end(),
-            [role, &sgfName](GameObserver* observer) {
-                observer->onPlayerChange(role, sgfName);
-            });
+        spdlog::info("Created SGF player '{}' at index {}", sgfName, newIndex);
     };
 
     spdlog::info("loadSGF: matching players - Black='{}', White='{}', players.size={}",
         gameInfo.blackPlayer, gameInfo.whitePlayer, playerManager->getNumPlayers());
-    matchPlayerName(gameInfo.blackPlayer, Player::BLACK);
-    matchPlayerName(gameInfo.whitePlayer, Player::WHITE);
+    matchPlayerName(gameInfo.blackPlayer, 0);
+    matchPlayerName(gameInfo.whitePlayer, 1);
     spdlog::info("loadSGF: after matching - activePlayer=[{}, {}], players.size={}",
         playerManager->getActivePlayer(0), playerManager->getActivePlayer(1), playerManager->getNumPlayers());
 
@@ -785,8 +645,10 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
 
 void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, Engine* coach) {
     int boardSize = model.getBoardSize();
-    for (auto player : playerManager->getPlayers()) {
-        if (player != coach && player->getRole() != Player::NONE) {
+    // Sync handicap stones to active players (if they're engines and not the coach)
+    for (int which = 0; which < 2; which++) {
+        Player* player = playerManager->getPlayers()[playerManager->getActivePlayer(which)];
+        if (player != coach && player->isTypeOf(Player::ENGINE)) {
             player->boardsize(boardSize);
             player->clear();
             for (const auto& stone : stones) {

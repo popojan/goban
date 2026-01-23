@@ -42,57 +42,39 @@ Engine* PlayerManager::currentKibitz() {
 }
 
 Player* PlayerManager::currentPlayer(Color colorToMove) {
-    int roleToMove = colorToMove == Color::BLACK ? Player::BLACK : Player::WHITE;
-    for (auto& player : players) {
-        if (player->hasRole(roleToMove)) return player;
+    int which = colorToMove == Color::BLACK ? 0 : 1;
+    if (activePlayer[which] < players.size()) {
+        return players[activePlayer[which]];
     }
     return nullptr;
 }
 
-void PlayerManager::setRole(size_t playerIndex, int role, bool add) {
-    if (players.size() <= playerIndex) return;
+size_t PlayerManager::activatePlayer(int which, size_t newIndex) {
+    std::lock_guard<std::mutex> lock(mutex);
 
-    Player* player = players[playerIndex];
-    player->setRole(role, add);
-    spdlog::debug("Player[{}] newType = [human = {}, computer = {}] newRole = [black = {}, white = {}]",
-        playerIndex,
-        player->isTypeOf(Player::HUMAN),
-        player->isTypeOf(Player::ENGINE),
-        player->hasRole(Player::BLACK),
-        player->hasRole(Player::WHITE)
-    );
+    if (newIndex >= players.size()) return activePlayer[which];
+    size_t oldp = activePlayer[which];
+    if (newIndex == oldp) return oldp;
 
-    // Interrupt current player if removing role from human
-    if (!add && interruptPlayer) {
+    activePlayer[which] = newIndex;
+
+    // Interrupt old player to unblock any blocking genmove
+    if (interruptPlayer) {
         interruptPlayer();
     }
 
-    // Notify observers when adding a role
-    if (add) {
-        std::for_each(
-            gameObservers.begin(), gameObservers.end(),
-            [player, role](GameObserver* observer) {
-                observer->onPlayerChange(role, player->getName());
-            }
-        );
-    }
-}
+    // Notify observers of player change
+    std::for_each(
+        gameObservers.begin(), gameObservers.end(),
+        [which, this](GameObserver* observer) {
+            observer->onPlayerChange(which, players[activePlayer[which]]->getName());
+        }
+    );
 
-size_t PlayerManager::activatePlayer(int which, int delta) {
-    std::lock_guard<std::mutex> lock(mutex);
+    spdlog::debug("activatePlayer: which={}, old={}, new={}, name='{}'",
+        which, oldp, newIndex, players[newIndex]->getName());
 
-    size_t oldp = activePlayer[which];
-    size_t newp = (oldp + delta) % numPlayers;
-
-    activePlayer[which] = newp;
-
-    int role = which == 0 ? Player::BLACK : Player::WHITE;
-
-    // setRole doesn't lock (observer notification is safe)
-    setRole(oldp, role, false);
-    setRole(newp, role, true);
-
-    return newp;
+    return newIndex;
 }
 
 size_t PlayerManager::getActivePlayer(int which) const {
@@ -166,7 +148,7 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
                                 players[coach]->getName());
                         }
                     }
-                    setRole(id, role, true);
+                    players[id]->setRole(role, true);
                 }
             }
         }
@@ -214,9 +196,13 @@ void PlayerManager::removeSgfPlayers() {
 
     numPlayers = players.size();
 
-    // Only reset to defaults if the active player was an SGF player that got removed
-    if (blackWasSgf) activePlayer[0] = human;
-    if (whiteWasSgf) activePlayer[1] = coach;
+    // Reset to defaults if the active player was an SGF player
+    if (blackWasSgf) {
+        activePlayer[0] = human;
+    }
+    if (whiteWasSgf) {
+        activePlayer[1] = coach;
+    }
 
     spdlog::debug("removeSgfPlayers: {} players remaining, activePlayer=[{}, {}]",
         numPlayers, activePlayer[0], activePlayer[1]);

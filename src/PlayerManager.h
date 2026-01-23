@@ -39,13 +39,10 @@ public:
     Engine* currentKibitz();
     Player* currentPlayer(Color colorToMove);
 
-    // Role management
-    void setRole(size_t playerIndex, int role, bool add);
-
-    // Active player management
-    size_t activatePlayer(int which, int delta);
+    // Active player management (activePlayer[] is the single source of truth for who plays each color)
+    size_t activatePlayer(int which, size_t newIndex);
     size_t getActivePlayer(int which) const;
-    void setActivePlayer(int which, size_t index);  // For SGF loading
+    void setActivePlayer(int which, size_t index);  // Index-only, no notification
 
     // Check if both active players are human (used for Analysis mode check)
     bool areBothPlayersHuman() const;
@@ -64,7 +61,7 @@ public:
     size_t getCoachIndex() const { return coach; }
     size_t getKibitzIndex() const { return kibitz; }
 
-    // Set callback for interrupting current player (used by setRole)
+    // Set callback for interrupting current player (used by activatePlayer)
     void setInterruptCallback(InterruptCallback callback) { interruptPlayer = std::move(callback); }
 
     // Mutex access for external synchronization (e.g., game loop)

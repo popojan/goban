@@ -173,19 +173,12 @@ bool GobanControl::command(const std::string& cmd) {
 
     }
     else if (cmd == "play once") {
-        // Start engine if not running (consistent with board click behavior)
+        // Start game loop if not running (needed for kibitz to work)
         if (!engine.isRunning() && !model.isGameOver) {
             engine.run();
-            view.requestRepaint();
         }
-        // In Analysis mode, "play once" triggers genmove if waiting; otherwise kibitz
-        else if (engine.getGameMode() == GameMode::ANALYSIS && engine.isWaitingForGenmove()) {
-            engine.triggerGenmove();
-            view.requestRepaint();
-        } else {
-            engine.playKibitzMove();
-            view.requestRepaint();
-        }
+        engine.playKibitzMove();
+        view.requestRepaint();
     }
     else if (cmd == "toggle_analysis_mode") {
         if (engine.getGameMode() == GameMode::MATCH) {
@@ -200,11 +193,7 @@ bool GobanControl::command(const std::string& cmd) {
         view.requestRepaint();
     }
     else if (cmd == "genmove") {
-        // Trigger AI to play (when waiting for genmove in Analysis mode)
-        if (engine.isWaitingForGenmove()) {
-            engine.triggerGenmove();
-            view.requestRepaint();
-        }
+        // Reserved for future "resume match from here" feature
     }
     else if (cmd == "toggle ai vs ai") {
         engine.setAiVsAi(!engine.isAiVsAi());
@@ -243,7 +232,16 @@ bool GobanControl::command(const std::string& cmd) {
         view.clearView();
     }
     else if (cmd == "undo move") {
-        engine.playLocalMove(model.getUndoMove());
+        if (!engine.isThinking()) {
+            // In match mode vs engine at end of game, double-undo to skip AI's response
+            bool doubleUndo = engine.getGameMode() == GameMode::MATCH
+                && !model.game.hasNextMove()
+                && model.game.moveCount() > 1;
+            if (engine.navigateBack()) {
+                if (doubleUndo) engine.navigateBack();
+                view.updateNavigationOverlay();
+            }
+        }
     }
     else if (cmd == "navigate_start" || cmd == "navigate_end" ||
              cmd == "navigate_back" || cmd == "navigate_forward") {
@@ -501,29 +499,35 @@ bool GobanControl::setHandicap(int handicap){
 }
 
 void GobanControl::togglePlayer(int which, int delta) {
-    engine.activatePlayer(which, delta);
+    size_t oldIdx = engine.getActivePlayer(which);
+    size_t numPlayers = engine.getPlayers().size();
+    size_t newIdx = (oldIdx + numPlayers + delta) % numPlayers;
+    engine.activatePlayer(which, newIdx);
     model.state.holdsStone = false;
-    // Save player to user settings
-    std::string playerName = engine.getName(engine.getActivePlayer(which));
-    if (which == 0) {
-        UserSettings::instance().setBlackPlayer(playerName);
-    } else {
-        UserSettings::instance().setWhitePlayer(playerName);
+    // Save player to user settings (skip temporary SGF players)
+    auto players = engine.getPlayers();
+    if (newIdx < players.size() && !players[newIdx]->isTypeOf(Player::SGF_PLAYER)) {
+        if (which == 0) {
+            UserSettings::instance().setBlackPlayer(players[newIdx]->getName());
+        } else {
+            UserSettings::instance().setWhitePlayer(players[newIdx]->getName());
+        }
     }
 }
 
 void GobanControl::switchPlayer(int which, int newPlayerIndex) {
-    int idx = engine.getActivePlayer(which);
-    engine.activatePlayer(which, newPlayerIndex - idx);
+    engine.activatePlayer(which, static_cast<size_t>(newPlayerIndex));
     model.state.holdsStone = false;
-    // Save player to user settings (skip during UI sync)
+    // Save player to user settings (skip during init and for temporary SGF players)
     if (!syncingUI) {
-        std::string playerName = engine.getName(engine.getActivePlayer(which));
-        spdlog::info("switchPlayer: which={}, newIdx={}, oldIdx={}, playerName='{}'", which, newPlayerIndex, idx, playerName);
-        if (which == 0) {
-            UserSettings::instance().setBlackPlayer(playerName);
-        } else {
-            UserSettings::instance().setWhitePlayer(playerName);
+        auto players = engine.getPlayers();
+        size_t idx = engine.getActivePlayer(which);
+        if (idx < players.size() && !players[idx]->isTypeOf(Player::SGF_PLAYER)) {
+            if (which == 0) {
+                UserSettings::instance().setBlackPlayer(players[idx]->getName());
+            } else {
+                UserSettings::instance().setWhitePlayer(players[idx]->getName());
+            }
         }
     }
 }

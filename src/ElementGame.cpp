@@ -161,11 +161,12 @@ void ElementGame::refreshPlayerDropdowns() {
         return;
     }
 
-    // Save target selections BEFORE clearing (Remove() triggers change events that modify activePlayer)
+    // Save target selections BEFORE clearing
     const auto targetBlack = static_cast<int>(engine.getActivePlayer(0));
     const auto targetWhite = static_cast<int>(engine.getActivePlayer(1));
 
-    // Clear existing options (remove from end to avoid index shifting)
+    // Clear and repopulate (change events during this are harmless -
+    // intermediate activatePlayer calls are corrected by final SetSelection)
     while (selectBlack->GetNumOptions() > 0) {
         selectBlack->Remove(selectBlack->GetNumOptions() - 1);
     }
@@ -173,7 +174,6 @@ void ElementGame::refreshPlayerDropdowns() {
         selectWhite->Remove(selectWhite->GetNumOptions() - 1);
     }
 
-    // Repopulate from current players list
     const auto players = engine.getPlayers();
     for (unsigned i = 0; i < players.size(); ++i) {
         std::ostringstream ss;
@@ -184,7 +184,7 @@ void ElementGame::refreshPlayerDropdowns() {
         selectWhite->Add(playerName.c_str(), playerIndex.c_str());
     }
 
-    // Set selection using saved values
+    // Final selection corrects any intermediate changes from clear events
     selectBlack->SetSelection(targetBlack);
     selectWhite->SetSelection(targetWhite);
 
