@@ -354,7 +354,16 @@ void GameThread::gameLoop() {
 void GameThread::playLocalMove(const Move& move) {
     std::unique_lock<std::mutex> lock(playerMutex);
     spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), playerToMove ? "set" : "null");
-    if(playerToMove) playerToMove->suggestMove(move);
+    if (playerToMove) {
+        playerToMove->suggestMove(move);
+    } else if (model.started) {
+        // Game loop hasn't entered genmove yet - pre-load the move.
+        // LocalHumanPlayer::genmove() will pick it up without blocking.
+        Player* player = currentPlayer();
+        if (player && player->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+            player->suggestMove(move);
+        }
+    }
 }
 
 void GameThread::playKibitzMove() {
@@ -394,13 +403,6 @@ bool GameThread::navigateToVariation(const Move& move) {
     }
     wakeGameThread();
     NavResult result = future.get();
-
-    // Analysis mode switch (no GTP needed, safe on UI thread)
-    if (result.success && result.newBranch && gameMode == GameMode::MATCH) {
-        spdlog::info("navigateToVariation: switching to Analysis mode for SGF editing");
-        setGameMode(GameMode::ANALYSIS);
-    }
-
     return result.success;
 }
 
@@ -741,6 +743,9 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
 
     spdlog::info("SGF file [{}] (game index {}) loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
                  fileName, gameIndex, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, model.game.moveCount());
+
+    // Finished games enter Analysis mode (review), unfinished enter Match mode (continue)
+    gameMode = model.game.hasGameResult() ? GameMode::ANALYSIS : GameMode::MATCH;
 
     // Start game thread for navigation command processing
     run();

@@ -67,14 +67,8 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 Move newMove(coord, colorToMove);
                 if (engine.navigateToVariation(newMove)) {
                     view.updateNavigationOverlay();
-                    // Sync analysis mode menu if mode changed
-                    if (engine.getGameMode() == GameMode::ANALYSIS) {
-                        parent->OnMenuToggle("toggle_analysis_mode", true);
-                    }
-                    // Start game loop for AI response (after navigateToVariation completes)
+                    model.start();  // New variation = game continues
                     if (!engine.isRunning()) {
-                        spdlog::debug("Starting game loop for AI auto-response");
-                        model.start();
                         engine.run();
                     }
                 }
@@ -86,9 +80,11 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 newGame(model.getBoardSize());
                 playNow = false;
             }
-            else if(!engine.isRunning() && !model.isGameOver) {
+            else if(!model.isGameOver) {
                model.start();
-               engine.run();
+               if (!engine.isRunning()) {
+                   engine.run();
+               }
             }
             spdlog::debug("engine.isRunning() = {}", engine.isRunning());
             if(playNow) {
@@ -178,10 +174,12 @@ bool GobanControl::command(const std::string& cmd) {
 
     }
     else if (cmd == "play once") {
-        // Start game loop if not running (needed for kibitz to work)
-        if (!engine.isRunning() && !model.isGameOver) {
+        // Activate genmove if needed (for kibitz to work)
+        if (!model.isGameOver) {
             model.start();
-            engine.run();
+            if (!engine.isRunning()) {
+                engine.run();
+            }
         }
         engine.playKibitzMove();
         view.requestRepaint();
@@ -223,9 +221,11 @@ bool GobanControl::command(const std::string& cmd) {
         }
     }
     else if (cmd == "start") {
-        if(!engine.isRunning() && !model.isGameOver) {
+        if (!model.isGameOver) {
             model.start();
-            engine.run();
+            if (!engine.isRunning()) {
+                engine.run();
+            }
         }
     }
     else if (cmd == "reset camera") {
@@ -240,12 +240,7 @@ bool GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "undo move") {
         if (!engine.isThinking()) {
-            // In match mode vs engine at end of game, double-undo to skip AI's response
-            bool doubleUndo = engine.getGameMode() == GameMode::MATCH
-                && !model.game.hasNextMove()
-                && model.game.moveCount() > 1;
             if (engine.navigateBack()) {
-                if (doubleUndo) engine.navigateBack();
                 view.updateNavigationOverlay();
             }
         }

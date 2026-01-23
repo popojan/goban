@@ -365,6 +365,7 @@ void ElementGame::ProcessEvent(Rml::Event& event)
             // Sync dropdowns with SGF game settings
             refreshPlayerDropdowns();
             refreshGameSettingsDropdowns();
+            OnMenuToggle("toggle_analysis_mode", engine.getGameMode() == GameMode::ANALYSIS);
         } else {
             // Apply user settings if no SGF was loaded
             auto& settings = UserSettings::instance();

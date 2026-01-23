@@ -76,6 +76,8 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
                         gameElement->getGameThread().loadSGF(filePath, gameIndex);
                         gameElement->refreshPlayerDropdowns();  // Update dropdowns with SGF player names
                         gameElement->refreshGameSettingsDropdowns();  // Sync board/komi/handicap with SGF
+                        gameElement->OnMenuToggle("toggle_analysis_mode",
+                            gameElement->getGameThread().getGameMode() == GameMode::ANALYSIS);
                         gameElement->updateNavigationOverlay();  // Update markup and variation overlays
                         gameElement->requestRepaint();  // Ensure UI updates
                     }
