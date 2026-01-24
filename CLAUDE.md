@@ -38,7 +38,7 @@ make
 ./goban
 
 # Chinese translation with suppressed logging
-./goban --verbosity error --config data/zh/config.json
+./goban --verbosity error --config config/zh.json
 ```
 
 ## Architecture Overview
@@ -105,23 +105,23 @@ The codebase supports multiple platforms with platform-specific implementations 
 ### Key Directories
 
 - **src/**: Main source code
-- **data/**: Configuration files, shaders, fonts, sounds, GUI resources
-- **data/shaders/**: GLSL shader files for ray-traced rendering
-- **data/gui/**: libRocket GUI templates and stylesheets
-- **data/sgf/**: SGF game record storage
+- **config/**: Configuration files, shaders, fonts, sounds, GUI resources
+- **config/shaders/**: GLSL shader files for ray-traced rendering
+- **config/gui/**: libRocket GUI templates and stylesheets
+- **games/**: SGF game record storage
 - **engine/**: External Go engines (GNU Go, KataGo, etc.)
 - **cmake/**: CMake find modules for dependencies
 
 ### Configuration System
 
 The application uses JSON configuration files:
-- **data/config.json**: Main configuration with bot definitions, controls, shaders
-- **data/zh/config.json**: Chinese language configuration
+- **config/base.json**: Main configuration with bot definitions, controls, shaders
+- **config/zh.json**: Chinese language configuration
 - Bot configuration includes GTP engine paths, parameters, and message parsing
 
 ### SGF Game Records
 
-- Games are automatically saved to `data/sgf/` directory
+- Games are automatically saved to `games/` directory
 - Each session creates a timestamped SGF file
 - SGF files contain complete game records with move history
 
