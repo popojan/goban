@@ -46,3 +46,6 @@ publish/
 # Claude Code local instructions
 CLAUDE.local.md
 wiki/
+
+# Current user configuration
+user.json

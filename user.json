@@ -11,24 +11,5 @@
       "y": -0.04205499589443207,
       "z": -0.21725745499134064
     }
-  },
-  "fullscreen": true,
-  "game": {
-    "black_player": "Human",
-    "board_size": 13,
-    "handicap": 0,
-    "komi": 7.5,
-    "white_player": "Human"
-  },
-  "last_config": "./config/cs.json",
-  "last_sgf_path": "./games/2026-01-24.sgf",
-  "shader": {
-    "contrast": 0.0,
-    "dof": 0.0925000011920929,
-    "eof": 0.07249999791383743,
-    "gamma": 1.0,
-    "name": "Red Carpet"
-  },
-  "sound_enabled": true,
-  "start_fresh": false
+  }
 }
