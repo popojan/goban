@@ -29,15 +29,8 @@ void main() {
 
     vec3 tt = (mat4(col.x,0.0,col.z,0.0,0.0,1.0,0.0,0.0,-col.z,0.0,col.x,0.0,0.0,0.0,0.0,1.0)*vec4(iTranslate, 0.0)).xyz;
 
-    // Compute effective camera distance along z-axis (independent of rotation)
-    // ro.z is negative (camera behind board), iTranslate.z positive = zoom in
-    float camDist = -ro.z - iTranslate.z;
-
-    // Scale stereo base to keep on-screen deviation bounded
-    // - At refDist or further: use full eof (user's tuned value)
-    // - Closer than refDist: reduce eof proportionally to maintain ~1/30 deviation
     float refDist = 3.0;
-    float scaleFactor = min(1.0, camDist / refDist);
+    float scaleFactor = length((m*vec4(ro, 1.0)).xyz + tt) / refDist;
     vec4 scaledEof = eoff * scaleFactor;
 
     // Left eye at negative X, right eye at positive X
