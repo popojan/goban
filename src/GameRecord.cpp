@@ -567,23 +567,46 @@ void GameRecord::appendGameToDocument() {
     }
 
     if (doc == nullptr) {
-        doc = F::CreateDocument(game);
-        spdlog::info("appendGameToDocument: created new doc with first game (numGames={})", numGames);
-    } else {
-        // Safety check: verify game isn't already in the document
-        auto existingGames = doc->GetGames();
-        for (const auto& g : existingGames) {
-            if (g == game) {
-                spdlog::warn("appendGameToDocument: game already in doc, skipping");
-                gameInDocument = true;
-                return;
+        // Check if daily session file already exists - load it to preserve previous games
+        if (std::filesystem::exists(defaultFileName)) {
+            try {
+                auto reader = F::CreateDocumentReader();
+                auto readResult = reader->ReadSgfFile(defaultFileName);
+                if (readResult && readResult->IsSgfDataValid()) {
+                    doc = readResult->GetDocument();
+                    numGames = doc->GetGames().size();
+                    spdlog::info("appendGameToDocument: loaded existing session file with {} games", numGames);
+                } else {
+                    spdlog::warn("appendGameToDocument: existing session file invalid, creating new doc");
+                    doc = F::CreateDocument(game);
+                    numGames = 0;
+                }
+            } catch (const std::exception& e) {
+                spdlog::error("appendGameToDocument: failed to load existing session: {}", e.what());
+                doc = F::CreateDocument(game);
+                numGames = 0;
             }
+        } else {
+            doc = F::CreateDocument(game);
+            numGames = 0;
+            spdlog::info("appendGameToDocument: no existing session file, created new doc");
         }
-        doc->AppendGame(game);
-        ++numGames;
-        spdlog::info("appendGameToDocument: appended game #{} to existing doc", numGames);
     }
+
+    // Safety check: verify game isn't already in the document
+    auto existingGames = doc->GetGames();
+    for (const auto& g : existingGames) {
+        if (g == game) {
+            spdlog::warn("appendGameToDocument: game already in doc, skipping");
+            gameInDocument = true;
+            return;
+        }
+    }
+
+    doc->AppendGame(game);
+    ++numGames;
     gameInDocument = true;
+    spdlog::info("appendGameToDocument: appended game #{} to doc (total: {})", numGames, numGames);
 }
 
 void GameRecord::saveAs(const std::string& fileName) {
@@ -604,10 +627,21 @@ void GameRecord::saveAs(const std::string& fileName) {
 
     std::string fn(fileName.length() > 0 ? fileName : defaultFileName);
 
-    // Create backup before overwriting (protection against disk issues)
+    // Rotating backup system: keep .bak (latest) and .bak.old (previous)
+    // This protects against both disk failures AND logic bugs in save code
     if (std::filesystem::exists(fn)) {
         std::string backupPath = fn + ".bak";
+        std::string oldBackupPath = fn + ".bak.old";
+
         try {
+            // Rotate: .bak → .bak.old (keep previous backup)
+            if (std::filesystem::exists(backupPath)) {
+                std::filesystem::copy_file(backupPath, oldBackupPath,
+                    std::filesystem::copy_options::overwrite_existing);
+                spdlog::debug("Rotated backup: {} → {}", backupPath, oldBackupPath);
+            }
+
+            // Create new backup: file → .bak
             std::filesystem::copy_file(fn, backupPath,
                 std::filesystem::copy_options::overwrite_existing);
             spdlog::debug("Created backup: {}", backupPath);
