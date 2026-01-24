@@ -1,8 +1,12 @@
 # Red Carpet Goban Documentation
 
-Ray-traced 3D Go/Baduk/Weiqi board application with GLSL shaders, GTP engine support, and SGF game records. Runs on Windows, Linux, and macOS.
+Ray-traced 3D Go/Baduk/Weiqi board application with GLSL shaders, GTP engine support, and SGF game records.
 
-**Downloads**: Full bundles with engines available at [hraj.si/goban](https://hraj.si/goban)
+**Downloads**:
+- [hraj.si/goban](https://hraj.si/goban) - Windows bundle with GNU Go included
+- [GitHub Releases](https://github.com/popojan/goban/releases) - Bare executables for all platforms
+
+**Cross-platform setup**: Download the Windows bundle for config/data files, then replace the executable with your platform's build from GitHub releases.
 
 ## Documentation
 

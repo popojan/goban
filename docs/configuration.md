@@ -4,21 +4,24 @@ Red Carpet Goban uses JSON configuration files to define GTP engines, keyboard c
 
 ## Configuration Files
 
-The application looks for configuration in this order:
+The application uses a hierarchical configuration system where language configs extend a shared base:
+
+- **[config/base.json](https://github.com/popojan/goban/blob/master/config/base.json)** - Shared settings (bots, controls, shaders, sounds, fonts)
+- **Language configs** - Extend base.json with GUI paths:
+  - [config/en.json](https://github.com/popojan/goban/blob/master/config/en.json) - English
+  - [config/cs.json](https://github.com/popojan/goban/blob/master/config/cs.json) - Czech
+  - [config/zh.json](https://github.com/popojan/goban/blob/master/config/zh.json) - Chinese
+  - [config/ja.json](https://github.com/popojan/goban/blob/master/config/ja.json) - Japanese
+  - [config/ko.json](https://github.com/popojan/goban/blob/master/config/ko.json) - Korean
+
+The application loads configuration in this order:
 1. Path specified via `-c` / `--config` command line argument
 2. Last used config stored in [user.json](user-settings.md)
 3. Default: `config/en.json`
 
-### Language Configurations
-
-Pre-configured language variants:
-- [config/en.json](https://github.com/popojan/goban/blob/master/config/en.json) - English
-- [config/cs.json](https://github.com/popojan/goban/blob/master/config/cs.json) - Czech
-- [config/zh.json](https://github.com/popojan/goban/blob/master/config/zh.json) - Chinese
-- [config/ja.json](https://github.com/popojan/goban/blob/master/config/ja.json) - Japanese
-- [config/ko.json](https://github.com/popojan/goban/blob/master/config/ko.json) - Korean
-
-These extend [config/base.json](https://github.com/popojan/goban/blob/master/config/base.json) with language-specific GUI paths.
+**To modify engine configurations, controls, or shaders**: Edit `config/base.json` (applies to all languages).
+**To change GUI language**: Edit the specific language config (e.g., `config/en.json`) to point to a different GUI folder.
+**To modify GUI layout**: Edit the RML files in `config/gui/<lang>/` (e.g., `config/gui/en/goban.rml`).
 
 ## Configuration Sections
 
@@ -48,7 +51,13 @@ These names appear in the GUI and are recorded in SGF game files.
 
 ## Bots
 
-GTP engine configurations. Any GTP-compliant engine can be used.
+GTP engine configurations defined in `config/base.json`. Any GTP-compliant engine can be used.
+
+The bundled configuration includes several predefined engines:
+- **GNU Go 3.8** - Included and enabled by default (`main: 1`)
+- **KataGo** (multiple models) - Predefined but disabled (`enabled: 0`)
+- **Pachi** - Predefined but disabled
+- **Zen 6/7** - Predefined but disabled
 
 ```json
 "bots": [
@@ -69,6 +78,8 @@ GTP engine configurations. Any GTP-compliant engine can be used.
   }
 ]
 ```
+
+**To enable a predefined engine**: Install the engine binary in the specified path, then change `"enabled": 0` to `"enabled": 1` in `config/base.json`.
 
 ### Bot Attributes
 
