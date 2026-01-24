@@ -9,5 +9,5 @@ void main(void)
     vec3 cr = render(roor, normalize(rdbr));
     float gl = (cl.r+cl.g+cl.b)/3.0;
     float gr = (cr.r+cr.g+cr.b)/3.0;
-    glFragColor = vec3(gl, 0.0, gr);
+    glFragColor = vec3(gl, 0.1, gr);
 }
