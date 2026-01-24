@@ -12,12 +12,12 @@
 
 class Engine;
 
-/** \brief Manages player and engine lifecycle and role assignment
+/** \brief Manages player and engine lifecycle
  *
  * Extracted from GameThread to separate player management from game loop.
  * Handles:
  * - Player/engine registration and ownership
- * - Role assignment (BLACK, WHITE, COACH, KIBITZ)
+ * - Coach and kibitz engine tracking via indices
  * - Active player tracking and switching
  * - Engine loading from configuration
  */

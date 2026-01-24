@@ -28,15 +28,15 @@ size_t PlayerManager::addPlayer(Player* player) {
 }
 
 Engine* PlayerManager::currentCoach() const {
-    for (auto& engine : engines) {
-        if (engine->hasRole(Player::COACH)) return engine;
+    if (coach < players.size() && players[coach]->isTypeOf(Player::ENGINE)) {
+        return dynamic_cast<Engine*>(players[coach]);
     }
     return nullptr;
 }
 
 Engine* PlayerManager::currentKibitz() const {
-    for (auto& engine : engines) {
-        if (engine->hasRole(Player::KIBITZ)) return engine;
+    if (kibitz < players.size() && players[kibitz]->isTypeOf(Player::ENGINE)) {
+        return dynamic_cast<Engine*>(players[kibitz]);
     }
     return nullptr;
 }
@@ -116,15 +116,12 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
                 auto kibitzFlag = it->value("kibitz", 0);
                 auto messages = it->value("messages", nlohmann::json::array());
 
-                int role = Player::SPECTATOR;
-
                 if (!command.empty()) {
                     auto engine = new GtpEngine(command, parameters, path, name, messages);
                     size_t id = addEngine(engine);
 
                     if (main) {
                         if (!hasCoach) {
-                            role |= Player::COACH;
                             hasCoach = true;
                             coach = id;
                             spdlog::info("Setting [{}] engine as coach and referee.",
@@ -137,7 +134,6 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
                     }
                     if (kibitzFlag) {
                         if (!hasKibitz) {
-                            role |= Player::KIBITZ;
                             hasKibitz = true;
                             kibitz = id;
                             spdlog::info("Setting [{}] engine as trusted kibitz.",
@@ -148,7 +144,6 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
                                 players[coach]->getName());
                         }
                     }
-                    players[id]->setRole(role, true);
                 }
             }
         }
@@ -156,7 +151,6 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
             kibitz = coach;
             spdlog::info("No kibitz set. Defaulting to [{}] coach engine.",
                 players[kibitz]->getName());
-            players[coach]->setRole(players[coach]->getRole() | Player::KIBITZ);
         }
     }
 

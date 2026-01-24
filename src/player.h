@@ -13,10 +13,9 @@
 class Player
 {
 public:
-    enum Role { NONE = 0, WHITE = 1, BLACK = 2, COACH = 4, SPECTATOR = 8, KIBITZ = 16 };
     enum Type { LOCAL = 1, HUMAN = 2, ENGINE = 4, SGF_PLAYER = 8 };
 
-    Player(std::string  name, int role, int type) : name(std::move(name)), role(role), type(type) {
+    Player(std::string  name, int type) : name(std::move(name)), type(type) {
 
     }
     virtual Move genmove(const Color& colorToMove) = 0;
@@ -28,25 +27,18 @@ public:
     virtual bool clear() { return true; }
     virtual bool undo() { return true; }
     virtual std::string getName() { return name; }
-    [[nodiscard]] bool hasRole(int r) const { return (role & r) != 0;  }
-    void setRole(int r, bool add = true) {
-        if(add) role |=  r;
-        else role &= ~r;
-    }
-    [[nodiscard]] int getRole() const {return role;}
     virtual void suggestMove(const Move& move) { (void)move; }
     [[nodiscard]] bool isTypeOf(int t) const { return (type & t) != 0; }
     void addType(int t) { type |= t; }
     virtual ~Player() = default;
 protected:
     std::string name;
-    int role;
     int type;
 };
 
 class LocalHumanPlayer: public Player {
 public:
-    explicit LocalHumanPlayer(const std::string& name): Player(name, NONE, LOCAL | HUMAN) {}
+    explicit LocalHumanPlayer(const std::string& name): Player(name, LOCAL | HUMAN) {}
     Move genmove(const Color& ) override {
         Move ret(move);
         if(move == Move::INVALID) {
@@ -76,7 +68,7 @@ protected:
 class Engine: public Player
 {
 public:
-    explicit Engine(const std::string& name) : Player(name, NONE, LOCAL | ENGINE), board(19)  {}
+    explicit Engine(const std::string& name) : Player(name, LOCAL | ENGINE), board(19)  {}
     Move genmove(const Color& colorToMove) override = 0;
     virtual const Board& showboard() = 0;
     virtual const Board& showterritory(bool final, Color colorToMove) = 0;
@@ -89,7 +81,7 @@ protected:
 
 class SGFPlayer : public Player {
 public:
-    explicit SGFPlayer(const std::string& name = "SGF Player") : Player(name, NONE, LOCAL), currentMoveIndex(0) {}
+    explicit SGFPlayer(const std::string& name = "SGF Player") : Player(name, LOCAL | SGF_PLAYER), currentMoveIndex(0) {}
     
     void setMoves(const std::vector<Move>& moves) {
         sgfMoves = moves;
