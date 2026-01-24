@@ -155,24 +155,6 @@
       "vertex": "./config/shaders/vertex/stereo.glsl",
       "fragment": "./config/shaders/fragment/thin_stereo.glsl",
       "height": 0.85
-    },
-    {
-      "name": "(legacy) Red Carpet",
-      "vertex": "./config/shaders/vertex/mono.glsl",
-      "fragment": "./config/shaders/legacy/fragment.glsl",
-      "height": 0.85
-    },
-    {
-      "name": "(legacy) Minimal Thin",
-      "vertex": "./config/shaders/vertex/mono.glsl",
-      "fragment": "./config/shaders/legacy/fragment.25D.glsl",
-      "height": 0.85
-    },
-    {
-      "name": "(legacy) Minimal Flat",
-      "vertex": "./config/shaders/vertex/mono.glsl",
-      "fragment": "./config/shaders/legacy/fragment.2D.glsl",
-      "height": 0.0
     }
   ],
   "overlay_shaders": {
