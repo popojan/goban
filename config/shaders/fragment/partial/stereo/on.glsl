@@ -7,6 +7,7 @@ void main(void)
 {
     vec3 cl = render(rool, normalize(rdbl));
     vec3 cr = render(roor, normalize(rdbr));
-    //glFragColor = vec3(0.9707,0.0,0.0)*cl.rgb + vec3(0.0,0.7709,0.1989)*cr.rgb;
-    glFragColor = vec3(cl.r, cr.g, cr.b);
+    float gl = (cl.r+cl.g+cl.b)/3.0;
+    float gr = (cr.r+cr.g+cr.b)/3.0;
+    glFragColor = vec3(gl, 0.0, gr);
 }
