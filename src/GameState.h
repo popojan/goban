@@ -47,7 +47,7 @@ public:
 
     Message msg;
 
-    GameState(): colorToMove(Color::BLACK), black(), white(), capturedBlack(0), capturedWhite(0),
+    GameState(): colorToMove(Color::BLACK), capturedBlack(0), capturedWhite(0),
                  reservoirBlack(32), reservoirWhite(32),
                  komi(0.5f), handicap(0), result(0.0f), cmd("xxx"), msg(PAUSED),
                  reason(NO_REASON), scoreDelta(0.0f), winner(Color::EMPTY), metricsReady(false),

@@ -188,7 +188,7 @@ bool GameThread::humanToMove() const {
     if(playerToMove) {
         return currentPlayer()->isTypeOf(Player::HUMAN);
     }
-    return false;
+    return true;
 }
 void GameThread::syncOtherEngines(const Move& move, const Player* player, const Engine* coach,
                                    const Engine* kibitzEngine, bool kibitzed) const {

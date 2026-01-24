@@ -750,7 +750,7 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         // External SGFs are ephemeral - if modified, they become part of daily session
         spdlog::debug("loadFromSGF: comparing fileName='{}' with defaultFileName='{}'",
             fileName, defaultFileName);
-        if (fileName == defaultFileName) {
+        if (fileName == defaultFileName && doc == nullptr) {
             doc = loadedDoc->GetDocument();
             numGames = games.size();
             gameInDocument = true;  // Game is already in doc, prevent re-append

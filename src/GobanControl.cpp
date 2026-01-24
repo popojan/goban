@@ -95,7 +95,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
             }
             spdlog::debug("engine.isRunning() = {}", engine.isRunning());
             if(playNow) {
-                if(const bool humanMove = engine.humanToMove(); model.state.holdsStone || !humanMove) {
+                if(!engine.humanToMove() || model.state.holdsStone) {
                     const auto move = engine.getLocalMove(coord);
                     engine.playLocalMove(move);
                     view.requestRepaint();
