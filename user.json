@@ -15,7 +15,7 @@
   "fullscreen": true,
   "game": {
     "black_player": "Human",
-    "board_size": 9,
+    "board_size": 13,
     "handicap": 0,
     "komi": 7.5,
     "white_player": "Human"

@@ -313,10 +313,18 @@ void GameThread::gameLoop() {
         if (gameMode == GameMode::ANALYSIS && coach && !interruptRequested) {
             // Analysis mode: human plays either color, engine responds to human moves
             Player* humanPlayer = playerManager->getPlayers()[playerManager->getHumanIndex()];
-            playerToMove = humanPlayer;
-            player->suggestMove(queuedMove);
+
+            // Atomically read and clear queuedMove under lock
+            Move suggestedMove;
+            {
+                std::unique_lock<std::mutex> qLock(playerMutex);
+                suggestedMove = queuedMove;
+                queuedMove = Move(Move::INVALID, model.state.colorToMove);
+                playerToMove = humanPlayer;
+            }
+
+            player->suggestMove(suggestedMove);
             Move move = humanPlayer->genmove(model.state.colorToMove);
-            queuedMove = Move(Move::INVALID, model.state.colorToMove);
 
             bool wasKibitz = false;
             move = handleKibitzRequest(move, kibitzEngine, model.state.colorToMove, wasKibitz);
@@ -362,10 +370,18 @@ void GameThread::gameLoop() {
 
         } else if(coach && player && !interruptRequested) {
             // Match mode: strict player roles
-            playerToMove = player;
-            player->suggestMove(queuedMove);
+
+            // Atomically read and clear queuedMove under lock
+            Move suggestedMove;
+            {
+                std::unique_lock<std::mutex> qLock(playerMutex);
+                suggestedMove = queuedMove;
+                queuedMove = Move(Move::INVALID, model.state.colorToMove);
+                playerToMove = player;
+            }
+
+            player->suggestMove(suggestedMove);
             Move move = player->genmove(model.state.colorToMove);
-            queuedMove = Move(Move::INVALID, model.state.colorToMove);
 
             bool kibitzed = false;
             move = handleKibitzRequest(move, kibitzEngine, model.state.colorToMove, kibitzed);
