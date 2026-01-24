@@ -112,8 +112,8 @@ private:
 
     // Shader
     std::string shaderName;
-    float shaderEof = 0.0075f;
-    float shaderDof = 0.01f;
+    float shaderEof = 0.0725f;
+    float shaderDof = 0.0925f;
     float shaderGamma = 1.0f;
     float shaderContrast = 0.0f;
 

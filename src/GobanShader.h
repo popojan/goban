@@ -21,7 +21,7 @@ std::string createShaderFromFile(const std::string& filename);
 class GobanShader {
 public:
     explicit GobanShader(const GobanView& view): shadersReady(false), currentProgram(-1),
-        width(0), height(0), gamma(1.0f), contrast(0.0f), eof(0.0075), dof(0.01), view(view), animT(0.5f)
+        width(0), height(0), gamma(1.0f), contrast(0.0f), eof(0.0725), dof(0.0925), view(view), animT(0.5f)
     {
         init();
     }
