@@ -339,6 +339,8 @@ void GobanControl::command(const std::string& cmd) {
         // Save current game and remember the archived filename
         std::string archivedFile = model.game.getDefaultFileName();
         model.game.saveAs("");
+        // Clear session doc so new session starts fresh (prevents games from being duplicated)
+        model.game.clearSession();
         // Create new timestamped filename for next session
         std::time_t t = std::time(nullptr);
         std::tm time {};

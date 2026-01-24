@@ -334,7 +334,7 @@ void ElementGame::ProcessEvent(Rml::Event& event)
                 // Set defaultFileName BEFORE loading so path comparison in loadFromSGF succeeds
                 // This ensures doc is preserved (not lost) when loading daily session across restarts
                 model.game.setDefaultFileName(lastSgf);
-                UserSettings::instance().setLastSgfPath("");  // Clear after processing
+                // Don't clear - persist timestamped session until day changes (cleared in GameRecord::initGame)
 
                 if (std::filesystem::exists(lastSgf)) {
                     // File exists - load the game (SGF settings take precedence)

@@ -45,6 +45,7 @@ public:
 
     [[nodiscard]] std::string getDefaultFileName() const { return defaultFileName; }
     void setDefaultFileName(const std::string& fileName) { defaultFileName = fileName; }
+    void clearSession();  // Clear doc to start new session (used by archive)
     [[nodiscard]] size_t getNumGames() const { return numGames; }
     [[nodiscard]] bool hasNewMoves() const { return gameHasNewMoves; }
 

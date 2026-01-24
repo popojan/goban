@@ -1,5 +1,6 @@
 #include "GameRecord.h"
 #include "Configuration.h"
+#include "UserSettings.h"
 #include <iomanip>
 #include <filesystem>
 #include <spdlog/spdlog.h>
@@ -408,6 +409,10 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
                 gamesPath = config->data["sgf_dialog"].value("games_path", "./games");
             }
             defaultFileName = gamesPath + "/" + today + ".sgf";
+
+            // Clear archived session from user.json - we're on a new day
+            UserSettings::instance().setLastSgfPath("");
+
             spdlog::info("Day changed, new session file: {}", defaultFileName);
         }
     }
@@ -607,6 +612,14 @@ void GameRecord::appendGameToDocument() {
     ++numGames;
     gameInDocument = true;
     spdlog::info("appendGameToDocument: appended game #{} to doc (total: {})", numGames, numGames);
+}
+
+void GameRecord::clearSession() {
+    std::lock_guard<std::mutex> lock(mutex);
+    doc = nullptr;
+    numGames = 0;
+    gameInDocument = false;  // Allow current game to be added to new session
+    spdlog::info("Cleared session document - new session will start fresh");
 }
 
 void GameRecord::saveAs(const std::string& fileName) {
