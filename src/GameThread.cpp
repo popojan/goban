@@ -186,7 +186,7 @@ bool GameThread::isThinking() const {
 bool GameThread::humanToMove() const {
     std::unique_lock<std::mutex> lock(playerMutex);
     if(playerToMove) {
-        return currentPlayer()->isTypeOf(Player::HUMAN);
+        return playerToMove->isTypeOf(Player::HUMAN);
     }
     return true;
 }
