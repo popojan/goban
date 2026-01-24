@@ -356,6 +356,16 @@ int Board::capturedCount(const Color::Value& whose) const {
     return whose == Color::WHITE ? capturedWhite : capturedBlack;
 }
 
+int Board::stonesOnBoard(const Color::Value& whose) const {
+    int count = 0;
+    for (const auto& point : points) {
+        if (point.stone == whose) {
+            count++;
+        }
+    }
+    return count;
+}
+
 void Board::clear(int boardsize) {
 
     this->boardSize = boardsize;

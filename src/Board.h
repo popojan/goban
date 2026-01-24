@@ -196,6 +196,7 @@ public:
     }
 
     [[nodiscard]] int capturedCount(const Color::Value& whose) const;
+    [[nodiscard]] int stonesOnBoard(const Color::Value& whose) const;
 
     void clear(int boardSize = DEFAULT_SIZE);
     void clearTerritory() {

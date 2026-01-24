@@ -64,6 +64,7 @@ public:
     float result(const Move& lastMove);
 
     void calcCaptured(Metrics& m, int capturedBlack, int capturedWhite);
+    void updateReservoirs();
 
     operator bool() const { return !isGameOver && started; }
 

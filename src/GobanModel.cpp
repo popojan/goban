@@ -180,12 +180,7 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     }
     else {
         state.msg = GameState::NONE;
-        if(state.holdsStone == false) {
-            if (state.colorToMove == Color::BLACK)
-                state.reservoirBlack -= 1;
-            else
-                state.reservoirWhite -= 1;
-        }
+        // Reservoir counts now calculated in updateReservoirs(), called from onBoardChange()
     }
     // On first move, update PB/PW to capture actual players after setup
     if (game.moveCount() == 0) {
@@ -203,6 +198,15 @@ void GobanModel::onStonePlaced(const Move& move) {
     state.holdsStone = false;
 }
 
+void GobanModel::updateReservoirs() {
+    // Calculate reservoir from board state: initial - on_board - captured - in_hand
+    int initialStones = (board.getSize() * board.getSize() - 1) / 2 + 1;
+    int blackInHand = (state.holdsStone && state.colorToMove == Color::BLACK) ? 1 : 0;
+    int whiteInHand = (state.holdsStone && state.colorToMove == Color::WHITE) ? 1 : 0;
+    state.reservoirBlack = initialStones - board.stonesOnBoard(Color::BLACK) - board.capturedCount(Color::BLACK) - blackInHand;
+    state.reservoirWhite = initialStones - board.stonesOnBoard(Color::WHITE) - board.capturedCount(Color::WHITE) - whiteInHand;
+}
+
 void GobanModel::onBoardChange(const Board& result) {
     spdlog::debug("LOCK board");
     std::lock_guard<std::mutex> lock(mutex);
@@ -212,6 +216,7 @@ void GobanModel::onBoardChange(const Board& result) {
 
     state.capturedBlack = board.capturedCount(Color::BLACK);
     state.capturedWhite = board.capturedCount(Color::WHITE);
+    updateReservoirs();
 
     spdlog::debug("over {} ready {}", isGameOver, result.territoryReady);
 

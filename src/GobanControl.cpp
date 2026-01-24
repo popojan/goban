@@ -73,10 +73,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     }
                 } else if (inputAllowed) {
                     model.state.holdsStone = true;
-                    if(model.state.colorToMove == Color::BLACK)
-                        model.state.reservoirBlack -= 1;
-                    else
-                        model.state.reservoirWhite -= 1;
+                    model.updateReservoirs();  // Stone in hand reduces reservoir
                     view.requestRepaint(GobanView::UPDATE_STONES);
                 }
                 return;
@@ -102,10 +99,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 }
                 else {
                     model.state.holdsStone = true;
-                    if(model.state.colorToMove == Color::BLACK)
-                        model.state.reservoirBlack -= 1;
-                    else
-                        model.state.reservoirWhite -= 1;
+                    model.updateReservoirs();  // Stone in hand reduces reservoir
                     view.requestRepaint(GobanView::UPDATE_STONES);
                 }
             }
