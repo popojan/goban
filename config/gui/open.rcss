@@ -94,13 +94,13 @@ body.open {
 
 span.file_name {
     display: inline-block;
-    width: 70%;
+    width: 73%;
     overflow: hidden;
 }
 
 span.file_type {
     display: inline-block;
-    width: 25%;
+    width: 22%;
     color: #888;
     text-align: right;
 }
@@ -109,34 +109,34 @@ span.file_type {
     color: #ccc;
 }
 
-/* Game table column classes - fixed width columns use vh units */
+/* Game table column classes - fixed width columns use percentages */
 .col-index {
-    width: 4vh;
+    width: 5%;
     text-align: right;
     padding-right: 1vh;
     flex-shrink: 0;
 }
 
 .col-board {
-    width: 10vh;
+    width: 12.5%;
     text-align: center;
     flex-shrink: 0;
 }
 
 .col-moves {
-    width: 6vh;
+    width: 7.5%;
     text-align: right;
     flex-shrink: 0;
 }
 
 .col-komi {
-    width: 6vh;
+    width: 7.5%;
     text-align: right;
     flex-shrink: 0;
 }
 
 .col-result {
-    width: 10vh;
+    width: 17.5%;
     text-align: center;
     flex-shrink: 0;
 }
@@ -227,7 +227,7 @@ span.file_type {
 /* Responsive layout - side by side when viewport is wide enough */
 @media (min-aspect-ratio: 3/2) {
     .file_list_container {
-        width: 38vw;
+        width: 34vw;
         height: 75vh;
         position: absolute;
         left: 1vw;
@@ -235,7 +235,7 @@ span.file_type {
     }
 
     .preview_container {
-        width: 38vw;
+        width: 45vw;
         height: 75vh;
         position: absolute;
         right: 1vw;
@@ -244,15 +244,19 @@ span.file_type {
     }
 
     .item_list {
-        width: 37vw;
+        width: 33vw;
         height: 68vh;
     }
 
+    .preview_container .item_list {
+        width: 44vw;
+    }
+
     .file_row {
-        width: 37vw;
+        width: 33vw;
     }
 
     .game_row, .game_header {
-        width: 37vw;
+        width: 44vw;
     }
 }
