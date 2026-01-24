@@ -1,0 +1,24 @@
+● GitHub wikis are stored separately and can't be edited from here. Here's the updated key bindings you can paste into the wiki:
+
+  Display Adjustments:
+  ┌─────┬──────────────────────────┐
+  │ Key │          Action          │
+  ├─────┼──────────────────────────┤
+  │ ]   │ Increase gamma           │
+  ├─────┼──────────────────────────┤
+  │ [   │ Decrease gamma           │
+  ├─────┼──────────────────────────┤
+  │ =   │ Increase contrast        │
+  ├─────┼──────────────────────────┤
+  │ -   │ Decrease contrast        │
+  ├─────┼──────────────────────────┤
+  │ 0   │ Reset contrast and gamma │
+  └─────┴──────────────────────────┘
+  SGF Navigation (when a game is loaded):
+  ┌───────────────┬───────────────┐
+  │      Key      │    Action     │
+  ├───────────────┼───────────────┤
+  │ → / Space     │ Next move     │
+  ├───────────────┼───────────────┤
+  │ ← / Backspace │ Previous move │
+  └───────────────┴───────────────┘

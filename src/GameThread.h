@@ -123,6 +123,12 @@ private:
     void notifyMoveComplete(Engine* coach, const Move& move, Engine* kibitzEngine, bool kibitzed, const std::string& engineComments);
     void setHandicapStones(const std::vector<Position>& stones);
     void applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const;
+
+    // Helper methods for game loop
+    Move handleKibitzRequest(Move move, Engine* kibitzEngine, const Color& colorToMove, bool& wasKibitz);
+    std::string collectEngineComments() const;
+    void processSuccessfulMove(const Move& move, const Player* movePlayer, Engine* coach,
+                              Engine* kibitzEngine, bool wasKibitz);
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;
     std::unique_ptr<std::thread> thread;

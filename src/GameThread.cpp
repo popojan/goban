@@ -218,6 +218,55 @@ void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
         });
 }
 
+Move GameThread::handleKibitzRequest(Move move, Engine* kibitzEngine,
+                                      const Color& colorToMove, bool& wasKibitz) {
+    if (move == Move::KIBITZED) {
+        if (kibitzEngine) {
+            move = kibitzEngine->genmove(colorToMove);
+            wasKibitz = true;
+        } else {
+            spdlog::warn("Kibitz requested but no kibitz engine available");
+            move = Move(Move::INVALID, colorToMove);
+        }
+    }
+    return move;
+}
+
+std::string GameThread::collectEngineComments() const {
+    std::ostringstream engineComments;
+    for (auto p : playerManager->getPlayers()) {
+        if (p->isTypeOf(Player::ENGINE)) {
+            std::string engineMsg(dynamic_cast<GtpEngine*>(p)->lastError());
+            if (!engineMsg.empty()) {
+                engineComments << engineMsg << " (" << p->getName() << ") ";
+            }
+        }
+    }
+    return engineComments.str();
+}
+
+void GameThread::processSuccessfulMove(const Move& move, const Player* movePlayer,
+                                        Engine* coach, Engine* kibitzEngine, bool wasKibitz) {
+    // 1. Collect engine diagnostic comments
+    std::string engineComments = collectEngineComments();
+
+    // 2. Sync all other engines (including RESIGN - they need to know game ended)
+    syncOtherEngines(move, movePlayer, coach, kibitzEngine, wasKibitz);
+
+    // 3. Notify observers with move and comments
+    notifyMoveComplete(coach, move, kibitzEngine, wasKibitz, engineComments);
+
+    // 4. Update territory display if enabled
+    if (model.board.showTerritory) {
+        bool finalized = model.state.reason == GameState::DOUBLE_PASS;
+        const Board& result = coach->showterritory(finalized, model.game.lastStoneMove().col);
+        std::for_each(
+            gameObservers.begin(), gameObservers.end(),
+            [&result](GameObserver* observer) { observer->onBoardChange(result); }
+        );
+    }
+}
+
 void GameThread::gameLoop() {
     interruptRequested = false;
     while (!interruptRequested) {
@@ -268,15 +317,9 @@ void GameThread::gameLoop() {
             player->suggestMove(queuedMove);
             Move move = humanPlayer->genmove(model.state.colorToMove);
             queuedMove = Move(Move::INVALID, model.state.colorToMove);
+
             bool wasKibitz = false;
-            if (move == Move::KIBITZED) {
-                if (kibitzEngine) {
-                    move = kibitzEngine->genmove(model.state.colorToMove);
-                    wasKibitz = true;
-                } else {
-                    move = Move(Move::INVALID, model.state.colorToMove);
-                }
-            }
+            move = handleKibitzRequest(move, kibitzEngine, model.state.colorToMove, wasKibitz);
 
             lock.lock();
             locked = true;
@@ -294,8 +337,7 @@ void GameThread::gameLoop() {
             }
 
             if (success) {
-                syncOtherEngines(move, humanPlayer, coach, kibitzEngine, wasKibitz);
-                notifyMoveComplete(coach, move, kibitzEngine, wasKibitz, "");
+                processSuccessfulMove(move, humanPlayer, coach, kibitzEngine, wasKibitz);
 
                 // Human-originated move: engine (kibitz) auto-responds
                 if (!wasKibitz && !model.isGameOver && kibitzEngine) {
@@ -304,8 +346,7 @@ void GameThread::gameLoop() {
                     Move response = kibitzEngine->genmove(responseColor);
                     if (response && response != Move::RESIGN) {
                         if (kibitzEngine == coach || coach->play(response)) {
-                            syncOtherEngines(response, kibitzEngine, coach, kibitzEngine, false);
-                            notifyMoveComplete(coach, response, kibitzEngine, false, "");
+                            processSuccessfulMove(response, kibitzEngine, coach, kibitzEngine, false);
                         }
                     }
                 }
@@ -321,65 +362,34 @@ void GameThread::gameLoop() {
 
         } else if(coach && player && !interruptRequested) {
             // Match mode: strict player roles
-            bool success = false;
-            bool kibitzed = false;
             playerToMove = player;
             player->suggestMove(queuedMove);
             Move move = player->genmove(model.state.colorToMove);
             queuedMove = Move(Move::INVALID, model.state.colorToMove);
-            if(move == Move::KIBITZED) {
-                if (kibitzEngine) {
-                    move = kibitzEngine->genmove(model.state.colorToMove);
-                    kibitzed = true;
-                } else {
-                    spdlog::warn("Kibitz requested but no kibitz engine available");
-                    move = Move(Move::INVALID, model.state.colorToMove);
-                }
-            }
+
+            bool kibitzed = false;
+            move = handleKibitzRequest(move, kibitzEngine, model.state.colorToMove, kibitzed);
+
             spdlog::debug("MOVE to {}, valid = {}", move.toString(), static_cast<bool>(move));
             lock.lock();
             locked = true;
+
             if (move == Move::INTERRUPT) {
                 spdlog::debug("INTERRUPT received, re-evaluating game state");
                 playerToMove = nullptr;
                 continue;
             }
-            else if (move) {
+
+            bool success = false;
+            if (move) {
                 success = player == coach
                           || (kibitzed && kibitzEngine == coach)
                           || move == Move::RESIGN
                           || coach->play(move);
             }
+
             if(success) {
-                std::ostringstream engineComments;
-                for (auto p : playerManager->getPlayers()) {
-                    if (p->isTypeOf(Player::ENGINE)) {
-                        std::string engineMsg(dynamic_cast<GtpEngine*>(p)->lastError());
-                        if (!engineMsg.empty()) {
-                            engineComments << engineMsg << " (" << p->getName() << ") ";
-                        }
-                    }
-                }
-
-                if (move != Move::RESIGN) {
-                    syncOtherEngines(move, player, coach, kibitzEngine, kibitzed);
-                }
-
-                notifyMoveComplete(coach, move, kibitzEngine, kibitzed, engineComments.str());
-            }
-
-            bool influence = model.board.showTerritory
-                && (success || move == Move::INTERRUPT);
-
-            if(influence) {
-                bool finalized = model.state.reason == GameState::DOUBLE_PASS;
-                const Board& result(
-                    coach->showterritory(finalized, model.game.lastStoneMove().col)
-                );
-                std::for_each(
-                    gameObservers.begin(), gameObservers.end(),
-                    [&result](GameObserver* observer){observer->onBoardChange(result);}
-                );
+                processSuccessfulMove(move, player, coach, kibitzEngine, kibitzed);
             }
 
             if(model.isGameOver) {
@@ -536,8 +546,7 @@ NavResult GameThread::executeNavCommand(const NavCommand& cmd) {
                     Move response = kibitz->genmove(responseColor);
                     if (response && response != Move::RESIGN) {
                         if (kibitz == coach || coach->play(response)) {
-                            syncOtherEngines(response, reinterpret_cast<Player*>(kibitz), coach, kibitz, false);
-                            notifyMoveComplete(coach, response, kibitz, false, "");
+                            processSuccessfulMove(response, kibitz, coach, kibitz, false);
                         }
                     }
                 }
