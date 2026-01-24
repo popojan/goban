@@ -4,12 +4,9 @@
 #include <string>
 #include "gtpclient.h"
 #include "Board.h"
-#include <sstream>
-#include <thread>
 #include <condition_variable>
 #include <mutex>
 #include <algorithm>
-#include <iterator>
 #include <memory>
 #include <utility>
 
@@ -142,7 +139,7 @@ public:
     ~GtpEngine() override = default;
 
     Move genmove(const Color& colorToMove) override;
-    const Board& showboard() override;
+    const Board& showboard();
     bool fixed_handicap(int handicap, std::vector<Position>& stones) override;
     bool komi(float komi) override;
     bool play(const Move& m) override;

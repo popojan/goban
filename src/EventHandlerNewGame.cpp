@@ -3,12 +3,9 @@
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
 #include <RmlUi/Core/ElementDocument.h>
-#include <RmlUi/Core/ElementUtilities.h>
 #include <RmlUi/Core/Event.h>
-#include "EventManager.h"
 #include "AppState.h"
 #include "Configuration.h"
-#include <iostream>
 
 extern std::shared_ptr<Configuration> config;
 

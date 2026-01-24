@@ -1,8 +1,7 @@
 #include "AudioPlayer.hpp"
 
-AudioPlayer::AudioPlayer()
-    : fileHandler()
-    , streamHandler()
+AudioPlayer::AudioPlayer() : fileHandler(), streamHandler(), muted(false)
+
 {
 
 }
@@ -28,7 +27,7 @@ void AudioPlayer::stop()
     streamHandler.processEvent(AudioEventType::stop);
 }
 
-void AudioPlayer::preload(const std::shared_ptr<Configuration> config) {
+void AudioPlayer::preload(const std::shared_ptr<Configuration> &config) {
     auto sounds = config->data.find("sounds");
     if (sounds != config->data.end()) {
         for (auto sit = sounds->begin(); sit != sounds->end(); ++sit) {

@@ -4,7 +4,6 @@
 #include "GameThread.h"
 #include "GobanModel.h"
 #include "GobanView.h"
-#include "Configuration.h"
 
 class ElementGame;
 
@@ -18,7 +17,7 @@ public:
 
     ~GobanControl() { destroy(); }
 
-    void destroy();
+    void destroy() const;
 
     void mouseClick(int button, int state, int x, int y);
     void mouseMove(int x, int y);
@@ -26,14 +25,13 @@ public:
     [[nodiscard]] bool isExiting() const {
         return exit;
     }
-    bool newGame(unsigned boardSize);
-    void togglePlayer(int which, int delta = 1);
-    void switchPlayer(int which, int idx);
-    void switchShader(int idx);
-    bool setHandicap(int);
-    bool setKomi(float);
-    bool command(const std::string& cmd);
-    void saveCurrentGame();
+    bool newGame(unsigned boardSize) const;
+    void switchPlayer(int which, int idx) const;
+    void switchShader(int idx) const;
+    bool setHandicap(int) const;
+    bool setKomi(float) const;
+    void command(const std::string& cmd);
+    void saveCurrentGame() const;
 
 private:
     ElementGame* parent;

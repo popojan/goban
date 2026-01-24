@@ -4,11 +4,9 @@
 #include <spdlog/spdlog.h>
 #include <array>
 #include <sstream>
-#include <stdexcept>
 #include <vector>
 #include <iostream>
 #include <random>
-#include <mutex>
 #include <atomic>
 #include <glm/glm.hpp>
 #include "Metrics.h"
@@ -157,10 +155,10 @@ public:
 class Board
 {
 public:
-    static const int MAX_BOARD = 19;
-    static const int MIN_BOARD = 9;
-    static const int BOARD_SIZE = MAX_BOARD * MAX_BOARD;
-    static const int DEFAULT_SIZE = 19;
+    static constexpr int MAX_BOARD = 19;
+    static constexpr int MIN_BOARD = 9;
+    static constexpr int BOARD_SIZE = MAX_BOARD * MAX_BOARD;
+    static constexpr int DEFAULT_SIZE = 19;
 
     enum Change { NO_CHANGE = 0, STONE_PLACED = 1, STONE_REMOVED = 2, TERRITORY_CHANGED = 4, SIZE_CHANGED = 8};
 
@@ -231,7 +229,7 @@ public:
     int placeCursor(const Position& p, const Color& col);
     double placeFuzzy(const Position& p, bool noFix = false);
 
-    bool collides(int i, int j, int i0, int j0);
+    bool collides(int i, int j, int i0, int j0) const;
     void removeOverlay(const Position& p);
     void setOverlay(const Position& p, const std::string& text, const Color& c);
     void setBoardOverlay(const Position& p, const std::string& text);  // Board-level overlay (layer 0)

@@ -12,9 +12,9 @@ const float Board::mDeltaCaptured = 0.5f;
 const float Board::safeDist = 1.01f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
-    dist(0.0f, 0.05f), invalidated(false), squareYtoXRatio(1.0), showTerritory(false), showTerritoryAuto(false),
-    territoryReady(false), cursor({0, 0}),
-    collision(0.0), generator(std::random_device()())
+    generator(std::random_device()()), dist(0.0f, 0.05f), invalidated(false), squareYtoXRatio(1.0), showTerritory(false),
+    showTerritoryAuto(false), territoryReady(false),
+    cursor({0, 0}), collision(0.0)
 {
     clear(size);
     positionNumber = generator();
@@ -45,17 +45,17 @@ std::istream& operator>> (std::istream& stream, Position& pos) {
     unsigned char c = '\x00';
     int d = -1;
     stream >> c >> d;
-    int i, j;
+    int j;
     if(d < 0)
         return stream;
     if (c >= 'I') j = 7 + c - 'I'; else j = c - 'A';
-    i = d - 1;
+    int i = d - 1;
     pos = Position(j, i);
     return stream;
 }
 
 std::ostream& operator<< (std::ostream& stream, const Position& pos) {
-    char c = pos.c < 8 ? (char)('A' + pos.c) : (char)('I' + pos.c - 7);
+    char c = pos.c < 8 ? static_cast<char>('A' + pos.c) : static_cast<char>('I' + pos.c - 7);
     unsigned d = pos.r + 1u;
     stream << c << d;
     return stream;
@@ -108,7 +108,7 @@ std::istream& operator>> (std::istream& stream, Move& move) {
 
 }
 
-bool Board::collides(int i, int j, int i0, int j0) {
+bool Board::collides(int i, int j, int i0, int j0) const {
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
     float x0 = glStones[idx0 - 2];
@@ -120,16 +120,14 @@ bool Board::collides(int i, int j, int i0, int j0) {
 }
 
 double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
-    const size_t MAX_FIX = 100;
-
-    spdlog::debug("fixStone ({},{})/({},{})", i, j, i0, j0);
+    spdlog::trace("fixStone ({},{})/({},{})", i, j, i0, j0);
     int idx = ((boardSize  * i + j) << 2) + 2;
     int idx0 = ((boardSize  * i0 + j0) << 2) + 2;
     float mValue = glStones[idx0];
     double ret = 0.0;
     if (mValue != mEmpty &&  mValue != mBlackArea && mValue != mWhiteArea) {
-        bool fixNeeded = collides(i, j, i0, j0);
-        if(fixNeeded) {
+        if(collides(i, j, i0, j0)) {
+            constexpr size_t MAX_FIX = 100;
             float x0 = glStones[idx0 - 2];
             float y0 = glStones[idx0 - 1];
             float x = glStones[idx - 2];
@@ -148,7 +146,7 @@ double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
             pt.x = p.x;
             pt.y = p.y;
             (*this)[Position(j0, i0)].y = p.y;
-            ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/(float)boardSize);
+            ret = std::sqrt(glm::distance(glm::vec2(p.x, p.y), glm::vec2(x, y))/static_cast<float>(boardSize));
             if (i0 + 1 < boardSize &&  collides(i0, j0, i0 + 1, j0) && rep < MAX_FIX)
                 ret = std::max(ret, fixStone(i0, j0, i0 + 1, j0, rep + 1));
             if (i0 - 1 >= 0 &&  collides(i0, j0, i0 - 1, j0) && rep < MAX_FIX)
@@ -166,13 +164,13 @@ double Board::fixStone(int i, int j, int i0, int j0, size_t rep) {
 double Board::placeFuzzy(const Position& p, bool noFix){
     int j = p.col();
     int i = p.row();
-    const float halfN = 0.5f * (float)boardSize - 0.5f;
+    const float halfN = 0.5f * static_cast<float>(boardSize) - 0.5f;
     float x = p.x;
     float y = p.y;
     double ret = 0.0;
     if(p.x == 0 && p.y == 0) {
-        x = (float)j - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
-        y = (float)i - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
+        x = static_cast<float>(j) - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
+        y = static_cast<float>(i) - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
     }
     else {
         x = x - halfN;
@@ -188,7 +186,7 @@ double Board::placeFuzzy(const Position& p, bool noFix){
     (*this)[p].y = y;
 
     //random rotation for the first time
-    glStones[idx + 1] = (float)randomStoneRotation;
+    glStones[idx + 1] = static_cast<float>(randomStoneRotation);
     if(noFix == false) {
         if (i + 1 < boardSize)
             ret = std::max(ret, fixStone(i, j, i + 1, j));
@@ -275,7 +273,6 @@ int Board::updateStone(const Position& p, const Color& c) {
         ret = STONE_REMOVED;
         removeOverlay(p);
     }
-    //TODO refactor arrays and indexing to simplify
     glStones[idx + 0] = mValue;
     (*this)[p].stone = c;
     return ret;
@@ -328,9 +325,9 @@ int Board::updateStones(const Board& board) {
         changed = 1;
         return changed;
     }
-    for(int col = 0; col < MAX_BOARD; ++col) {
-        for(int row = 0; row < MAX_BOARD; ++row) {
-            Position pos(row, col);
+    for(int row = 0; row < MAX_BOARD; ++row) {
+        for(int col = 0; col < MAX_BOARD; ++col) {
+            Position pos(col, row);
 
             const Point& np = board[pos];
             Color newStone(np.stone);
@@ -510,15 +507,15 @@ bool Board::toggleTerritory() {
 int Board::placeCursor(const Position& coord, const Color& col) {
 
     glm::vec2 v(
-        coord.x - (float)coord.col() - 0.5f,
-        coord.y - (float)coord.row() - 0.5f
+        coord.x - static_cast<float>(coord.col()) - 0.5f,
+        coord.y - static_cast<float>(coord.row()) - 0.5f
     );
 
     glm::vec2 add(6.0f * r1 * v);
 
     Position pos(coord);
-    pos.x = (float)coord.col() + add.x;
-    pos.y = (float)coord.row() + add.y;
+    pos.x = static_cast<float>(coord.col()) + add.x;
+    pos.y = static_cast<float>(coord.row()) + add.y;
 
     return updateStone(pos, col);
 }
@@ -585,10 +582,10 @@ void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadSt
                     region.push_back(current);
 
                     // Check all 4 neighbors
-                    const int dc[] = {-1, 1, 0, 0};
-                    const int dr[] = {0, 0, -1, 1};
 
                     for (int d = 0; d < 4; ++d) {
+                        constexpr int dr[] = {0, 0, -1, 1};
+                        constexpr int dc[] = {-1, 1, 0, 0};
                         int nc = current.col() + dc[d];
                         int nr = current.row() + dr[d];
 

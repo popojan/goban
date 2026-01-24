@@ -1,5 +1,4 @@
 #include "player.h"
-#include "SGF.h"
 
 Move GtpEngine::genmove(const Color& colorToMove) {
     GtpClient::CommandOutput ret(issueCommand(colorToMove == Color::BLACK ? "genmove B" : "genmove W"));
@@ -95,41 +94,6 @@ bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
         success = true;
 
         spdlog::debug("Territory estimation completed with {} dead stones", deadStones.size());
-    }
-    else {
-        /*
-        std::stringstream ss;
-        ss << "initial_influence " << colorToMove << " influence_regions";
-        GtpClient::CommandOutput ret = GtpClient::issueCommand(ss.str());
-        board.clearTerritory();
-        board.parseGtpInfluence(ret);
-        ret = GtpClient::issueCommand("dragon_status");
-        for (size_t i = 0; i < ret.size(); ++i) {
-            spdlog::debug(ret[i]);
-            std::stringstream ssi(ret[i]);
-            char c;
-            if (i == 0) {
-                ssi >> c;
-            }
-            Position pos;
-            ssi >> pos;
-            ssi >> c >> c;
-            if (c == 'd') {
-                {
-                    std::ostringstream ss;
-                    ss << "dragon_stones " << pos;
-                    ret = GtpClient::issueCommand(ss.str());
-                }
-                if (GtpClient::success(ret)) {
-                    std::istringstream ss(ret[0].substr(2));
-                    Position p;
-                    while ((ss >> p)){
-                        board[p].influence = Color::other(board[p].stone);
-                    }
-                }
-            }
-        }
-        */
     }
     board.territoryReady = success;
     return success;

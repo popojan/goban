@@ -2,7 +2,6 @@
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include <fstream>
-#include <sstream>
 #include "SGF.h"
 
 FileChooserDataSource::FileChooserDataSource(const std::string& gamesPath)
@@ -22,7 +21,7 @@ FileChooserDataSource::~FileChooserDataSource() {
     games.clear();
 }
 
-void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::string& table, int row_index, const std::vector<std::string>& columns) {
+void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::string& table, int row_index, const std::vector<std::string>& columns) const {
     if (table == "files") {
         // Check if this is the first row and we can navigate up
         if (row_index == 0 && currentPath.has_parent_path()) {
@@ -110,7 +109,7 @@ void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::str
     }
 }
 
-int FileChooserDataSource::GetNumRows(const std::string& table) {
+int FileChooserDataSource::GetNumRows(const std::string& table) const {
     if (table == "files") {
         // Calculate base number of files on current page
         int totalFiles = static_cast<int>(files.size());
@@ -293,7 +292,7 @@ void FileChooserDataSource::previewSGF(const std::string& filePath) {
     spdlog::debug("Games list updated (data source disabled)");
 }
 
-std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string& filePath) {
+std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string& filePath) const {
     using namespace LibSgfcPlusPlus;
     
     std::vector<SGFGameInfo> gameList;
@@ -388,7 +387,7 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
     return gameList;
 }
 
-int FileChooserDataSource::countMovesInGame(std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game) {
+int FileChooserDataSource::countMovesInGame(const std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game) {
     using namespace LibSgfcPlusPlus;
     
     int moveCount = 0;

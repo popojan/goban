@@ -1,6 +1,3 @@
-//
-// Created by jan on 7.5.17.
-//
 #include "ElementGame.h"
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
@@ -13,15 +10,13 @@
 #include <sstream>
 #include <iomanip>
 
-bool GobanControl::newGame(unsigned boardSize) {
+bool GobanControl::newGame(unsigned boardSize) const {
     engine.interrupt();
     engine.reset();
     engine.removeSgfPlayers();  // Remove temporary SGF players from previous load
     if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         model.createNewRecord();
         view.animateIntro();
-        // Reset Analysis Mode menu toggle (new game starts in Match mode)
-        parent->OnMenuToggle("toggle_analysis_mode", false);
         parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
         // Save game settings so fresh start uses these values
         UserSettings::instance().setBoardSize(static_cast<int>(boardSize));
@@ -38,7 +33,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     mouseY = static_cast<float>(y);
     view.mouseMoved(mouseX, mouseY);
 
-    Position coord = view.getBoardCoordinate((float)x, (float)y);
+    Position coord = view.getBoardCoordinate(static_cast<float>(x), static_cast<float>(y));
     spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
         if (button == 0 && state == 1) {
@@ -64,20 +59,32 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 Color colorToMove = model.game.getColorToMove();
                 spdlog::debug("Clicked on new position during navigation - creating new variation (color={})",
                     colorToMove == Color::BLACK ? "B" : "W");
+                model.start();  // New variation = game continues
+                if (!engine.isRunning()) {
+                    engine.run();
+                }
                 Move newMove(coord, colorToMove);
-                if (engine.navigateToVariation(newMove)) {
-                    view.updateNavigationOverlay();
+                if (bool inputAllowed = engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS;
+                    inputAllowed && model.state.holdsStone && engine.navigateToVariation(newMove)) {
+                    //view.updateNavigationOverlay();
                     model.start();  // New variation = game continues
                     if (!engine.isRunning()) {
                         engine.run();
                     }
+                } else if (inputAllowed) {
+                    model.state.holdsStone = true;
+                    if(model.state.colorToMove == Color::BLACK)
+                        model.state.reservoirBlack -= 1;
+                    else
+                        model.state.reservoirWhite -= 1;
+                    view.requestRepaint(GobanView::UPDATE_STONES);
                 }
                 return;
             }
 
             bool playNow = true;
             if (model.isGameOver) {
-                newGame(model.getBoardSize());
+                (void) newGame(model.getBoardSize());
                 playNow = false;
             }
             else if(!model.isGameOver) {
@@ -88,10 +95,8 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
             }
             spdlog::debug("engine.isRunning() = {}", engine.isRunning());
             if(playNow) {
-                bool humanMove = engine.humanToMove();
-                if(model.state.holdsStone || !humanMove) {
-                    auto move = engine.getLocalMove(coord);
-                    //model.playMove(move);
+                if(const bool humanMove = engine.humanToMove(); model.state.holdsStone || !humanMove) {
+                    const auto move = engine.getLocalMove(coord);
                     engine.playLocalMove(move);
                     view.requestRepaint();
                 }
@@ -132,7 +137,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     }
 }
 
-bool GobanControl::command(const std::string& cmd) {
+void GobanControl::command(const std::string& cmd) {
 
     bool checked = false;
     if(cmd == "quit") {
@@ -217,7 +222,7 @@ bool GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "clear") {
         if (model.isGameOver) {
-            newGame(model.getBoardSize());
+            (void) newGame(model.getBoardSize());
         }
     }
     else if (cmd == "start") {
@@ -276,11 +281,8 @@ bool GobanControl::command(const std::string& cmd) {
         view.endZoom();
     }
     else if (cmd == "cycle shaders") {
-        //TODO generalize linked select boxes and cycle commands
-        auto doc = parent->GetContext()->GetDocument("game_window");
-        if(doc) {
-            auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectShader"));
-            if(select) {
+        if(auto doc = parent->GetContext()->GetDocument("game_window")) {
+            if(auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectShader"))) {
                 int currentProgram = select->GetSelection();
                 select->SetSelection((currentProgram + 1) % select->GetNumOptions());
             }
@@ -328,19 +330,17 @@ bool GobanControl::command(const std::string& cmd) {
     else if(cmd == "save") {
         model.game.saveAs("");
         // Show feedback with filename
-        auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
-        if (msg) {
+        if (auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage")) {
             msg->SetInnerRML(model.game.getDefaultFileName().c_str());
         }
     }
     else if(cmd == "archive") {
         // Only archive if there are games or moves to archive
         if (model.game.getNumGames() == 0 && model.game.moveCount() == 0) {
-            auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
-            if (msg) {
+            if (auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage")) {
                 msg->SetInnerRML("Nothing to archive");
             }
-            return true;
+            return;
         }
         // Save current game and remember the archived filename
         std::string archivedFile = model.game.getDefaultFileName();
@@ -359,29 +359,25 @@ bool GobanControl::command(const std::string& cmd) {
         // Save new session path so it's used after restart
         UserSettings::instance().setLastSgfPath(model.game.getDefaultFileName());
         // Show feedback with archived filename (where games went)
-        auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
-        if (msg) {
+        if (auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage")) {
             msg->SetInnerRML(archivedFile.c_str());
         }
         spdlog::info("Archived to {}, new session: {}", archivedFile, model.game.getDefaultFileName());
     }
     else if(cmd == "load") {
         // Get the file chooser handler and show the dialog
-        auto* handler = dynamic_cast<EventHandlerFileChooser*>(EventManager::GetEventHandler("open"));
-        if (handler) {
+        if (auto* handler = dynamic_cast<EventHandlerFileChooser*>(EventManager::GetEventHandler("open"))) {
             handler->ShowDialog();
         } else {
             spdlog::warn("File chooser handler not found");
         }
     }
     else if(cmd == "msg") {
-        auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage");
-        if(msg) {
+        if(auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage")) {
             msg->SetInnerRML("");
         }
     }
     parent->OnMenuToggle(cmd, checked);
-    return true;
 }
 
 void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
@@ -405,17 +401,22 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
 
         // Space/Right: navigate forward (or trigger kibitz at end of unfinished branch)
         if (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT) {
-            if (engine.navigateForward()) {
-                spdlog::debug("Navigation: forward to move {}/{}",
-                    model.game.getViewPosition(), model.game.getLoadedMovesCount());
-                view.updateNavigationOverlay();
-                return;  // Handled navigation
+            if (model.game.hasNextMove()) {
+                if (engine.navigateForward()) {
+                    spdlog::debug("Navigation: forward to move {}/{}",
+                        model.game.getViewPosition(), model.game.getLoadedMovesCount());
+                    view.updateNavigationOverlay();
+                    return;  // Handled navigation
+                }
             }
             // At end of finished game - nothing more to do
-            if (!model.game.hasNextMove() && model.game.isAtFinishedGame()) {
+            if (model.game.isAtFinishedGame()) {
                 return;
             }
-            // At end of unfinished branch - fall through to allow Space for kibitz
+            // At end of unfinished branch - Space falls through to kibitz
+            if (key == Rml::Input::KI_RIGHT) {
+                return;  // Right key doesn't trigger kibitz
+            }
             spdlog::debug("Navigation: at end of branch, Space falls through to kibitz");
         }
         if (key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK) {
@@ -473,9 +474,8 @@ void GobanControl::mouseMove(int x, int y){
     view.moveCursor(mouseX, mouseY);
 }
 
-bool GobanControl::setKomi(float komi) {
-    bool isRunning = engine.isRunning();
-    if(!isRunning) {
+bool GobanControl::setKomi(float komi) const {
+    if(bool isRunning = engine.isRunning(); !isRunning) {
         engine.setKomi(komi);
         model.state.komi = komi;
         model.game.updateKomi(komi);  // Keep game record in sync
@@ -485,7 +485,7 @@ bool GobanControl::setKomi(float komi) {
     return false;
 }
 
-bool GobanControl::setHandicap(int handicap){
+bool GobanControl::setHandicap(int handicap) const {
     bool isOver = model.state.reason != GameState::NO_REASON;
     bool isRunning = engine.isRunning();
     bool success = false;
@@ -500,41 +500,12 @@ bool GobanControl::setHandicap(int handicap){
     return success;
 }
 
-void GobanControl::togglePlayer(int which, int delta) {
-    size_t oldIdx = engine.getActivePlayer(which);
-    size_t numPlayers = engine.getPlayers().size();
-    size_t newIdx = (oldIdx + numPlayers + delta) % numPlayers;
-    engine.activatePlayer(which, newIdx);
-    model.state.holdsStone = false;
-    // Save player to user settings (skip temporary SGF players)
-    auto players = engine.getPlayers();
-    if (newIdx < players.size() && !players[newIdx]->isTypeOf(Player::SGF_PLAYER)) {
-        if (which == 0) {
-            UserSettings::instance().setBlackPlayer(players[newIdx]->getName());
-        } else {
-            UserSettings::instance().setWhitePlayer(players[newIdx]->getName());
-        }
-    }
-}
-
-void GobanControl::switchPlayer(int which, int newPlayerIndex) {
+void GobanControl::switchPlayer(int which, int newPlayerIndex) const {
     engine.activatePlayer(which, static_cast<size_t>(newPlayerIndex));
     model.state.holdsStone = false;
-    // Save player to user settings (skip during init and for temporary SGF players)
-    if (!syncingUI) {
-        auto players = engine.getPlayers();
-        size_t idx = engine.getActivePlayer(which);
-        if (idx < players.size() && !players[idx]->isTypeOf(Player::SGF_PLAYER)) {
-            if (which == 0) {
-                UserSettings::instance().setBlackPlayer(players[idx]->getName());
-            } else {
-                UserSettings::instance().setWhitePlayer(players[idx]->getName());
-            }
-        }
-    }
 }
 
-void GobanControl::switchShader(int newShaderIndex) {
+void GobanControl::switchShader(int newShaderIndex) const {
     view.switchShader(newShaderIndex);
 
     // Save shader name to user settings
@@ -545,12 +516,12 @@ void GobanControl::switchShader(int newShaderIndex) {
     }
 }
 
-void GobanControl::destroy() {
+void GobanControl::destroy() const {
     spdlog::debug("GAME DESTRUCT");
     engine.interrupt();
 }
 
-void GobanControl::saveCurrentGame() {
+void GobanControl::saveCurrentGame() const {
     if (model.game.moveCount() > 0) {
         model.game.saveAs("");
         UserSettings::instance().setLastSgfPath(model.game.getDefaultFileName());

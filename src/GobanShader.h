@@ -2,7 +2,6 @@
 #define GOBAN_GOBANSHADER_H
 
 #include <string>
-#include "glyphy/GlyphyFont.h"
 #include "Metrics.h"
 #include "GobanModel.h"
 
@@ -10,14 +9,7 @@ class GobanView;
 
 #include "OpenGL.h"
 #include "Board.h"
-#include "GobanModel.h"
-#include "Camera.h"
 
-#include <glm/vec3.hpp>
-#include <glm/geometric.hpp>
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include "spdlog/spdlog.h"
 
 GLuint shaderCompileFromString(GLenum type, const std::string& source);
@@ -29,8 +21,7 @@ std::string createShaderFromFile(const std::string& filename);
 class GobanShader {
 public:
     explicit GobanShader(const GobanView& view): shadersReady(false), currentProgram(-1),
-        width(0), height(0), gamma(1.0f), contrast(0.0f), view(view), animT(0.5f),
-        currentProgramH(.0), eof(0.0075), dof(0.01)
+        width(0), height(0), gamma(1.0f), contrast(0.0f), eof(0.0075), dof(0.01), view(view), animT(0.5f)
     {
         init();
     }
@@ -38,7 +29,7 @@ public:
     void setMetrics(const Metrics &) const;
     void init();
     void destroy() const;
-    void draw(const GobanModel&, int, float);
+    void draw(const GobanModel&, int, float) const;
     int choose(int idx);
     void use() const;
     static void unuse() ;
@@ -50,8 +41,8 @@ public:
     void setContrast(float);
     void setEof(float);
     void setDof(float);
-    float getEof();
-    float getDof();
+    float getEof() const;
+    float getDof() const;
     [[nodiscard]] float getGamma() const { return gamma;}
     [[nodiscard]] float getContrast() const { return contrast;}
     [[nodiscard]] bool isReady() const { return shadersReady;}

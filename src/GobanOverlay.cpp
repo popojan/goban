@@ -1,7 +1,3 @@
-//
-// Created by jan on 21.6.17.
-//
-
 #include "GobanOverlay.h"
 #include "GobanView.h"
 
@@ -9,7 +5,6 @@
 #include "glyphy/GlyphyBuffer.h"
 #include "glyphy/GlyphyState.h"
 
-#include <glm/vec3.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <memory>
@@ -77,7 +72,7 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 
     auto& points = board.get();
     int boardSize = board.getSize();
-    float halfN = 0.5f * (float)boardSize - 0.5f;
+    float halfN = 0.5f * static_cast<float>(boardSize) - 0.5f;
 
 	for (size_t layer = 0; layer < layers.size(); ++layer) {
 		int cnt = 0;
@@ -91,8 +86,8 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 					// Points are indexed as ord(p) = col * MAX_BOARD + row
 					int col = idx / Board::MAX_BOARD;
 					int row = idx % Board::MAX_BOARD;
-					posX = (float)col - halfN;
-					posY = (float)row - halfN;
+					posX = static_cast<float>(col) - halfN;
+					posY = static_cast<float>(row) - halfN;
 				} else {
 					// Stone-level overlay: use fuzzy position (matches stone placement)
 					posX = point.x;
@@ -109,7 +104,7 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 	}
 
 }
-void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigned which) {
+void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigned which) const {
 	if (!overlayReady
 		|| std::all_of(layers.begin(), layers.end(), [](const Layer& x){return x.empty; }))
 			return;
@@ -139,8 +134,6 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 
 		glm::mat4 m(cam.setView());
 
-		mat = glm::mat4(1.0);
-
 		st->set_color(glm::value_ptr(layers[layer].color));
 		st->fast_setup();
 
@@ -151,44 +144,44 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 
 		glyphy_extents_t extents;
 		buffer[layer]->extents(nullptr, &extents);
-		float content_scale = std::min((float)height / 2.0f, 10000.0f);
+		float content_scale = std::min(static_cast<float>(height) / 2.0f, 10000.0f);
 		float text_scale = content_scale;
-		float x = -content_scale * (glm::transpose(m) * ta).x;//(extents.max_x + extents.min_x) / 2.;
-		float y = -content_scale * (glm::transpose(m)* ta).y;//(extents.max_y + extents.min_y) / 2.;
-		float z = content_scale * (glm::transpose(m) * ta).z;
 		{
+			float x = -content_scale * (transpose(m) * ta).x;
+			float y = -content_scale * (transpose(m)* ta).y;
+			float z = content_scale * (transpose(m) * ta).z;
 
-			auto d = (float)height;
+			auto d = static_cast<float>(height);
 			float near = d;
 			float factor = 0.01f * near / (2 * near + d);
 			float far = near + 10.0f * d;
-			mat = glm::frustum(
-                -(float)width * factor, (float)width * factor,
-                -(float)height * factor, (float)height * factor,
+			mat = frustum(
+                -static_cast<float>(width) * factor, static_cast<float>(width) * factor,
+                -static_cast<float>(height) * factor, static_cast<float>(height) * factor,
                 0.01f * near, far
             );
-			mat = glm::translate(mat, glm::vec3(x, y, -0.5f*d - near + z));
+			mat = translate(mat, vec3(x, y, -0.5f*d - near + z));
 		}
-		mat = glm::scale(mat, glm::vec3(1, 1, -1));
-		glm::mat4 rm(glm::transpose(m)*glm::rotate(glm::mat4(1.0f), 3.141592656f / 2, glm::vec3(1.0f, 0.0f, 0.0f)));
+		mat = scale(mat, vec3(1, 1, -1));
+		mat4 rm(transpose(m)*rotate(mat4(1.0f), 3.141592656f / 2, vec3(1.0f, 0.0f, 0.0f)));
 
 		mat = mat*rm;
-		mat = glm::scale(mat, glm::vec3(1, -1, 1));
+		mat = scale(mat, vec3(1, -1, 1));
 
 		glMatrixMode(GL_MODELVIEW);
 		glPushMatrix();
 
-		glLoadMatrixf(glm::value_ptr(mat));
+		glLoadMatrixf(value_ptr(mat));
 
 
-		mat = glm::scale(mat, glm::vec3(text_scale));
+		mat = scale(mat, vec3(text_scale));
 		// Center buffer
 
-		mat = glm::translate(mat, glm::vec3(
+		mat = translate(mat, vec3(
 			-static_cast<float>(extents.max_x + extents.min_x) / 2.0f,
 			-static_cast<float>(extents.max_y + extents.min_y) / 2.0f, 0.0f));
 
-		st->set_matrix(glm::value_ptr(mat));
+		st->set_matrix(value_ptr(mat));
 		buffer[layer]->draw();
 
 		glPopMatrix();

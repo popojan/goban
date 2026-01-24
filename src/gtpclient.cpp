@@ -2,6 +2,7 @@
 #include <string>
 #include <algorithm>
 #include <cstring>
+#include <spdlog/spdlog.h>
 
 #ifdef _WIN32
 // Windows implementation
@@ -188,6 +189,10 @@ bool Process::running() const {
 
 #else
 // POSIX implementation
+#include <unistd.h>
+#include <sys/wait.h>
+#include <signal.h>
+
 Process::Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir) {
     int stdinPipe[2], stdoutPipe[2], stderrPipe[2];
 
@@ -246,7 +251,7 @@ Process::~Process() {
     if (stderrFd_ >= 0) close(stderrFd_);
 }
 
-bool Process::write(const std::string& data) {
+bool Process::write(const std::string& data) const {
     if (stdinFd_ < 0) return false;
     ssize_t written = ::write(stdinFd_, data.c_str(), data.size());
     return written == static_cast<ssize_t>(data.size());
@@ -309,7 +314,7 @@ void Process::closeStdin() {
     }
 }
 
-int Process::wait() {
+int Process::wait() const {
     if (pid_ < 0) return -1;
     int status;
     waitpid(pid_, &status, 0);
@@ -340,7 +345,7 @@ void StderrReaderThread::stop() {
     }
 }
 
-void StderrReaderThread::readLoop() {
+void StderrReaderThread::readLoop() const {
     std::string line;
     while (running_ && proc_.readLineStderr(line)) {
         callback_(line);
@@ -540,7 +545,7 @@ GtpClient::~GtpClient() {
     }
 
     proc_->closeStdin();
-    proc_->wait();
+    (void) proc_->wait();
 }
 
 void GtpClient::interpolate(std::string& out) {

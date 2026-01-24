@@ -52,16 +52,16 @@ public:
     explicit GameThread(GobanModel &model);
     ~GameThread();
 
-    size_t addEngine(Engine* engine);
+    size_t addEngine(Engine* engine) const;
 
-    size_t addPlayer(Player* player);
+    size_t addPlayer(Player* player) const;
 
-    Engine* currentCoach();
-    Engine* currentKibitz();
+    Engine* currentCoach() const;
+    Engine* currentKibitz() const;
 
-    Player* currentPlayer();
+    Player* currentPlayer() const;
 
-    std::string getName(size_t id) { return playerManager->getName(id); }
+    std::string getName(size_t id) const { return playerManager->getName(id); }
 
     void interrupt();
 
@@ -70,7 +70,7 @@ public:
 
     bool clearGame(int boardSize, float komi, int handicap);
 
-    void removeSgfPlayers();  // Remove temporary players created from SGF loading
+    void removeSgfPlayers() const;  // Remove temporary players created from SGF loading
 
     void setKomi(float komi);
 
@@ -82,10 +82,10 @@ public:
 
     void gameLoop();
 
-    bool humanToMove();
+    bool humanToMove() const;
 
     void playLocalMove(const Move& move);
-    void playKibitzMove();
+    void playKibitzMove() const;
 
     // Analysis mode support
     bool setGameMode(GameMode mode);  // Returns true if mode change succeeded
@@ -93,11 +93,11 @@ public:
     void setAiVsAi(bool enabled);
     bool isAiVsAi() const { return aiVsAiMode; }
 
-    void loadEngines(std::shared_ptr<Configuration> config);
+    void loadEngines(std::shared_ptr<Configuration> config) const;
 
-	size_t activatePlayer(int which, size_t newIndex);
+	size_t activatePlayer(int which, size_t newIndex) const;
 
-	size_t getActivePlayer(int which);
+	size_t getActivePlayer(int which) const;
 
 	[[nodiscard]] Move getLocalMove(const Position& coord) const;
     [[nodiscard]] Move getLocalMove(Move::Special move) const;
@@ -114,15 +114,15 @@ public:
     bool navigateToStart();  // Go to beginning of game
     bool navigateToEnd();    // Go to end of game (main line)
 
-    std::vector<Player*> getPlayers() { return playerManager->getPlayers(); }
+    std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
 
     bool loadSGF(const std::string& fileName, int gameIndex = 0);
 
 private:
-    void syncOtherEngines(const Move& move, Player* player, Engine* coach, Engine* kibitzEngine, bool kibitzed);
+    void syncOtherEngines(const Move& move, const Player* player, const Engine* coach, const Engine* kibitzEngine, bool kibitzed) const;
     void notifyMoveComplete(Engine* coach, const Move& move, Engine* kibitzEngine, bool kibitzed, const std::string& engineComments);
     void setHandicapStones(const std::vector<Position>& stones);
-    void applyHandicapStonesToEngines(const std::vector<Position>& stones, Engine* coach);
+    void applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const;
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;
     std::unique_ptr<std::thread> thread;
@@ -130,6 +130,7 @@ private:
     std::atomic<bool> interruptRequested{false};
     std::atomic<bool> hasThreadRunning{false};
     Player* playerToMove;
+    Move queuedMove;
     mutable std::mutex playerMutex;
     std::condition_variable engineStarted;
 

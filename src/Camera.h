@@ -1,11 +1,3 @@
-// -----------------------------------------------------------------------------
-// libDDG -- Camera.h
-// -----------------------------------------------------------------------------
-//
-// Camera is used by Viewer to keep track of the view state; it also
-// handles mouse input related to camera manipulation.
-//
-
 #ifndef DDG_CAMERA_H
 #define DDG_CAMERA_H
 

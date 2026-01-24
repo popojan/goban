@@ -29,13 +29,11 @@ void GobanModel::onBoardSized(int boardSize) {
 	calcCapturedBlack = 0;
 	calcCapturedWhite = 0;
 
-    if(!state.metricsReady) {
-        metrics.calc(boardSize);
-        calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
-        state.metricsReady = true;
-    }
-
+    metrics.calc(boardSize);
+    calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
+    state.metricsReady = true;
 }
+
 GobanModel::~GobanModel() = default;
 
 float GobanModel::result(const Move& lastMove) {
@@ -69,22 +67,11 @@ bool GobanModel::isPointOnBoard(const Position& p) const {
 void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) {
     using namespace glm;
     capturedBlack = capturedWhite = Metrics::maxc;
-    float cc0x = 0.0f;
-    float cc0z = 0.0f;
-    float cc1x = 0.0f;
-    float cc1z = 0.0f;
-    float magic = 0.0f;
-    float factor = 1.00f;
-    float ddcy = 0.5f * m.h - factor * m.innerBowlRadius - magic;
-
-    vec3 s0a(cc0x, -magic, cc0z);
-    vec3 s1a(cc0x, ddcy, cc0z);
-    vec3 s0b(cc1x, -magic, cc1z);
-    vec3 s1b(cc1x, ddcy, cc1z);
-    vec3 sy(0.0f, m.stoneSphereRadius - 0.5 * m.h, 0.0f);
-
 
     for (int i = 0; i < 2 * maxCaptured; ++i) {
+        float factor = 1.00f;
+        float cc0z = 0.0f;
+        float cc0x = 0.0f;
         float ccx = cc0x;
         float ccz = cc0z;
         float rr = factor * m.innerBowlRadius;
@@ -93,6 +80,8 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         bool white = false;
 
         if (i + calcCapturedBlack >= capturedBlack) {
+            float cc1z = 0.0f;
+            float cc1x = 0.0f;
             ccx = cc1x;
             ccz = cc1z;
             di = calcCapturedWhite;
@@ -100,11 +89,12 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         }
 
         float mindy = 1e6, mindx = 0, mindz = 0;
-        const int ITERS = 500;
+        constexpr int ITERS = 500;
         for (int k = 0; k < ITERS; ++k) {
-            const int turns = int(sqrt(ITERS));
-            const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * (float)turns);
-            const float phi = (float)turns * 2.0f * 3.1415926f * (float)k / float(ITERS);
+            const int turns = static_cast<int>(sqrt(ITERS));
+            const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * static_cast<float>(turns));
+            const float phi = static_cast<float>(turns)
+                * 2.0f * 3.1415926f * static_cast<float>(k) / static_cast<float>(ITERS);
             const float r = a * phi;
             float dx = cos(phi) * r;
             float dz = sin(phi) * r;
@@ -137,7 +127,7 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         ddc[4 * (i + di) + 0] = ccx + mindx;
         ddc[4 * (i + di) + 1] = ccy + mindy;
         ddc[4 * (i + di) + 2] = ccz + mindz;
-        ddc[4 * (i + di) + 3] = (float)board.getRandomStoneRotation();
+        ddc[4 * (i + di) + 3] = static_cast<float>(board.getRandomStoneRotation());
     }
     calcCapturedBlack = capturedBlack;
     calcCapturedWhite = capturedWhite;
@@ -207,6 +197,10 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     }
     state.holdsStone = false;
     changeTurn();
+}
+
+void GobanModel::onStonePlaced(const Move& move) {
+    state.holdsStone = false;
 }
 
 void GobanModel::onBoardChange(const Board& result) {

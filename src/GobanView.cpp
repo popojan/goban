@@ -3,7 +3,6 @@
 #include "AudioPlayer.hpp"
 #include "ElementGame.h"
 
-#include <iostream>
 #include <cstdio>
 #include <set>
 #include "UserSettings.h"
@@ -180,7 +179,7 @@ void GobanView::mouseMoved(float x, float y) {
         requestRepaint();
     }
     else if (isZooming) {
-        glm::vec4 a(0.0f, 0.0f, -6.0f * (y - startY)/(float)WINDOW_HEIGHT, 1.0);
+        glm::vec4 a(0.0f, 0.0f, -6.0f * (y - startY)/static_cast<float>(WINDOW_HEIGHT), 1.0);
         a = cam.getView(true) * a;
         newTranslate[0] = translate[0] + a.x;
         newTranslate[1] = translate[1] + a.y;
@@ -195,10 +194,9 @@ void GobanView::mouseMoved(float x, float y) {
         glm::vec4 nBoard = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
         float t = glm::dot(-tt - ro, nBoard) / glm::dot(dir, nBoard);//<float, glm::precision::defaultp, glm::tvec4>
         float scale = 2.0f*(3.0f - t) / 3.0f;
-        glm::vec4 a0(translate[0], translate[1], translate[2], 1.0);
         glm::vec4 a(
-                -scale * (x - startX) / (float)WINDOW_HEIGHT,
-                 scale * (y - startY) / (float)WINDOW_HEIGHT,
+                -scale * (x - startX) / static_cast<float>(WINDOW_HEIGHT),
+                 scale * (y - startY) / static_cast<float>(WINDOW_HEIGHT),
                  0.0, 1.0);
         a = cam.getView(true) * a;
         newTranslate[0] = translate[0] + a.x;
@@ -242,7 +240,7 @@ void GobanView::requestRepaint(int what) {
     }
 }
 
-void GobanView::shadeIt(float time, GobanShader& shader) const {
+void GobanView::shadeIt(float time, const GobanShader& shader) const {
 	shader.use();
 
 	shader.setTime(lastTime);

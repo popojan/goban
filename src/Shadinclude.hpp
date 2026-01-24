@@ -66,11 +66,11 @@ class Shadinclude
 {
 public:
   // Return the source code of the complete shader
-  static std::string load(std::string path, std::string includeIndentifier = "#include") {
+  static std::string load(const std::string &path, const std::string& includeIndentifier = "#include") {
     return _load(path, includeIndentifier, false);
   }
 private:
-  static std::string _load(std::string path, std::string includeIndentifier0 = "#include", bool isRecursiveCall = false)
+  static std::string _load(const std::string &path, const std::string& includeIndentifier0 = "#include", bool isRecursiveCall = false)
   {
     std::string includeIndentifier(includeIndentifier0 + ' ');
 

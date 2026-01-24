@@ -1,23 +1,18 @@
-//
-// Created by jan on 7.5.17.
-//
+#ifndef GOBAN_GOBANVIEW_H
+#define GOBAN_GOBANVIEW_H
 
-#include <utility>
 #include <string>
 #include <atomic>
 #include "GobanOverlay.h"
 #include <RmlUi/Core/Types.h>
-#include <RmlUi/Core/Texture.h>
 #include "GobanShader.h"
 #include "GobanModel.h"
 #include "GameObserver.h"
-#include "Metrics.h"
 #include "Camera.h"
 #include "GameState.h"
-#include <GLFW/glfw3.h>
+#include "Configuration.h"
+#include "AudioPlayer.hpp"
 
-#ifndef GOBAN_GOBANVIEW_H
-#define GOBAN_GOBANVIEW_H
 
 extern std::shared_ptr<Configuration> config;
 
@@ -32,7 +27,7 @@ public:
         UPDATE_SOME = 16,
         UPDATE_SHADER = 32,
         UPDATE_SOUND_STONE = 64,
-        UPDATE_ALL = (1|2|3|4|8|16|32)
+        UPDATE_ALL = (1|2|4|8|16|32)
     };
 
     explicit GobanView(GobanModel& m);
@@ -42,9 +37,10 @@ public:
     void onBoardChange(const Board& board) override;
     void onBoardSized(int newBoardSize) override;
 
-    ~GobanView() {
+    ~GobanView() override {
         gobanShader.destroy();
     }
+
     void Render(int, int);
 
     void updateTranslation();
@@ -80,11 +76,11 @@ public:
         gobanShader.setDof(dof);
         updateFlag |= UPDATE_SHADER;
     }
-    float getEof() {
+    float getEof() const {
         return gobanShader.getEof();
     };
 
-    float getDof() {
+    float getDof() const {
         return gobanShader.getDof();
     };
 
@@ -118,7 +114,7 @@ public:
 
     void resetView();
     void saveView();
-    void shadeIt(float time, GobanShader &shader) const;
+    void shadeIt(float time, const GobanShader &shader) const;
 
     void animateIntro();
 

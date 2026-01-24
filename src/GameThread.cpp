@@ -37,23 +37,23 @@ GameThread::~GameThread() {
     // PlayerManager destructor handles player cleanup
 }
 
-size_t GameThread::addEngine(Engine* engine) {
+size_t GameThread::addEngine(Engine* engine) const {
     return playerManager->addEngine(engine);
 }
 
-size_t GameThread::addPlayer(Player* player) {
+size_t GameThread::addPlayer(Player* player) const {
     return playerManager->addPlayer(player);
 }
 
-Engine* GameThread::currentCoach() {
+Engine* GameThread::currentCoach() const {
     return playerManager->currentCoach();
 }
 
-Engine* GameThread::currentKibitz() {
+Engine* GameThread::currentKibitz() const {
     return playerManager->currentKibitz();
 }
 
-Player* GameThread::currentPlayer() {
+Player* GameThread::currentPlayer() const {
     return playerManager->currentPlayer(model.state.colorToMove);
 }
 
@@ -67,7 +67,7 @@ void GameThread::interrupt() {
     }
 }
 
-void GameThread::removeSgfPlayers() {
+void GameThread::removeSgfPlayers() const {
     playerManager->removeSgfPlayers();
 }
 
@@ -116,11 +116,11 @@ void GameThread::setKomi(float komi) {
     }
 }
 
-size_t GameThread::getActivePlayer(int which) {
+size_t GameThread::getActivePlayer(int which) const {
     return playerManager->getActivePlayer(which);
 }
 
-size_t GameThread::activatePlayer(int which, size_t newIndex) {
+size_t GameThread::activatePlayer(int which, size_t newIndex) const {
     return playerManager->activatePlayer(which, newIndex);
 }
 
@@ -183,17 +183,17 @@ bool GameThread::isThinking() const {
     return playerToMove != nullptr && playerToMove->isTypeOf(Player::ENGINE);
 }
 
-bool GameThread::humanToMove() {
+bool GameThread::humanToMove() const {
     std::unique_lock<std::mutex> lock(playerMutex);
     if(playerToMove) {
         return currentPlayer()->isTypeOf(Player::HUMAN);
     }
     return false;
 }
-void GameThread::syncOtherEngines(const Move& move, Player* player, Engine* coach,
-                                   Engine* kibitzEngine, bool kibitzed) {
+void GameThread::syncOtherEngines(const Move& move, const Player* player, const Engine* coach,
+                                   const Engine* kibitzEngine, bool kibitzed) const {
     for (auto p : playerManager->getPlayers()) {
-        if (p != reinterpret_cast<Player*>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
+        if (p != reinterpret_cast<const Player*>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
             spdlog::debug("syncOtherEngines: syncing player {}", p->getName());
             p->play(move);
         }
@@ -251,24 +251,82 @@ void GameThread::gameLoop() {
             continue;
         }
         bool navigatingHistory = model.game.isNavigating() && !model.game.isAtEndOfNavigation();
-        if (navigatingHistory && player && !player->isTypeOf(Player::HUMAN)) {
-            // Only block engine genmove at historical positions.
-            // Human players must still enter genmove (blocking wait) to accept undo/moves.
+        if (navigatingHistory && gameMode == GameMode::MATCH
+            && player && !player->isTypeOf(Player::HUMAN)) {
+            // Match mode only: block engine genmove at historical positions.
+            // In Analysis mode, human always controls — handled by the Analysis branch.
             spdlog::debug("Game loop: skipping engine genmove during navigation (view pos {}/{})",
                 model.game.getViewPosition(), model.game.getLoadedMovesCount());
             waitForCommandOrTimeout(100);
             continue;
         }
 
-        if(coach && player && !interruptRequested) {
+        if (gameMode == GameMode::ANALYSIS && coach && !interruptRequested) {
+            // Analysis mode: human plays either color, engine responds to human moves
+            Player* humanPlayer = playerManager->getPlayers()[playerManager->getHumanIndex()];
+            playerToMove = humanPlayer;
+            player->suggestMove(queuedMove);
+            Move move = humanPlayer->genmove(model.state.colorToMove);
+            queuedMove = Move(Move::INVALID, model.state.colorToMove);
+            bool wasKibitz = false;
+            if (move == Move::KIBITZED) {
+                if (kibitzEngine) {
+                    move = kibitzEngine->genmove(model.state.colorToMove);
+                    wasKibitz = true;
+                } else {
+                    move = Move(Move::INVALID, model.state.colorToMove);
+                }
+            }
+
+            lock.lock();
+            locked = true;
+
+            if (move == Move::INTERRUPT) {
+                playerToMove = nullptr;
+                continue;
+            }
+
+            bool success = false;
+            if (move) {
+                success = move == Move::RESIGN
+                          || (wasKibitz && kibitzEngine == coach)
+                          || coach->play(move);
+            }
+
+            if (success) {
+                syncOtherEngines(move, humanPlayer, coach, kibitzEngine, wasKibitz);
+                notifyMoveComplete(coach, move, kibitzEngine, wasKibitz, "");
+
+                // Human-originated move: engine (kibitz) auto-responds
+                if (!wasKibitz && !model.isGameOver && kibitzEngine) {
+                    Color responseColor = model.state.colorToMove;
+                    spdlog::debug("Analysis: triggering kibitz response for {}", responseColor.toString());
+                    Move response = kibitzEngine->genmove(responseColor);
+                    if (response && response != Move::RESIGN) {
+                        if (kibitzEngine == coach || coach->play(response)) {
+                            syncOtherEngines(response, kibitzEngine, coach, kibitzEngine, false);
+                            notifyMoveComplete(coach, response, kibitzEngine, false, "");
+                        }
+                    }
+                }
+            }
+
+            if (model.isGameOver) {
+                playerToMove = nullptr;
+                continue;
+            }
+
+            if (success)
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        } else if(coach && player && !interruptRequested) {
+            // Match mode: strict player roles
             bool success = false;
             bool kibitzed = false;
             playerToMove = player;
-            //cancel blocking wait for input if human player
-            player->suggestMove(Move(Move::INVALID, model.state.colorToMove));
-            //blocking wait for move - do NOT hold mutex during this wait
-            //to keep UI responsive (especially important for slow engines like KataGo loading models)
+            player->suggestMove(queuedMove);
             Move move = player->genmove(model.state.colorToMove);
+            queuedMove = Move(Move::INVALID, model.state.colorToMove);
             if(move == Move::KIBITZED) {
                 if (kibitzEngine) {
                     move = kibitzEngine->genmove(model.state.colorToMove);
@@ -278,27 +336,21 @@ void GameThread::gameLoop() {
                     move = Move(Move::INVALID, model.state.colorToMove);
                 }
             }
-            spdlog::debug("MOVE to {}, valid = {}", move.toString(), (bool)move);
-            //lock mutex after genmove returns, before processing the move result
-            //NOTE: keep playerToMove set until processing complete to block navigation
+            spdlog::debug("MOVE to {}, valid = {}", move.toString(), static_cast<bool>(move));
             lock.lock();
             locked = true;
-            //TODO no direct access to model but via observers
             if (move == Move::INTERRUPT) {
-                // Mode switch or player change - skip this iteration and re-evaluate
                 spdlog::debug("INTERRUPT received, re-evaluating game state");
-                playerToMove = nullptr;  // Clear before continue
+                playerToMove = nullptr;
                 continue;
             }
             else if (move) {
-                // coach plays
                 success = player == coach
                           || (kibitzed && kibitzEngine == coach)
                           || move == Move::RESIGN
                           || coach->play(move);
             }
             if(success) {
-                // Collect engine comments for annotation
                 std::ostringstream engineComments;
                 for (auto p : playerManager->getPlayers()) {
                     if (p->isTypeOf(Player::ENGINE)) {
@@ -309,16 +361,12 @@ void GameThread::gameLoop() {
                     }
                 }
 
-                // Sync other engines (not for resign)
-                if (!(move == Move::RESIGN)) {
+                if (move != Move::RESIGN) {
                     syncOtherEngines(move, player, coach, kibitzEngine, kibitzed);
                 }
 
-                // Notify observers
                 notifyMoveComplete(coach, move, kibitzEngine, kibitzed, engineComments.str());
             }
-
-            //update territory if shown
 
             bool influence = model.board.showTerritory
                 && (success || move == Move::INTERRUPT);
@@ -339,7 +387,6 @@ void GameThread::gameLoop() {
                 continue;
             }
 
-
             if(success && move != Move::INTERRUPT)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -357,16 +404,11 @@ void GameThread::playLocalMove(const Move& move) {
     if (playerToMove) {
         playerToMove->suggestMove(move);
     } else if (model.started) {
-        // Game loop hasn't entered genmove yet - pre-load the move.
-        // LocalHumanPlayer::genmove() will pick it up without blocking.
-        Player* player = currentPlayer();
-        if (player && player->isTypeOf(Player::LOCAL | Player::HUMAN)) {
-            player->suggestMove(move);
-        }
+        queuedMove = move;
     }
 }
 
-void GameThread::playKibitzMove() {
+void GameThread::playKibitzMove() const {
     std::unique_lock<std::mutex> lock(playerMutex);
     Move kibitzed(Move::KIBITZED, model.state.colorToMove);
     if(playerToMove) playerToMove->suggestMove(kibitzed);
@@ -467,8 +509,7 @@ NavResult GameThread::executeNavCommand(const NavCommand& cmd) {
             // Territory consolidation: if at scored game end, show territory atomically
             if (result.success && model.game.isAtEndOfNavigation()
                 && model.game.shouldShowTerritory()) {
-                Engine* coach = currentCoach();
-                if (coach) {
+                if (Engine* coach = currentCoach()) {
                     model.board.toggleTerritoryAuto(true);
                     const Board& territory = coach->showterritory(true, model.game.lastStoneMove().col);
                     navigator->notifyBoardChange(territory);
@@ -485,6 +526,22 @@ NavResult GameThread::executeNavCommand(const NavCommand& cmd) {
             auto varResult = navigator->navigateToVariation(cmd.move);
             result.success = varResult.success;
             result.newBranch = varResult.newBranch;
+            // In Analysis mode, auto-respond with kibitz engine after human variation
+            if (result.success && gameMode == GameMode::ANALYSIS) {
+                Engine* kibitz = currentKibitz();
+                Engine* coach = currentCoach();
+                if (kibitz && coach && !model.isGameOver) {
+                    Color responseColor = model.state.colorToMove;
+                    spdlog::debug("Analysis nav: triggering kibitz response for {}", responseColor.toString());
+                    Move response = kibitz->genmove(responseColor);
+                    if (response && response != Move::RESIGN) {
+                        if (kibitz == coach || coach->play(response)) {
+                            syncOtherEngines(response, reinterpret_cast<Player*>(kibitz), coach, kibitz, false);
+                            notifyMoveComplete(coach, response, kibitz, false, "");
+                        }
+                    }
+                }
+            }
             break;
         }
     }
@@ -523,8 +580,8 @@ void GameThread::setAiVsAi(bool enabled) {
     spdlog::info("AI vs AI mode: {}", enabled ? "enabled" : "disabled");
 }
 
-void GameThread::loadEngines(const std::shared_ptr<Configuration> config) {
-    playerManager->loadEngines(config);
+void GameThread::loadEngines(const std::shared_ptr<Configuration> conf) const {
+    playerManager->loadEngines(conf);
 }
 
 Move GameThread::getLocalMove(const Position& coord) const {
@@ -753,7 +810,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     return true;
 }
 
-void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, Engine* coach) {
+void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const {
     int boardSize = model.getBoardSize();
     // Sync handicap stones to active players (if they're engines and not the coach)
     for (int which = 0; which < 2; which++) {

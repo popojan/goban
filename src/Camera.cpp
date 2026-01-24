@@ -6,10 +6,10 @@ using namespace std;
 #include "Camera.h"
 
 glm::dmat4x4 getMatrix(const DDG::Quaternion& r) {
-    auto w = (float)r[0];
-    auto x = (float)r[1];
-    auto y = (float)r[2];
-    auto z = (float)r[3];
+    auto w = static_cast<float>(r[0]);
+    auto x = static_cast<float>(r[1]);
+    auto y = static_cast<float>(r[2]);
+    auto z = static_cast<float>(r[3]);
     return  {
         1.f-2.f*y*y-2.f*z*z, 2.f*x*y+2.f*w*z, 2.f*x*z-2.f*w*y, 0.f,
         2.f*x*y-2.f*w*z, 1.f-2.f*x*x-2.f*z*z, 2.f*y*z+2.f*w*x, 0.f,
@@ -45,8 +45,8 @@ namespace DDG {
               tLast(0),
               zoom(1.),
               vZoom(1.),
-              axis(Y_AXIS),
-              lock(true) {}
+              lock(true),
+              axis(Y_AXIS) {}
 
     void Camera::setHorizontalLock(bool newLock) {
         lock = newLock;

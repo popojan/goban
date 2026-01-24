@@ -22,7 +22,7 @@ private:
 class EventHandlerFileChooser : public EventHandler {
 public:
     EventHandlerFileChooser();
-    virtual ~EventHandlerFileChooser();
+    ~EventHandlerFileChooser() override;
 
     void ProcessEvent(Rml::Event& event, const Rml::String& value) override;
 
@@ -34,18 +34,19 @@ public:
     void ShowDialog();
 
     // Public method to hide the dialog (called from DialogKeyListener)
-    void HideDialog();
+    void HideDialog() const;
 
 private:
-    void populateFilesList();
+    void populateFilesList() const;
     void populateGamesList();
     void handleFileSelection(int index);
-    void handleGameSelection(int index);
-    void updateCurrentPath();
-    void updatePaginationInfo();
-    void clearGridSelection(Rml::Element* grid);
-    void requestRepaint();
-    std::string getTemplateString(const char* templateId, const char* defaultValue);
+    void handleGameSelection(int index) const;
+    void updateCurrentPath() const;
+    void updatePaginationInfo() const;
+
+    static void clearGridSelection(const Rml::Element* grid);
+    void requestRepaint() const;
+    std::string getTemplateString(const char* templateId, const char* defaultValue) const;
     void initializeLocalization();
 
     Rml::ElementDocument* dialogDocument;
@@ -60,7 +61,8 @@ private:
     std::map<std::string, std::string> columnHeaders;
     void loadGameColumnsConfig();
     void createGameHeaderRow(Rml::Element* gamesList);
-    Rml::ElementPtr createColumnSpan(Rml::Element* parent, const std::string& colType, const std::string& text);
+
+    static Rml::ElementPtr createColumnSpan(Rml::Element* parent, const std::string& colType, const std::string& text);
 };
 
 #endif //GOBAN_EVENTHANDLERFILECHOOSER_H

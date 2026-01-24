@@ -3,7 +3,6 @@
 #include "UserSettings.h"
 #include "version.h"
 #include <RmlUi/Core/ElementDocument.h>
-#include <RmlUi/Core/Factory.h>
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/StringUtilities.h>
@@ -48,7 +47,7 @@ void ElementGame::populateEngines() {
             selectBlack->Add(playerName.c_str(), playerIndex.c_str());
             selectWhite->Add(playerName.c_str(), playerIndex.c_str());
         }
-        selectBlack->SetSelection((int)players.size() - 1);
+        selectBlack->SetSelection(static_cast<int>(players.size()) - 1);
         selectWhite->SetSelection(0);
     }
 
@@ -95,9 +94,9 @@ void ElementGame::populateEngines() {
     std::string currentGui = config->data.value("gui", "./config/gui/en");
     std::string currentLang = fs::path(currentGui).filename().string();
     int currentLangIndex = -1;
-    int index = 0;
 
     try {
+        int index = 0;
         for (const auto& entry : fs::directory_iterator(configDir)) {
             if (entry.path().extension() == ".json") {
                 std::ifstream file(entry.path());
@@ -142,8 +141,7 @@ void ElementGame::populateEngines() {
     OnMenuToggle("toggle_fps", view.isFpsLimitEnabled());
 
     // Populate version label (uses its own content as format string)
-    auto versionLabel = GetContext()->GetDocument("game_window")->GetElementById("lblVersion");
-    if (versionLabel) {
+    if (auto versionLabel = GetContext()->GetDocument("game_window")->GetElementById("lblVersion")) {
         versionLabel->SetInnerRML(
             Rml::CreateString(versionLabel->GetInnerRML().c_str(), GOBAN_VERSION).c_str()
         );
@@ -233,7 +231,8 @@ void ElementGame::gameLoop() {
     if (currentTime - s_fpsLastTime >= 1.0) {
         auto debugElement = context->GetDocument("game_window")->GetElementById("lblFPS");
         auto fpsTemplate = context->GetDocument("game_window")->GetElementById("templateFPS");
-        const Rml::String sFps = Rml::CreateString(fpsTemplate->GetInnerRML().c_str(), (float)s_fpsFrames / (currentTime - s_fpsLastTime));
+        const Rml::String sFps = Rml::CreateString(fpsTemplate->GetInnerRML().c_str(),
+            static_cast<float>(s_fpsFrames) / (currentTime - s_fpsLastTime));
         if (debugElement != nullptr && s_fpsLastDisplayed != s_fpsFrames) {
             debugElement->SetInnerRML(sFps.c_str());
             if (s_fpsFrames < 1) {
@@ -271,7 +270,7 @@ void ElementGame::gameLoop() {
     //}
 }
 
-double ElementGame::getIdleTimeout() const {
+double ElementGame::getIdleTimeout() {
     // If we displayed non-zero FPS, we need one more wake-up to show "0 fps"
     if (s_fpsLastDisplayed > 0) {
         float currentTime = static_cast<float>(glfwGetTime());
@@ -298,7 +297,7 @@ void ElementGame::ProcessEvent(Rml::Event& event)
     }
 
     if (event == "keydown" || event == "keyup") {
-        Rml::Input::KeyIdentifier key_identifier = (Rml::Input::KeyIdentifier) event.GetParameter< int >("key_identifier", 0);
+        Rml::Input::KeyIdentifier key_identifier = static_cast<Rml::Input::KeyIdentifier>(event.GetParameter<int>("key_identifier", 0));
         spdlog::debug("ElementGame received {} key={}", event.GetType().c_str(), static_cast<int>(key_identifier));
         control.keyPress(key_identifier, 0, 0, event == "keydown");
     }
@@ -365,7 +364,6 @@ void ElementGame::ProcessEvent(Rml::Event& event)
             // Sync dropdowns with SGF game settings
             refreshPlayerDropdowns();
             refreshGameSettingsDropdowns();
-            OnMenuToggle("toggle_analysis_mode", engine.getGameMode() == GameMode::ANALYSIS);
         } else {
             // Apply user settings if no SGF was loaded
             auto& settings = UserSettings::instance();
@@ -378,7 +376,7 @@ void ElementGame::ProcessEvent(Rml::Event& event)
                 model.state.komi = settings.getKomi();
                 model.state.handicap = settings.getHandicap();
                 if (settings.getBoardSize() != 19) {
-                    control.newGame(settings.getBoardSize());
+                    (void) control.newGame(settings.getBoardSize());
                 }
             }
 
@@ -462,6 +460,15 @@ void ElementGame::OnUpdate()
         context->GetDocument("game_window")->GetElementsByClassName(els, "toggle_territory");
         if (!els.empty() && els[0]->IsClassSet("selected") != model.board.showTerritory) {
             OnMenuToggle("toggle_territory", model.board.showTerritory);
+        }
+    }
+    // Sync game mode menu toggle with engine state
+    {
+        std::vector<Rml::Element*> els;
+        context->GetDocument("game_window")->GetElementsByClassName(els, "toggle_analysis_mode");
+        bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
+        if (!els.empty() && els[0]->IsClassSet("selected") != analysisMode) {
+            OnMenuToggle("toggle_analysis_mode", analysisMode);
         }
     }
 
@@ -667,7 +674,7 @@ void ElementGame::Reshape() {
     }
 }
 
-void ElementGame::OnMenuToggle(const std::string &cmd, bool checked) {
+void ElementGame::OnMenuToggle(const std::string &cmd, bool checked) const {
     if(cmd.substr(0, 7) == "toggle_") {
         std::vector<Rml::Element*> elements;
         GetContext()->GetDocument("game_window")->GetElementsByClassName(elements, cmd.c_str());

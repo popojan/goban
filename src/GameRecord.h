@@ -33,7 +33,7 @@ public:
     void move(const Move& move);
     void branchFromFinishedGame(const Move& move);  // Copy path and branch (preserves original)
 
-    void annotate(const std::string& comment);
+    void annotate(const std::string& comment) const;
 
     void initGame(int boardSize, float komi, int handicap, const std::string& blackPlayer, const std::string& whitePlayer);
 
@@ -133,12 +133,12 @@ public:
     [[nodiscard]] GameState::Message getResultMessage() const;
 
     // Remove RE (result) property from root node
-    void removeGameResult();
+    void removeGameResult() const;
 
     // Multi-variation support
     [[nodiscard]] std::vector<Move> getVariations() const;
     bool navigateToChild(const Move& move, bool promoteToMainLine = false);
-    void promoteCurrentPathToMainLine();
+    void promoteCurrentPathToMainLine() const;
 
     // Get comment from current node (C property)
     [[nodiscard]] std::string getComment() const;

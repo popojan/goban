@@ -40,8 +40,8 @@ public:
     ~FileChooserDataSource();
 
     // Legacy DataSource interface - stubbed out
-    void GetRow(std::vector<std::string>& row, const std::string& table, int row_index, const std::vector<std::string>& columns);
-    int GetNumRows(const std::string& table);
+    void GetRow(std::vector<std::string>& row, const std::string& table, int row_index, const std::vector<std::string>& columns) const;
+    int GetNumRows(const std::string& table) const;
 
     // File navigation
     void SetCurrentPath(const std::filesystem::path& path);
@@ -93,8 +93,8 @@ private:
     std::string strSgfFile = "SGF File";
     std::string strUp = "Up";
     std::string strGameInfoFmt = "Game %d (%dx%d, %d moves)";
-    static const int FILES_PAGE_SIZE = 10000;
-    static const int GAMES_PAGE_SIZE = 10000;
+    static constexpr int FILES_PAGE_SIZE = 10000;
+    static constexpr int GAMES_PAGE_SIZE = 10000;
     
     std::filesystem::path currentPath;
     std::vector<FileEntry> files;
@@ -109,8 +109,9 @@ private:
     
     void refreshFileList();
     void previewSGF(const std::string& filePath);
-    std::vector<SGFGameInfo> parseSGFGames(const std::string& filePath);
-    int countMovesInGame(std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game);
+    std::vector<SGFGameInfo> parseSGFGames(const std::string& filePath) const;
+
+    static int countMovesInGame(const std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game);
 };
 
 #endif // GOBAN_FILECHOOSERDATASOURCE_H

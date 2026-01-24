@@ -60,8 +60,7 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
     }
     else if (value == "open_file") {
         // Load the selected game
-        const SGFGameInfo* game = dataSource->GetSelectedGame();
-        if (game) {
+        if (dataSource->GetSelectedGame()) {
             std::string filePath = dataSource->GetSelectedFilePath();
             int gameIndex = dataSource->GetSelectedGameIndex();
             spdlog::info("Opening SGF file: {} game index: {}", filePath, gameIndex);
@@ -69,15 +68,11 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
             // Get the game element and load the SGF
             if (dialogDocument) {
                 auto context = dialogDocument->GetContext();
-                auto gameDoc = context->GetDocument("game_window");
-                if (gameDoc) {
-                    auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
-                    if (gameElement) {
+                if (auto gameDoc = context->GetDocument("game_window")) {
+                    if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
                         gameElement->getGameThread().loadSGF(filePath, gameIndex);
                         gameElement->refreshPlayerDropdowns();  // Update dropdowns with SGF player names
                         gameElement->refreshGameSettingsDropdowns();  // Sync board/komi/handicap with SGF
-                        gameElement->OnMenuToggle("toggle_analysis_mode",
-                            gameElement->getGameThread().getGameMode() == GameMode::ANALYSIS);
                         gameElement->updateNavigationOverlay();  // Update markup and variation overlays
                         gameElement->requestRepaint();  // Ensure UI updates
                     }
@@ -229,14 +224,14 @@ void EventHandlerFileChooser::ShowDialog() {
     requestRepaint();
 }
 
-void EventHandlerFileChooser::HideDialog() {
+void EventHandlerFileChooser::HideDialog() const {
     if (dialogDocument) {
         dialogDocument->Hide();
         requestRepaint();
     }
 }
 
-void EventHandlerFileChooser::populateFilesList() {
+void EventHandlerFileChooser::populateFilesList() const {
     if (!dialogDocument) return;
 
     auto filesList = dialogDocument->GetElementById("files_list");
@@ -370,8 +365,7 @@ void EventHandlerFileChooser::populateGamesList() {
                     rowIdx++;
                 }
 
-                auto span = createColumnSpan(rowElement.get(), colType, cellText);
-                if (span) {
+                if (auto span = createColumnSpan(rowElement.get(), colType, cellText)) {
                     rowElement->AppendChild(std::move(span));
                 }
             }
@@ -389,8 +383,7 @@ void EventHandlerFileChooser::handleFileSelection(int index) {
     if (!dialogDocument) return;
 
     // Clear previous selection
-    auto filesList = dialogDocument->GetElementById("files_list");
-    if (filesList) {
+    if (auto filesList = dialogDocument->GetElementById("files_list")) {
         for (int i = 0; i < filesList->GetNumChildren(); ++i) {
             filesList->GetChild(i)->SetClass("selected", false);
         }
@@ -442,12 +435,11 @@ void EventHandlerFileChooser::handleFileSelection(int index) {
     }
 }
 
-void EventHandlerFileChooser::handleGameSelection(int index) {
+void EventHandlerFileChooser::handleGameSelection(int index) const {
     if (!dialogDocument) return;
 
     // Clear previous selection (skip header row at index 0)
-    auto gamesList = dialogDocument->GetElementById("games_list");
-    if (gamesList) {
+    if (auto gamesList = dialogDocument->GetElementById("games_list")) {
         for (int i = 1; i < gamesList->GetNumChildren(); ++i) {
             gamesList->GetChild(i)->SetClass("selected", false);
         }
@@ -463,82 +455,72 @@ void EventHandlerFileChooser::handleGameSelection(int index) {
     dataSource->SelectGame(actualIndex);
 }
 
-void EventHandlerFileChooser::updateCurrentPath() {
+void EventHandlerFileChooser::updateCurrentPath() const {
     if (!dialogDocument) return;
 
-    auto pathElement = dialogDocument->GetElementById("current_path");
-    if (pathElement) {
+    if (auto pathElement = dialogDocument->GetElementById("current_path")) {
         pathElement->SetInnerRML(dataSource->GetCurrentPath().string().c_str());
     }
 }
 
-void EventHandlerFileChooser::updatePaginationInfo() {
+void EventHandlerFileChooser::updatePaginationInfo() const {
     if (!dialogDocument) return;
 
     // Files pagination
-    auto filesPageInfo = dialogDocument->GetElementById("files_page_info");
-    if (filesPageInfo) {
+    if (auto filesPageInfo = dialogDocument->GetElementById("files_page_info")) {
         char buf[64];
         snprintf(buf, sizeof(buf), strPageInfoFmt.c_str(),
                  dataSource->GetFilesCurrentPage(), std::max(1, dataSource->GetFilesTotalPages()));
         filesPageInfo->SetInnerRML(buf);
     }
 
-    auto filesPrev = dialogDocument->GetElementById("files_prev");
-    if (filesPrev) {
+    if (auto filesPrev = dialogDocument->GetElementById("files_prev")) {
         filesPrev->SetClass("disabled", !dataSource->CanGoToFilesPrevPage());
     }
 
-    auto filesNext = dialogDocument->GetElementById("files_next");
-    if (filesNext) {
+    if (auto filesNext = dialogDocument->GetElementById("files_next")) {
         filesNext->SetClass("disabled", !dataSource->CanGoToFilesNextPage());
     }
 
     // Games pagination
-    auto gamesPageInfo = dialogDocument->GetElementById("games_page_info");
-    if (gamesPageInfo) {
+    if (auto gamesPageInfo = dialogDocument->GetElementById("games_page_info")) {
         char buf[64];
         snprintf(buf, sizeof(buf), strPageInfoFmt.c_str(),
                  dataSource->GetGamesCurrentPage(), std::max(1, dataSource->GetGamesTotalPages()));
         gamesPageInfo->SetInnerRML(buf);
     }
 
-    auto gamesPrev = dialogDocument->GetElementById("games_prev");
-    if (gamesPrev) {
+    if (auto gamesPrev = dialogDocument->GetElementById("games_prev")) {
         gamesPrev->SetClass("disabled", !dataSource->CanGoToGamesPrevPage());
     }
 
-    auto gamesNext = dialogDocument->GetElementById("games_next");
-    if (gamesNext) {
+    if (auto gamesNext = dialogDocument->GetElementById("games_next")) {
         gamesNext->SetClass("disabled", !dataSource->CanGoToGamesNextPage());
     }
 }
 
-void EventHandlerFileChooser::clearGridSelection(Rml::Element* grid) {
+void EventHandlerFileChooser::clearGridSelection(const Rml::Element* grid) {
     if (!grid) return;
     for (int i = 0; i < grid->GetNumChildren(); ++i) {
         grid->GetChild(i)->SetClass("selected", false);
     }
 }
 
-void EventHandlerFileChooser::requestRepaint() {
+void EventHandlerFileChooser::requestRepaint() const {
     if (dialogDocument) {
-        auto context = dialogDocument->GetContext();
-        auto gameDoc = context->GetDocument("game_window");
-        if (gameDoc) {
-            auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
-            if (gameElement) {
+        const auto context = dialogDocument->GetContext();
+        if (auto gameDoc = context->GetDocument("game_window")) {
+            if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
                 gameElement->requestRepaint();
             }
         }
     }
 }
 
-std::string EventHandlerFileChooser::getTemplateString(const char* templateId, const char* defaultValue) {
+std::string EventHandlerFileChooser::getTemplateString(const char* templateId, const char* defaultValue) const {
     if (!dialogDocument) return defaultValue;
 
-    auto templateElement = dialogDocument->GetElementById(templateId);
-    if (templateElement) {
+    if (auto templateElement = dialogDocument->GetElementById(templateId)) {
         return templateElement->GetInnerRML().c_str();
     }
     return defaultValue;
@@ -603,8 +585,7 @@ void EventHandlerFileChooser::createGameHeaderRow(Rml::Element* gamesList) {
         for (const auto& colType : gameColumns) {
             auto it = columnHeaders.find(colType);
             std::string headerText = (it != columnHeaders.end()) ? it->second : colType;
-            auto span = createColumnSpan(headerRow.get(), colType, headerText);
-            if (span) {
+            if (auto span = createColumnSpan(headerRow.get(), colType, headerText)) {
                 headerRow->AppendChild(std::move(span));
             }
         }

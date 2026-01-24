@@ -4,10 +4,10 @@
 
 #include "GobanShader.h"
 
-#include <iostream>
 #include <fstream>
 #include "GobanView.h"
 #include "Shadinclude.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
 const GLushort GobanShader::elementBufferData[] = {0, 1, 2, 3};
 const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
@@ -18,11 +18,10 @@ const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
 } };
 
 GLuint shaderCompileFromString(GLenum type, const std::string& source) {
-    GLuint shader;
     GLint length;
     GLint result;
 
-    shader = glCreateShader(type);
+    GLuint shader = glCreateShader(type);
     length = static_cast<GLint>(source.length());
     const char * psource = source.c_str();
     glShaderSource(shader, 1, &psource, &length);
@@ -30,10 +29,8 @@ GLuint shaderCompileFromString(GLenum type, const std::string& source) {
 
     glGetShaderiv(shader, GL_COMPILE_STATUS, &result);
     if (result == GL_FALSE) {
-        char *log;
-
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
-        log = new char[length];
+        char *log = new char[length];
         glGetShaderInfoLog(shader, length, &result, log);
 
         spdlog::error("shaderCompileFromString(): Unable to compile: {}", log);
@@ -96,10 +93,9 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
 
     if (result == GL_FALSE) {
         GLint length;
-        char *log;
 
         glGetProgramiv(gobanProgram, GL_INFO_LOG_LENGTH, &length);
-        log = (char*)malloc(static_cast<size_t>(length));
+        char *log = static_cast<char *>(malloc(static_cast<size_t>(length)));
         glGetProgramInfoLog(gobanProgram, length, &result, log);
 
         spdlog::error("sceneInit(): Program linking failed: {0}", log);
@@ -261,7 +257,7 @@ void GobanShader::init() {
     glEnable(GL_BLEND);
 }
 
-void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
+void GobanShader::draw(const GobanModel& model, int updateFlag, float time) const {
     if(!shadersReady)
         return;
 #ifndef DEBUG_NVIDIA
@@ -300,22 +296,18 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
         Position coord = view.getBoardCoordinate(view.lastX, view.lastY);
         float cur[2];
         int size = view.board.getSize();
-        cur[0] = (float)(coord.x - (float)size/2.0);
-        cur[1] = (float)(coord.y - (float)size/2.0);
+        cur[0] = static_cast<float>(coord.x - static_cast<float>(size) / 2.0);
+        cur[1] = static_cast<float>(coord.y - static_cast<float>(size) / 2.0);
         glUniform2fv(fsu_cursor, 1, cur);
-        //if (boardChanged > 1) { //TODO sound
-            //stoneSound();
-            //stoneSound(true);
-        //}
     }
 
     glUniform3fv(iTranslate, 1, glm::value_ptr(view.newTranslate));
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, (void*)nullptr);
+    glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, static_cast<void *>(nullptr));
     glEnableVertexAttribArray(iVertex);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
-    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, (void*)nullptr);
+    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, static_cast<void *>(nullptr));
     glDisableVertexAttribArray(iVertex);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -343,7 +335,7 @@ int GobanShader::choose(int idx) {
         return -1;
     }
 
-    int newProgram = (int)(idx % shaders.size());
+    int newProgram = static_cast<int>(idx % shaders.size());
 
     json shader(shaders[newProgram]);
 
@@ -393,10 +385,10 @@ void GobanShader::setDof(float val) {
     dof = val;
 }
 
-float GobanShader::getEof() {
+float GobanShader::getEof() const {
     return eof;
 }
 
-float GobanShader::getDof() {
+float GobanShader::getDof() const {
     return dof;
 }

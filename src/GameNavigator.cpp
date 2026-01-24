@@ -10,7 +10,7 @@ GameNavigator::GameNavigator(GobanModel& model, CoachProvider getCoach,
 {
 }
 
-void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo) {
+void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo) const {
     for (auto player : players) {
         if (player != reinterpret_cast<Player*>(coach)) {
             if (isUndo) {
@@ -22,12 +22,12 @@ void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo) {
     }
 }
 
-void GameNavigator::notifyBoardChange(const Board& result) {
+void GameNavigator::notifyBoardChange(const Board& result) const {
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&result](GameObserver* observer) { observer->onBoardChange(result); });
 }
 
-void GameNavigator::notifyBoardChangeWithMove(const Board& result, const Move& move) {
+void GameNavigator::notifyBoardChangeWithMove(const Board& result, const Move& move) const {
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&result, move](GameObserver* observer) {
             observer->onBoardChange(result);
@@ -288,7 +288,6 @@ bool GameNavigator::navigateToEnd() {
     NavigationGuard guard(navigationInProgress);
 
     bool playedMoves = false;
-    Move lastMove;
 
     // Play all moves on main line (first child at each branch)
     while (true) {
@@ -311,7 +310,6 @@ bool GameNavigator::navigateToEnd() {
             spdlog::warn("navigateToEnd: navigateToChild failed, this shouldn't happen");
             break;  // Don't create new moves, something is wrong
         }
-        lastMove = nextMove;
         playedMoves = true;
     }
 

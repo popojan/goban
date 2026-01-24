@@ -35,9 +35,9 @@ public:
     size_t addPlayer(Player* player);
 
     // Current player queries
-    Engine* currentCoach();
-    Engine* currentKibitz();
-    Player* currentPlayer(Color colorToMove);
+    Engine* currentCoach() const;
+    Engine* currentKibitz() const;
+    Player* currentPlayer(Color colorToMove) const;
 
     // Active player management (activePlayer[] is the single source of truth for who plays each color)
     size_t activatePlayer(int which, size_t newIndex);
@@ -65,7 +65,7 @@ public:
     void setInterruptCallback(InterruptCallback callback) { interruptPlayer = std::move(callback); }
 
     // Mutex access for external synchronization (e.g., game loop)
-    std::mutex& getMutex() { return mutex; }
+    std::mutex& getMutex() const { return mutex; }
 
 private:
     ObserverList& gameObservers;

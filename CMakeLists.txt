@@ -368,7 +368,7 @@ else()
         src/sound/AudioPlayer.cpp
         src/sound/FileHandler.cpp
         src/sound/StreamHandler.cpp
-        src/sound/util.cpp src/Configuration.cpp
+            src/Configuration.cpp
         src/glad/src/glad.c
         src/GameRecord.cpp
         src/AppState.cpp

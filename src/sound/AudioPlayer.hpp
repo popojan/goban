@@ -14,15 +14,15 @@ public:
     void loop(const std::string& id, double volume = 1.0);
     void stop();
     void init();
-    void preload(const std::shared_ptr<Configuration> config);
+    void preload(const std::shared_ptr<Configuration> &config);
     size_t playbackCount() { return streamHandler.playbackCount(); }
     void stopIfInactive() { streamHandler.stopIfInactive(); }
 
-    void setMuted(bool muted) { this->muted = muted; }
+    void setMuted(const bool mute) { this->muted = mute; }
     bool isMuted() const { return muted; }
 private:
     FileHandler fileHandler;
     StreamHandler streamHandler;
-    bool muted = false;
+    bool muted;
 };
 #endif

@@ -1,15 +1,7 @@
 #pragma once
 
 #include "AudioFile.hpp"
-
-#include "sndfile.h"
 #include "portaudio.h"
-
-#if defined (__linux__)
-    #include <cstdlib> // required for putenv.
-#endif
-
-#include <cstring>
 #include <sstream>
 #include <vector>
 #include <mutex>
@@ -36,7 +28,7 @@ class StreamHandler
         StreamHandler();
         ~StreamHandler();
 
-        void init();
+        static void init();
 
         void processEvent(AudioEventType audioEventType,
                           AudioFile * audioFile = nullptr,

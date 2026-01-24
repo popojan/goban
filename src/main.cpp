@@ -48,7 +48,6 @@
 #include <nlohmann/json.hpp>
 
 #include <memory>
-#include <fstream>
 #include <set>
 
 #include "UserSettings.h"
@@ -64,10 +63,8 @@ public:
         // Trigger repaint on CSS state changes from ANY document
         // The repaint trigger (ElementGame) lives in game_window
         if (context) {
-            auto doc = context->GetDocument("game_window");
-            if (doc) {
-                auto gameElement = dynamic_cast<ElementGame*>(doc->GetElementById("game"));
-                if (gameElement) {
+            if (auto doc = context->GetDocument("game_window")) {
+                if (auto gameElement = dynamic_cast<ElementGame*>(doc->GetElementById("game"))) {
                     gameElement->requestRepaint();
                 }
             }
@@ -194,10 +191,8 @@ static void GlfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
     if (context) {
         context->SetDimensions(Rml::Vector2i(width, height));
         // Trigger repaint on window resize
-        auto gameDoc = context->GetDocument("game_window");
-        if (gameDoc) {
-            auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
-            if (gameElement) {
+        if (auto gameDoc = context->GetDocument("game_window")) {
+            if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
                 gameElement->requestRepaint();
             }
         }
@@ -407,14 +402,14 @@ int main(int argc, char** argv)
     }
 
     // Initialize glad
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
         spdlog::critical("Failed to initialize GLAD");
         glfwDestroyWindow(window);
         glfwTerminate();
         return -1;
     }
 
-    spdlog::info("OpenGL version: {}", (const char*)glGetString(GL_VERSION));
+    spdlog::info("OpenGL version: {}", reinterpret_cast<const char *>(glGetString(GL_VERSION)));
 
     // Set up GLFW callbacks
     glfwSetWindowSizeCallback(window, GlfwWindowSizeCallback);
@@ -472,9 +467,7 @@ int main(int argc, char** argv)
     EventManager::RegisterEventHandler("open", fileChooserHandler);
     fileChooserHandler->LoadDialog(context);
 
-    auto windowLoaded = EventManager::LoadWindow("goban", context);
-
-    if (windowLoaded) {
+    if (EventManager::LoadWindow("goban", context)) {
         // Main loop
         while (!glfwWindowShouldClose(window) && !AppState::ExitRequested()) {
             // Get game element
@@ -526,10 +519,8 @@ int main(int argc, char** argv)
 
     // Save current game and stop thread before destroying RmlUi elements
     spdlog::debug("Stopping game thread");
-    auto gameDoc = context->GetDocument("game_window");
-    if (gameDoc) {
-        auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
-        if (gameElement) {
+    if (auto gameDoc = context->GetDocument("game_window")) {
+        if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
             gameElement->getController().saveCurrentGame();
             gameElement->getGameThread().interrupt();
         }

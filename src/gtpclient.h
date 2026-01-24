@@ -3,25 +3,16 @@
 
 #include <string>
 #include <vector>
-#include <iostream>
-#include <sstream>
-#include <spdlog/spdlog.h>
 #include <regex>
 #include <nlohmann/json.hpp>
 #include <thread>
-#include <mutex>
-#include <deque>
-#include <condition_variable>
 #include <atomic>
 #include <functional>
 
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <unistd.h>
 #include <sys/types.h>
-#include <sys/wait.h>
-#include <signal.h>
 #endif
 
 struct OutputFilter {
@@ -39,11 +30,11 @@ public:
     Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir);
     ~Process();
 
-    bool write(const std::string& data);
+    bool write(const std::string& data) const;
     bool readLine(std::string& line);
     bool readLineStderr(std::string& line);
     void closeStdin();
-    int wait();
+    int wait() const;
     bool running() const;
 
 private:
@@ -71,7 +62,7 @@ public:
     void stop();
 
 private:
-    void readLoop();
+    void readLoop() const;
     Process& proc_;
     std::function<void(const std::string&)> callback_;
     std::thread thread_;
@@ -94,7 +85,7 @@ public:
     GtpClient(const std::string &exe, const std::string &cmdline,
               const std::string &path, const nlohmann::json &messages);
 
-    ~GtpClient();
+    virtual ~GtpClient();
 
     void interpolate(std::string &out);
 

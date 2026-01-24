@@ -5,13 +5,9 @@
 #ifndef GOBAN_GOBANOVERLAY_H
 #define GOBAN_GOBANOVERLAY_H
 
-#include <ft2build.h>
-//#include  "glyphy-freetype.h"
 #include  "glyphy/GlyphyFont.h"
-#include "Metrics.h"
 #include "GobanModel.h"
 #include "Camera.h"
-#include <spdlog/spdlog.h>
 #include <GlyphyState.h>
 
 class GobanView;
@@ -24,15 +20,17 @@ struct Layer {
 
 class GobanOverlay {
 public:
-    GobanOverlay(const GobanView& view): view(view), overlayReady(false),
-        ft_library(nullptr), ft_face(nullptr), font_size(.0)
+	explicit GobanOverlay(const GobanView& view): ft_library(nullptr), ft_face(nullptr),
+	                                              view(view), overlayReady(false), font_size(.0)
     {
         init();
     }
     bool init();
-    void use();
-    void unuse();
-    void draw(const GobanModel&, const DDG::Camera&, unsigned);
+
+	static void use();
+
+	static void unuse();
+    void draw(const GobanModel&, const DDG::Camera&, unsigned) const;
     ~GobanOverlay();
     void setReady() { overlayReady = true; }
 	void Update(const Board& board, const GobanModel& model);

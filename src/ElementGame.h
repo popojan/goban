@@ -30,9 +30,9 @@ public:
     }
 
     // Returns timeout for idle sleep: >0 = seconds to wait, -1 = wait forever
-    double getIdleTimeout() const;
+    static double getIdleTimeout();
 
-    bool isExiting() { return control.isExiting(); }
+    bool isExiting() const { return control.isExiting(); }
     void Reshape();
     void gameLoop();
     void populateEngines();
@@ -40,12 +40,12 @@ public:
     void refreshGameSettingsDropdowns();  // Sync board/komi/handicap dropdowns with model state
     GobanControl& getController() { return control; }
     GameThread& getGameThread() { return engine; }
-    void OnMenuToggle(const std::string& cmd, bool checked);
+    void OnMenuToggle(const std::string& cmd, bool checked) const;
 
 protected:
-    virtual void OnUpdate();
+    void OnUpdate() override;
 public:
-    virtual void OnRender();
+    void OnRender() override;
 
 private:
 

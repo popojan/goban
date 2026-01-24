@@ -6,7 +6,6 @@
 #if defined(RMLUI_PLATFORM_LINUX)
     #include <alsa/asoundlib.h>
     #include <cstdarg>
-    #include <cstdio>
 
     void alsa_error_callback (
             const char *file,
@@ -21,7 +20,7 @@
             if(err >= SND_ERROR_BEGIN)
                 spdlog::warn("Alsa error {} in {} at {}:{}: {}", err, function, file, line, msg);
             else
-                spdlog::debug("Alsa info {} in {} at {}:{}: {}", err, function, file, line, msg);
+                spdlog::trace("Alsa info {} in {} at {}:{}: {}", err, function, file, line, msg);
             free(msg);
         }
         va_end(args);
@@ -53,7 +52,7 @@ int StreamHandler::PortAudioCallback(const void * input,
 
                         int * bufferCursor = outputBuffer;
 
-                        unsigned int framesLeft = (unsigned int) frameCount;
+                        unsigned int framesLeft = static_cast<unsigned int>(frameCount);
                         int framesRead;
 
                         bool playbackEnded = false;
@@ -63,7 +62,7 @@ int StreamHandler::PortAudioCallback(const void * input,
                                 int pos = data->position;
                                 if (framesLeft > (audioFile->fh.frames() - data->position))
                                 {
-                                        framesRead = (unsigned int) (audioFile->fh.frames() - data->position);
+                                        framesRead = static_cast<unsigned int>(audioFile->fh.frames() - data->position);
                                         if (data->loop)
                                         {
                                                 data->position = 0;
@@ -84,7 +83,7 @@ int StreamHandler::PortAudioCallback(const void * input,
 
                                 framesLeft -= framesRead;
                         }
-                        int * outputCursor = (int *) output;
+                        int * outputCursor = static_cast<int *>(output);
                         if (audioFile->fh.channels() == 1) {
                                 for (unsigned long i = 0; i < stereoFrameCount; ++i)
                                 {
@@ -197,22 +196,21 @@ void StreamHandler::ensureInitialized() {
         if (initialized) return;
 
         Pa_Initialize();
-        PaError errorCode;
         PaStreamParameters outputParameters;
         outputParameters.device = Pa_GetDefaultOutputDevice();
         outputParameters.channelCount = CHANNEL_COUNT;
         outputParameters.sampleFormat = paInt32;
         outputParameters.suggestedLatency = 0.02;
-        outputParameters.hostApiSpecificStreamInfo = 0;
+        outputParameters.hostApiSpecificStreamInfo = nullptr;
 
-        errorCode = Pa_OpenStream(&stream,
-                                  NO_INPUT,
-                                  &outputParameters,
-                                  SAMPLE_RATE,
-                                  paFramesPerBufferUnspecified,
-                                  paNoFlag,
-                                  &PortAudioCallback,
-                                  this);
+        PaError errorCode = Pa_OpenStream(&stream,
+                                          NO_INPUT,
+                                          &outputParameters,
+                                          SAMPLE_RATE,
+                                          paFramesPerBufferUnspecified,
+                                          paNoFlag,
+                                          &PortAudioCallback,
+                                          this);
 
         if (errorCode)
         {

@@ -47,9 +47,8 @@ public:
     bool isNavigating() const { return navigationInProgress.load(); }
 
     // Board change notifications (public for use by GameThread::executeNavCommand)
-    void notifyBoardChange(const Board& result);
-    void notifyBoardChangeWithMove(const Board& result, const Move& move);
-
+    void notifyBoardChange(const Board& result) const;
+    void notifyBoardChangeWithMove(const Board& result, const Move& move) const;
 private:
     // Scope guard to set/clear navigationInProgress flag
     struct NavigationGuard {
@@ -59,7 +58,7 @@ private:
     };
 
     // Helper to sync move across all engines
-    void syncEngines(const Move& move, Engine* coach, bool isUndo);
+    void syncEngines(const Move& move, Engine* coach, bool isUndo) const;
 
     GobanModel& model;
     CoachProvider getCoach;

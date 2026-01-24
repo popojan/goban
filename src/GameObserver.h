@@ -5,6 +5,8 @@
 class GameObserver {
 
 public:
+    virtual ~GameObserver() = default;
+
     /// Visual/audio event: a stone was placed on the board (sound, overlay update)
     /// Called during both gameplay and navigation
     virtual void onStonePlaced(const Move& move) {}

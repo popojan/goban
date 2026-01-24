@@ -10,7 +10,6 @@
 #include "GameState.h"
 #include <spdlog/spdlog.h>
 #include <atomic>
-#include "AudioPlayer.hpp"
 #include "GameObserver.h"
 #include "GameRecord.h"
 
@@ -19,24 +18,24 @@ class ElementGame;
 class GobanModel: public GameObserver {
 public:
     GobanModel(ElementGame *p, int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
-            : parent(p), invalidated(false),
-            calcCapturedBlack(0), calcCapturedWhite(0), cursor({0,0}) {
-        spdlog::info("Preloading sounds...");
-        //newGame(boardSize, handicap, komi);
+        : parent(p), started(false), invalidated(true),
+          calcCapturedBlack(0), calcCapturedWhite(0), ddc{}, metrics(), cursor({0, 0}) {
     }
-    ~GobanModel();
-    virtual void onGameMove(const Move&, const std::string& comment);
-    virtual void onKomiChange(float);
-    virtual void onHandicapChange(const std::vector<Position>&);
-    virtual void onPlayerChange(int, const std::string&);
 
-    virtual void onBoardSized(int);
+    ~GobanModel() override;
+    void onGameMove(const Move&, const std::string& comment) override;
 
-    virtual void onBoardChange(const Board&);
+    void onStonePlaced(const Move &move) override;
 
-	//void newGame(int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f);
+    void onKomiChange(float) override;
+    void onHandicapChange(const std::vector<Position>&) override;
+    void onPlayerChange(int, const std::string&) override;
 
-    bool isPointOnBoard(const Position& coord) const;
+    void onBoardSized(int) override;
+
+    void onBoardChange(const Board&) override;
+
+	bool isPointOnBoard(const Position& coord) const;
 
     void start() {
         started = true;
@@ -66,7 +65,7 @@ public:
 
     void calcCaptured(Metrics& m, int capturedBlack, int capturedWhite);
 
-    operator bool() { return !isGameOver && started; }
+    operator bool() const { return !isGameOver && started; }
 
     void setCursor(const Position& p) { cursor = p;}
 
@@ -83,7 +82,7 @@ public:
 
     bool invalidated;
 
-    static const int maxCaptured = 191;
+    static constexpr int maxCaptured = 191;
     int calcCapturedBlack, calcCapturedWhite;
     float ddc[8 * maxCaptured];
 

@@ -4,7 +4,7 @@
 #include <RmlUi/Core/Input.h>
 #include <unordered_map>
 #include <string>
-#include "json.hpp"
+#include <nlohmann/json.hpp>
 
 struct Configuration {
 

@@ -1,7 +1,6 @@
 #include "GameRecord.h"
 #include "Configuration.h"
 #include <iomanip>
-#include <chrono>
 #include <filesystem>
 #include <spdlog/spdlog.h>
 
@@ -180,11 +179,10 @@ void GameRecord::move(const Move& move)  {
 
     using namespace LibSgfcPlusPlus;
 
-    std::vector<std::shared_ptr<ISgfcProperty> > properties;
-
     auto newNode(F::CreateNode());
 
     if (move == Move::NORMAL || move == Move::PASS) {
+        std::vector<std::shared_ptr<ISgfcProperty> > properties;
         // If creating a branch (existing children), invalidate old result
         // RE property reflects result of main line only
         if (currentNode->GetFirstChild() && hasGameResult()) {
@@ -337,7 +335,7 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
         path.size());
 }
 
-void GameRecord::annotate(const std::string& comment) {
+void GameRecord::annotate(const std::string& comment) const {
     if(currentNode == nullptr)
         return;
     auto properties = currentNode->GetProperties();
@@ -619,9 +617,9 @@ void GameRecord::saveAs(const std::string& fileName) {
         }
     }
 
-    std::shared_ptr<LibSgfcPlusPlus::ISgfcDocumentWriter> writer(F::CreateDocumentWriter());
+    const std::shared_ptr writer(F::CreateDocumentWriter());
     try {
-        writer->WriteSgfFile(doc, fn);
+        (void) writer->WriteSgfFile(doc, fn);
         spdlog::info("Writing sgf file [{}] success!", fn);
     } catch (std::exception& ex) {
         spdlog::error("Writing sgf file [{}] failed: {}", fn, ex.what());
@@ -693,44 +691,38 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         for (auto property : rootNode->GetProperties()) {
             switch (property->GetPropertyType()) {
                 case T::SZ: {
-                    auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue());
-                    if (numberValue) {
+                    if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue())) {
                         gameInfo.boardSize = numberValue->GetNumberValue();
                     }
                     break;
                 }
                 case T::KM: {
-                    auto realValue = std::dynamic_pointer_cast<ISgfcRealPropertyValue>(property->GetPropertyValue());
-                    if (realValue) {
+                    if (auto realValue = std::dynamic_pointer_cast<ISgfcRealPropertyValue>(property->GetPropertyValue())) {
                         gameInfo.komi = realValue->GetRealValue();
                     }
                     break;
                 }
                 case T::HA: {
-                    auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue());
-                    if (numberValue) {
+                    if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue())) {
                         gameInfo.handicap = numberValue->GetNumberValue();
                     }
                     break;
                 }
                 case T::PB: {
-                    auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue());
-                    if (textValue) {
+                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
                         gameInfo.blackPlayer = textValue->GetSimpleTextValue();
                     }
                     break;
                 }
                 case T::PW: {
-                    auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue());
-                    if (textValue) {
+                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
                         gameInfo.whitePlayer = textValue->GetSimpleTextValue();
                     }
                     break;
                 }
                 case T::AB: {
                     for (auto value : property->GetPropertyValues()) {
-                        auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value);
-                        if (stoneValue) {
+                        if (auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value)) {
                             auto sgfPoint = stoneValue->GetStoneValue();
                             Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
                             gameInfo.handicapStones.push_back(pos);
@@ -739,12 +731,13 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
                     break;
                 }
                 case T::RE: {
-                    auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue());
-                    if (textValue) {
+                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
                         gameInfo.gameResult = SgfcGameResult::FromPropertyValue(textValue->GetSimpleTextValue());
                     }
                     break;
                 }
+                default:
+                    ;
             }
         }
 
@@ -936,7 +929,7 @@ GameState::Message GameRecord::getResultMessage() const {
     return GameState::NONE;
 }
 
-void GameRecord::removeGameResult() {
+void GameRecord::removeGameResult() const {
     if (!game) return;
 
     auto root = game->GetRootNode();
@@ -1049,7 +1042,7 @@ bool GameRecord::navigateToChild(const Move& targetMove, bool promoteToMainLine)
     return false;
 }
 
-void GameRecord::promoteCurrentPathToMainLine() {
+void GameRecord::promoteCurrentPathToMainLine() const {
     if (!game || !currentNode) return;
 
     auto treeBuilder = game->GetTreeBuilder();
@@ -1129,8 +1122,7 @@ std::vector<BoardMarkup> GameRecord::getMarkup() const {
                     if (pointValue && textValue) {
                         std::string pointStr = pointValue->GetRawValue();
                         std::string label = textValue->GetRawValue();
-                        Position pos = Position::fromSgf(pointStr, boardSizeColumns);
-                        if (pos) {
+                        if (Position pos = Position::fromSgf(pointStr, boardSizeColumns)) {
                             result.emplace_back(pos, markupType, label);
                         }
                     }
@@ -1139,8 +1131,7 @@ std::vector<BoardMarkup> GameRecord::getMarkup() const {
                 // TR, SQ, CR, MA have simple point values
                 if (value->ToSingleValue()) {
                     std::string pointStr = value->ToSingleValue()->GetRawValue();
-                    Position pos = Position::fromSgf(pointStr, boardSizeColumns);
-                    if (pos) {
+                    if (Position pos = Position::fromSgf(pointStr, boardSizeColumns)) {
                         result.emplace_back(pos, markupType);
                     }
                 }

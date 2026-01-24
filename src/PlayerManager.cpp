@@ -27,21 +27,21 @@ size_t PlayerManager::addPlayer(Player* player) {
     return players.size() - 1;
 }
 
-Engine* PlayerManager::currentCoach() {
+Engine* PlayerManager::currentCoach() const {
     for (auto& engine : engines) {
         if (engine->hasRole(Player::COACH)) return engine;
     }
     return nullptr;
 }
 
-Engine* PlayerManager::currentKibitz() {
+Engine* PlayerManager::currentKibitz() const {
     for (auto& engine : engines) {
         if (engine->hasRole(Player::KIBITZ)) return engine;
     }
     return nullptr;
 }
 
-Player* PlayerManager::currentPlayer(Color colorToMove) {
+Player* PlayerManager::currentPlayer(Color colorToMove) const {
     int which = colorToMove == Color::BLACK ? 0 : 1;
     if (activePlayer[which] < players.size()) {
         return players[activePlayer[which]];
@@ -53,8 +53,9 @@ size_t PlayerManager::activatePlayer(int which, size_t newIndex) {
     std::lock_guard<std::mutex> lock(mutex);
 
     if (newIndex >= players.size()) return activePlayer[which];
-    size_t oldp = activePlayer[which];
-    if (newIndex == oldp) return oldp;
+    size_t oldIndex = activePlayer[which];
+    //following guard causes single-engine self-play not notify observers
+    //if (oldIndex == newIndex) return oldIndex;
 
     activePlayer[which] = newIndex;
 
@@ -72,7 +73,7 @@ size_t PlayerManager::activatePlayer(int which, size_t newIndex) {
     );
 
     spdlog::debug("activatePlayer: which={}, old={}, new={}, name='{}'",
-        which, oldp, newIndex, players[newIndex]->getName());
+        which, oldIndex, newIndex, players[newIndex]->getName());
 
     return newIndex;
 }
@@ -106,8 +107,7 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
         bool hasCoach = false;
         bool hasKibitz = false;
         for (auto it = bots->begin(); it != bots->end(); ++it) {
-            auto enabled = it->value("enabled", 1);
-            if (enabled) {
+            if (it->value("enabled", 1)) {
                 auto path = it->value("path", "");
                 auto name = it->value("name", "");
                 auto command = it->value("command", "");
