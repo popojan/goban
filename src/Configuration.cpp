@@ -11,7 +11,16 @@ void Configuration::load(const std::string& fileName) {
     }
 
     nlohmann::json current;
-    fin >> current;
+    try {
+        fin >> current;
+    } catch (const nlohmann::json::parse_error& e) {
+        spdlog::error("JSON parse error in config file '{}': {}", fileName, e.what());
+        spdlog::error("  at byte position: {}", e.byte);
+        return;
+    } catch (const std::exception& e) {
+        spdlog::error("Error reading config file '{}': {}", fileName, e.what());
+        return;
+    }
 
     // Handle $include - load base config first, then override with current values
     if (current.contains("$include")) {
