@@ -117,32 +117,38 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
                 auto messages = it->value("messages", nlohmann::json::array());
 
                 if (!command.empty()) {
-                    auto engine = new GtpEngine(command, parameters, path, name, messages);
-                    size_t id = addEngine(engine);
+                    try {
+                        auto engine = new GtpEngine(command, parameters, path, name, messages);
+                        size_t id = addEngine(engine);
 
-                    if (main) {
-                        if (!hasCoach) {
-                            hasCoach = true;
-                            coach = id;
-                            spdlog::info("Setting [{}] engine as coach and referee.",
-                                players[id]->getName());
-                        } else {
-                            spdlog::warn("Ignoring coach flag for [{}] engine, coach has already been set to [{}].",
-                                players[id]->getName(),
-                                players[coach]->getName());
+                        if (main) {
+                            if (!hasCoach) {
+                                hasCoach = true;
+                                coach = id;
+                                spdlog::info("Setting [{}] engine as coach and referee.",
+                                    players[id]->getName());
+                            } else {
+                                spdlog::warn("Ignoring coach flag for [{}] engine, coach has already been set to [{}].",
+                                    players[id]->getName(),
+                                    players[coach]->getName());
+                            }
                         }
-                    }
-                    if (kibitzFlag) {
-                        if (!hasKibitz) {
-                            hasKibitz = true;
-                            kibitz = id;
-                            spdlog::info("Setting [{}] engine as trusted kibitz.",
-                                players[id]->getName());
-                        } else {
-                            spdlog::warn("Ignoring kibitz flag for [{}] engine, kibitz has already been set to [{}].",
-                                players[id]->getName(),
-                                players[coach]->getName());
+                        if (kibitzFlag) {
+                            if (!hasKibitz) {
+                                hasKibitz = true;
+                                kibitz = id;
+                                spdlog::info("Setting [{}] engine as trusted kibitz.",
+                                    players[id]->getName());
+                            } else {
+                                spdlog::warn("Ignoring kibitz flag for [{}] engine, kibitz has already been set to [{}].",
+                                    players[id]->getName(),
+                                    players[coach]->getName());
+                            }
                         }
+                    } catch (const std::exception& e) {
+                        spdlog::error("Failed to load engine '{}': {}", name.empty() ? command : name, e.what());
+                        spdlog::warn("Continuing with other engines...");
+                        // Don't set coach/kibitz if this engine failed
                     }
                 }
             }
