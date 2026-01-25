@@ -9,8 +9,8 @@
     },
     {
       "name": "Pachi 12.60",
-      "path": "./engine/Pachi-12.60",
-      "command": "pachi.exe",
+      "path": "",
+      "command": "./engine/Pachi-12.60/pachi",
       "parameters": "-r japanese --smart-pass",
       "enabled": 0
     },
