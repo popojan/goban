@@ -1,14 +1,3 @@
-/*
- * Copyright (c) 2006 - 2008
- * Wandering Monster Studios Limited
- *
- * Any use of this program is governed by the terms of Wandering Monster
- * Studios Limited's Licence Agreement included with this program, a copy
- * of which can be obtained by contacting Wandering Monster Studios
- * Limited at info@wanderingmonster.co.nz.
- *
- */
-
 // Windows headers must come first to avoid conflicts
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
