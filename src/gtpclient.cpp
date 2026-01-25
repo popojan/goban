@@ -1,5 +1,6 @@
 #include "gtpclient.h"
 #include <string>
+#include <sstream>
 #include <algorithm>
 #include <cstring>
 #include <spdlog/spdlog.h>
@@ -107,7 +108,7 @@ Process::~Process() {
     if (hProcess_ != INVALID_HANDLE_VALUE) CloseHandle(hProcess_);
 }
 
-bool Process::write(const std::string& data) {
+bool Process::write(const std::string& data) const {
     if (hStdinWrite_ == INVALID_HANDLE_VALUE) return false;
     DWORD written;
     return WriteFile(hStdinWrite_, data.c_str(), static_cast<DWORD>(data.size()), &written, NULL) && written == data.size();
@@ -173,7 +174,7 @@ void Process::closeStdin() {
     }
 }
 
-int Process::wait() {
+int Process::wait() const {
     if (hProcess_ == INVALID_HANDLE_VALUE) return -1;
     WaitForSingleObject(hProcess_, INFINITE);
     DWORD exitCode;
