@@ -22,6 +22,10 @@
 
 // GLFW and RmlUi backends
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 #include <RmlUi_Platform_GLFW.h>
 #include <RmlUi_Renderer_GL2.h>
 
@@ -413,6 +417,16 @@ int main(int argc, char** argv)
 
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
+
+    // Set window icon from executable resource (Windows only)
+#ifdef _WIN32
+    HWND hwnd = glfwGetWin32Window(window);
+    HICON icon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(101));
+    if (icon) {
+        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
+        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+    }
+#endif
 
     // Store window in AppState for fullscreen toggle etc.
     AppState::SetWindow(window);
