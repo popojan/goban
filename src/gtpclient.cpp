@@ -405,11 +405,12 @@ GtpClient::GtpClient(const std::string& exe, const std::string& cmdline,
     try {
         proc_ = std::make_unique<Process>(program, params, path);
 
-        if (!outputFilters.empty()) {
-            stderrReader_ = std::make_unique<StderrReaderThread>(*proc_, [this](const std::string& line) {
-                (*this)(line);
-            });
-        }
+        // Always create stderr reader to prevent pipe buffer deadlock.
+        // If the child process writes to stderr and nobody reads it,
+        // the pipe buffer fills up and the child blocks.
+        stderrReader_ = std::make_unique<StderrReaderThread>(*proc_, [this](const std::string& line) {
+            (*this)(line);  // Logs at debug level and applies any filters
+        });
     } catch (const std::exception& e) {
         spdlog::error("Failed to start GTP engine: {}", e.what());
         throw;
