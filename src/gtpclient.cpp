@@ -356,10 +356,17 @@ void StderrReaderThread::readLoop() const {
 static std::string findExecutable(const std::string& exe, const std::string& path) {
     // Check if executable exists in provided path
     std::string fullPath = path + "/" + exe;
+
+    // Check if exe has a file extension (dot after last slash/backslash)
+    size_t lastSlash = exe.find_last_of("/\\");
+    size_t lastDot = exe.find_last_of('.');
+    bool hasExtension = (lastDot != std::string::npos &&
+                        (lastSlash == std::string::npos || lastDot > lastSlash));
+
 #ifdef _WIN32
     // On Windows, CreateProcessA searches for exe in parent's current directory,
     // not in lpCurrentDirectory. So we must return the full path.
-    if (exe.find('.') == std::string::npos) {
+    if (!hasExtension) {
         std::string withExe = fullPath + ".exe";
         if (GetFileAttributesA(withExe.c_str()) != INVALID_FILE_ATTRIBUTES) {
             return withExe;  // Return full path including .exe
