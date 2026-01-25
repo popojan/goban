@@ -9,11 +9,12 @@
 struct Configuration {
 
     explicit Configuration(const std::string& fileName) {
-        load(fileName);
+        valid = load(fileName);
     }
-    void load(const std::string& fileName);
+    bool load(const std::string& fileName);
 
     nlohmann::json data;
+    bool valid = false;
 
     std::string getCommand(Rml::Input::KeyIdentifier key) const;
 

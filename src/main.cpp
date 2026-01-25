@@ -176,6 +176,39 @@ public:
 static GobanSystemInterface system_interface;
 static RenderInterface_GL2 render_interface;
 
+// Centralized cleanup for graceful exit on errors
+// Safe to call multiple times or with partially initialized resources
+static void CleanupResources(GLFWwindow* window) {
+    // Flush logs first to ensure all error messages are written
+    if (spdlog::default_logger()) {
+        spdlog::default_logger()->flush();
+    }
+
+    // Clear all GLFW callbacks to prevent accessing freed resources during cleanup
+    // This is critical: callbacks can fire during glfwTerminate() and access spdlog
+    glfwSetErrorCallback(nullptr);
+    if (window) {
+        glfwSetWindowSizeCallback(window, nullptr);
+        glfwSetKeyCallback(window, nullptr);
+        glfwSetCharCallback(window, nullptr);
+        glfwSetCursorPosCallback(window, nullptr);
+        glfwSetMouseButtonCallback(window, nullptr);
+        glfwSetScrollCallback(window, nullptr);
+    }
+
+    // Cleanup RmlUi if it was initialized
+    if (context) {
+        context = nullptr;  // Will be destroyed by Rml::Shutdown()
+    }
+    Rml::Shutdown();  // Safe to call even if not initialized
+
+    // Cleanup GLFW
+    if (window) {
+        glfwDestroyWindow(window);
+    }
+    glfwTerminate();  // Safe to call even if not initialized
+}
+
 // GLFW callbacks
 static void GlfwErrorCallback(int error, const char* description) {
     // Wayland doesn't support window positioning - demote to debug
@@ -373,6 +406,7 @@ int main(int argc, char** argv)
     glfwSetErrorCallback(GlfwErrorCallback);
     if (!glfwInit()) {
         spdlog::critical("Failed to initialize GLFW");
+        CleanupResources(nullptr);
         return -1;
     }
 
@@ -384,7 +418,7 @@ int main(int argc, char** argv)
     GLFWwindow* window = glfwCreateWindow(window_width, window_height, WINDOW_NAME, nullptr, nullptr);
     if (!window) {
         spdlog::critical("Failed to create GLFW window");
-        glfwTerminate();
+        CleanupResources(nullptr);
         return -1;
     }
 
@@ -404,8 +438,7 @@ int main(int argc, char** argv)
     // Initialize glad
     if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
         spdlog::critical("Failed to initialize GLAD");
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        CleanupResources(window);
         return -1;
     }
 
@@ -427,14 +460,17 @@ int main(int argc, char** argv)
     Rml::Initialise();
 
     config = std::make_shared<Configuration>(configurationFile);
+    if (!config->valid) {
+        spdlog::critical("Failed to load configuration from '{}'. Cannot continue.", configurationFile);
+        CleanupResources(window);
+        return -1;
+    }
 
     // Create the main RmlUi context
     context = Rml::CreateContext("main", Rml::Vector2i(window_width, window_height));
     if (context == nullptr) {
         spdlog::critical("Failed to create RmlUi context");
-        Rml::Shutdown();
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        CleanupResources(window);
         return -1;
     }
 
@@ -509,9 +545,7 @@ int main(int argc, char** argv)
         spdlog::critical("Cannot create window, exiting immediately");
         fileChooserHandler->UnloadDialog(context);
         EventManager::Shutdown();
-        Rml::Shutdown();
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        CleanupResources(window);
         return 13;
     }
 

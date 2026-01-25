@@ -3,11 +3,11 @@
 #include <fstream>
 #include <spdlog/spdlog.h>
 
-void Configuration::load(const std::string& fileName) {
+bool Configuration::load(const std::string& fileName) {
     std::ifstream fin(fileName);
     if (!fin.is_open()) {
         spdlog::error("Failed to open config file: {}", fileName);
-        return;
+        return false;
     }
 
     nlohmann::json current;
@@ -16,10 +16,10 @@ void Configuration::load(const std::string& fileName) {
     } catch (const nlohmann::json::parse_error& e) {
         spdlog::error("JSON parse error in config file '{}': {}", fileName, e.what());
         spdlog::error("  at byte position: {}", e.byte);
-        return;
+        return false;
     } catch (const std::exception& e) {
         spdlog::error("Error reading config file '{}': {}", fileName, e.what());
-        return;
+        return false;
     }
 
     // Handle $include - load base config first, then override with current values
@@ -31,7 +31,9 @@ void Configuration::load(const std::string& fileName) {
             includePath = fileName.substr(0, lastSlash + 1) + includePath;
         }
         spdlog::debug("Loading included config: {}", includePath);
-        load(includePath);  // Recursively load base
+        if (!load(includePath)) {  // Recursively load base
+            return false;
+        }
         current.erase("$include");
         data.merge_patch(current);  // Override with current file's values
     } else {
@@ -48,6 +50,7 @@ void Configuration::load(const std::string& fileName) {
             }
         }
     }
+    return true;
 }
 
 void Configuration::addKey(Rml::Input::KeyIdentifier key, const std::string& cmd) {
