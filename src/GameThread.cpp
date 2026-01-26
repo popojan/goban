@@ -1,4 +1,5 @@
 #include "GameThread.h"
+#include "UserSettings.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <cmath>
@@ -609,6 +610,103 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> conf) const {
     playerManager->loadEngines(conf);
 }
 
+void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
+                                      const std::string& sgfPath,
+                                      std::function<void()> onFirstEngineReady) {
+    auto bots = conf->data.find("bots");
+    if (bots == conf->data.end()) {
+        spdlog::warn("No bots configured");
+        playerManager->loadHumanPlayers(conf);
+        return;
+    }
+
+    // Collect enabled bot configs
+    std::vector<nlohmann::json> botConfigs;
+    for (auto it = bots->begin(); it != bots->end(); ++it) {
+        if (it->value("enabled", 1) && !it->value("command", "").empty()) {
+            botConfigs.push_back(*it);
+        }
+    }
+
+    if (botConfigs.empty()) {
+        spdlog::warn("No enabled bots configured");
+        playerManager->loadHumanPlayers(conf);
+        return;
+    }
+
+    // Synchronization state
+    std::mutex mtx;
+    std::condition_variable cv;
+    Engine* firstReadyEngine = nullptr;
+    std::atomic<int> enginesLoaded{0};
+    int totalEngines = static_cast<int>(botConfigs.size());
+    std::vector<Engine*> loadedEngines(totalEngines, nullptr);
+
+    spdlog::info("Loading {} engines in parallel", totalEngines);
+
+    // Spawn a thread for each engine
+    std::vector<std::thread> threads;
+    for (int i = 0; i < totalEngines; ++i) {
+        threads.emplace_back([this, &botConfigs, i, &mtx, &cv, &firstReadyEngine, &enginesLoaded, &loadedEngines]() {
+            Engine* engine = playerManager->loadSingleEngine(botConfigs[i]);
+
+            std::lock_guard<std::mutex> lock(mtx);
+            loadedEngines[i] = engine;
+            if (engine && !firstReadyEngine) {
+                firstReadyEngine = engine;
+                spdlog::info("First engine ready: {}", engine->getName());
+            }
+            enginesLoaded++;
+            cv.notify_all();
+        });
+    }
+
+    // Wait for first engine to be ready
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait(lock, [&firstReadyEngine]() { return firstReadyEngine != nullptr; });
+    }
+
+    // Load SGF with first ready engine (stones appear now!)
+    if (!sgfPath.empty() && firstReadyEngine) {
+        spdlog::info("Loading SGF with first engine: {}", sgfPath);
+        loadSGFWithEngine(sgfPath, firstReadyEngine, -1);
+    } else if (firstReadyEngine) {
+        // No SGF - just clear the board
+        auto& settings = UserSettings::instance();
+        int boardSize = settings.getBoardSize();
+        firstReadyEngine->boardsize(boardSize);
+        firstReadyEngine->clear();
+        std::for_each(gameObservers.begin(), gameObservers.end(),
+            [boardSize](GameObserver* observer) { observer->onBoardSized(boardSize); });
+    }
+
+    // Notify that first engine is ready (for UI update)
+    if (onFirstEngineReady) {
+        onFirstEngineReady();
+    }
+
+    // Wait for all engines
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait(lock, [&enginesLoaded, totalEngines]() { return enginesLoaded >= totalEngines; });
+    }
+
+    // Join all threads
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    // Load human players
+    playerManager->loadHumanPlayers(conf);
+
+    // Sync remaining engines to game state
+    spdlog::info("Syncing {} engines to game state", totalEngines);
+    syncRemainingEngines(firstReadyEngine);
+
+    spdlog::info("All engines loaded and synced");
+}
+
 Move GameThread::getLocalMove(const Position& coord) const {
     return {coord, model.state.colorToMove};
 }
@@ -833,6 +931,135 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     run();
 
     return true;
+}
+
+void GameThread::syncEngineToPosition(Engine* engine) {
+    // Core method: sync one engine to current game position
+    if (!engine) return;
+
+    int boardSize = model.getBoardSize();
+
+    engine->boardsize(boardSize);
+    engine->clear();
+    engine->komi(model.state.komi);
+
+    // Replay handicap stones
+    for (const auto& stone : model.handicapStones) {
+        engine->play(Move(stone, Color::BLACK));
+    }
+
+    // Replay all moves
+    model.game.replay([&](const Move& move) {
+        engine->play(move);
+    });
+}
+
+bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, int gameIndex) {
+    // Load SGF and sync specified engine (or coach if none specified)
+    // Call syncRemainingEngines() later when other engines are ready
+
+    removeSgfPlayers();
+
+    // Auto-save current game if it has moves
+    if (model.game.moveCount() > 0) {
+        try {
+            model.game.saveAs("");
+            spdlog::info("Auto-saved current game with {} moves before loading SGF", model.game.moveCount());
+        } catch (const std::exception& ex) {
+            spdlog::warn("Failed to auto-save current game: {}", ex.what());
+        }
+    }
+
+    GameRecord::SGFGameInfo gameInfo;
+    if (!model.game.loadFromSGF(fileName, gameInfo, gameIndex)) {
+        return false;
+    }
+
+    interrupt();
+    model.pause();
+
+    // Set up model state from SGF
+    model.state.komi = gameInfo.komi;
+    model.state.handicap = gameInfo.handicap;
+    gameMode = GameMode::MATCH;
+
+    // Handle handicap stones in model
+    if (!gameInfo.handicapStones.empty()) {
+        model.board.clear(gameInfo.boardSize);
+        for (const auto& stone : gameInfo.handicapStones) {
+            model.board.updateStone(stone, Color::BLACK);
+        }
+        model.game.setHandicapStones(gameInfo.handicapStones);
+        model.handicapStones = gameInfo.handicapStones;
+    }
+
+    // Notify observers of board size
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&gameInfo](GameObserver* observer) {
+            observer->onBoardSized(gameInfo.boardSize);
+        });
+
+    // Use provided engine or fall back to coach
+    if (!engine) {
+        engine = currentCoach();
+    }
+    if (engine) {
+        syncEngineToPosition(engine);
+
+        const Board& result = engine->showboard();
+        std::for_each(gameObservers.begin(), gameObservers.end(),
+            [&result](GameObserver* observer) {
+                observer->onBoardChange(result);
+            });
+    }
+
+    // Set game state
+    if (model.game.moveCount() > 0) {
+        model.state.colorToMove = Color(model.game.lastMove().col == Color::BLACK
+            ? Color::WHITE : Color::BLACK);
+        const Move& lastMove = model.game.lastMove();
+        if (lastMove == Move::PASS) {
+            model.state.msg = (lastMove.col == Color::BLACK)
+                ? GameState::BLACK_PASS : GameState::WHITE_PASS;
+        }
+    } else if (gameInfo.handicap > 0) {
+        model.state.colorToMove = Color::WHITE;
+    } else {
+        model.state.colorToMove = Color::BLACK;
+    }
+
+    model.state.comment = model.game.getComment();
+    model.state.markup = model.game.getMarkup();
+
+    spdlog::info("SGF [{}] loaded. Board: {}, Moves: {}.",
+                 fileName, gameInfo.boardSize, model.game.moveCount());
+
+    return true;
+}
+
+void GameThread::syncRemainingEngines(Engine* alreadySynced) {
+    // Sync all engines except the one already synced
+
+    // If no engine specified, fall back to coach
+    Engine* skipEngine = alreadySynced ? alreadySynced : currentCoach();
+
+    spdlog::info("Syncing remaining engines (board: {}, moves: {})",
+                 model.getBoardSize(), model.game.moveCount());
+
+    for (auto player : playerManager->getPlayers()) {
+        if (player == skipEngine) continue;  // Already synced
+        if (!player->isTypeOf(Player::ENGINE)) continue;  // Skip non-engines
+
+        syncEngineToPosition(static_cast<Engine*>(player));
+    }
+
+    // Set game mode based on result
+    gameMode = model.game.hasGameResult() ? GameMode::ANALYSIS : GameMode::MATCH;
+
+    // Start game thread for navigation
+    run();
+
+    spdlog::info("All engines synced");
 }
 
 void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const {

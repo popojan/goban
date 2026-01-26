@@ -8,6 +8,7 @@
 #include <memory>
 #include <queue>
 #include <future>
+#include <functional>
 #include <condition_variable>
 
 #include "player.h"
@@ -95,6 +96,13 @@ public:
 
     void loadEngines(std::shared_ptr<Configuration> config) const;
 
+    // Parallel engine loading with early SGF display
+    // Callback is invoked when first engine is ready (for SGF loading)
+    // Returns when all engines are loaded and synced
+    void loadEnginesParallel(std::shared_ptr<Configuration> config,
+                             const std::string& sgfPath,
+                             std::function<void()> onFirstEngineReady);
+
 	size_t activatePlayer(int which, size_t newIndex) const;
 
 	size_t getActivePlayer(int which) const;
@@ -117,6 +125,9 @@ public:
     std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
 
     bool loadSGF(const std::string& fileName, int gameIndex = 0);
+    bool loadSGFWithEngine(const std::string& fileName, Engine* engine = nullptr, int gameIndex = 0);  // Load SGF, sync engine
+    void syncEngineToPosition(Engine* engine);  // Sync one engine to current game state
+    void syncRemainingEngines(Engine* alreadySynced = nullptr);  // Sync all engines except alreadySynced
 
 private:
     void syncOtherEngines(const Move& move, const Player* player, const Engine* coach, const Engine* kibitzEngine, bool kibitzed) const;

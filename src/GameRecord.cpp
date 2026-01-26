@@ -1205,3 +1205,42 @@ std::vector<BoardMarkup> GameRecord::getMarkup() const {
 
     return result;
 }
+
+int GameRecord::peekBoardSize(const std::string& fileName) {
+    using namespace LibSgfcPlusPlus;
+
+    if (!std::filesystem::exists(fileName)) {
+        return -1;
+    }
+
+    try {
+        auto reader = SgfcPlusPlusFactory::CreateDocumentReader();
+        auto loadedDoc = reader->ReadSgfFile(fileName);
+
+        if (!loadedDoc || !loadedDoc->IsSgfDataValid()) {
+            return -1;
+        }
+
+        auto games = loadedDoc->GetDocument()->GetGames();
+        if (games.empty()) {
+            return -1;
+        }
+
+        // Check last game (consistent with loadFromSGF with gameIndex=-1)
+        auto lastGame = games.back();
+        auto rootNode = lastGame->GetRootNode();
+
+        for (auto property : rootNode->GetProperties()) {
+            if (property->GetPropertyType() == SgfcPropertyType::SZ) {
+                if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue())) {
+                    return numberValue->GetNumberValue();
+                }
+            }
+        }
+
+        return 19;  // Default board size if SZ not specified
+    } catch (const std::exception& e) {
+        spdlog::warn("peekBoardSize failed for {}: {}", fileName, e.what());
+        return -1;
+    }
+}

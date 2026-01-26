@@ -12,70 +12,48 @@
 #include <fstream>
 
 ElementGame::ElementGame(const Rml::String& tag)
-        : Rml::Element(tag), model(this), view(model), engine(model),
+        : Rml::Element(tag),
+          model(this, determineInitialBoardSize()),
+          view(model), engine(model),
           control(this, model, view, engine)
 {
-    engine.loadEngines(config);
+    // Register observers (doesn't require engines)
     engine.addGameObserver(&model);
     engine.addGameObserver(&view);
 
-    engine.clearGame(19, 0.5, 0);
+    // Create initial game record (doesn't require engines)
     model.createNewRecord();
+
+    // Engine loading is deferred to async thread - board renders immediately
     // Player initialization moved to "load" event (from SGF or user settings)
 }
 
-void ElementGame::populateEngines() {
-    auto selectBlack = dynamic_cast<Rml::ElementFormControlSelect*>(
-            GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
-    auto selectWhite = dynamic_cast<Rml::ElementFormControlSelect*>(
-            GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
-    const auto players(engine.getPlayers());
-
-    if(!selectBlack) {
-        spdlog::warn("missing GUI element [selectBlack]");
-    }
-    if(!selectWhite) {
-        spdlog::warn("missing GUI element [selectWhite]");
-    }
-
-    if(selectBlack && selectWhite) {
-        for (unsigned i = 0; i < players.size(); ++i) {
-            std::ostringstream ss;
-            ss << i;
-            std::string playerName(players[i]->getName());
-            std::string playerIndex(ss.str());
-            selectBlack->Add(playerName.c_str(), playerIndex.c_str());
-            selectWhite->Add(playerName.c_str(), playerIndex.c_str());
-        }
-        selectBlack->SetSelection(static_cast<int>(players.size()) - 1);
-        selectWhite->SetSelection(0);
-    }
-
+void ElementGame::populateUIElements() {
+    // Populate shaders dropdown (doesn't require engines)
     auto selectShader = dynamic_cast<Rml::ElementFormControlSelect*>(
             GetContext()->GetDocument("game_window")->GetElementById("selectShader"));
 
     if(!selectShader) {
         spdlog::warn("missing GUI element [selectShader]");
-        return;
-    }
-
-    using nlohmann::json;
-    const auto shaders(config->data.value("shaders", json::array()));
-
-    int i = 0;
-    for(json::const_iterator it = shaders.begin(); it != shaders.end(); ++it, ++i){
-        std::ostringstream ss;
-        ss << i;
-        std::string shaderName(it->value("name", ss.str()));
-        std::string shaderIndex(ss.str());
-        selectShader->Add(shaderName.c_str(),shaderIndex.c_str());
-    }
-    // Sync shader menu to restored shader state
-    int currentShader = view.gobanShader.getCurrentProgram();
-    if (currentShader >= 0 && currentShader < static_cast<int>(shaders.size())) {
-        selectShader->SetSelection(currentShader);
     } else {
-        selectShader->SetSelection(0);
+        using nlohmann::json;
+        const auto shaders(config->data.value("shaders", json::array()));
+
+        int i = 0;
+        for(json::const_iterator it = shaders.begin(); it != shaders.end(); ++it, ++i){
+            std::ostringstream ss;
+            ss << i;
+            std::string shaderName(it->value("name", ss.str()));
+            std::string shaderIndex(ss.str());
+            selectShader->Add(shaderName.c_str(),shaderIndex.c_str());
+        }
+        // Sync shader menu to restored shader state
+        int currentShader = view.gobanShader.getCurrentProgram();
+        if (currentShader >= 0 && currentShader < static_cast<int>(shaders.size())) {
+            selectShader->SetSelection(currentShader);
+        } else {
+            selectShader->SetSelection(0);
+        }
     }
 
     // Populate languages from config/*.json files
@@ -84,49 +62,48 @@ void ElementGame::populateEngines() {
 
     if (!selectLanguage) {
         spdlog::warn("missing GUI element [selectLanguage]");
-        return;
-    }
+    } else {
+        namespace fs = std::filesystem;
+        std::string configDir = "./config";
 
-    namespace fs = std::filesystem;
-    std::string configDir = "./config";
+        // Get current language from config's gui path (e.g., "./config/gui/zh" -> "zh")
+        std::string currentGui = config->data.value("gui", "./config/gui/en");
+        std::string currentLang = fs::path(currentGui).filename().string();
+        int currentLangIndex = -1;
 
-    // Get current language from config's gui path (e.g., "./config/gui/zh" -> "zh")
-    std::string currentGui = config->data.value("gui", "./config/gui/en");
-    std::string currentLang = fs::path(currentGui).filename().string();
-    int currentLangIndex = -1;
-
-    try {
-        int index = 0;
-        for (const auto& entry : fs::directory_iterator(configDir)) {
-            if (entry.path().extension() == ".json") {
-                std::ifstream file(entry.path());
-                if (file) {
-                    try {
-                        nlohmann::json cfg;
-                        file >> cfg;
-                        if (cfg.contains("language_name")) {
-                            std::string langName = cfg["language_name"].get<std::string>();
-                            std::string langFile = entry.path().stem().string();  // e.g., "en" from "en.json"
-                            selectLanguage->Add(langName.c_str(), langFile.c_str());
-                            spdlog::info("Found language: {} ({})", langName, langFile);
-                            if (langFile == currentLang) {
-                                currentLangIndex = index;
+        try {
+            int index = 0;
+            for (const auto& entry : fs::directory_iterator(configDir)) {
+                if (entry.path().extension() == ".json") {
+                    std::ifstream file(entry.path());
+                    if (file) {
+                        try {
+                            nlohmann::json cfg;
+                            file >> cfg;
+                            if (cfg.contains("language_name")) {
+                                std::string langName = cfg["language_name"].get<std::string>();
+                                std::string langFile = entry.path().stem().string();  // e.g., "en" from "en.json"
+                                selectLanguage->Add(langName.c_str(), langFile.c_str());
+                                spdlog::info("Found language: {} ({})", langName, langFile);
+                                if (langFile == currentLang) {
+                                    currentLangIndex = index;
+                                }
+                                index++;
                             }
-                            index++;
+                        } catch (const std::exception& e) {
+                            spdlog::warn("Failed to parse {}: {}", entry.path().string(), e.what());
                         }
-                    } catch (const std::exception& e) {
-                        spdlog::warn("Failed to parse {}: {}", entry.path().string(), e.what());
                     }
                 }
             }
+        } catch (const std::exception& e) {
+            spdlog::warn("Failed to scan config directory: {}", e.what());
         }
-    } catch (const std::exception& e) {
-        spdlog::warn("Failed to scan config directory: {}", e.what());
-    }
 
-    // Set selection to current language to avoid triggering onchange
-    if (currentLangIndex >= 0) {
-        selectLanguage->SetSelection(currentLangIndex);
+        // Set selection to current language to avoid triggering onchange
+        if (currentLangIndex >= 0) {
+            selectLanguage->SetSelection(currentLangIndex);
+        }
     }
 
     // Sync fullscreen menu state with restored state
@@ -145,6 +122,51 @@ void ElementGame::populateEngines() {
         versionLabel->SetInnerRML(
             Rml::CreateString(versionLabel->GetInnerRML().c_str(), GOBAN_VERSION).c_str()
         );
+    }
+
+    // Add "Human" placeholder to player dropdowns during loading
+    auto selectBlack = dynamic_cast<Rml::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
+    auto selectWhite = dynamic_cast<Rml::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
+    if (selectBlack && selectWhite) {
+        selectBlack->Add("Human", "0");
+        selectWhite->Add("Human", "0");
+        selectBlack->SetSelection(0);
+        selectWhite->SetSelection(0);
+    }
+}
+
+void ElementGame::populateEngines() {
+    // Populate player dropdowns with all available players (requires engines loaded)
+    auto selectBlack = dynamic_cast<Rml::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
+    auto selectWhite = dynamic_cast<Rml::ElementFormControlSelect*>(
+            GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
+    const auto players(engine.getPlayers());
+
+    if(!selectBlack) {
+        spdlog::warn("missing GUI element [selectBlack]");
+    }
+    if(!selectWhite) {
+        spdlog::warn("missing GUI element [selectWhite]");
+    }
+
+    if(selectBlack && selectWhite) {
+        // Clear placeholder items
+        while (selectBlack->GetNumOptions() > 0) selectBlack->Remove(0);
+        while (selectWhite->GetNumOptions() > 0) selectWhite->Remove(0);
+
+        for (unsigned i = 0; i < players.size(); ++i) {
+            std::ostringstream ss;
+            ss << i;
+            std::string playerName(players[i]->getName());
+            std::string playerIndex(ss.str());
+            selectBlack->Add(playerName.c_str(), playerIndex.c_str());
+            selectWhite->Add(playerName.c_str(), playerIndex.c_str());
+        }
+        selectBlack->SetSelection(static_cast<int>(players.size()) - 1);
+        selectWhite->SetSelection(0);
     }
 }
 
@@ -225,6 +247,9 @@ static float s_fpsLastTime = -1;
 static bool s_fpsSkipFrameCount = false;
 
 void ElementGame::gameLoop() {
+    // Check if async engine loading has completed
+    checkEngineLoadingComplete();
+
     auto context = GetContext();
 
     float currentTime = static_cast<float>(glfwGetTime());
@@ -270,7 +295,12 @@ void ElementGame::gameLoop() {
     //}
 }
 
-double ElementGame::getIdleTimeout() {
+double ElementGame::getIdleTimeout() const {
+    // During async engine loading, poll periodically to check completion
+    if (!enginesLoaded && engineLoadingStarted) {
+        return 0.1;  // 100ms polling interval during loading
+    }
+
     // If we displayed non-zero FPS, we need one more wake-up to show "0 fps"
     if (s_fpsLastDisplayed > 0) {
         float currentTime = static_cast<float>(glfwGetTime());
@@ -280,7 +310,189 @@ double ElementGame::getIdleTimeout() {
     return -1.0;  // Already showing 0 or never displayed - sleep forever
 }
 
-ElementGame::~ElementGame() = default;
+ElementGame::~ElementGame() {
+    // Wait for async engine loading to complete before destruction
+    if (engineLoadFuture.valid()) {
+        spdlog::debug("Waiting for engine loading to complete before destruction");
+        engineLoadFuture.wait();
+    }
+}
+
+void ElementGame::startAsyncEngineLoading() {
+    if (engineLoadingStarted.exchange(true)) {
+        return;  // Already started
+    }
+
+    spdlog::info("Starting parallel engine loading");
+    updateLoadingStatus("Loading engines...");
+
+    // Determine which SGF (if any) we'll load - same logic as determineInitialBoardSize()
+    auto& settings = UserSettings::instance();
+    sgfToLoad.clear();
+
+    if (!settings.getStartFresh()) {
+        std::string lastSgf = settings.getLastSgfPath();
+        if (!lastSgf.empty() && std::filesystem::exists(lastSgf)) {
+            sgfToLoad = lastSgf;
+        } else {
+            GameRecord tempRecord;
+            std::string dailyFile = tempRecord.getDefaultFileName();
+            if (std::filesystem::exists(dailyFile)) {
+                sgfToLoad = dailyFile;
+            }
+        }
+    }
+
+    // Store initial board size from model (already set by determineInitialBoardSize())
+    initialBoardSize = model.getBoardSize();
+    spdlog::info("Initial board size: {}, SGF to load: {}", initialBoardSize,
+                 sgfToLoad.empty() ? "(none)" : sgfToLoad);
+
+    // Start intro animation so board is visible and responsive during loading
+    view.animateIntro();
+
+    // Set default filename for SGF saving
+    if (!sgfToLoad.empty()) {
+        model.game.setDefaultFileName(sgfToLoad);
+    }
+
+    // Load all engines in parallel - first ready engine loads SGF, rest sync
+    engineLoadFuture = std::async(std::launch::async, [this]() {
+        engine.loadEnginesParallel(config, sgfToLoad, [this]() {
+            // Called when first engine is ready and SGF is loaded
+            stonesDisplayed = true;
+            updateLoadingStatus("Loading other engines...");
+            view.requestRepaint();
+        });
+        spdlog::info("All engines loaded");
+    });
+}
+
+void ElementGame::checkEngineLoadingComplete() {
+    if (enginesLoaded) {
+        return;
+    }
+    if (!engineLoadFuture.valid()) {
+        return;  // Not started yet
+    }
+
+    // Check if future is ready (non-blocking)
+    auto status = engineLoadFuture.wait_for(std::chrono::milliseconds(0));
+    if (status == std::future_status::ready) {
+        engineLoadFuture.get();  // void return
+        enginesLoaded = true;
+
+        spdlog::info("All engines ready, updating UI");
+        updateLoadingStatus("");  // Clear loading message
+
+        // Perform deferred initialization if needed
+        if (deferredInitNeeded && !deferredInitDone) {
+            performDeferredInitialization();
+        }
+
+        view.requestRepaint();
+    }
+}
+
+void ElementGame::performDeferredInitialization() {
+    if (deferredInitDone) return;
+    deferredInitDone = true;
+
+    spdlog::info("Performing deferred initialization");
+
+    // Populate engine dropdowns
+    populateEngines();
+
+    // Clear startFresh flag if it was set
+    if (UserSettings::instance().getStartFresh()) {
+        spdlog::info("Starting fresh (board was cleared last session)");
+        UserSettings::instance().setStartFresh(false);
+    }
+
+    // SGF was already loaded in loadEnginesParallel()
+    if (!sgfToLoad.empty()) {
+        refreshPlayerDropdowns();
+        refreshGameSettingsDropdowns();
+    } else {
+        // Apply user settings if no SGF was loaded
+        auto& settings = UserSettings::instance();
+        auto players = engine.getPlayers();
+
+        auto findPlayer = [&players](const std::string& name) -> int {
+            for (size_t i = 0; i < players.size(); i++) {
+                if (players[i]->getName() == name) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        };
+
+        std::string blackName = settings.hasGameSettings() ? settings.getBlackPlayer() : "Human";
+        std::string whiteName = settings.hasGameSettings() ? settings.getWhitePlayer() : "Human";
+
+        int blackIdx = findPlayer(blackName);
+        int whiteIdx = findPlayer(whiteName);
+        if (blackIdx >= 0) control.switchPlayer(0, blackIdx);
+        if (whiteIdx >= 0) control.switchPlayer(1, whiteIdx);
+
+        refreshPlayerDropdowns();
+        if (settings.hasGameSettings()) {
+            refreshGameSettingsDropdowns();
+        }
+    }
+
+    control.finishInitialization();
+    view.requestRepaint();
+}
+
+void ElementGame::updateLoadingStatus(const std::string& message) {
+    auto context = GetContext();
+    if (!context) return;
+
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+
+    auto msgLabel = doc->GetElementById("lblMessage");
+    if (msgLabel) {
+        msgLabel->SetInnerRML(message.c_str());
+    }
+
+    // Request repaint so the loading message is visible
+    view.requestRepaint();
+}
+
+int ElementGame::determineInitialBoardSize() {
+    auto& settings = UserSettings::instance();
+
+    // If starting fresh, use settings board size
+    if (settings.getStartFresh()) {
+        return settings.getBoardSize();
+    }
+
+    // Check if there's a last SGF to resume
+    std::string lastSgf = settings.getLastSgfPath();
+    if (!lastSgf.empty() && std::filesystem::exists(lastSgf)) {
+        int size = GameRecord::peekBoardSize(lastSgf);
+        if (size > 0) {
+            spdlog::debug("Peeked board size {} from last SGF: {}", size, lastSgf);
+            return size;
+        }
+    }
+
+    // Check for daily session file
+    GameRecord tempRecord;
+    std::string dailyFile = tempRecord.getDefaultFileName();
+    if (std::filesystem::exists(dailyFile)) {
+        int size = GameRecord::peekBoardSize(dailyFile);
+        if (size > 0) {
+            spdlog::debug("Peeked board size {} from daily file: {}", size, dailyFile);
+            return size;
+        }
+    }
+
+    // Fall back to user settings
+    return settings.getBoardSize();
+}
 
 void ElementGame::ProcessEvent(Rml::Event& event)
 {
@@ -318,102 +530,16 @@ void ElementGame::ProcessEvent(Rml::Event& event)
     }
     if (event == "load")
     {
-        //control.Initialise();
-        spdlog::debug("Load");
-        populateEngines();
+        spdlog::debug("Load event - initializing UI elements");
 
-        // Resume last session (e.g., after language switch or archive)
-        // Skip auto-loading if user cleared board before quitting
-        bool sgfLoaded = false;
-        if (UserSettings::instance().getStartFresh()) {
-            spdlog::info("Starting fresh (board was cleared last session)");
-            UserSettings::instance().setStartFresh(false);  // Clear flag after processing
-        } else {
-            std::string lastSgf = UserSettings::instance().getLastSgfPath();
-            if (!lastSgf.empty()) {
-                // Set defaultFileName BEFORE loading so path comparison in loadFromSGF succeeds
-                // This ensures doc is preserved (not lost) when loading daily session across restarts
-                model.game.setDefaultFileName(lastSgf);
-                // Don't clear - persist timestamped session until day changes (cleared in GameRecord::initGame)
+        // Populate engine-independent UI elements immediately (shaders, languages, toggles)
+        populateUIElements();
 
-                if (std::filesystem::exists(lastSgf)) {
-                    // File exists - load the game (SGF settings take precedence)
-                    spdlog::info("Resuming last game from: {}", lastSgf);
-                    // Initialize view metrics before loading to ensure fuzzy stone placement
-                    view.board.updateMetrics(model.metrics);
-                    engine.loadSGF(lastSgf, -1);  // Load last game in file
-                    sgfLoaded = true;
-                } else {
-                    // File doesn't exist yet (new session after archive) - just set as active
-                    spdlog::info("Starting new session: {}", lastSgf);
-                }
-            } else {
-                // No explicit last SGF - check for today's daily session file
-                std::string dailyFile = model.game.getDefaultFileName();
-                if (std::filesystem::exists(dailyFile)) {
-                    spdlog::info("Loading today's session file: {}", dailyFile);
-                    // Initialize view metrics before loading to ensure fuzzy stone placement
-                    view.board.updateMetrics(model.metrics);
-                    engine.loadSGF(dailyFile, -1);  // Load last game in file
-                    sgfLoaded = true;
-                }
-            }
-        }
+        // Mark that we need to do initialization once engines are ready
+        deferredInitNeeded = true;
 
-        if (sgfLoaded) {
-            // Sync dropdowns with SGF game settings
-            refreshPlayerDropdowns();
-            refreshGameSettingsDropdowns();
-        } else {
-            // Apply user settings if no SGF was loaded
-            auto& settings = UserSettings::instance();
-
-            if (settings.hasGameSettings()) {
-                spdlog::info("Applying saved game settings: {}x{}, komi={}, handicap={}",
-                    settings.getBoardSize(), settings.getBoardSize(), settings.getKomi(), settings.getHandicap());
-
-                // Apply board size, komi, handicap
-                model.state.komi = settings.getKomi();
-                model.state.handicap = settings.getHandicap();
-                if (settings.getBoardSize() != 19) {
-                    (void) control.newGame(settings.getBoardSize());
-                }
-            }
-
-            // Find and activate players by name (or defaults if no settings)
-            auto players = engine.getPlayers();
-            auto findPlayer = [&players](const std::string& name) -> int {
-                for (size_t i = 0; i < players.size(); i++) {
-                    if (players[i]->getName() == name) {
-                        return static_cast<int>(i);
-                    }
-                }
-                return -1;
-            };
-
-            std::string blackName = settings.hasGameSettings() ? settings.getBlackPlayer() : "Human";
-            std::string whiteName = settings.hasGameSettings() ? settings.getWhitePlayer() : "Human";
-
-            int blackIdx = findPlayer(blackName);
-            int whiteIdx = findPlayer(whiteName);
-            spdlog::debug("Restoring players: black='{}' (idx={}), white='{}' (idx={})",
-                blackName, blackIdx, whiteName, whiteIdx);
-            if (blackIdx >= 0) {
-                control.switchPlayer(0, blackIdx);
-            }
-            if (whiteIdx >= 0) {
-                control.switchPlayer(1, whiteIdx);
-            }
-
-            // Sync dropdown UI with engine state after player settings applied
-            refreshPlayerDropdowns();
-            if (settings.hasGameSettings()) {
-                refreshGameSettingsDropdowns();
-            }
-        }
-
-        // Initialization complete - enable player settings persistence
-        control.finishInitialization();
+        // Start async engine loading (will show "Loading engines..." status)
+        startAsyncEngineLoading();
     }
 }
 

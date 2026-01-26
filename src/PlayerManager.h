@@ -54,7 +54,11 @@ public:
 
     // Configuration
     void loadEngines(const std::shared_ptr<Configuration>& config);
+    void loadHumanPlayers(const std::shared_ptr<Configuration>& config);  // Load human player entries
     void removeSgfPlayers();
+
+    // Load a single engine from JSON config entry, returns engine or nullptr on failure
+    Engine* loadSingleEngine(const nlohmann::json& botConfig);
 
     // Special indices
     size_t getHumanIndex() const { return human; }

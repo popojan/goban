@@ -20,6 +20,8 @@ public:
     GobanModel(ElementGame *p, int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
         : parent(p), started(false), invalidated(true),
           calcCapturedBlack(0), calcCapturedWhite(0), ddc{}, metrics(), cursor({0, 0}) {
+        // Initialize metrics so board can render before engine initialization
+        metrics.calc(boardSize);
     }
 
     ~GobanModel() override;
