@@ -4,8 +4,8 @@
 
 void AudioFile::load(const std::string& path) {
   fh = SndfileHandle(path);
-  sf_count_t N = fh.frames();
-  data = new int[N];
-  spdlog::debug("sound {} frame count {}", path, N);
-  fh.read(data, N);
+  sf_count_t totalSamples = fh.frames() * fh.channels();
+  data = new int[totalSamples];
+  spdlog::debug("sound {} frames={} channels={} samples={}", path, fh.frames(), fh.channels(), totalSamples);
+  fh.read(data, totalSamples);
 }

@@ -39,8 +39,9 @@ int StreamHandler::PortAudioCallback(const void * input,
         unsigned long stereoFrameCount = frameCount * handler->CHANNEL_COUNT;
         memset((int *) output, 0, stereoFrameCount * sizeof(int));
 
-	int * outputBuffer = new int[stereoFrameCount];
-	memset(outputBuffer, 0, stereoFrameCount*sizeof(int));
+        // Use pre-allocated buffer (sized to FRAMES_PER_BUFFER * CHANNEL_COUNT)
+        int * outputBuffer = handler->mixBuffer.data();
+        memset(outputBuffer, 0, stereoFrameCount * sizeof(int));
 
         if (handler->data.size() > 0)
         {
@@ -51,6 +52,7 @@ int StreamHandler::PortAudioCallback(const void * input,
                         AudioFile * audioFile = data->audioFile;
 
                         int * bufferCursor = outputBuffer;
+                        int channels = audioFile->fh.channels();
 
                         unsigned int framesLeft = static_cast<unsigned int>(frameCount);
                         int framesRead;
@@ -58,8 +60,7 @@ int StreamHandler::PortAudioCallback(const void * input,
                         bool playbackEnded = false;
                         while (framesLeft > 0)
                         {
-                                //sf_seek(audioFile->data, data->position, SEEK_SET);
-                                int pos = data->position;
+                                int pos = data->position;  // position in frames
                                 if (framesLeft > (audioFile->fh.frames() - data->position))
                                 {
                                         framesRead = static_cast<unsigned int>(audioFile->fh.frames() - data->position);
@@ -77,9 +78,12 @@ int StreamHandler::PortAudioCallback(const void * input,
                                         data->position += framesRead;
                                 }
 
-                                std::copy(&audioFile->data[pos], &audioFile->data[pos + framesRead], bufferCursor);
+                                // Copy samples: frames * channels (for stereo, 2 samples per frame)
+                                int samplePos = pos * channels;
+                                int sampleCount = framesRead * channels;
+                                std::copy(&audioFile->data[samplePos], &audioFile->data[samplePos + sampleCount], bufferCursor);
 
-                                bufferCursor += framesRead;
+                                bufferCursor += sampleCount;
 
                                 framesLeft -= framesRead;
                         }
@@ -110,7 +114,7 @@ int StreamHandler::PortAudioCallback(const void * input,
                         }
                 }
         }
-	delete [] outputBuffer;
+        // No delete needed - using pre-allocated buffer
 
         // Stop stream when no more audio to play
         if (handler->data.empty()) {
@@ -142,22 +146,29 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
                                 spdlog::warn("Audio: Pa_StartStream failed: {}", Pa_GetErrorText(err));
                         }
                 }
-                data.push_back(new Playback {
-                        audioFile,
-                        0,
-                        loop,
-                        volume
-                });
+                {
+                        std::lock_guard<std::mutex> lock(mut);
+                        data.push_back(new Playback {
+                                audioFile,
+                                0,
+                                loop,
+                                volume
+                        });
+                }
+                lastActivityTime = std::chrono::steady_clock::now();
                 break;
         case stop:
                 if (initialized && stream) {
                         Pa_StopStream(stream);
                 }
-                for (auto instance : data)
                 {
-                        delete instance;
+                        std::lock_guard<std::mutex> lock(mut);
+                        for (auto instance : data)
+                        {
+                                delete instance;
+                        }
+                        data.clear();
                 }
-                data.clear();
                 break;
         }
 }
@@ -168,8 +179,14 @@ StreamHandler::StreamHandler()
 
 void StreamHandler::stopIfInactive() {
         // Only shutdown if stream finished AND no pending playbacks (allow overlapping sounds)
+        // AND idle for at least IDLE_SHUTDOWN_SECONDS (to avoid lag from frequent shutdown/restart)
         if (initialized && stream && data.empty() && !Pa_IsStreamActive(stream)) {
-                shutdown();
+                auto now = std::chrono::steady_clock::now();
+                auto idleSeconds = std::chrono::duration_cast<std::chrono::seconds>(
+                        now - lastActivityTime).count();
+                if (idleSeconds >= IDLE_SHUTDOWN_SECONDS) {
+                        shutdown();
+                }
         }
 }
 
@@ -195,19 +212,22 @@ void StreamHandler::init() {
 void StreamHandler::ensureInitialized() {
         if (initialized) return;
 
+        // Pre-allocate mixing buffer to match fixed frames per buffer
+        mixBuffer.resize(FRAMES_PER_BUFFER * CHANNEL_COUNT);
+
         Pa_Initialize();
         PaStreamParameters outputParameters;
         outputParameters.device = Pa_GetDefaultOutputDevice();
         outputParameters.channelCount = CHANNEL_COUNT;
         outputParameters.sampleFormat = paInt32;
-        outputParameters.suggestedLatency = 0.02;
+        outputParameters.suggestedLatency = 0.05;  // 50ms - more forgiving than 20ms
         outputParameters.hostApiSpecificStreamInfo = nullptr;
 
         PaError errorCode = Pa_OpenStream(&stream,
                                           NO_INPUT,
                                           &outputParameters,
                                           SAMPLE_RATE,
-                                          paFramesPerBufferUnspecified,
+                                          FRAMES_PER_BUFFER,  // Fixed size for predictable callback
                                           paNoFlag,
                                           &PortAudioCallback,
                                           this);

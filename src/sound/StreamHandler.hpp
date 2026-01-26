@@ -5,6 +5,7 @@
 #include <sstream>
 #include <vector>
 #include <mutex>
+#include <chrono>
 
 using std::stringstream;
 using std::vector;
@@ -49,9 +50,13 @@ class StreamHandler
 
         const int CHANNEL_COUNT = 2;
         const int SAMPLE_RATE = 44100;
+        const int FRAMES_PER_BUFFER = 2048;  // Fixed buffer size for predictable callbacks
         const PaStreamParameters * NO_INPUT = nullptr;
         PaStream * stream = nullptr;
         vector<Playback *> data;
         std::mutex mut;
         bool initialized = false;
+        std::chrono::steady_clock::time_point lastActivityTime;
+        static constexpr int IDLE_SHUTDOWN_SECONDS = 180;  // 3 minutes
+        std::vector<int> mixBuffer;  // Pre-allocated mixing buffer
 };
