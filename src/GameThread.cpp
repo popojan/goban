@@ -731,6 +731,7 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
         spdlog::debug("Setting model.state.komi = {} from settings", komi);
         model.state.komi = komi;
         model.state.handicap = settings.getHandicap();
+        model.game.updateKomi(komi);  // Sync game record with actual komi
 
         std::for_each(gameObservers.begin(), gameObservers.end(),
             [boardSize](GameObserver* observer) { observer->onBoardSized(boardSize); });
@@ -880,7 +881,11 @@ void GameThread::finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInf
                 } else if (std::abs(finalScore) > 0.1f) {
                     float scoreDifference = std::abs(finalScore - sgfScore);
                     if (scoreDifference > 0.1f) {
-                        spdlog::warn("Score discrepancy: Engine {:.1f}, SGF {:.1f}", finalScore, sgfScore);
+                        spdlog::warn("Score discrepancy: Engine {:.1f}, SGF {:.1f} (diff={:.1f})",
+                            finalScore, sgfScore, scoreDifference);
+                        spdlog::warn("  komi={:.1f}, moves={}, prisoners: black={}, white={}",
+                            model.state.komi, model.game.moveCount(),
+                            result.capturedCount(Color::BLACK), result.capturedCount(Color::WHITE));
                     }
                 }
             }
