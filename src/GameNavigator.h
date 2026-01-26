@@ -49,6 +49,10 @@ public:
     // Board change notifications (public for use by GameThread::executeNavCommand)
     void notifyBoardChange(const Board& result) const;
     void notifyBoardChangeWithMove(const Board& result, const Move& move) const;
+
+    // Build board state from SGF without engine dependency (local capture logic)
+    void buildBoardFromSGF(Board& outBoard) const;
+
 private:
     // Scope guard to set/clear navigationInProgress flag
     struct NavigationGuard {

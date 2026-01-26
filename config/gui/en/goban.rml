@@ -132,6 +132,8 @@
                             <div class="template" id="templateWhitePasses">White passes</div>
                             <div class="template" id="templateBlackPasses">Black passes</div>
                             <div class="template" id="templateCalculatingScore">Calculating score...</div>
+                            <div class="template" id="templateClearBoard">Clear board?</div>
+                            <div class="template" id="templateQuitWithoutFinishing">Quit without finishing?</div>
                             </div>
                             <div id="grpMoves">
                             <div class="hr">Play</div>

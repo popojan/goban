@@ -879,6 +879,18 @@ std::pair<std::string, std::string> GameRecord::getPlayerNames() const {
     return {black, white};
 }
 
+int GameRecord::countStoneMoves(const Color& color) const {
+    auto path = getPathFromRoot();
+    int count = 0;
+    for (const auto& move : path) {
+        // Count only stone placements (NORMAL moves), not passes
+        if (move == Move::NORMAL && move.col == color) {
+            count++;
+        }
+    }
+    return count;
+}
+
 bool GameRecord::isGameFinished() const {
     Move last = lastMove();
 
@@ -970,14 +982,24 @@ bool GameRecord::isAtFinishedGame() const {
 }
 
 bool GameRecord::shouldShowTerritory() const {
-    if (!isAtEndOfNavigation()) return false;
+    bool atEnd = isAtEndOfNavigation();
+    bool finished = isGameFinished();
+    Move last = lastMove();
+    bool hasResult = hasGameResult();
+    bool isResign = isResignationResult();
+
+    spdlog::debug("shouldShowTerritory: atEnd={}, finished={}, lastMove={}, hasResult={}, isResign={}",
+        atEnd, finished, last == Move::PASS ? "PASS" : (last == Move::RESIGN ? "RESIGN" : "other"),
+        hasResult, isResign);
+
+    if (!atEnd) return false;
 
     // Double-pass at current position (not resign)
-    if (isGameFinished() && lastMove() == Move::PASS) return true;
+    if (finished && last == Move::PASS) return true;
 
     // Has point result (not resignation)
     // RE property is valid - it's cleared when creating new variations
-    if (hasGameResult() && !isResignationResult()) return true;
+    if (hasResult && !isResign) return true;
 
     return false;
 }
@@ -1265,4 +1287,46 @@ int GameRecord::peekBoardSize(const std::string& fileName) {
         spdlog::warn("peekBoardSize failed for {}: {}", fileName, e.what());
         return -1;
     }
+}
+
+void GameRecord::buildBoardFromMoves(Board& outBoard, Position& koPosition) const {
+    outBoard.clear(boardSize.Columns);
+    koPosition = Position(-1, -1);
+
+    // First, place any handicap stones from AB property in root node
+    if (game && game->GetRootNode()) {
+        for (const auto& prop : game->GetRootNode()->GetProperties()) {
+            if (prop->GetPropertyType() == T::AB) {
+                for (const auto& value : prop->GetPropertyValues()) {
+                    if (auto stoneValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcStonePropertyValue>(value)) {
+                        auto sgfPoint = stoneValue->GetStoneValue();
+                        Position pos = Position::fromSgf(sgfPoint, boardSize.Columns);
+                        if (pos.col() >= 0 && pos.row() >= 0) {
+                            outBoard[pos].stone = Color::BLACK;
+                        }
+                    }
+                }
+            }
+            // Also handle AW (added white) if present
+            if (prop->GetPropertyType() == T::AW) {
+                for (const auto& value : prop->GetPropertyValues()) {
+                    if (auto stoneValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcStonePropertyValue>(value)) {
+                        auto sgfPoint = stoneValue->GetStoneValue();
+                        Position pos = Position::fromSgf(sgfPoint, boardSize.Columns);
+                        if (pos.col() >= 0 && pos.row() >= 0) {
+                            outBoard[pos].stone = Color::WHITE;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Replay moves from root to current position
+    auto path = getPathFromRoot();
+    outBoard.replayMoves(path);
+    koPosition = outBoard.getKoPosition();
+
+    spdlog::debug("buildBoardFromMoves: replayed {} moves, {} black stones, {} white stones on board",
+        path.size(), outBoard.stonesOnBoard(Color::BLACK), outBoard.stonesOnBoard(Color::WHITE));
 }

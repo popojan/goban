@@ -71,6 +71,10 @@ public:
     // Get player names from currently loaded game (reads PB/PW properties)
     std::pair<std::string, std::string> getPlayerNames() const;
 
+    // Count stone moves (non-pass) of given color from root to current position
+    // Used for capture calculation: captured = stonesPlayed - stonesOnBoard
+    int countStoneMoves(const Color& color) const;
+
     // Quick peek at SGF file to get board size without full parsing
     // Returns board size or -1 if file doesn't exist or can't be parsed
     static int peekBoardSize(const std::string& fileName);
@@ -156,6 +160,14 @@ public:
 
     // Get markup annotations from current node (LB/TR/SQ/CR/MA properties)
     [[nodiscard]] std::vector<BoardMarkup> getMarkup() const;
+
+    // Build board state from SGF by replaying moves (no engine dependency)
+    // Populates outBoard with stones placed and captures processed
+    // koPosition is set for ko rule enforcement
+    void buildBoardFromMoves(Board& outBoard, Position& koPosition) const;
+
+    // Get the board size from SGF
+    [[nodiscard]] int getBoardSize() const { return boardSize.Columns; }
 };
 
 #endif //GOBAN_GAMERECORD_H

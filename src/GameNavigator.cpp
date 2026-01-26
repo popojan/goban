@@ -86,7 +86,9 @@ bool GameNavigator::navigateBack() {
         model.state.msg = GameState::NONE;
     }
 
-    const Board& result = coach->showboard();
+    // Build board from SGF (local capture logic, no engine dependency)
+    Board result(model.game.getBoardSize());
+    buildBoardFromSGF(result);
     notifyBoardChange(result);
 
     spdlog::debug("navigateBack: success, undid {}, now at move {}/{}, colorToMove={}",
@@ -157,11 +159,12 @@ bool GameNavigator::navigateForward() {
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
-    // Show board update (territory handled by executeNavCommand after forward returns)
-    const Board& result = coach->showboard();
+    // Build board from SGF (local capture logic, no engine dependency)
+    Board boardResult(model.game.getBoardSize());
+    buildBoardFromSGF(boardResult);
     spdlog::debug("navigateForward: notifying {} observers, colorToMove={}",
         gameObservers.size(), model.state.colorToMove == Color::BLACK ? "B" : "W");
-    notifyBoardChangeWithMove(result, nextMove);
+    notifyBoardChangeWithMove(boardResult, nextMove);
     spdlog::debug("navigateForward: done");
 
     return true;
@@ -220,8 +223,9 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
-    // Notify observers
-    const Board& boardResult = coach->showboard();
+    // Build board from SGF (local capture logic, no engine dependency)
+    Board boardResult(model.game.getBoardSize());
+    buildBoardFromSGF(boardResult);
     notifyBoardChangeWithMove(boardResult, move);
 
     result.success = true;
@@ -268,7 +272,9 @@ bool GameNavigator::navigateToStart() {
         model.state.markup = model.game.getMarkup();
         model.state.msg = GameState::NONE;
 
-        const Board& result = coach->showboard();
+        // Build board from SGF (local capture logic, no engine dependency)
+        Board result(model.game.getBoardSize());
+        buildBoardFromSGF(result);
         notifyBoardChange(result);
         spdlog::debug("navigateToStart: at beginning, colorToMove={}",
             model.state.colorToMove == Color::BLACK ? "B" : "W");
@@ -320,15 +326,29 @@ bool GameNavigator::navigateToEnd() {
 
     model.state.msg = GameState::NONE;
 
-    // Show territory if at a scored game ending; model handles result/resignation messages
-    const Board& result = model.game.shouldShowTerritory()
-        ? (model.board.toggleTerritoryAuto(true), coach->showterritory(true, model.game.lastStoneMove().col))
-        : coach->showboard();
-    notifyBoardChange(result);
+    // Always build stones from SGF (local capture logic, reliable)
+    Board boardResult(model.game.getBoardSize());
+    buildBoardFromSGF(boardResult);
+
+    // Show territory if at a scored game ending
+    if (model.game.shouldShowTerritory()) {
+        model.board.toggleTerritoryAuto(true);
+        // Apply territory from engine to our local board (graceful degradation if unsupported)
+        coach->applyTerritory(boardResult);
+    }
+
+    notifyBoardChange(boardResult);
 
     spdlog::debug("navigateToEnd: at end, move {}/{}, colorToMove={}, playedMoves={}",
         model.game.getViewPosition(), model.game.getLoadedMovesCount(),
         model.state.colorToMove == Color::BLACK ? "B" : "W", playedMoves);
 
     return true;  // Always return true - we're at the end now
+}
+
+void GameNavigator::buildBoardFromSGF(Board& outBoard) const {
+    Position koPosition;
+    model.game.buildBoardFromMoves(outBoard, koPosition);
+    spdlog::debug("buildBoardFromSGF: built board from SGF, koPosition=({},{})",
+        koPosition.col(), koPosition.row());
 }

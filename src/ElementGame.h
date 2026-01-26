@@ -49,6 +49,7 @@ public:
     // Message system - template-based messages in lblMessage
     void showMessage(const std::string& text);  // Dismissable message
     void showPromptYesNo(const std::string& message, std::function<void(bool)> callback);
+    void showPromptYesNoTemplate(const std::string& templateId, std::function<void(bool)> callback);
     void showPromptOkCancel(const std::string& message, std::function<void(bool)> callback);
     void handlePromptResponse(bool affirmative);  // Called by event handlers
     void clearMessage();

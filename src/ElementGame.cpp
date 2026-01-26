@@ -407,7 +407,14 @@ void ElementGame::checkEngineLoadingComplete() {
         enginesLoaded = true;
 
         spdlog::info("All engines ready, updating UI");
-        updateLoadingStatus("");  // Clear loading message
+        // Only clear loading message if no important game message is showing
+        // (result messages like "Black won" should not be overwritten)
+        auto msg = model.state.msg;
+        bool isImportantMessage = msg == GameState::WHITE_WON || msg == GameState::BLACK_WON ||
+                                  msg == GameState::WHITE_RESIGNED || msg == GameState::BLACK_RESIGNED;
+        if (!isImportantMessage) {
+            updateLoadingStatus("");  // Clear loading message
+        }
 
         // Perform deferred initialization if needed
         if (deferredInitNeeded && !deferredInitDone) {
@@ -542,6 +549,21 @@ void ElementGame::showPromptYesNo(const std::string& message, std::function<void
 
     pendingPromptCallback = std::move(callback);
     view.requestRepaint();
+}
+
+void ElementGame::showPromptYesNoTemplate(const std::string& templateId, std::function<void(bool)> callback) {
+    auto context = GetContext();
+    if (!context) {
+        // Fallback to template ID as message
+        showPromptYesNo(templateId, std::move(callback));
+        return;
+    }
+    std::string message = getTemplateText(context, templateId);
+    if (message.empty()) {
+        // Fallback to template ID if not found
+        message = templateId;
+    }
+    showPromptYesNo(message, std::move(callback));
 }
 
 void ElementGame::showPromptOkCancel(const std::string& message, std::function<void(bool)> callback) {
@@ -858,12 +880,18 @@ void ElementGame::OnUpdate()
         case GameState::WHITE_RESIGNS:
             showMessage(getTemplateText(context, "templateWhiteResigns"));
             break;
-        case GameState::BLACK_RESIGNED:
-            showMessage(getTemplateText(context, "templateResignWhiteWon"));
+        case GameState::BLACK_RESIGNED: {
+            std::string msg = getTemplateText(context, "templateResignWhiteWon");
+            if (!model.state.comment.empty()) msg += "\n\n" + model.state.comment;
+            showMessage(msg);
             break;
-        case GameState::WHITE_RESIGNED:
-            showMessage(getTemplateText(context, "templateResignBlackWon"));
+        }
+        case GameState::WHITE_RESIGNED: {
+            std::string msg = getTemplateText(context, "templateResignBlackWon");
+            if (!model.state.comment.empty()) msg += "\n\n" + model.state.comment;
+            showMessage(msg);
             break;
+        }
         case GameState::BLACK_PASS:
             showMessage(getTemplateText(context, "templateBlackPasses"));
             break;
@@ -879,14 +907,21 @@ void ElementGame::OnUpdate()
                     Rml::CreateString("White captured: %d", model.state.capturedWhite).c_str());
             elBlackCnt->SetInnerRML(
                     Rml::CreateString("Black captured: %d", model.state.capturedBlack).c_str());
+            // Build result message, combining with SGF comment if present
+            std::string resultMsg;
             if (model.state.winner == Color::WHITE)
-                showMessage(Rml::CreateString(
+                resultMsg = Rml::CreateString(
                     getTemplateText(context, "templateWhiteWon").c_str(),
-                    std::abs(model.state.scoreDelta)).c_str());
+                    std::abs(model.state.scoreDelta)).c_str();
             else
-                showMessage(Rml::CreateString(
+                resultMsg = Rml::CreateString(
                     getTemplateText(context, "templateBlackWon").c_str(),
-                    std::abs(model.state.scoreDelta)).c_str());
+                    std::abs(model.state.scoreDelta)).c_str();
+            // Append SGF comment if present (user-authored content takes priority)
+            if (!model.state.comment.empty()) {
+                resultMsg += "\n\n" + model.state.comment;
+            }
+            showMessage(resultMsg);
             view.state.reason = model.state.reason;
         }
             break;
@@ -898,7 +933,8 @@ void ElementGame::OnUpdate()
             }
         }
         view.state.msg = model.state.msg;
-        view.board.positionNumber.store(model.board.positionNumber.load());
+        // Note: Don't store positionNumber here - let GobanView::Update() handle it
+        // to ensure UPDATE_STONES flag is set before positionNumber is consumed
     }
     // Show SGF comment if available, but don't overwrite important game messages
     if (view.state.comment != model.state.comment || errorsChanged) {

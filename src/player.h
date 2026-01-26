@@ -73,10 +73,11 @@ public:
     virtual const Board& showboard() = 0;
     virtual const Board& showterritory(bool final, Color colorToMove) = 0;
     virtual float final_score() = 0;
+    // Apply territory calculation to an existing board (uses engine for dead stones + score)
+    virtual void applyTerritory(Board& targetBoard) = 0;
     ~Engine() override = default;
 protected:
     Board board;
-    //TODO GTP API
 };
 
 class SGFPlayer : public Player {
@@ -141,6 +142,7 @@ public:
     virtual bool estimateTerritory(bool final, const Color& colorToMove);
     const Board& showterritory(bool final, Color colorToMove) override;
     float final_score() override;
+    void applyTerritory(Board& targetBoard) override;
 
 protected:
 

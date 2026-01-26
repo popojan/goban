@@ -209,7 +209,38 @@ public:
     // This is GTP-standard compliant (only needs 'dead' status, not gnugo extensions)
     void calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones);
 
+    // Go rule implementation - apply move with capture processing
+    // Returns number of opponent stones captured (0 if none)
+    // Updates internal koPosition if exactly 1 stone captured
+    // Does NOT validate the move - caller should check isValidMove() beforehand
+    int applyMoveWithCaptures(const Move& move);
+
+    // Check if a move would be valid (not ko, not suicide unless captures)
+    // Uses internal koPosition for ko rule checking
+    bool isValidMove(const Position& pos, const Color& color) const;
+
+    // Build board state by replaying moves (for SGF navigation without engine)
+    void replayMoves(const std::vector<Move>& moves);
+
+    // Sync glStones visual array from points logical state (call after replayMoves)
+    void syncVisualState();
+
+    // Get current ko position (for display or debugging)
+    [[nodiscard]] Position getKoPosition() const { return koPosition; }
+
     explicit Board(int size = DEFAULT_SIZE);
+
+private:
+    // Find all stones connected to the given position (same color flood-fill)
+    std::vector<Position> findGroup(const Position& pos) const;
+
+    // Count liberties (unique empty adjacent positions) for a group
+    int countLiberties(const std::vector<Position>& group) const;
+
+    // Remove a group of stones from the board, returns count removed
+    int removeGroup(const std::vector<Position>& group);
+
+public:
 
     bool parseGtp(const std::vector<std::string>& lines);
 
@@ -268,6 +299,7 @@ private:
     int capturedBlack;
     int capturedWhite;
     int boardSize;
+    Position koPosition{-1, -1};  // Ko position (invalid if no ko)
 
     float r1, rStone;
 

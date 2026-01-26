@@ -216,19 +216,27 @@ void GobanModel::onBoardChange(const Board& result) {
     spdlog::debug("LOCK board");
     std::lock_guard<std::mutex> lock(mutex);
 
-    board.copyStateFrom(result);
+    // Use updateStones to preserve existing fuzzy positions
+    // Only changed stones get new fuzzy positions
+    board.updateStones(result);
     board.positionNumber += 1;
-
-    state.capturedBlack = board.capturedCount(Color::BLACK);
-    state.capturedWhite = board.capturedCount(Color::WHITE);
     updateReservoirs();
 
-    spdlog::debug("over {} ready {}", isGameOver, result.territoryReady);
+    spdlog::debug("over {} ready {} score {} showTerritory={}",
+        isGameOver, result.territoryReady, result.score, board.showTerritory);
 
-    if (result.territoryReady && game.shouldShowTerritory()) {
+    bool shouldShow = game.shouldShowTerritory();
+    spdlog::debug("onBoardChange: territoryReady={}, shouldShowTerritory={}", result.territoryReady, shouldShow);
+
+    if (result.territoryReady && shouldShow) {
         // At end of scored game - compute result message
+        spdlog::debug("onBoardChange: ENTERING result block, score={}", result.score);
+        board.score = result.score;  // Copy score from result board
         state.reason = GameState::DOUBLE_PASS;
         this->result(game.lastMove());
+        spdlog::debug("onBoardChange: after result(), msg={}", static_cast<int>(state.msg));
+        // Trigger repaint to show territory
+        board.positionNumber += 1;
         // Finalize and save only once (live game ending, result not yet written)
         if (isGameOver && !game.hasGameResult()) {
             game.finalizeGame(state.scoreDelta);

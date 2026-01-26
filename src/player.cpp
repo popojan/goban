@@ -11,8 +11,62 @@ Move GtpEngine::genmove(const Color& colorToMove) {
 }
 
 const Board& GtpEngine::showboard() {
+    // DEPRECATED: Use local board building via GameRecord::buildBoardFromMoves() instead.
+    // This method relies on engine-specific GTP commands (list_stones, showboard) which
+    // may not be supported by all engines (e.g., Pachi).
+    spdlog::warn("DEPRECATED: GtpEngine::showboard() called - use local board building instead");
+
     board.territoryReady = false;
-    board.parseGtp(GtpClient::showboard());
+
+    // Try list_stones first (simple, engine-independent format: "= A1 B2 C3...")
+    // Fall back to parsing showboard output if list_stones is not supported
+    auto blackResult = GtpClient::issueCommand("list_stones black");
+
+    if (GtpClient::success(blackResult)) {
+        // list_stones supported - use it for both colors
+        int blackCount = 0, whiteCount = 0;
+
+        // Clear stones but preserve board size and other state
+        for (int row = 0; row < board.getSize(); ++row) {
+            for (int col = 0; col < board.getSize(); ++col) {
+                board[Position(col, row)].stone = Color::EMPTY;
+            }
+        }
+
+        // Parse black stones
+        if (!blackResult.empty() && blackResult[0].length() > 2) {
+            std::istringstream ss(blackResult[0].substr(2));  // Skip "= "
+            Position pos;
+            while (ss >> pos) {
+                if (pos.col() >= 0 && pos.col() < board.getSize() &&
+                    pos.row() >= 0 && pos.row() < board.getSize()) {
+                    board[pos].stone = Color::BLACK;
+                    blackCount++;
+                }
+            }
+        }
+
+        // Get and parse white stones
+        auto whiteResult = GtpClient::issueCommand("list_stones white");
+        if (GtpClient::success(whiteResult) && !whiteResult.empty() && whiteResult[0].length() > 2) {
+            std::istringstream ss(whiteResult[0].substr(2));  // Skip "= "
+            Position pos;
+            while (ss >> pos) {
+                if (pos.col() >= 0 && pos.col() < board.getSize() &&
+                    pos.row() >= 0 && pos.row() < board.getSize()) {
+                    board[pos].stone = Color::WHITE;
+                    whiteCount++;
+                }
+            }
+        }
+
+        spdlog::debug("showboard via list_stones: {} black, {} white", blackCount, whiteCount);
+    } else {
+        // list_stones not supported - fall back to parsing showboard output
+        spdlog::debug("list_stones not supported, falling back to showboard parsing");
+        board.parseGtp(GtpClient::showboard());
+    }
+
     return board;
 }
 
@@ -111,8 +165,12 @@ bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
 }
 
 const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
-    // Refresh board state from GTP engine first (play/undo don't update internal board)
-    board.parseGtp(GtpClient::showboard());
+    // DEPRECATED: Use local board building + applyTerritory() instead.
+    // This method calls showboard() which relies on engine-specific GTP commands.
+    spdlog::warn("DEPRECATED: GtpEngine::showterritory() called - use applyTerritory() instead");
+
+    // Refresh board state from GTP engine first (reuses list_stones approach)
+    showboard();
     estimateTerritory(final, colorToMove);
     board.score = final ? final_score() : 0.0f;
     // Set display flags so observers know to show territory
@@ -120,6 +178,49 @@ const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
     board.showTerritoryAuto = true;
     board.invalidate();
     return board;
+}
+
+void GtpEngine::applyTerritory(Board& targetBoard) {
+    // Apply territory calculation to an existing board (e.g., from local SGF replay)
+    // This avoids calling showboard() which would overwrite stones with engine state
+
+    // Get dead stones from engine (requires final_status_list support)
+    auto deadResult = GtpClient::issueCommand("final_status_list dead");
+
+    if (!GtpClient::success(deadResult)) {
+        // Engine doesn't support final_status_list - graceful degradation
+        spdlog::warn("Engine doesn't support final_status_list, territory not shown");
+        targetBoard.territoryReady = false;
+        return;
+    }
+
+    // Parse dead stone positions
+    std::vector<Position> deadStones;
+    if (!deadResult.empty()) {
+        for (const auto& line : deadResult) {
+            std::istringstream ss(line);
+            char c = ss.peek();
+            if (c == '=') ss.get();
+            Position pos;
+            while (ss >> pos) {
+                if (pos.col() >= 0 && pos.row() >= 0) {
+                    deadStones.push_back(pos);
+                }
+            }
+        }
+    }
+    spdlog::debug("applyTerritory: {} dead stones from engine", deadStones.size());
+
+    // Calculate territory using flood-fill
+    targetBoard.calculateTerritoryFromDeadStones(deadStones);
+
+    // Get score from engine
+    targetBoard.score = final_score();
+
+    // Set display flags
+    targetBoard.showTerritory = true;
+    targetBoard.showTerritoryAuto = true;
+    targetBoard.territoryReady = true;
 }
 
 bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, const Color& color) {

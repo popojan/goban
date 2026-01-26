@@ -329,8 +329,18 @@ int Board::updateStones(const Board& board) {
     int newSize = board.getSize();
     int changed = 0;
 
-    this->showTerritory = board.showTerritory;
-	this->showTerritoryAuto = board.showTerritoryAuto;
+    // Copy game state from source board
+    this->capturedBlack = board.capturedBlack;
+    this->capturedWhite = board.capturedWhite;
+    this->koPosition = board.koPosition;
+    // Copy territory display flags if source has territory - needed for view.board
+    // which doesn't get toggleTerritoryAuto() called directly
+    if (board.territoryReady) {
+        this->territoryReady = true;
+        this->score = board.score;
+        this->showTerritory = board.showTerritory;
+        this->showTerritoryAuto = board.showTerritoryAuto;
+    }
 
     if(newSize != boardSize) {
         spdlog::debug("updateStones: size mismatch this={} source={}, resizing", boardSize, newSize);
@@ -341,6 +351,7 @@ int Board::updateStones(const Board& board) {
         // Continue to copy stones - don't return early
     }
     int stonesCopied = 0;
+    int areaCopied = 0;
     for(int row = 0; row < MAX_BOARD; ++row) {
         for(int col = 0; col < MAX_BOARD; ++col) {
             Position pos(col, row);
@@ -362,8 +373,12 @@ int Board::updateStones(const Board& board) {
             if(newArea != p.influence) {
                 spdlog::trace("area changed [{},{}]", p.x, p.y);
                 changed |= updateArea(pos, newArea);
+                if (newArea != Color::EMPTY) areaCopied++;
             }
         }
+    }
+    if (areaCopied > 0) {
+        spdlog::debug("updateStones: copied {} territory areas, showTerritory={}", areaCopied, this->showTerritory);
     }
     if (stonesCopied > 0 || changed) {
         spdlog::debug("updateStones: copied {} stones, changed={}", stonesCopied, changed);
@@ -400,6 +415,7 @@ void Board::clear(int boardsize) {
 
     capturedBlack = 0;
     capturedWhite = 0;
+    koPosition = Position(-1, -1);
     positionNumber += 1;
 }
 
@@ -409,6 +425,7 @@ void Board::copyStateFrom(const Board& b) {
     boardSize = b.boardSize;
     capturedBlack = b.capturedBlack;
     capturedWhite = b.capturedWhite;
+    koPosition = b.koPosition;
     territoryReady = b.territoryReady;
     moveNumber.store(b.moveNumber.load());
     score = b.score;
@@ -654,4 +671,218 @@ void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadSt
     }
 
     spdlog::debug("Territory calculated from {} dead stones", deadStones.size());
+}
+
+// Find all stones connected to the given position (same color flood-fill)
+std::vector<Position> Board::findGroup(const Position& pos) const {
+    std::vector<Position> group;
+    Color color = (*this)[pos].stone;
+
+    if (color == Color::EMPTY) {
+        return group;
+    }
+
+    std::vector<Position> stack;
+    std::array<bool, BOARD_SIZE> visited;
+    visited.fill(false);
+
+    stack.push_back(pos);
+
+    while (!stack.empty()) {
+        Position current = stack.back();
+        stack.pop_back();
+
+        int idx = ord(current);
+        if (visited[idx]) continue;
+        visited[idx] = true;
+
+        if ((*this)[current].stone == color) {
+            group.push_back(current);
+
+            // Check all 4 neighbors
+            constexpr int dr[] = {0, 0, -1, 1};
+            constexpr int dc[] = {-1, 1, 0, 0};
+            for (int d = 0; d < 4; ++d) {
+                int nc = current.col() + dc[d];
+                int nr = current.row() + dr[d];
+
+                if (nc >= 0 && nc < boardSize && nr >= 0 && nr < boardSize) {
+                    Position neighbor(nc, nr);
+                    if (!visited[ord(neighbor)] && (*this)[neighbor].stone == color) {
+                        stack.push_back(neighbor);
+                    }
+                }
+            }
+        }
+    }
+
+    return group;
+}
+
+// Count liberties (unique empty adjacent positions) for a group
+int Board::countLiberties(const std::vector<Position>& group) const {
+    std::array<bool, BOARD_SIZE> counted;
+    counted.fill(false);
+    int liberties = 0;
+
+    constexpr int dr[] = {0, 0, -1, 1};
+    constexpr int dc[] = {-1, 1, 0, 0};
+
+    for (const auto& pos : group) {
+        for (int d = 0; d < 4; ++d) {
+            int nc = pos.col() + dc[d];
+            int nr = pos.row() + dr[d];
+
+            if (nc >= 0 && nc < boardSize && nr >= 0 && nr < boardSize) {
+                Position neighbor(nc, nr);
+                int idx = ord(neighbor);
+                if (!counted[idx] && (*this)[neighbor].stone == Color::EMPTY) {
+                    counted[idx] = true;
+                    liberties++;
+                }
+            }
+        }
+    }
+
+    return liberties;
+}
+
+// Remove a group of stones from the board
+int Board::removeGroup(const std::vector<Position>& group) {
+    for (const auto& pos : group) {
+        points[ord(pos)].stone = Color::EMPTY;
+    }
+    return static_cast<int>(group.size());
+}
+
+// Apply a move with capture processing
+int Board::applyMoveWithCaptures(const Move& move) {
+    // Handle pass - no board change, but ko expires
+    if (move == Move::PASS || move == Move::RESIGN || move == Move::INVALID) {
+        koPosition = Position(-1, -1);
+        return 0;
+    }
+
+    Position pos = move.pos;
+    Color color = move.col;
+
+    // Place the stone
+    points[ord(pos)].stone = color;
+
+    // Check opponent's adjacent groups for captures
+    Color opponent = Color::other(color);
+    int totalCaptured = 0;
+    Position lastCapturePos(-1, -1);
+
+    constexpr int dr[] = {0, 0, -1, 1};
+    constexpr int dc[] = {-1, 1, 0, 0};
+
+    for (int d = 0; d < 4; ++d) {
+        int nc = pos.col() + dc[d];
+        int nr = pos.row() + dr[d];
+
+        if (nc >= 0 && nc < boardSize && nr >= 0 && nr < boardSize) {
+            Position neighbor(nc, nr);
+            if ((*this)[neighbor].stone == opponent) {
+                auto group = findGroup(neighbor);
+                if (countLiberties(group) == 0) {
+                    if (group.size() == 1) {
+                        lastCapturePos = group[0];
+                    }
+                    totalCaptured += removeGroup(group);
+                }
+            }
+        }
+    }
+
+    // Set ko position if exactly 1 stone captured, otherwise clear it
+    koPosition = (totalCaptured == 1) ? lastCapturePos : Position(-1, -1);
+
+    // Update capture counts
+    if (totalCaptured > 0) {
+        if (opponent == Color::BLACK) {
+            capturedBlack += totalCaptured;
+        } else {
+            capturedWhite += totalCaptured;
+        }
+    }
+
+    return totalCaptured;
+}
+
+// Check if a move would be valid (not ko, not suicide unless captures)
+bool Board::isValidMove(const Position& pos, const Color& color) const {
+    // Check ko rule (uses internal koPosition)
+    if (pos == koPosition) {
+        return false;
+    }
+
+    // Check if position is empty
+    if ((*this)[pos].stone != Color::EMPTY) {
+        return false;
+    }
+
+    // Check if move would capture any opponent stones
+    // (a move that captures is always valid, even if own group has no liberties)
+    Color opponent = Color::other(color);
+
+    constexpr int dr[] = {0, 0, -1, 1};
+    constexpr int dc[] = {-1, 1, 0, 0};
+
+    for (int d = 0; d < 4; ++d) {
+        int nc = pos.col() + dc[d];
+        int nr = pos.row() + dr[d];
+
+        if (nc >= 0 && nc < boardSize && nr >= 0 && nr < boardSize) {
+            Position neighbor(nc, nr);
+            if ((*this)[neighbor].stone == opponent) {
+                auto group = findGroup(neighbor);
+                // Group has exactly 1 liberty (the position we're playing)
+                // After placing, it will have 0 liberties = captured
+                int liberties = countLiberties(group);
+                if (liberties == 1) {
+                    return true;  // This move captures, so it's valid
+                }
+            }
+        }
+    }
+
+    // No captures - check for suicide
+    // Count liberties the new stone would have (not counting self)
+    int ownLiberties = 0;
+    bool connectsToFriendlyGroup = false;
+
+    for (int d = 0; d < 4; ++d) {
+        int nc = pos.col() + dc[d];
+        int nr = pos.row() + dr[d];
+
+        if (nc >= 0 && nc < boardSize && nr >= 0 && nr < boardSize) {
+            Position neighbor(nc, nr);
+            Color neighborColor = (*this)[neighbor].stone;
+
+            if (neighborColor == Color::EMPTY) {
+                ownLiberties++;
+            } else if (neighborColor == color) {
+                // Connected to friendly group - check if group has >1 liberty
+                auto group = findGroup(neighbor);
+                if (countLiberties(group) > 1) {
+                    connectsToFriendlyGroup = true;
+                }
+            }
+        }
+    }
+
+    // Valid if we have direct liberties OR connect to a living group
+    return ownLiberties > 0 || connectsToFriendlyGroup;
+}
+
+// Build board state by replaying moves
+void Board::replayMoves(const std::vector<Move>& moves) {
+    koPosition = Position(-1, -1);
+
+    for (const auto& move : moves) {
+        if (move == Move::NORMAL || move == Move::PASS) {
+            applyMoveWithCaptures(move);  // Handles ko expiration on pass
+        }
+    }
 }

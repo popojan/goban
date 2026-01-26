@@ -132,6 +132,8 @@
                             <div class="template" id="templateWhitePasses">白方虚着</div>
                             <div class="template" id="templateBlackPasses">黑方虚着</div>
                             <div class="template" id="templateCalculatingScore">计算得分中...</div>
+                            <div class="template" id="templateClearBoard">清空棋盘？</div>
+                            <div class="template" id="templateQuitWithoutFinishing">退出未完成的对局？</div>
                             </div>
                             <div id="grpMoves">
                             <div class="hr">落子</div>

@@ -148,7 +148,11 @@ bool GameThread::setFixedHandicap(int handicap) {
     }
 
     model.state.handicap = handicap;
-    model.board.copyStateFrom(coach->showboard());
+    // Place handicap stones locally instead of using showboard()
+    for (const auto& pos : stones) {
+        model.board.updateStone(pos, Color::BLACK);
+    }
+    model.board.positionNumber += 1;
 
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&stones](GameObserver* observer) { observer->onHandicapChange(stones); });
@@ -204,17 +208,27 @@ void GameThread::syncOtherEngines(const Move& move, const Player* player, const 
 void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
                                      Engine* kibitzEngine, bool kibitzed,
                                      const std::string& engineComments) {
-    const Board& result = coach->showboard();
-
     std::ostringstream comment;
     comment << engineComments;
     if (kibitzed) {
         comment << GameRecord::eventNames[GameRecord::KIBITZ_MOVE] << kibitzEngine->getName();
     }
 
+    // First notify observers of the move (this adds the move to game record)
     std::for_each(gameObservers.begin(), gameObservers.end(),
-        [&result, move, &comment](GameObserver* observer) {
+        [move, &comment](GameObserver* observer) {
             observer->onGameMove(move, comment.str());
+        });
+
+    // Now build board from SGF using local capture logic (engine-independent)
+    // This must happen AFTER onGameMove adds the move to the game record
+    Board result(model.game.getBoardSize());
+    Position koPosition;
+    model.game.buildBoardFromMoves(result, koPosition);
+
+    // Notify observers of the board state
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&result](GameObserver* observer) {
             observer->onBoardChange(result);
         });
 }
@@ -257,10 +271,13 @@ void GameThread::processSuccessfulMove(const Move& move, const Player* movePlaye
     // 3. Notify observers with move and comments
     notifyMoveComplete(coach, move, kibitzEngine, wasKibitz, engineComments);
 
-    // 4. Update territory display if enabled
+    // 4. Update territory display if enabled (double pass detected)
     if (model.board.showTerritory) {
-        bool finalized = model.state.reason == GameState::DOUBLE_PASS;
-        const Board& result = coach->showterritory(finalized, model.game.lastStoneMove().col);
+        // Build board locally and apply territory from coach (engine-independent)
+        Board result(model.game.getBoardSize());
+        Position koPosition;
+        model.game.buildBoardFromMoves(result, koPosition);
+        coach->applyTerritory(result);
         std::for_each(
             gameObservers.begin(), gameObservers.end(),
             [&result](GameObserver* observer) { observer->onBoardChange(result); }
@@ -538,7 +555,11 @@ NavResult GameThread::executeNavCommand(const NavCommand& cmd) {
                 && model.game.shouldShowTerritory()) {
                 if (Engine* coach = currentCoach()) {
                     model.board.toggleTerritoryAuto(true);
-                    const Board& territory = coach->showterritory(true, model.game.lastStoneMove().col);
+                    // Build board locally and apply territory (engine-independent)
+                    Board territory(model.game.getBoardSize());
+                    Position koPosition;
+                    model.game.buildBoardFromMoves(territory, koPosition);
+                    coach->applyTerritory(territory);
                     navigator->notifyBoardChange(territory);
                 }
             }
@@ -787,10 +808,15 @@ void GameThread::finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInf
 
     if (engine) {
         model.board.toggleTerritoryAuto(true);
-        const Board& result = engine->showterritory(endedWithPasses, model.game.lastStoneMove().col);
+        // Build board locally and apply territory (engine-independent)
+        Board result(model.game.getBoardSize());
+        Position koPosition;
+        model.game.buildBoardFromMoves(result, koPosition);
 
-        // Score verification for scored games
         if (endedWithPasses) {
+            engine->applyTerritory(result);
+
+            // Score verification for scored games
             float coachScore = result.score;
             if (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinWithScore) {
                 float sgfScore = gameInfo.gameResult.Score;
@@ -805,14 +831,17 @@ void GameThread::finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInf
             model.state.scoreDelta = coachScore;
         }
 
+        // Set isGameOver BEFORE onBoardChange so territory display logic works
+        model.isGameOver = true;
+
         // Notify all observers of board change (triggers territory display via onBoardChange)
         std::for_each(gameObservers.begin(), gameObservers.end(),
             [&result](GameObserver* observer) {
                 observer->onBoardChange(result);
             });
+    } else {
+        model.isGameOver = true;
     }
-
-    model.isGameOver = true;
 
     if (endedByResignation) {
         bool blackWon = (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin);
@@ -907,13 +936,16 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     }
     if (engine) {
         syncEngineToPosition(engine);
-
-        const Board& result = engine->showboard();
-        std::for_each(gameObservers.begin(), gameObservers.end(),
-            [&result](GameObserver* observer) {
-                observer->onBoardChange(result);
-            });
     }
+
+    // Build board from SGF using local capture logic (engine-independent)
+    Board result(model.game.getBoardSize());
+    Position koPosition;
+    model.game.buildBoardFromMoves(result, koPosition);
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&result](GameObserver* observer) {
+            observer->onBoardChange(result);
+        });
 
     // Set game state
     if (model.game.moveCount() > 0) {
@@ -1009,8 +1041,11 @@ void GameThread::setHandicapStones(const std::vector<Position>& stones) {
     // Sync to other engines
     applyHandicapStonesToEngines(stones, coach);
 
-    // Notify observers
-    const Board& result = coach->showboard();
+    // Notify observers - build board locally from handicap stones
+    Board result(model.getBoardSize());
+    for (const auto& pos : stones) {
+        result.updateStone(pos, Color::BLACK);
+    }
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&result](GameObserver* observer) { observer->onBoardChange(result); });
 

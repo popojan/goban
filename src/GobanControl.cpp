@@ -81,6 +81,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
 
             bool playNow = true;
             if (model.isGameOver) {
+                // Clicking on finished game starts a new game
                 (void) newGame(model.getBoardSize());
                 playNow = false;
             }
@@ -184,6 +185,10 @@ void GobanControl::command(const std::string& cmd) {
 
     }
     else if (cmd == "play once") {
+        // Don't trigger at end of finished game
+        if (model.game.isAtFinishedGame()) {
+            return;
+        }
         // Activate genmove if needed (for kibitz to work)
         if (!model.isGameOver) {
             model.start();
