@@ -79,7 +79,7 @@ static void EnsureHoverListenersForAllDocuments() {
         if (doc && g_documentsWithHoverListener.find(doc) == g_documentsWithHoverListener.end()) {
             // Events that can change CSS visual state and need repaint:
             // :hover -> mouseover/mouseout (shows submenus via CSS)
-            // click  -> complete click cycle (RmlUi select dropdowns)
+            // click  -> complete click cycle (RmlUi select dropdowns, buttons with onmouseup)
             doc->AddEventListener(Rml::EventId::Mouseover, &g_hoverListener);
             doc->AddEventListener(Rml::EventId::Mouseout, &g_hoverListener);
             doc->AddEventListener(Rml::EventId::Click, &g_hoverListener);
