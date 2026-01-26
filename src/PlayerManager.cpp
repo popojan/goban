@@ -94,6 +94,14 @@ bool PlayerManager::areBothPlayersHuman() const {
         && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
 }
 
+bool PlayerManager::areBothPlayersEngines() const {
+    if (players.empty() || activePlayer[0] >= players.size() || activePlayer[1] >= players.size()) {
+        return false;
+    }
+    return players[activePlayer[0]]->isTypeOf(Player::ENGINE)
+        && players[activePlayer[1]]->isTypeOf(Player::ENGINE);
+}
+
 std::string PlayerManager::getName(size_t id) const {
     if (id < players.size()) {
         return players[id]->getName();

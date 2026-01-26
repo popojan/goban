@@ -720,12 +720,7 @@ void ElementGame::OnUpdate()
     std::string gameState(!isOver && isRunning ? "1" : (isOver ? "2" : "4"));
     model.state.cmd = gameState;
     if(model.state.cmd != view.state.cmd) {
-        auto grpMoves = context->GetDocument("game_window")->GetElementById("grpMoves");
-        auto grpGame  = context->GetDocument("game_window")->GetElementById("grpGame");
-        const Rml::String DISPLAY("display");
-        bool gameInProgress = !isOver && isRunning;
-        grpMoves->SetProperty(DISPLAY, gameInProgress ? "block" : "none");
-        grpGame->SetProperty(DISPLAY, gameInProgress ? "none" : "block");
+        // Both grpGame and grpMoves are always visible; individual items are disabled as needed
         requestRepaint();
         view.state.cmd = gameState;
     }
@@ -754,13 +749,21 @@ void ElementGame::OnUpdate()
         bool humanTurn = engine.humanToMove() && !thinking;
         bool hasMoves = model.game.moveCount() > 0;
         bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
-        // In AI vs AI mode without analysis, most play actions are locked
-        bool aiVsAiLocked = engine.isAiVsAi() && !analysisMode;
+        // Bot-bot match detection: either explicit AI vs AI mode OR both players are engines
+        bool botVsBot = engine.isAiVsAi() || engine.areBothPlayersEngines();
+        // In bot-bot mode without analysis, most play actions are locked
+        bool aiVsAiLocked = botVsBot && !analysisMode;
 
-        // Pass/Resign/Kibitz: disabled when not human's turn, or locked in AI vs AI
-        setElementDisabled("cmdPass", !humanTurn || aiVsAiLocked);
-        setElementDisabled("cmdResign", !humanTurn || aiVsAiLocked);
-        setElementDisabled("cmdKibitz", thinking || aiVsAiLocked);
+        // Start: enabled when current player is an engine (to trigger genmove)
+        // Disabled when game over, already started, or current player is human
+        bool engineToMove = engine.isCurrentPlayerEngine();
+        setElementDisabled("cmdStart", isOver || model.started || !engineToMove);
+
+        // Pass/Resign/Undo: disabled when not human's turn, game over, or locked in AI vs AI
+        setElementDisabled("cmdPass", !humanTurn || isOver || aiVsAiLocked);
+        setElementDisabled("cmdResign", !humanTurn || isOver || aiVsAiLocked);
+        setElementDisabled("cmdUndo", !humanTurn || isOver || aiVsAiLocked);
+        setElementDisabled("cmdKibitz", thinking || isOver || aiVsAiLocked);
 
         // Navigation: disabled when engine thinking or locked in AI vs AI
         bool navDisabled = thinking || aiVsAiLocked;

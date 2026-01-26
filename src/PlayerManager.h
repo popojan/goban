@@ -46,6 +46,8 @@ public:
 
     // Check if both active players are human (used for Analysis mode check)
     bool areBothPlayersHuman() const;
+    // Check if both active players are engines (for bot-bot detection)
+    bool areBothPlayersEngines() const;
 
     // Player info
     std::string getName(size_t id) const;

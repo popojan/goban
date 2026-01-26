@@ -193,10 +193,8 @@ bool GameThread::isThinking() const {
 
 bool GameThread::humanToMove() const {
     std::unique_lock<std::mutex> lock(playerMutex);
-    if(playerToMove) {
-        return playerToMove->isTypeOf(Player::HUMAN);
-    }
-    return true;
+    // Return false when no player to move (prevents menu item flashing during transitions)
+    return playerToMove && playerToMove->isTypeOf(Player::HUMAN);
 }
 void GameThread::syncOtherEngines(const Move& move, const Player* player, const Engine* coach,
                                    const Engine* kibitzEngine, bool kibitzed) const {
@@ -637,6 +635,21 @@ void GameThread::setAiVsAi(bool enabled) {
     std::unique_lock<std::mutex> lock(playerMutex);
     aiVsAiMode = enabled;
     spdlog::info("AI vs AI mode: {}", enabled ? "enabled" : "disabled");
+}
+
+bool GameThread::areBothPlayersEngines() const {
+    return playerManager->areBothPlayersEngines();
+}
+
+bool GameThread::isCurrentPlayerEngine() const {
+    // Get color to move (0 = black, 1 = white)
+    int colorIndex = (model.state.colorToMove == Color::BLACK) ? 0 : 1;
+    size_t playerIdx = playerManager->getActivePlayer(colorIndex);
+    auto& players = playerManager->getPlayers();
+    if (playerIdx >= players.size()) {
+        return false;
+    }
+    return players[playerIdx]->isTypeOf(Player::ENGINE);
 }
 
 void GameThread::loadEngines(const std::shared_ptr<Configuration> conf) const {

@@ -93,6 +93,8 @@ public:
     GameMode getGameMode() const { return gameMode; }
     void setAiVsAi(bool enabled);
     bool isAiVsAi() const { return aiVsAiMode; }
+    bool areBothPlayersEngines() const;
+    bool isCurrentPlayerEngine() const;  // Is the player to move an engine?
 
     void loadEngines(std::shared_ptr<Configuration> config) const;
 
