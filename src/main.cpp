@@ -447,6 +447,11 @@ int main(int argc, char** argv)
 
     spdlog::info("OpenGL version: {}", reinterpret_cast<const char *>(glGetString(GL_VERSION)));
 
+    // Show window immediately with black screen (before shader compilation)
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glfwSwapBuffers(window);
+
     // Set up GLFW callbacks
     glfwSetWindowSizeCallback(window, GlfwWindowSizeCallback);
     glfwSetKeyCallback(window, GlfwKeyCallback);

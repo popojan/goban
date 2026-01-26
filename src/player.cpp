@@ -39,6 +39,13 @@ bool GtpEngine::komi(float komi) {
 }
 
 bool GtpEngine::play(const Move& m) {
+    // Only NORMAL and PASS moves are valid GTP play commands
+    // RESIGN, INVALID, INTERRUPT, KIBITZED are not sendable via "play"
+    if (m != Move::NORMAL && m != Move::PASS) {
+        spdlog::debug("GtpEngine::play: skipping non-playable move type {}", m.toString());
+        return true;  // No-op for non-playable moves
+    }
+
     std::stringstream ssout;
     ssout << "play " << m;
     return GtpClient::success(GtpClient::issueCommand(ssout.str()));
@@ -47,7 +54,11 @@ bool GtpEngine::play(const Move& m) {
 bool GtpEngine::boardsize(unsigned boardSize) {
     std::stringstream ssout;
     ssout << "boardsize " << boardSize;
-    return GtpClient::success(GtpClient::issueCommand(ssout.str()));
+    bool success = GtpClient::success(GtpClient::issueCommand(ssout.str()));
+    if (success) {
+        board.clear(boardSize);  // Sync internal board state with new size
+    }
+    return success;
 }
 
 bool GtpEngine::clear() {
@@ -104,6 +115,9 @@ const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
     board.parseGtp(GtpClient::showboard());
     estimateTerritory(final, colorToMove);
     board.score = final ? final_score() : 0.0f;
+    // Set display flags so observers know to show territory
+    board.showTerritory = true;
+    board.showTerritoryAuto = true;
     board.invalidate();
     return board;
 }

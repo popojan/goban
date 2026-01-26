@@ -178,6 +178,24 @@ div.template {
   height: 30%;
   overflow: auto;
 }
+#lblMessage:hover {
+  color: #ffffff80;  /* No hover on container - children handle their own */
+}
+
+/* Dismissable messages show hover to indicate clickability */
+.dismissable:hover {
+  color: #fffffff0;
+}
+
+/* Prompt buttons in lblMessage (aligned with .button in open.rcss) */
+.prompt-btn {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  margin: 0 0.25rem;
+}
+.prompt-btn:hover {
+  color: #fffffff0;
+}
 
 /* Positioning utilities */
 .bottom { position: absolute; bottom: 0px; left: 0px; right: 0px; }

@@ -127,7 +127,7 @@ public:
     bool loadSGF(const std::string& fileName, int gameIndex = 0);
     bool loadSGFWithEngine(const std::string& fileName, Engine* engine = nullptr, int gameIndex = 0);  // Load SGF, sync engine
     void syncEngineToPosition(Engine* engine);  // Sync one engine to current game state
-    void syncRemainingEngines(Engine* alreadySynced = nullptr);  // Sync all engines except alreadySynced
+    void syncRemainingEngines(Engine* alreadySynced = nullptr, bool matchPlayers = true);  // Sync all engines except alreadySynced
 
 private:
     void syncOtherEngines(const Move& move, const Player* player, const Engine* coach, const Engine* kibitzEngine, bool kibitzed) const;
@@ -140,6 +140,12 @@ private:
     std::string collectEngineComments() const;
     void processSuccessfulMove(const Move& move, const Player* movePlayer, Engine* coach,
                               Engine* kibitzEngine, bool wasKibitz);
+
+    // Helper for SGF loading - handles finished game detection and state setup
+    void finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInfo& gameInfo);
+
+    // Helper for SGF loading - matches SGF player names to engines or creates temporary players
+    void matchSgfPlayers();
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;
     std::unique_ptr<std::thread> thread;

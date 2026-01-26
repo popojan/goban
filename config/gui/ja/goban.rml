@@ -202,5 +202,9 @@
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
     </game>
+    <!-- Message templates -->
+    <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
+    <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">はい</span> <span class="prompt-btn" onmouseup="prompt_no">いいえ</span></div>
+    <div class="template" id="tplPromptOkCancel">%MSG% <span class="prompt-btn" onmouseup="prompt_ok">OK</span> <span class="prompt-btn" onmouseup="prompt_cancel">キャンセル</span></div>
 </body>
 </rml>

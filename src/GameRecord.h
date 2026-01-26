@@ -68,6 +68,9 @@ public:
 
     bool loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo, int gameIndex = 0);
 
+    // Get player names from currently loaded game (reads PB/PW properties)
+    std::pair<std::string, std::string> getPlayerNames() const;
+
     // Quick peek at SGF file to get board size without full parsing
     // Returns board size or -1 if file doesn't exist or can't be parsed
     static int peekBoardSize(const std::string& fileName);

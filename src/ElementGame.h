@@ -7,6 +7,7 @@
 #include <RmlUi/Core/StyleSheet.h>
 #include <future>
 #include <atomic>
+#include <functional>
 
 class ElementGame : public Rml::Element,
     public Rml::EventListener
@@ -45,6 +46,14 @@ public:
     GameThread& getGameThread() { return engine; }
     void OnMenuToggle(const std::string& cmd, bool checked) const;
 
+    // Message system - template-based messages in lblMessage
+    void showMessage(const std::string& text);  // Dismissable message
+    void showPromptYesNo(const std::string& message, std::function<void(bool)> callback);
+    void showPromptOkCancel(const std::string& message, std::function<void(bool)> callback);
+    void handlePromptResponse(bool affirmative);  // Called by event handlers
+    void clearMessage();
+    bool hasActivePrompt() const { return pendingPromptCallback != nullptr; }
+
 protected:
     void OnUpdate() override;
 public:
@@ -79,6 +88,9 @@ private:
 
     // Determine initial board size by peeking at SGF that will be loaded
     static int determineInitialBoardSize();
+
+    // Prompt system callback storage
+    std::function<void(bool)> pendingPromptCallback;
 };
 
 #endif

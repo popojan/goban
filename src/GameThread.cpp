@@ -672,11 +672,20 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
         spdlog::info("Loading SGF with first engine: {}", sgfPath);
         loadSGFWithEngine(sgfPath, firstReadyEngine, -1);
     } else if (firstReadyEngine) {
-        // No SGF - just clear the board
+        // No SGF - apply saved game settings
         auto& settings = UserSettings::instance();
         int boardSize = settings.getBoardSize();
+        float komi = settings.getKomi();
+
         firstReadyEngine->boardsize(boardSize);
+        firstReadyEngine->komi(komi);
         firstReadyEngine->clear();
+
+        // Update model state with saved settings
+        spdlog::debug("Setting model.state.komi = {} from settings", komi);
+        model.state.komi = komi;
+        model.state.handicap = settings.getHandicap();
+
         std::for_each(gameObservers.begin(), gameObservers.end(),
             [boardSize](GameObserver* observer) { observer->onBoardSized(boardSize); });
     }
@@ -702,7 +711,8 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
 
     // Sync remaining engines to game state
     spdlog::info("Syncing {} engines to game state", totalEngines);
-    syncRemainingEngines(firstReadyEngine);
+    bool sgfWasLoaded = !sgfPath.empty();
+    syncRemainingEngines(firstReadyEngine, sgfWasLoaded);
 
     spdlog::info("All engines loaded and synced");
 }
@@ -716,186 +726,113 @@ Move GameThread::getLocalMove(const Move::Special move) const {
 }
 
 bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
-    //std::unique_lock<std::mutex> lock(mutex2);
-
-    // Remove any SGF players from previous load
-    removeSgfPlayers();
-
-    // Auto-save current game if it has moves before replacing it
-    if (model.game.moveCount() > 0) {
-        try {
-            model.game.saveAs(""); // Use default auto-generated filename
-            spdlog::info("Auto-saved current game with {} moves before loading SGF", model.game.moveCount());
-        } catch (const std::exception& ex) {
-            spdlog::warn("Failed to auto-save current game before SGF loading: {}", ex.what());
-        }
-    }
-    
-    GameRecord::SGFGameInfo gameInfo;
-    
-    if (!model.game.loadFromSGF(fileName, gameInfo, gameIndex)) {
-        return false;
-    }
-
-    interrupt();
-    model.pause();  // Must pause before clearGame so onKomiChange/onHandicapChange take effect
-
-    if (!clearGame(gameInfo.boardSize, gameInfo.komi, gameInfo.handicap)) {
-        spdlog::error("Failed to clear game for SGF loading");
-        return false;
-    }
-
-    // Ensure SGF values are set in model state (setFixedHandicap may have failed if no coach)
-    spdlog::info("loadSGF: setting model.state from SGF - komi={}, handicap={}", gameInfo.komi, gameInfo.handicap);
-    model.state.komi = gameInfo.komi;
-    model.state.handicap = gameInfo.handicap;
-
-    if (!gameInfo.handicapStones.empty()) {
-        setHandicapStones(gameInfo.handicapStones);
-    }
-
+    // Use unified loading path - same as startup
     Engine* coach = currentCoach();
-    if (coach) {
-        model.game.replay([&](const Move& move) {
-            coach->play(move);
-            for (auto player : playerManager->getPlayers()) {
-                if (player != coach) {
-                    player->play(move);
+
+    if (!loadSGFWithEngine(fileName, coach, gameIndex)) {
+        return false;
+    }
+
+    // Sync remaining engines and finalize (player matching, game mode, run thread)
+    // Pass coach as already-synced engine
+    syncRemainingEngines(coach);
+
+    return true;
+}
+
+void GameThread::syncEngineToPosition(Engine* engine) {
+    // Core method: sync one engine to current game position
+    if (!engine) return;
+
+    int boardSize = model.getBoardSize();
+    float komi = model.state.komi;
+    spdlog::debug("syncEngineToPosition: {} boardSize={} komi={}", engine->getName(), boardSize, komi);
+
+    engine->boardsize(boardSize);
+    engine->clear();
+    engine->komi(komi);
+
+    // Replay handicap stones
+    for (const auto& stone : model.handicapStones) {
+        engine->play(Move(stone, Color::BLACK));
+    }
+
+    // Replay all moves
+    model.game.replay([&](const Move& move) {
+        engine->play(move);
+    });
+}
+
+void GameThread::finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInfo& gameInfo) {
+    // Check if game ended (double pass or resignation)
+    bool endedWithPasses = false;
+    if (model.game.moveCount() >= 2) {
+        const Move& lastMove = model.game.lastMove();
+        const Move& secondLastMove = model.game.secondLastMove();
+        endedWithPasses = (lastMove == Move::PASS && secondLastMove == Move::PASS);
+    }
+
+    bool endedByResignation = (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinByResignation);
+
+    if (!endedWithPasses && !endedByResignation && gameInfo.gameResult.IsValid) {
+        endedWithPasses = true;
+    }
+
+    if (!endedWithPasses && !endedByResignation) {
+        return;  // Game not finished
+    }
+
+    // Set the game state for finished game
+    model.state.reason = endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
+
+    if (engine) {
+        model.board.toggleTerritoryAuto(true);
+        const Board& result = engine->showterritory(endedWithPasses, model.game.lastStoneMove().col);
+
+        // Score verification for scored games
+        if (endedWithPasses) {
+            float coachScore = result.score;
+            if (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinWithScore) {
+                float sgfScore = gameInfo.gameResult.Score;
+                if (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::WhiteWin) {
+                    sgfScore = -sgfScore;
+                }
+                float scoreDifference = std::abs(coachScore - sgfScore);
+                if (scoreDifference > 0.1f) {
+                    spdlog::warn("Score discrepancy: Coach {:.1f}, SGF {:.1f}", coachScore, sgfScore);
                 }
             }
-        });
-        
-        const Board& result = coach->showboard();
-        std::for_each(
-            gameObservers.begin(), gameObservers.end(),
+            model.state.scoreDelta = coachScore;
+        }
+
+        // Notify all observers of board change (triggers territory display via onBoardChange)
+        std::for_each(gameObservers.begin(), gameObservers.end(),
             [&result](GameObserver* observer) {
                 observer->onBoardChange(result);
-            }
-        );
+            });
     }
 
-    if (model.game.moveCount() > 0) {
-        model.state.colorToMove = Color(model.game.lastMove().col == Color::BLACK
-            ? Color::WHITE : Color::BLACK);
-        
-        // Set pass message if last move was a pass (needed for proper UI display)
-        const Move& lastMove = model.game.lastMove();
-        if (lastMove == Move::PASS) {
-            model.state.msg = (lastMove.col == Color::BLACK) 
-                ? GameState::BLACK_PASS 
-                : GameState::WHITE_PASS;
-        }
-    } else if (gameInfo.handicap > 0) {
-        model.state.colorToMove = Color::WHITE;
+    model.isGameOver = true;
+
+    if (endedByResignation) {
+        bool blackWon = (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin);
+        model.state.winner = blackWon ? Color::BLACK : Color::WHITE;
+        Color resigningPlayer = blackWon ? Color::WHITE : Color::BLACK;
+        Move resignationMove(Move::RESIGN, resigningPlayer);
+        model.result(resignationMove);
+        spdlog::info("Loaded SGF: game ended by resignation");
     } else {
-        model.state.colorToMove = Color::BLACK;
+        model.result(model.game.lastMove());
+        spdlog::info("Loaded SGF: game ended with scoring");
     }
+}
 
-    // Set initial comment and markup from current SGF node
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
+void GameThread::matchSgfPlayers() {
+    auto [blackPlayer, whitePlayer] = model.game.getPlayerNames();
 
-    // Check if the loaded game is finished and trigger final scoring
-    if (gameInfo.gameResult.IsValid && 
-        (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin ||
-         gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::WhiteWin ||
-         gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::Draw)) {
-        
-        spdlog::info("Loaded SGF contains finished game, triggering final scoring");
-        
-        // Check if we ended with consecutive passes (typical for finished games)
-        bool endedWithPasses = false;
-        if (model.game.moveCount() >= 2) {
-            const Move& lastMove = model.game.lastMove();
-            const Move& secondLastMove = model.game.secondLastMove();
-            endedWithPasses = (lastMove == Move::PASS && secondLastMove == Move::PASS);
-        }
-        
-        // Check if the game ended by resignation (from SGF result, not from moves)
-        bool endedByResignation = (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinByResignation);
-
-        if (!endedWithPasses && !endedByResignation && gameInfo.gameResult.IsValid) {
-            endedWithPasses = true;
-        }
-
-        // Trigger final scoring for finished games (both double pass and resignation)
-        if (coach && (endedWithPasses || endedByResignation)) {
-            // Set the game state reason but don't set 'over' yet to avoid breaking the game loop
-            model.state.reason = endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
-
-            model.board.toggleTerritoryAuto(true);
-            const Board& result = coach->showterritory(endedWithPasses, model.game.lastStoneMove().col);
-
-            // Do not update observers with the final board state
-            /*std::for_each(
-                gameObservers.begin(), gameObservers.end(),
-                [&result](GameObserver* observer) {
-                    observer->onBoardChange(result);
-                }
-            );*/
-            
-            // Compare coach's calculated score with SGF result
-            if (endedWithPasses) {
-                float coachScore = result.score;  // Already calculated by showterritory()
-                float sgfScore = 0.0f;
-                bool sgfScoreValid = false;
-                
-                // Extract score from SGF result if it's a win with score
-                if (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinWithScore) {
-                    sgfScore = gameInfo.gameResult.Score;
-                    if (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::WhiteWin) {
-                        sgfScore = -sgfScore; // Convert to coach's convention (negative = white wins)
-                    }
-                    sgfScoreValid = true;
-                }
-                
-                if (sgfScoreValid) {
-                    float scoreDifference = std::abs(coachScore - sgfScore);
-                    if (scoreDifference > 0.1f) {
-                        spdlog::warn("Score discrepancy detected: Coach calculated {:.1f}, SGF shows {:.1f} (difference: {:.1f}). "
-                                   "This may be due to different scoring rules or SGF error.",
-                                   coachScore, sgfScore, scoreDifference);
-                    } else {
-                        spdlog::info("Score verification: Coach {:.1f}, SGF {:.1f} - scores match", coachScore, sgfScore);
-                    }
-                }
-                model.state.scoreDelta = coachScore;
-            }
-
-            // Now safely set the game as over after all operations are complete
-            model.isGameOver = true;
-            model.board.copyStateFrom(result);
-            model.board.positionNumber += 1;
-
-            model.state.capturedBlack = model.board.capturedCount(Color::BLACK);
-            model.state.capturedWhite = model.board.capturedCount(Color::WHITE);
-
-            if (endedByResignation) {
-                // For resigned games, set winner based on SGF result and create resignation move
-                // BlackWin means white resigned, WhiteWin means black resigned
-                bool blackWon = (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin);
-                model.state.winner = blackWon ? Color::BLACK : Color::WHITE;
-                Color resigningPlayer = blackWon ? Color::WHITE : Color::BLACK;
-                Move resignationMove(Move::RESIGN, resigningPlayer);
-                model.result(resignationMove);
-            } else {
-                model.result(model.game.lastMove());
-            }
-
-            if (endedByResignation) {
-                spdlog::info("Final scoring completed for resigned game (showing territory influence)");
-            } else {
-                spdlog::info("Final scoring completed for loaded SGF game");
-            }
-        }
-    }
-    
-    // Match SGF player names to loaded players (engines)
-    // If a name matches an engine exactly, activate that engine; otherwise create a temporary SGF player
     auto matchPlayerName = [this](const std::string& sgfName, int which) {
         auto players = playerManager->getPlayers();
-        spdlog::info("matchPlayerName: sgfName='{}', which={}, current activePlayer[{}]={}",
-            sgfName, which, which, playerManager->getActivePlayer(which));
+        spdlog::debug("matchPlayerName: sgfName='{}', which={}", sgfName, which);
 
         // Search for matching player name (skip SGF_PLAYER types from previous loads)
         for (size_t i = 0; i < players.size(); i++) {
@@ -914,44 +851,9 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
         spdlog::info("Created SGF player '{}' at index {}", sgfName, newIndex);
     };
 
-    spdlog::info("loadSGF: matching players - Black='{}', White='{}', players.size={}",
-        gameInfo.blackPlayer, gameInfo.whitePlayer, playerManager->getNumPlayers());
-    matchPlayerName(gameInfo.blackPlayer, 0);
-    matchPlayerName(gameInfo.whitePlayer, 1);
-    spdlog::info("loadSGF: after matching - activePlayer=[{}, {}], players.size={}",
-        playerManager->getActivePlayer(0), playerManager->getActivePlayer(1), playerManager->getNumPlayers());
-
-    spdlog::info("SGF file [{}] (game index {}) loaded successfully. Board size: {}, Komi: {}, Handicap: {}, Moves: {}",
-                 fileName, gameIndex, gameInfo.boardSize, gameInfo.komi, gameInfo.handicap, model.game.moveCount());
-
-    // Finished games enter Analysis mode (review), unfinished enter Match mode (continue)
-    gameMode = model.game.hasGameResult() ? GameMode::ANALYSIS : GameMode::MATCH;
-
-    // Start game thread for navigation command processing
-    run();
-
-    return true;
-}
-
-void GameThread::syncEngineToPosition(Engine* engine) {
-    // Core method: sync one engine to current game position
-    if (!engine) return;
-
-    int boardSize = model.getBoardSize();
-
-    engine->boardsize(boardSize);
-    engine->clear();
-    engine->komi(model.state.komi);
-
-    // Replay handicap stones
-    for (const auto& stone : model.handicapStones) {
-        engine->play(Move(stone, Color::BLACK));
-    }
-
-    // Replay all moves
-    model.game.replay([&](const Move& move) {
-        engine->play(move);
-    });
+    spdlog::info("Matching SGF players - Black='{}', White='{}'", blackPlayer, whitePlayer);
+    matchPlayerName(blackPlayer, 0);
+    matchPlayerName(whitePlayer, 1);
 }
 
 bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, int gameIndex) {
@@ -1031,13 +933,16 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
+    // Handle finished games (resignation or double pass)
+    finalizeLoadedGame(engine, gameInfo);
+
     spdlog::info("SGF [{}] loaded. Board: {}, Moves: {}.",
                  fileName, gameInfo.boardSize, model.game.moveCount());
 
     return true;
 }
 
-void GameThread::syncRemainingEngines(Engine* alreadySynced) {
+void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) {
     // Sync all engines except the one already synced
 
     // If no engine specified, fall back to coach
@@ -1051,6 +956,11 @@ void GameThread::syncRemainingEngines(Engine* alreadySynced) {
         if (!player->isTypeOf(Player::ENGINE)) continue;  // Skip non-engines
 
         syncEngineToPosition(static_cast<Engine*>(player));
+    }
+
+    // Match SGF player names to engines (only when SGF was loaded)
+    if (matchPlayers) {
+        matchSgfPlayers();
     }
 
     // Set game mode based on result

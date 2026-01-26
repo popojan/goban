@@ -102,12 +102,7 @@ public:
     bool toggleFpsLimit() {MAX_FPS = !MAX_FPS; return MAX_FPS;}
     bool isFpsLimitEnabled() const { return MAX_FPS; }
 
-    void switchShader(int idx)  {
-        updateFlag |= GobanView::UPDATE_ALL;
-        gobanShader.choose(idx);
-        state.metricsReady = false;
-        gobanShader.setReady();
-    }
+    void switchShader(int idx);
 
     [[nodiscard]] Position getBoardCoordinate(float x, float y)const ;
     [[nodiscard]] glm::vec2 boardCoordinate(float x, float y) const;

@@ -135,9 +135,20 @@ void GobanControl::command(const std::string& cmd) {
 
     bool checked = false;
     if(cmd == "quit") {
-        saveCurrentGame();  // Saves game and stores path for restore on next start
-        exit = true;
-        AppState::RequestExit();
+        // Show confirmation if game has moves
+        if (model.game.moveCount() > 0 && !model.isGameOver) {
+            parent->showPromptYesNo("Quit without finishing?", [this](bool confirmed) {
+                if (confirmed) {
+                    saveCurrentGame();
+                    exit = true;
+                    AppState::RequestExit();
+                }
+            });
+        } else {
+            saveCurrentGame();  // Saves game and stores path for restore on next start
+            exit = true;
+            AppState::RequestExit();
+        }
     }
     else if (cmd == "toggle_fullscreen") {
         fullscreen = AppState::ToggleFullscreen();
@@ -324,16 +335,12 @@ void GobanControl::command(const std::string& cmd) {
     else if(cmd == "save") {
         model.game.saveAs("");
         // Show feedback with filename
-        if (auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage")) {
-            msg->SetInnerRML(model.game.getDefaultFileName().c_str());
-        }
+        parent->showMessage(model.game.getDefaultFileName());
     }
     else if(cmd == "archive") {
         // Only archive if there are games or moves to archive
         if (model.game.getNumGames() == 0 && model.game.moveCount() == 0) {
-            if (auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage")) {
-                msg->SetInnerRML("Nothing to archive");
-            }
+            parent->showMessage("Nothing to archive");
             return;
         }
         // Save current game and remember the archived filename
@@ -355,9 +362,7 @@ void GobanControl::command(const std::string& cmd) {
         // Save new session path so it's used after restart
         UserSettings::instance().setLastSgfPath(model.game.getDefaultFileName());
         // Show feedback with archived filename (where games went)
-        if (auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage")) {
-            msg->SetInnerRML(archivedFile.c_str());
-        }
+        parent->showMessage(archivedFile);
         spdlog::info("Archived to {}, new session: {}", archivedFile, model.game.getDefaultFileName());
     }
     else if(cmd == "load") {
@@ -369,9 +374,16 @@ void GobanControl::command(const std::string& cmd) {
         }
     }
     else if(cmd == "msg") {
-        if(auto msg = parent->GetContext()->GetDocument("game_window")->GetElementById("lblMessage")) {
-            msg->SetInnerRML("");
+        // Only clear if no active prompt (prompts require button click)
+        if (!parent->hasActivePrompt()) {
+            parent->clearMessage();
         }
+    }
+    else if(cmd == "prompt_yes" || cmd == "prompt_ok") {
+        parent->handlePromptResponse(true);
+    }
+    else if(cmd == "prompt_no" || cmd == "prompt_cancel") {
+        parent->handlePromptResponse(false);
     }
     parent->OnMenuToggle(cmd, checked);
 }

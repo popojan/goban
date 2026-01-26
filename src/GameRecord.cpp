@@ -857,6 +857,28 @@ bool GameRecord::hasGameResult() const {
     return false;
 }
 
+std::pair<std::string, std::string> GameRecord::getPlayerNames() const {
+    std::string black = "Black";
+    std::string white = "White";
+
+    if (!game) return {black, white};
+    auto root = game->GetRootNode();
+    if (!root) return {black, white};
+
+    for (const auto& prop : root->GetProperties()) {
+        if (prop->GetPropertyType() == T::PB) {
+            if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(prop->GetPropertyValue())) {
+                black = textValue->GetSimpleTextValue();
+            }
+        } else if (prop->GetPropertyType() == T::PW) {
+            if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(prop->GetPropertyValue())) {
+                white = textValue->GetSimpleTextValue();
+            }
+        }
+    }
+    return {black, white};
+}
+
 bool GameRecord::isGameFinished() const {
     Move last = lastMove();
 
