@@ -123,9 +123,11 @@ std::pair<Move, size_t> GameRecord::lastStoneMoveIndex() const {
             if (*move == Move::NORMAL) {
                 return std::make_pair(*move, depth);
             }
+            // Only decrement depth for nodes that have moves (matching getTreeDepth logic)
+            depth--;
         }
+        // Skip empty nodes (semicolons without B/W) without decrementing depth
         node = node->GetParent();
-        depth--;
     }
     return std::make_pair(Move(Move::INVALID, Color::EMPTY), 0);
 }
@@ -207,6 +209,7 @@ void GameRecord::move(const Move& move)  {
         newNode->SetProperties(properties);
         game->GetTreeBuilder()->InsertChild(currentNode, newNode, currentNode->GetFirstChild());
         currentNode = newNode;
+        unsavedChanges = true;
         if (!gameHasNewMoves) {
             gameHasNewMoves = true;
             appendGameToDocument();
@@ -229,6 +232,7 @@ void GameRecord::move(const Move& move)  {
         rootProps.push_back(property);
         game->GetRootNode()->SetProperties(rootProps);
 
+        unsavedChanges = true;
         if (!gameHasNewMoves) {
             gameHasNewMoves = true;
             appendGameToDocument();
@@ -329,6 +333,7 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
     game = newGame;
     currentNode = newMoveNode;
     gameHasNewMoves = true;
+    unsavedChanges = true;
     gameInDocument = false;
     appendGameToDocument();
 
@@ -451,6 +456,7 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
     game = F::CreateGame();
     currentNode = game->GetRootNode();
     gameHasNewMoves = false;
+    unsavedChanges = false;
     gameInDocument = false;
     
     using namespace LibSgfcPlusPlus;
@@ -691,6 +697,7 @@ void GameRecord::saveAsInternal(const std::string& fileName) {
     const std::shared_ptr writer(F::CreateDocumentWriter());
     try {
         (void) writer->WriteSgfFile(doc, fn);
+        unsavedChanges = false;
         spdlog::info("Writing sgf file [{}] success!", fn);
     } catch (std::exception& ex) {
         spdlog::error("Writing sgf file [{}] failed: {}", fn, ex.what());
@@ -820,6 +827,7 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         // Keep the game tree (SGF is single source of truth)
         game = loadedGame;
         gameHasNewMoves = false;
+        unsavedChanges = false;
         gameInDocument = false;
 
         // Only preserve doc when loading daily session file (for appending)

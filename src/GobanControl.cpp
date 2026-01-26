@@ -235,13 +235,16 @@ void GobanControl::command(const std::string& cmd) {
         }
     }
     else if (cmd == "clear") {
-        if (model.isGameOver) {
-            parent->showPromptYesNoTemplate("templateClearBoard", [this](bool confirmed) {
-                if (confirmed) {
-                    (void) newGame(model.getBoardSize());
-                }
-            });
-        }
+        // Use different prompt for game in progress vs finished game
+        const char* templateId = engine.isRunning() && !model.isGameOver
+            ? "templateQuitWithoutFinishing"
+            : "templateClearBoard";
+        parent->showPromptYesNoTemplate(templateId, [this](bool confirmed) {
+            if (confirmed) {
+                saveCurrentGame();  // Save before clearing
+                (void) newGame(model.getBoardSize());  // newGame handles engine.interrupt() + reset()
+            }
+        });
     }
     else if (cmd == "start") {
         if (!model.isGameOver) {

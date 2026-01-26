@@ -48,6 +48,7 @@ public:
     void clearSession();  // Clear doc to start new session (used by archive)
     [[nodiscard]] size_t getNumGames() const { return numGames; }
     [[nodiscard]] bool hasNewMoves() const { return gameHasNewMoves; }
+    [[nodiscard]] bool hasUnsavedChanges() const { return unsavedChanges; }
 
     void setHandicapStones(const std::vector<Position>& stones);
 
@@ -112,6 +113,7 @@ private:
     size_t numGames;
     bool gameHasNewMoves;
     bool gameInDocument;  // True when game is already part of doc (prevent re-append)
+    bool unsavedChanges = false;  // True when changes made since last save
 
 public:
     // Navigation methods (SGF tree-based)

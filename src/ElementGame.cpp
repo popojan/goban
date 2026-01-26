@@ -778,8 +778,8 @@ void ElementGame::OnUpdate()
         // Clear: disabled when board is empty (no moves made)
         setElementDisabled("cmdClear", !hasMoves);
 
-        // Save: disabled when nothing to save (no moves)
-        setElementDisabled("cmdSave", !hasMoves);
+        // Save: disabled when no unsaved changes
+        setElementDisabled("cmdSave", !model.game.hasUnsavedChanges());
     }
 
     if (view.state.colorToMove != model.state.colorToMove) {
