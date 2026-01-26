@@ -11,6 +11,31 @@
 #include <filesystem>
 #include <fstream>
 
+// Escape special characters for safe RML display
+static std::string escapeRml(const std::string& text) {
+    std::string result;
+    result.reserve(text.size() * 1.2);  // Slight over-allocation for escapes
+    for (char c : text) {
+        switch (c) {
+            case '<': result += "&lt;"; break;
+            case '>': result += "&gt;"; break;
+            case '&': result += "&amp;"; break;
+            case '"': result += "&quot;"; break;
+            default: result += c; break;
+        }
+    }
+    return result;
+}
+
+// Get text from a localized template element
+static std::string getTemplateText(Rml::Context* context, const std::string& templateId) {
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return "";
+    auto tpl = doc->GetElementById(templateId.c_str());
+    if (!tpl) return "";
+    return tpl->GetInnerRML().c_str();
+}
+
 ElementGame::ElementGame(const Rml::String& tag)
         : Rml::Element(tag),
           model(this, determineInitialBoardSize()),
@@ -361,7 +386,6 @@ void ElementGame::startAsyncEngineLoading() {
         engine.loadEnginesParallel(config, sgfToLoad, [this]() {
             // Called when first engine is ready and SGF is loaded
             stonesDisplayed = true;
-            updateLoadingStatus("Loading other engines...");
             view.requestRepaint();
         });
         spdlog::info("All engines loaded");
@@ -458,6 +482,118 @@ void ElementGame::updateLoadingStatus(const std::string& message) {
     }
 
     // Request repaint so the loading message is visible
+    view.requestRepaint();
+}
+
+void ElementGame::showMessage(const std::string& text) {
+    auto context = GetContext();
+    if (!context) return;
+
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+
+    // Get template
+    auto tpl = doc->GetElementById("tplMessage");
+    if (!tpl) {
+        spdlog::warn("Message template tplMessage not found");
+        return;
+    }
+
+    // Build message from template
+    std::string msgHtml = tpl->GetInnerRML().c_str();
+    size_t pos = msgHtml.find("%MSG%");
+    if (pos != std::string::npos) {
+        msgHtml.replace(pos, 5, escapeRml(text));
+    }
+
+    // Set in lblMessage
+    if (auto msgLabel = doc->GetElementById("lblMessage")) {
+        msgLabel->SetInnerRML(msgHtml.c_str());
+    }
+
+    view.requestRepaint();
+}
+
+void ElementGame::showPromptYesNo(const std::string& message, std::function<void(bool)> callback) {
+    auto context = GetContext();
+    if (!context) return;
+
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+
+    // Get template
+    auto tpl = doc->GetElementById("tplPromptYesNo");
+    if (!tpl) {
+        spdlog::warn("Prompt template tplPromptYesNo not found");
+        return;
+    }
+
+    // Build prompt from template
+    std::string promptHtml = tpl->GetInnerRML().c_str();
+    size_t pos = promptHtml.find("%MSG%");
+    if (pos != std::string::npos) {
+        promptHtml.replace(pos, 5, escapeRml(message));
+    }
+
+    // Set in lblMessage
+    if (auto msgLabel = doc->GetElementById("lblMessage")) {
+        msgLabel->SetInnerRML(promptHtml.c_str());
+    }
+
+    pendingPromptCallback = std::move(callback);
+    view.requestRepaint();
+}
+
+void ElementGame::showPromptOkCancel(const std::string& message, std::function<void(bool)> callback) {
+    auto context = GetContext();
+    if (!context) return;
+
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+
+    // Get template
+    auto tpl = doc->GetElementById("tplPromptOkCancel");
+    if (!tpl) {
+        spdlog::warn("Prompt template tplPromptOkCancel not found");
+        return;
+    }
+
+    // Build prompt from template
+    std::string promptHtml = tpl->GetInnerRML().c_str();
+    size_t pos = promptHtml.find("%MSG%");
+    if (pos != std::string::npos) {
+        promptHtml.replace(pos, 5, escapeRml(message));
+    }
+
+    // Set in lblMessage
+    if (auto msgLabel = doc->GetElementById("lblMessage")) {
+        msgLabel->SetInnerRML(promptHtml.c_str());
+    }
+
+    pendingPromptCallback = std::move(callback);
+    view.requestRepaint();
+}
+
+void ElementGame::handlePromptResponse(bool affirmative) {
+    if (pendingPromptCallback) {
+        auto callback = std::move(pendingPromptCallback);
+        pendingPromptCallback = nullptr;
+        callback(affirmative);
+    }
+    clearMessage();
+}
+
+void ElementGame::clearMessage() {
+    pendingPromptCallback = nullptr;
+    auto context = GetContext();
+    if (!context) return;
+
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+
+    if (auto msgLabel = doc->GetElementById("lblMessage")) {
+        msgLabel->SetInnerRML("");
+    }
     view.requestRepaint();
 }
 
@@ -667,58 +803,72 @@ void ElementGame::OnUpdate()
             requestRepaint();
         }
     }
-    Rml::Element* msg = context->GetDocument("game_window")->GetElementById("lblMessage");
-    // Update message when msg changes OR when a new game is loaded (detected by positionNumber change)
-    if (view.state.msg != model.state.msg
-        || view.board.positionNumber.load() != model.board.positionNumber.load()) {
+    // Collect engine errors FIRST (before message display, so we can combine them)
+    std::string engineErrors;
+    for (auto& p : engine.getPlayers()) {
+        if (p->isTypeOf(Player::ENGINE)) {
+            std::string err = dynamic_cast<GtpEngine*>(p)->lastError();
+            if (!err.empty()) {
+                if (!engineErrors.empty()) engineErrors += "\n";
+                engineErrors += err;
+            }
+        }
+    }
+
+    // Helper to show message with engine errors prepended
+    auto showWithErrors = [this, &engineErrors](const std::string& msg) {
+        if (engineErrors.empty()) {
+            showMessage(msg);
+        } else if (msg.empty()) {
+            showMessage(engineErrors);
+        } else {
+            showMessage(engineErrors + "\n" + msg);
+        }
+    };
+
+    // Track if we need to refresh due to engine error changes
+    bool errorsChanged = (engineErrors != model.state.err);
+    if (errorsChanged) {
+        model.state.err = engineErrors;
+        view.state.err = engineErrors;
+    }
+
+    // Check if current message is important (game-related, should override engine messages)
+    auto isImportantMessage = [](GameState::Message msg) {
+        return msg == GameState::WHITE_WON || msg == GameState::BLACK_WON ||
+               msg == GameState::WHITE_RESIGNED || msg == GameState::BLACK_RESIGNED ||
+               msg == GameState::BLACK_PASS || msg == GameState::WHITE_PASS ||
+               msg == GameState::CALCULATING_SCORE;
+    };
+
+    // Update message when msg changes or position changes
+    // Don't let engine error changes override important messages
+    bool msgChanged = view.state.msg != model.state.msg;
+    bool posChanged = view.board.positionNumber.load() != model.board.positionNumber.load();
+    bool shouldUpdateForErrors = errorsChanged && !isImportantMessage(model.state.msg);
+
+    if (msgChanged || posChanged || shouldUpdateForErrors) {
         switch (model.state.msg) {
         case GameState::CALCULATING_SCORE:
-            msg->SetInnerRML(
-                context->GetDocument("game_window")
-                    ->GetElementById("templateCalculatingScore")
-                    ->GetInnerRML()
-            );
+            showMessage(getTemplateText(context, "templateCalculatingScore"));
             break;
         case GameState::BLACK_RESIGNS:
-            msg->SetInnerRML(
-                context->GetDocument("game_window")
-                    ->GetElementById("templateBlackResigns")
-                    ->GetInnerRML()
-            );
+            showMessage(getTemplateText(context, "templateBlackResigns"));
             break;
         case GameState::WHITE_RESIGNS:
-            msg->SetInnerRML(
-                context->GetDocument("game_window")
-                    ->GetElementById("templateWhiteReigns")
-                    ->GetInnerRML()
-            );
+            showMessage(getTemplateText(context, "templateWhiteResigns"));
             break;
         case GameState::BLACK_RESIGNED:
-            msg->SetInnerRML(
-                      context->GetDocument("game_window")
-                        ->GetElementById("templateResignWhiteWon")
-                        ->GetInnerRML()
-            );
+            showMessage(getTemplateText(context, "templateResignWhiteWon"));
             break;
         case GameState::WHITE_RESIGNED:
-            msg->SetInnerRML(
-                      context->GetDocument("game_window")
-                        ->GetElementById("templateResignBlackWon")
-                        ->GetInnerRML());
+            showMessage(getTemplateText(context, "templateResignBlackWon"));
             break;
         case GameState::BLACK_PASS:
-            msg->SetInnerRML(
-                context->GetDocument("game_window")
-                    ->GetElementById("templateBlackPasses")
-                    ->GetInnerRML()
-            );
+            showMessage(getTemplateText(context, "templateBlackPasses"));
             break;
         case GameState::WHITE_PASS:
-            msg->SetInnerRML(
-                context->GetDocument("game_window")
-                    ->GetElementById("templateWhitePasses")
-                    ->GetInnerRML()
-            );
+            showMessage(getTemplateText(context, "templateWhitePasses"));
             break;
         case GameState::BLACK_WON:
         case GameState::WHITE_WON: {
@@ -726,63 +876,47 @@ void ElementGame::OnUpdate()
             Rml::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
             // Show simplified captured stone counts (no detailed scoring breakdown)
             elWhiteCnt->SetInnerRML(
-                    Rml::CreateString( "White captured: %d", model.state.capturedWhite).c_str());
+                    Rml::CreateString("White captured: %d", model.state.capturedWhite).c_str());
             elBlackCnt->SetInnerRML(
-                    Rml::CreateString( "Black captured: %d", model.state.capturedBlack).c_str());
+                    Rml::CreateString("Black captured: %d", model.state.capturedBlack).c_str());
             if (model.state.winner == Color::WHITE)
-                msg->SetInnerRML(
-                    Rml::CreateString(
-                        context->GetDocument("game_window")
-                        ->GetElementById("templateWhiteWon")
-                        ->GetInnerRML().c_str(),
-                    std::abs(model.state.scoreDelta)).c_str()
-                );
+                showMessage(Rml::CreateString(
+                    getTemplateText(context, "templateWhiteWon").c_str(),
+                    std::abs(model.state.scoreDelta)).c_str());
             else
-                msg->SetInnerRML(
-                    Rml::CreateString(
-                        context->GetDocument("game_window")
-                        ->GetElementById("templateBlackWon")
-                        ->GetInnerRML().c_str(),
-                    std::abs(model.state.scoreDelta)).c_str()
-                );
+                showMessage(Rml::CreateString(
+                    getTemplateText(context, "templateBlackWon").c_str(),
+                    std::abs(model.state.scoreDelta)).c_str());
             view.state.reason = model.state.reason;
         }
             break;
         default:
-            msg->SetInnerRML("");
+            if (!engineErrors.empty()) {
+                showMessage(engineErrors);
+            } else {
+                clearMessage();
+            }
         }
-        requestRepaint();
         view.state.msg = model.state.msg;
         view.board.positionNumber.store(model.board.positionNumber.load());
     }
-    // Show SGF comment if available (takes priority over other NONE-state content)
-    if (view.state.comment != model.state.comment) {
+    // Show SGF comment if available, but don't overwrite important game messages
+    if (view.state.comment != model.state.comment || errorsChanged) {
         spdlog::debug("Comment changed: '{}' -> '{}'", view.state.comment.substr(0, 30), model.state.comment.substr(0, 30));
-        if (!model.state.comment.empty()) {
-            msg->SetInnerRML(model.state.comment.c_str());
+        if (!model.state.comment.empty() && !isImportantMessage(model.state.msg)) {
+            showWithErrors(model.state.comment);
             // Scroll to bottom to show latest content
-            msg->SetScrollTop(msg->GetScrollHeight() - msg->GetClientHeight());
-        } else if (view.state.msg == GameState::NONE) {
-            msg->SetInnerRML("");
-        }
-        view.state.comment = model.state.comment;
-        requestRepaint();
-    }
-    // Only show engine errors if no comment is displayed and msg is NONE
-    else if(view.state.msg == GameState::NONE && model.state.comment.empty()) {
-        for(auto &p: engine.getPlayers()) {
-            if(p->isTypeOf(Player::ENGINE)) {
-                std::string newMsg(dynamic_cast<GtpEngine*>(p)->lastError());
-                if(!newMsg.empty() && newMsg != model.state.err) {
-                    model.state.err = newMsg;
-                }
+            if (auto msg = context->GetDocument("game_window")->GetElementById("lblMessage")) {
+                msg->SetScrollTop(msg->GetScrollHeight() - msg->GetClientHeight());
+            }
+        } else if (!isImportantMessage(model.state.msg)) {
+            if (!engineErrors.empty()) {
+                showMessage(engineErrors);
+            } else {
+                clearMessage();
             }
         }
-        if(view.state.err != model.state.err) {
-            msg->SetInnerRML(model.state.err.c_str());
-            view.state.err = model.state.err;
-            requestRepaint();
-        }
+        view.state.comment = model.state.comment;
     }
     view.Update();
 }

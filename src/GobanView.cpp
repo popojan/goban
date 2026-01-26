@@ -24,11 +24,16 @@ GobanView::GobanView(GobanModel& m)
     translate[1] = newTranslate[1];
     translate[2] = newTranslate[2];
     resetView();
-    updateFlag |= GobanView::UPDATE_SHADER;
+    updateFlag |= GobanView::UPDATE_ALL;  // Ensure full render on startup
     gobanShader.setReady();
     gobanOverlay.setReady();
 
-    // Initialize to EMPTY so first OnUpdate() will sync with model and update player toggle indicators
+    // Sync initial state from model to prevent stale default values (e.g., reservoir counts)
+    state.reservoirBlack = model.state.reservoirBlack;
+    state.reservoirWhite = model.state.reservoirWhite;
+    state.capturedBlack = model.state.capturedBlack;
+    state.capturedWhite = model.state.capturedWhite;
+    // Initialize colorToMove to EMPTY so first OnUpdate() will sync with model and update player toggle indicators
     state.colorToMove = Color::EMPTY;
 }
 
@@ -120,6 +125,21 @@ void GobanView::resetView() {
     startTime = static_cast<float>(glfwGetTime());
     animationRunning = true;
     requestRepaint();
+}
+
+void GobanView::switchShader(int idx) {
+    updateFlag |= GobanView::UPDATE_ALL;
+    // Show loading message if UI is ready
+    if (model.parent && model.parent->GetContext()) {
+        model.parent->showMessage("Loading shaders...");
+    }
+    gobanShader.choose(idx);
+    state.metricsReady = false;
+    gobanShader.setReady();
+    // Clear message after compilation
+    if (model.parent && model.parent->GetContext()) {
+        model.parent->clearMessage();
+    }
 }
 
 void GobanView::saveView() {
@@ -416,7 +436,9 @@ void GobanView::Update() {
 		currentProgram = newProgram;
 	}
 	if (board.getSize() != model.board.getSize()) {
-		updateFlag |= UPDATE_BOARD | UPDATE_STONES;
+		// Only request UPDATE_BOARD for dimension change
+		// Don't request UPDATE_STONES - model.board might not have stones yet
+		updateFlag |= UPDATE_BOARD;
 	}
 	if (board.positionNumber.load() != model.board.positionNumber.load()) {
 		updateFlag |= UPDATE_STONES | UPDATE_OVERLAY;
@@ -586,6 +608,9 @@ void GobanView::onBoardSized(int newBoardSize) {
 	lastMove = Position(-1, -1);
 	navOverlays.clear();
 	markupOverlays.clear();
+	// Only request UPDATE_BOARD (for shader dimension) and UPDATE_OVERLAY
+	// Don't request UPDATE_STONES - let onBoardChange handle that when stones are ready
+	requestRepaint(UPDATE_BOARD | UPDATE_OVERLAY);
 }
 
 void GobanView::onStonePlaced(const Move& move) {

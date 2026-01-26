@@ -63,11 +63,25 @@ std::ostream& operator<< (std::ostream& stream, const Position& pos) {
 
 std::ostream& operator<< (std::ostream& stream, const Move& move) {
     stream << (move.col == Color::BLACK ? "B " : "W ");
-    if(move.spec == Move::PASS) {
-        stream << "PASS";
-    }
-    else if (move.spec == Move::NORMAL){
-        stream << move.pos;
+    switch (move.spec) {
+        case Move::NORMAL:
+            stream << move.pos;
+            break;
+        case Move::PASS:
+            stream << "PASS";
+            break;
+        case Move::RESIGN:
+            stream << "[RESIGN]";
+            break;
+        case Move::INVALID:
+            stream << "[INVALID]";
+            break;
+        case Move::INTERRUPT:
+            stream << "[INTERRUPT]";
+            break;
+        case Move::KIBITZED:
+            stream << "[KIBITZED]";
+            break;
     }
     return stream;
 }
@@ -319,12 +333,14 @@ int Board::updateStones(const Board& board) {
 	this->showTerritoryAuto = board.showTerritoryAuto;
 
     if(newSize != boardSize) {
+        spdlog::debug("updateStones: size mismatch this={} source={}, resizing", boardSize, newSize);
         sizeChanged(newSize);
         this->clearTerritory();
         this->clear(newSize);
         changed = 1;
-        return changed;
+        // Continue to copy stones - don't return early
     }
+    int stonesCopied = 0;
     for(int row = 0; row < MAX_BOARD; ++row) {
         for(int col = 0; col < MAX_BOARD; ++col) {
             Position pos(col, row);
@@ -341,12 +357,16 @@ int Board::updateStones(const Board& board) {
             if(newStone != p.stone) {
                 spdlog::trace("stone changed [{},{}]", p.x, p.y);
                 changed |= updateStone(pos, newStone);
+                if (newStone != Color::EMPTY) stonesCopied++;
             }
             if(newArea != p.influence) {
                 spdlog::trace("area changed [{},{}]", p.x, p.y);
                 changed |= updateArea(pos, newArea);
             }
         }
+    }
+    if (stonesCopied > 0 || changed) {
+        spdlog::debug("updateStones: copied {} stones, changed={}", stonesCopied, changed);
     }
     return changed;
 }

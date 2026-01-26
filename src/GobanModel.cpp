@@ -4,6 +4,7 @@
 
 #include "ElementGame.h"
 #include "GobanModel.h"
+#include "UserSettings.h"
 #include <glm/glm.hpp>
 
 void GobanModel::onBoardSized(int boardSize) {
@@ -20,10 +21,14 @@ void GobanModel::onBoardSized(int boardSize) {
 
     auto black = state.black;
     auto white = state.white;
+    auto komi = state.komi;
+    auto handicap = state.handicap;
 
 	state = GameState();
     state.black = black;
     state.white = white;
+    state.komi = komi;
+    state.handicap = handicap;
 
     state.reservoirBlack = state.reservoirWhite = (boardSize*boardSize - 1)/2 + 1;
 	calcCapturedBlack = 0;
@@ -245,8 +250,10 @@ void GobanModel::onKomiChange(float newKomi) {
 void GobanModel::onPlayerChange(int which, const std::string& name) {
     if (which == 0) {
         state.black = name;
+        UserSettings::instance().setBlackPlayer(name);
     } else {
         state.white = name;
+        UserSettings::instance().setWhitePlayer(name);
     }
 
     // Only annotate player switches after first move, and not on finished games

@@ -19,9 +19,10 @@ class GobanModel: public GameObserver {
 public:
     GobanModel(ElementGame *p, int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
         : parent(p), started(false), invalidated(true),
-          calcCapturedBlack(0), calcCapturedWhite(0), ddc{}, metrics(), cursor({0, 0}) {
+          calcCapturedBlack(0), calcCapturedWhite(0), ddc{}, metrics(), cursor({0, 0}), board(boardSize) {
         // Initialize metrics so board can render before engine initialization
         metrics.calc(boardSize);
+        state.metricsReady = true;  // Metrics are valid after calc()
     }
 
     ~GobanModel() override;
