@@ -24,7 +24,7 @@ class Player;
 class GameNavigator {
 public:
     using CoachProvider = std::function<Engine*()>;
-    using PlayerList = std::vector<Player*>;
+    using ActivePlayersProvider = std::function<std::vector<Player*>()>;
     using ObserverList = std::vector<GameObserver*>;
 
     /** \brief Result of navigateToVariation for caller to handle Analysis mode */
@@ -34,7 +34,7 @@ public:
     };
 
     GameNavigator(GobanModel& model, CoachProvider getCoach,
-                  const PlayerList& players, ObserverList& observers);
+                  ActivePlayersProvider getActivePlayers, ObserverList& observers);
 
     // Navigation methods for SGF replay
     bool navigateBack();
@@ -66,7 +66,7 @@ private:
 
     GobanModel& model;
     CoachProvider getCoach;
-    const PlayerList& players;
+    ActivePlayersProvider getActivePlayers;
     ObserverList& gameObservers;
     std::atomic<bool> navigationInProgress{false};
 };

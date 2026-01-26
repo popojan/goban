@@ -3,6 +3,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <cmath>
+#include <set>
 
 GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr), playerToMove(nullptr)
@@ -21,7 +22,21 @@ GameThread::GameThread(GobanModel &m) :
     navigator = std::make_unique<GameNavigator>(
         model,
         [this]() { return currentCoach(); },
-        playerManager->getPlayers(),
+        [this]() -> std::vector<Player*> {
+            // Return only engines that are actively used: active players + kibitz
+            // (coach is handled separately in syncEngines)
+            auto& allPlayers = playerManager->getPlayers();
+            std::set<Player*> used;
+            size_t blackIdx = playerManager->getActivePlayer(0);
+            size_t whiteIdx = playerManager->getActivePlayer(1);
+            if (blackIdx < allPlayers.size()) used.insert(allPlayers[blackIdx]);
+            if (whiteIdx < allPlayers.size()) used.insert(allPlayers[whiteIdx]);
+            // Include kibitz engine if set
+            if (auto* kibitz = currentKibitz()) {
+                used.insert(reinterpret_cast<Player*>(kibitz));
+            }
+            return std::vector<Player*>(used.begin(), used.end());
+        },
         gameObservers
     );
 }

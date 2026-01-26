@@ -5,13 +5,14 @@
 #include <algorithm>
 
 GameNavigator::GameNavigator(GobanModel& model, CoachProvider getCoach,
-                             const PlayerList& players, ObserverList& observers)
-    : model(model), getCoach(std::move(getCoach)), players(players), gameObservers(observers)
+                             ActivePlayersProvider getActivePlayers, ObserverList& observers)
+    : model(model), getCoach(std::move(getCoach)), getActivePlayers(std::move(getActivePlayers)), gameObservers(observers)
 {
 }
 
 void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo) const {
-    for (auto player : players) {
+    // Only sync active players (black + white), not all available engines
+    for (auto player : getActivePlayers()) {
         if (player != reinterpret_cast<Player*>(coach)) {
             if (isUndo) {
                 player->undo();
