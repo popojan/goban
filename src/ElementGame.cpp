@@ -295,7 +295,7 @@ void ElementGame::gameLoop() {
         spdlog::debug(sFps.c_str());
         s_fpsLastTime = currentTime;
 
-        // Release audio resources if stream finished playing
+        // Release audio resources after extended idle (3 min) to avoid lag from frequent restart
         view.stopAudioIfInactive();
     }
     ElementGame* game = dynamic_cast<ElementGame*>(context->GetDocument("game_window")->GetElementById("game"));

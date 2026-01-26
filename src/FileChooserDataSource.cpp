@@ -389,32 +389,37 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
 
 int FileChooserDataSource::countMovesInGame(const std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game) {
     using namespace LibSgfcPlusPlus;
-    
+
     int moveCount = 0;
-    auto currentNode = game->GetRootNode();
-    
-    // Traverse the game tree to count move nodes
+    int nodeCount = 0;
+    auto rootNode = game->GetRootNode();
+
+    // Traverse the game tree to count move nodes (main line only)
     std::function<void(std::shared_ptr<ISgfcNode>)> traverseNode = [&](std::shared_ptr<ISgfcNode> node) {
         if (!node) return;
-        
-        // Check if this node contains a move property
+        nodeCount++;
+
+        // Check if this node contains a move property (B or W, not AB/AW)
         auto properties = node->GetProperties();
         for (const auto& property : properties) {
             auto propertyType = property->GetPropertyType();
             if (propertyType == SgfcPropertyType::B || propertyType == SgfcPropertyType::W) {
                 moveCount++;
+                spdlog::debug("countMovesInGame: node {} has {} move, total={}", nodeCount,
+                    propertyType == SgfcPropertyType::B ? "B" : "W", moveCount);
                 break; // Only count once per node
             }
         }
-        
-        // Traverse children (we'll just follow the main line for move counting)
+
+        // Traverse children (follow main line only)
         auto children = node->GetChildren();
         if (!children.empty()) {
-            traverseNode(children[0]); // Follow main line
+            traverseNode(children[0]);
         }
     };
-    
-    traverseNode(currentNode);
+
+    traverseNode(rootNode);
+    spdlog::debug("countMovesInGame: {} nodes traversed, {} moves counted", nodeCount, moveCount);
     return moveCount;
 }
 
