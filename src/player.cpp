@@ -252,3 +252,59 @@ float GtpEngine::final_score() {
     }
     return 0.0f;
 }
+
+bool GtpEngine::supportsKataAnalyze() {
+    // Check if engine supports kata-analyze by looking at name or trying the command
+    std::string engineName = getName();
+    std::transform(engineName.begin(), engineName.end(), engineName.begin(), ::tolower);
+    return engineName.find("kata") != std::string::npos;
+}
+
+float GtpEngine::kataAnalyzeScore(const Color& colorToMove) {
+    // Try kata-genmove_analyze for single-shot analysis (not streaming like kata-analyze)
+    // Format: kata-genmove_analyze [color] [maxvisits]
+    // This returns analysis AND makes a move, but we only care about the score
+    // Alternative: use lz-analyze which also streams but we can stop it
+
+    // Actually, use kata-raw-nn for instant neural network evaluation (no search)
+    // Format: kata-raw-nn [symmetry]
+    // Returns: whiteWin X blackWin Y ... (probabilities)
+
+    // Simplest approach: use final_score first, this is a fallback
+    // For kata-analyze streaming, we'd need async handling
+
+    // Try the simpler approach: issue kata-analyze then immediately stop it
+    std::string cmd = "kata-analyze " + std::string(colorToMove == Color::BLACK ? "B" : "W") + " 1";
+
+    // Send the command but don't wait for normal termination
+    // kata-analyze streams continuously, so we read what we can and stop it
+    if (!GtpClient::issueCommand(cmd).empty()) {
+        // Immediately send another command to stop the analysis stream
+        // This causes kata-analyze to terminate
+        auto stopResult = GtpClient::issueCommand("name");
+
+        // The stop command response includes any pending kata-analyze output
+        // Parse the accumulated output for score
+        for (const auto& line : stopResult) {
+            size_t pos = line.find("scoreLead ");
+            if (pos != std::string::npos) {
+                float score = 0.0f;
+                std::istringstream ss(line.substr(pos + 10));
+                ss >> score;
+                spdlog::info("kata-analyze score: {:.1f}", score);
+                return score;
+            }
+            pos = line.find("scoreMean ");
+            if (pos != std::string::npos) {
+                float score = 0.0f;
+                std::istringstream ss(line.substr(pos + 10));
+                ss >> score;
+                spdlog::info("kata-analyze scoreMean: {:.1f}", score);
+                return score;
+            }
+        }
+    }
+
+    spdlog::debug("kata-analyze response did not contain score");
+    return 0.0f;
+}

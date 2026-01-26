@@ -152,6 +152,7 @@ private:
     std::mutex mutex2;
     std::atomic<bool> interruptRequested{false};
     std::atomic<bool> hasThreadRunning{false};
+    std::atomic<bool> enginesSyncedToPosition{true};  // False = player engines need sync before playing
     Player* playerToMove;
     Move queuedMove;
     mutable std::mutex playerMutex;

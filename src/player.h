@@ -144,6 +144,10 @@ public:
     float final_score() override;
     void applyTerritory(Board& targetBoard) override;
 
+    // KataGo-specific scoring via kata-analyze (returns 0.0 if not supported)
+    float kataAnalyzeScore(const Color& colorToMove);
+    bool supportsKataAnalyze();
+
 protected:
 
     static bool setTerritory(const GtpClient::CommandOutput& ret, Board& b, const Color& color);

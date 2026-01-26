@@ -88,6 +88,9 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
         success &= player->clear();
     }
 
+    // All engines now start from empty board - they're synced
+    enginesSyncedToPosition = true;
+
     // Always notify observers of board size, even if engine failed
     // This ensures the board renders correctly regardless of engine state
     std::for_each(
@@ -396,6 +399,15 @@ void GameThread::gameLoop() {
                 suggestedMove = queuedMove;
                 queuedMove = Move(Move::INVALID, model.state.colorToMove);
                 playerToMove = player;
+            }
+
+            // Lazy sync: ensure player engine is synced before it plays
+            if (!enginesSyncedToPosition && player->isTypeOf(Player::ENGINE)) {
+                Engine* engine = static_cast<Engine*>(player);
+                if (engine != coach && engine != kibitzEngine) {
+                    spdlog::info("Lazy syncing player engine {} before play", engine->getName());
+                    syncEngineToPosition(engine);
+                }
             }
 
             player->suggestMove(suggestedMove);
@@ -818,17 +830,48 @@ void GameThread::finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInf
 
             // Score verification for scored games
             float coachScore = result.score;
+            float finalScore = coachScore;
+
+            // If coach scoring failed (returned 0.0), try other engines' final_score
+            if (std::abs(coachScore) < 0.1f) {
+                for (auto* player : playerManager->getPlayers()) {
+                    if (player != engine && player->isTypeOf(Player::ENGINE)) {
+                        auto* gtpEngine = dynamic_cast<GtpEngine*>(player);
+                        if (gtpEngine) {
+                            spdlog::info("Coach scoring failed, trying {} for final_score", gtpEngine->getName());
+                            syncEngineToPosition(gtpEngine);
+                            float altScore = gtpEngine->final_score();
+                            if (std::abs(altScore) > 0.1f) {
+                                spdlog::info("Using {} score: {:.1f}", gtpEngine->getName(), altScore);
+                                finalScore = altScore;
+                                result.score = altScore;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Verify against SGF result if available
             if (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinWithScore) {
                 float sgfScore = gameInfo.gameResult.Score;
                 if (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::WhiteWin) {
                     sgfScore = -sgfScore;
                 }
-                float scoreDifference = std::abs(coachScore - sgfScore);
-                if (scoreDifference > 0.1f) {
-                    spdlog::warn("Score discrepancy: Coach {:.1f}, SGF {:.1f}", coachScore, sgfScore);
+
+                // Use SGF score as final fallback when all engines fail
+                if (std::abs(finalScore) < 0.1f && std::abs(sgfScore) > 0.1f) {
+                    spdlog::warn("All engine scoring failed, using SGF score: {:.1f}", sgfScore);
+                    finalScore = sgfScore;
+                    result.score = sgfScore;
+                } else if (std::abs(finalScore) > 0.1f) {
+                    float scoreDifference = std::abs(finalScore - sgfScore);
+                    if (scoreDifference > 0.1f) {
+                        spdlog::warn("Score discrepancy: Engine {:.1f}, SGF {:.1f}", finalScore, sgfScore);
+                    }
                 }
             }
-            model.state.scoreDelta = coachScore;
+            model.state.scoreDelta = finalScore;
         }
 
         // Set isGameOver BEFORE onBoardChange so territory display logic works
@@ -914,14 +957,14 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     model.state.handicap = gameInfo.handicap;
     gameMode = GameMode::MATCH;
 
-    // Handle handicap stones in model
+    // Handle handicap stones in model (always update, even if empty, to clear old state)
+    model.handicapStones = gameInfo.handicapStones;
+    model.game.setHandicapStones(gameInfo.handicapStones);
     if (!gameInfo.handicapStones.empty()) {
         model.board.clear(gameInfo.boardSize);
         for (const auto& stone : gameInfo.handicapStones) {
             model.board.updateStone(stone, Color::BLACK);
         }
-        model.game.setHandicapStones(gameInfo.handicapStones);
-        model.handicapStones = gameInfo.handicapStones;
     }
 
     // Notify observers of board size
@@ -975,20 +1018,24 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
 }
 
 void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) {
-    // Sync all engines except the one already synced
+    // For SGF viewing, only sync kibitz engine (coach is already synced)
+    // Player engines are synced lazily when they actually need to play
+    // This significantly speeds up SGF loading for large games
 
-    // If no engine specified, fall back to coach
-    Engine* skipEngine = alreadySynced ? alreadySynced : currentCoach();
+    Engine* coach = alreadySynced ? alreadySynced : currentCoach();
+    Engine* kibitz = currentKibitz();
 
-    spdlog::info("Syncing remaining engines (board: {}, moves: {})",
+    spdlog::info("Syncing kibitz engine for SGF viewing (board: {}, moves: {})",
                  model.getBoardSize(), model.game.moveCount());
 
-    for (auto player : playerManager->getPlayers()) {
-        if (player == skipEngine) continue;  // Already synced
-        if (!player->isTypeOf(Player::ENGINE)) continue;  // Skip non-engines
-
-        syncEngineToPosition(static_cast<Engine*>(player));
+    // Only sync kibitz if it's different from coach and is an engine
+    if (kibitz && kibitz != coach && kibitz->isTypeOf(Player::ENGINE)) {
+        syncEngineToPosition(kibitz);
     }
+
+    // Mark player engines as needing sync (will be done when they play)
+    // This avoids syncing engines that may never be used for this game
+    enginesSyncedToPosition = false;
 
     // Match SGF player names to engines (only when SGF was loaded)
     if (matchPlayers) {
@@ -1001,7 +1048,7 @@ void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) 
     // Start game thread for navigation
     run();
 
-    spdlog::info("All engines synced");
+    spdlog::info("Kibitz engine synced (player engines will sync on demand)");
 }
 
 void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const {
