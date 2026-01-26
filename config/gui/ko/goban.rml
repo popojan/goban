@@ -14,7 +14,7 @@
                         <div class="grp">
                             <div class="hr">SGF</div>
                             <div class="cmd" onmouseup="load">기보 불러오기...</div>
-                            <div class="cmd" onmouseup="save">저장</div>
+                            <div class="cmd" id="cmdSave" onmouseup="save">저장</div>
                             <div class="cmd" onmouseup="archive">보관</div>
                         </div>
                         <div class="grp">
@@ -126,16 +126,16 @@
                             <div id="grpMoves">
                             <div class="hr">착수</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">패스</div>
-                            <div class="cmd" onmouseup="play once">검토</div>
+                            <div class="cmd" id="cmdKibitz" onmouseup="play once">검토</div>
                             <div class="cmd" onmouseup="undo move">무르기</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">불계</div>
                             </div>
                             <div id="grpReplay">
                             <div class="hr">재생</div>
-                            <div class="cmd" onmouseup="navigate_start">처음</div>
-                            <div class="cmd" onmouseup="navigate_back">이전</div>
-                            <div class="cmd" onmouseup="navigate_forward">다음</div>
-                            <div class="cmd" onmouseup="navigate_end">마지막</div>
+                            <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">처음</div>
+                            <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">이전</div>
+                            <div class="cmd" id="cmdNavForward" onmouseup="navigate_forward">다음</div>
+                            <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">마지막</div>
                             </div>
                         </div>
                     </div>
@@ -149,7 +149,7 @@
                         </div>
                         <div class="grp">
                             <div class="hr">GnuGo</div>
-                            <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">집</div>
+                            <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">집</div>
                         </div>
                         <div class="grp">
                             <div class="hr">따낸 돌</div>

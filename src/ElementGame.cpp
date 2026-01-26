@@ -493,6 +493,9 @@ void ElementGame::updateLoadingStatus(const std::string& message) {
 }
 
 void ElementGame::showMessage(const std::string& text) {
+    // Don't overwrite active prompts (quit confirmation, clear board, etc.)
+    if (hasActivePrompt()) return;
+
     auto context = GetContext();
     if (!context) return;
 
@@ -717,23 +720,12 @@ void ElementGame::OnUpdate()
     std::string gameState(!isOver && isRunning ? "1" : (isOver ? "2" : "4"));
     model.state.cmd = gameState;
     if(model.state.cmd != view.state.cmd) {
-        auto cmdStart = context->GetDocument("game_window")->GetElementById("cmdStart");
-        auto cmdClear = context->GetDocument("game_window")->GetElementById("cmdClear");
         auto grpMoves = context->GetDocument("game_window")->GetElementById("grpMoves");
         auto grpGame  = context->GetDocument("game_window")->GetElementById("grpGame");
         const Rml::String DISPLAY("display");
         bool gameInProgress = !isOver && isRunning;
         grpMoves->SetProperty(DISPLAY, gameInProgress ? "block" : "none");
         grpGame->SetProperty(DISPLAY, gameInProgress ? "none" : "block");
-        if (!gameInProgress) {
-            if (!isOver) {
-                cmdClear->SetProperty(DISPLAY, "none");
-                cmdStart->SetProperty(DISPLAY, "block");
-            } else {
-                cmdClear->SetProperty(DISPLAY, "block");
-                cmdStart->SetProperty(DISPLAY, "none");
-            }
-        }
         requestRepaint();
         view.state.cmd = gameState;
     }
@@ -754,6 +746,37 @@ void ElementGame::OnUpdate()
         if (!els.empty() && els[0]->IsClassSet("selected") != analysisMode) {
             OnMenuToggle("toggle_analysis_mode", analysisMode);
         }
+    }
+
+    // Update disabled state for context-sensitive menu items
+    {
+        bool thinking = engine.isThinking();
+        bool humanTurn = engine.humanToMove() && !thinking;
+        bool hasMoves = model.game.moveCount() > 0;
+        bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
+        // In AI vs AI mode without analysis, most play actions are locked
+        bool aiVsAiLocked = engine.isAiVsAi() && !analysisMode;
+
+        // Pass/Resign/Kibitz: disabled when not human's turn, or locked in AI vs AI
+        setElementDisabled("cmdPass", !humanTurn || aiVsAiLocked);
+        setElementDisabled("cmdResign", !humanTurn || aiVsAiLocked);
+        setElementDisabled("cmdKibitz", thinking || aiVsAiLocked);
+
+        // Navigation: disabled when engine thinking or locked in AI vs AI
+        bool navDisabled = thinking || aiVsAiLocked;
+        setElementDisabled("cmdNavStart", navDisabled);
+        setElementDisabled("cmdNavBack", navDisabled);
+        setElementDisabled("cmdNavForward", navDisabled);
+        setElementDisabled("cmdNavEnd", navDisabled);
+
+        // Territory: disabled when game not over
+        setElementDisabled("cmdTerritory", !model.isGameOver);
+
+        // Clear: disabled when board is empty (no moves made)
+        setElementDisabled("cmdClear", !hasMoves);
+
+        // Save: disabled when nothing to save (no moves)
+        setElementDisabled("cmdSave", !hasMoves);
     }
 
     if (view.state.colorToMove != model.state.colorToMove) {
@@ -979,7 +1002,13 @@ void ElementGame::OnMenuToggle(const std::string &cmd, bool checked) const {
             el->SetClass("unselected", !checked);
         }
     }
+}
 
+void ElementGame::setElementDisabled(const std::string& elementId, bool disabled) const {
+    auto* el = GetContext()->GetDocument("game_window")->GetElementById(elementId);
+    if (el && el->IsClassSet("disabled") != disabled) {
+        el->SetClass("disabled", disabled);
+    }
 }
 
 void ElementGame::OnRender()

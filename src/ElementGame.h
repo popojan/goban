@@ -45,6 +45,7 @@ public:
     GobanControl& getController() { return control; }
     GameThread& getGameThread() { return engine; }
     void OnMenuToggle(const std::string& cmd, bool checked) const;
+    void setElementDisabled(const std::string& elementId, bool disabled) const;
 
     // Message system - template-based messages in lblMessage
     void showMessage(const std::string& text);  // Dismissable message

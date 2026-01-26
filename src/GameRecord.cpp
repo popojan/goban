@@ -366,27 +366,39 @@ void GameRecord::setHandicapStones(const std::vector<Position>& stones) {
 
     std::lock_guard<std::mutex> lock(mutex);
 
+    if (stones.empty())
+        return;
+
+    if (!game) return;
+    auto root = game->GetRootNode();
+    if (!root) return;
+
+    // Check if AB property already exists on root (e.g., from loaded SGF)
+    for (const auto& prop : root->GetProperties()) {
+        if (prop->GetPropertyType() == T::AB) {
+            spdlog::debug("setHandicapStones: AB property already exists on root, skipping");
+            return;  // Don't duplicate
+        }
+    }
+
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
 
-    if(stones.empty())
-        return;
-
-    auto type = T::AB;
-
-    auto newNode(F::CreateNode());
-    std::vector<std::shared_ptr<ISgfcProperty> > properties;
-    std::shared_ptr<ISgfcProperty> property(pF->CreateProperty(type));
-    std::vector<std::shared_ptr<ISgfcPropertyValue> > values;
-    for(auto stone: stones) {
+    // Add AB property to ROOT node so buildBoardFromMoves finds it
+    std::shared_ptr<ISgfcProperty> abProperty(pF->CreateProperty(T::AB));
+    std::vector<std::shared_ptr<ISgfcPropertyValue>> values;
+    for (const auto& stone : stones) {
         auto pos = stone.toSgf(boardSize.Columns);
         values.push_back(vF->CreateStonePropertyValue(pos));
     }
-    property->SetPropertyValues(values);
-    properties.push_back(property);
-    newNode->SetProperties(properties);
-    game->GetTreeBuilder()->InsertChild(currentNode, newNode, currentNode->GetFirstChild());
-    currentNode = newNode;
+    abProperty->SetPropertyValues(values);
+
+    // Add to root node's existing properties
+    auto existingProps = root->GetProperties();
+    existingProps.push_back(abProperty);
+    root->SetProperties(existingProps);
+
+    spdlog::debug("setHandicapStones: added {} stones as AB property to root node", stones.size());
 }
 
 void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std::string& blackPlayer, const std::string& whitePlayer) {

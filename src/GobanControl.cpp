@@ -405,6 +405,18 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     (void) x;
     (void) y;
 
+    // Handle prompt keyboard shortcuts (on key UP)
+    if (!downNotUp && parent->hasActivePrompt()) {
+        if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER) {
+            parent->handlePromptResponse(true);  // Enter = confirm
+            return;
+        }
+        if (key == Rml::Input::KI_ESCAPE) {
+            parent->handlePromptResponse(false);  // Escape = cancel
+            return;
+        }
+    }
+
     // SGF Navigation keys (on key UP)
     spdlog::debug("keyPress: key={}, downNotUp={}, isNavigating={}, viewPos={}/{}",
         key, downNotUp, model.game.isNavigating(),

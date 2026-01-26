@@ -105,6 +105,16 @@ div.cmd:hover {
   color: #fffffff0;
 }
 
+/* Disabled state - grayed out, no hover effect */
+div.cmd.disabled {
+  color: #ffffff30;
+  pointer-events: none;
+}
+
+div.cmd.disabled:hover {
+  color: #ffffff30;
+}
+
 /* Section headers in dropdowns */
 div.hr {
   display: block;
