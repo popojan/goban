@@ -404,6 +404,18 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
 
         // If defaultFileName doesn't contain today's date, update it
         if (defaultFileName.find(today) == std::string::npos) {
+            // Day changed - save current session to OLD filename before switching
+            // This ensures games from previous day stay in their session file
+            if (doc != nullptr && !doc->GetGames().empty()) {
+                spdlog::info("Day changed - saving previous session to: {}", defaultFileName);
+                saveAsInternal(defaultFileName);
+            }
+
+            // Clear the session so new day starts fresh
+            doc = nullptr;
+            numGames = 0;
+            // Note: gameInDocument will be set to false below when creating new game
+
             std::string gamesPath = "./games";
             if (config && config->data.contains("sgf_dialog")) {
                 gamesPath = config->data["sgf_dialog"].value("games_path", "./games");
@@ -622,8 +634,8 @@ void GameRecord::clearSession() {
     spdlog::info("Cleared session document - new session will start fresh");
 }
 
-void GameRecord::saveAs(const std::string& fileName) {
-    std::lock_guard<std::mutex> lock(mutex);
+void GameRecord::saveAsInternal(const std::string& fileName) {
+    // Internal save - caller must hold mutex lock
 
     if(doc == nullptr || doc->GetGames().empty())
         return;
@@ -671,6 +683,11 @@ void GameRecord::saveAs(const std::string& fileName) {
     } catch (std::exception& ex) {
         spdlog::error("Writing sgf file [{}] failed: {}", fn, ex.what());
     }
+}
+
+void GameRecord::saveAs(const std::string& fileName) {
+    std::lock_guard<std::mutex> lock(mutex);
+    saveAsInternal(fileName);
 }
 
 void GameRecord::undo() {

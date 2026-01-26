@@ -72,6 +72,9 @@ private:
 
     void appendGameToDocument();
 
+    // Internal save without mutex lock (for use within already-locked methods)
+    void saveAsInternal(const std::string& fileName);
+
     // Helper to extract Move from SGF node (reduces code duplication)
     static std::optional<Move> extractMoveFromNode(
         const std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>& node,
