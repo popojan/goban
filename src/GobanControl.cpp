@@ -81,8 +81,12 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
 
             bool playNow = true;
             if (model.isGameOver) {
-                // Clicking on finished game starts a new game
-                (void) newGame(model.getBoardSize());
+                // Clicking on finished game - confirm before starting new game
+                parent->showPromptYesNoTemplate("templateClearBoard", [this](bool confirmed) {
+                    if (confirmed) {
+                        (void) newGame(model.getBoardSize());
+                    }
+                });
                 playNow = false;
             }
             else if(!model.isGameOver) {
@@ -138,7 +142,7 @@ void GobanControl::command(const std::string& cmd) {
     if(cmd == "quit") {
         // Show confirmation if game has moves
         if (model.game.moveCount() > 0 && !model.isGameOver) {
-            parent->showPromptYesNo("Quit without finishing?", [this](bool confirmed) {
+            parent->showPromptYesNoTemplate("templateQuitWithoutFinishing", [this](bool confirmed) {
                 if (confirmed) {
                     saveCurrentGame();
                     exit = true;
@@ -232,7 +236,11 @@ void GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "clear") {
         if (model.isGameOver) {
-            (void) newGame(model.getBoardSize());
+            parent->showPromptYesNoTemplate("templateClearBoard", [this](bool confirmed) {
+                if (confirmed) {
+                    (void) newGame(model.getBoardSize());
+                }
+            });
         }
     }
     else if (cmd == "start") {
