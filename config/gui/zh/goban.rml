@@ -139,15 +139,8 @@
                             <div class="hr">落子</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">停一手</div>
                             <div class="cmd" id="cmdKibitz" onmouseup="play once">提示</div>
-                            <div class="cmd" onmouseup="undo move">悔棋</div>
+                            <div class="cmd" id="cmdUndo" onmouseup="undo move">悔棋</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">认输</div>
-                            </div>
-                            <div id="grpReplay">
-                            <div class="hr">回放</div>
-                            <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">第一手</div>
-                            <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">上一手</div>
-                            <div class="cmd" id="cmdNavForward" onmouseup="navigate_forward">下一手</div>
-                            <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">最后一手</div>
                             </div>
                         </div>
                     </div>
@@ -159,8 +152,15 @@
                             <div class="hr">模式</div>
                             <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">分析模式</div>
                         </div>
+                        <div class="grp" id="grpReplay">
+                            <div class="hr">回放</div>
+                            <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">第一手</div>
+                            <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">上一手</div>
+                            <div class="cmd" id="cmdNavForward" onmouseup="navigate_forward">下一手</div>
+                            <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">最后一手</div>
+                        </div>
                         <div class="grp">
-                            <div class="hr">GnuGo</div>
+                            <div class="hr">得分</div>
                             <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">形势判断</div>
                         </div>
                         <div class="grp">
