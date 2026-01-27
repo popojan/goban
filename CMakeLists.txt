@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 cmake_policy(SET CMP0072 NEW)
 cmake_policy(SET CMP0167 OLD)
 
-project(goban LANGUAGES C CXX VERSION 0.1.1)
+project(goban LANGUAGES C CXX VERSION 0.1.2)
 
 include(GNUInstallDirs)
 
