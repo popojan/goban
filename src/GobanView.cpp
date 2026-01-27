@@ -299,6 +299,7 @@ void GobanView::Render(int w, int h)
 
     if(updateFlag & UPDATE_SOUND_STONE) {
         updateFlag &= ~UPDATE_SOUND_STONE;
+        spdlog::debug("Playing stone sound in repaint");
         player.play("move", 1.0);
     }
 
@@ -635,6 +636,7 @@ void GobanView::onStonePlaced(const Move& move) {
             ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
         board.setOverlay(move.pos, ss.str(), move.col);
 
+        spdlog::debug("onStonePlaced: requesting UPDATE_SOUND_STONE");
         requestRepaint(UPDATE_SOUND_STONE | UPDATE_OVERLAY);
     }
 }

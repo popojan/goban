@@ -208,8 +208,13 @@ bool GameThread::isThinking() const {
 
 bool GameThread::humanToMove() const {
     std::unique_lock<std::mutex> lock(playerMutex);
-    // Return false when no player to move (prevents menu item flashing during transitions)
-    return playerToMove && playerToMove->isTypeOf(Player::HUMAN);
+    // Use playerToMove if set, otherwise fall back to actual current player
+    // (playerToMove is nullptr before game loop sets it, but we still need to check)
+    const Player* player = playerToMove;
+    if (!player && playerManager) {
+        player = playerManager->currentPlayer(model.state.colorToMove);
+    }
+    return player && player->isTypeOf(Player::HUMAN);
 }
 void GameThread::syncOtherEngines(const Move& move, const Player* player, const Engine* coach,
                                    const Engine* kibitzEngine, bool kibitzed) const {
@@ -385,7 +390,12 @@ void GameThread::gameLoop() {
                 if (!wasKibitz && !model.isGameOver && kibitzEngine) {
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis: triggering kibitz response for {}", responseColor.toString());
+                    // Release lock during genmove to allow main thread rendering
+                    lock.unlock();
+                    locked = false;
                     Move response = kibitzEngine->genmove(responseColor);
+                    lock.lock();
+                    locked = true;
                     if (response && response != Move::RESIGN) {
                         if (kibitzEngine == coach || coach->play(response)) {
                             processSuccessfulMove(response, kibitzEngine, coach, kibitzEngine, false);
