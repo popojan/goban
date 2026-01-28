@@ -63,7 +63,8 @@ public:
         int handicap;
         std::string blackPlayer;
         std::string whitePlayer;
-        std::vector<Position> handicapStones;
+        std::vector<Position> setupBlackStones;      // AB: added black stones
+        std::vector<Position> setupWhiteStones;    // AW: added white stones
         LibSgfcPlusPlus::SgfcGameResult gameResult;
     };
 

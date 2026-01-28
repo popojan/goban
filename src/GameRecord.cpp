@@ -1,6 +1,7 @@
 #include "GameRecord.h"
 #include "Configuration.h"
 #include "UserSettings.h"
+#include <ISgfcColorPropertyValue.h>
 #include <iomanip>
 #include <filesystem>
 #include <spdlog/spdlog.h>
@@ -768,7 +769,7 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         gameInfo.handicap = 0;
         gameInfo.blackPlayer = "Black";
         gameInfo.whitePlayer = "White";
-        gameInfo.handicapStones.clear();
+        gameInfo.setupBlackStones.clear();
         gameInfo.gameResult = LibSgfcPlusPlus::SgfcGameResult();
 
         for (auto property : rootNode->GetProperties()) {
@@ -808,7 +809,17 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
                         if (auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value)) {
                             auto sgfPoint = stoneValue->GetStoneValue();
                             Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
-                            gameInfo.handicapStones.push_back(pos);
+                            gameInfo.setupBlackStones.push_back(pos);
+                        }
+                    }
+                    break;
+                }
+                case T::AW: {
+                    for (auto value : property->GetPropertyValues()) {
+                        if (auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value)) {
+                            auto sgfPoint = stoneValue->GetStoneValue();
+                            Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
+                            gameInfo.setupWhiteStones.push_back(pos);
                         }
                     }
                     break;
@@ -1075,16 +1086,32 @@ void GameRecord::removeGameResult() const {
 Color GameRecord::getColorToMove() const {
     Move last = lastMove();
     if (last == Move::INVALID) {
-        // No moves yet - check if there are handicap stones (AB property)
+        // No moves yet - determine who plays first from SGF root properties.
+        // Priority: PL (explicit) > HA without AW (handicap convention) > default (black)
+        bool hasHandicap = false;
+        bool hasWhiteSetup = false;
         if (game && game->GetRootNode()) {
             for (const auto& prop : game->GetRootNode()->GetProperties()) {
-                if (prop->GetPropertyType() == T::AB) {
-                    // Handicap stones present - White moves first
-                    return Color::WHITE;
+                if (prop->GetPropertyType() == T::PL) {
+                    // PL property explicitly sets player to move - always wins
+                    if (auto colorVal = std::dynamic_pointer_cast<ISgfcColorPropertyValue>(prop->GetPropertyValue())) {
+                        return colorVal->GetColorValue() == SgfcColor::Black
+                            ? Color::BLACK : Color::WHITE;
+                    }
+                }
+                if (prop->GetPropertyType() == T::HA) {
+                    if (auto numVal = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(prop->GetPropertyValue())) {
+                        hasHandicap = numVal->GetNumberValue() > 0;
+                    }
+                }
+                if (prop->GetPropertyType() == T::AW) {
+                    hasWhiteSetup = true;
                 }
             }
         }
-        return Color::BLACK;  // Default: Black moves first
+        // HA without AW: standard handicap, white moves first.
+        // HA with AW or no HA: ambiguous/setup position, default to black.
+        return (hasHandicap && !hasWhiteSetup) ? Color::WHITE : Color::BLACK;
     }
     // Opposite of last move's color
     return (last.col == Color::BLACK) ? Color::WHITE : Color::BLACK;

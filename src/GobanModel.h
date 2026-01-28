@@ -46,8 +46,8 @@ public:
     }
     
     void createNewRecord() {
-        game.initGame(board.getSize(), state.komi, handicapStones.size(), state.black, state.white);
-        game.setHandicapStones(handicapStones);
+        game.initGame(board.getSize(), state.komi, setupBlackStones.size(), state.black, state.white);
+        game.setHandicapStones(setupBlackStones);
         start();
     }
 
@@ -95,7 +95,8 @@ public:
 	std::mutex mutex;
 
     Position cursor;
-    std::vector<Position> handicapStones;
+    std::vector<Position> setupBlackStones;
+    std::vector<Position> setupWhiteStones;
 };
 
 

@@ -824,9 +824,12 @@ void GameThread::syncEngineToPosition(Engine* engine) {
     engine->clear();
     engine->komi(komi);
 
-    // Replay handicap stones
-    for (const auto& stone : model.handicapStones) {
+    // Replay setup stones (AB: black, AW: white)
+    for (const auto& stone : model.setupBlackStones) {
         engine->play(Move(stone, Color::BLACK));
+    }
+    for (const auto& stone : model.setupWhiteStones) {
+        engine->play(Move(stone, Color::WHITE));
     }
 
     // Replay all moves
@@ -1000,13 +1003,17 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     model.state.handicap = gameInfo.handicap;
     gameMode = GameMode::MATCH;
 
-    // Handle handicap stones in model (always update, even if empty, to clear old state)
-    model.handicapStones = gameInfo.handicapStones;
-    model.game.setHandicapStones(gameInfo.handicapStones);
-    if (!gameInfo.handicapStones.empty()) {
+    // Handle setup stones in model (always update, even if empty, to clear old state)
+    model.setupBlackStones = gameInfo.setupBlackStones;
+    model.setupWhiteStones = gameInfo.setupWhiteStones;
+    model.game.setHandicapStones(gameInfo.setupBlackStones);
+    if (!gameInfo.setupBlackStones.empty() || !gameInfo.setupWhiteStones.empty()) {
         model.board.clear(gameInfo.boardSize);
-        for (const auto& stone : gameInfo.handicapStones) {
+        for (const auto& stone : gameInfo.setupBlackStones) {
             model.board.updateStone(stone, Color::BLACK);
+        }
+        for (const auto& stone : gameInfo.setupWhiteStones) {
+            model.board.updateStone(stone, Color::WHITE);
         }
     }
 

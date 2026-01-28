@@ -153,7 +153,7 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
 }
 
 void GobanModel::onHandicapChange(const std::vector<Position>& stones) {
-    handicapStones = stones;
+    setupBlackStones = stones;
 }
 
 void GobanModel::onGameMove(const Move& move, const std::string& comment) {
