@@ -918,12 +918,20 @@ void ElementGame::OnUpdate()
             showMessage(msg);
             break;
         }
-        case GameState::BLACK_PASS:
-            showMessage(getTemplateText(context, "templateBlackPasses"));
+        case GameState::BLACK_PASS: {
+            std::string msg = getTemplateText(context, "templateBlackPasses");
+            if (!model.state.passVariationLabel.empty())
+                msg = model.state.passVariationLabel + " " + msg;
+            showMessage(msg);
             break;
-        case GameState::WHITE_PASS:
-            showMessage(getTemplateText(context, "templateWhitePasses"));
+        }
+        case GameState::WHITE_PASS: {
+            std::string msg = getTemplateText(context, "templateWhitePasses");
+            if (!model.state.passVariationLabel.empty())
+                msg = model.state.passVariationLabel + " " + msg;
+            showMessage(msg);
             break;
+        }
         case GameState::BLACK_WON:
         case GameState::WHITE_WON: {
             Rml::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");

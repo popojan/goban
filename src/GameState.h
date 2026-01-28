@@ -46,6 +46,7 @@ public:
     };
 
     Message msg;
+    std::string passVariationLabel;  // e.g. "11b" when a pass variation exists during navigation
 
     GameState(): colorToMove(Color::BLACK), capturedBlack(0), capturedWhite(0),
                  reservoirBlack(32), reservoirWhite(32),

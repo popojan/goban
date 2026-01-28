@@ -43,6 +43,7 @@ public:
     void start() {
         started = true;
         isGameOver = false;
+        state.reason = GameState::NO_REASON;
     }
     
     void createNewRecord() {

@@ -71,6 +71,12 @@ bool GameNavigator::navigateBack() {
     model.board.showTerritory = false;
     model.board.showTerritoryAuto = false;
 
+    // Clear game-over state when navigating away from the end of a finished game.
+    // This allows resuming play (pass, new moves) in Analysis mode.
+    if (model.isGameOver) {
+        model.start();
+    }
+
     // Keep colorToMove in sync with SGF tree position
     model.state.colorToMove = model.game.getColorToMove();
 
@@ -160,6 +166,11 @@ bool GameNavigator::navigateForward() {
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
+    // Restore game-over state if we've reached the end of a finished game
+    if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+        model.isGameOver = true;
+    }
+
     // Build board from SGF (local capture logic, no engine dependency)
     Board boardResult(model.game.getBoardSize());
     buildBoardFromSGF(boardResult);
@@ -211,8 +222,7 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
             model.game.promoteCurrentPathToMainLine();
         }
         // Clear game over state - we're continuing the game in a new branch
-        model.isGameOver = false;
-        model.state.reason = GameState::NO_REASON;
+        model.start();
     } else {
         spdlog::debug("navigateToVariation: following existing branch");
     }
@@ -268,6 +278,12 @@ bool GameNavigator::navigateToStart() {
     if (success) {
         model.board.showTerritory = false;
         model.board.showTerritoryAuto = false;
+
+        // Clear game-over state when navigating away from end
+        if (model.isGameOver) {
+            model.start();
+        }
+
         model.state.colorToMove = model.game.getColorToMove();
         model.state.comment = model.game.getComment();
         model.state.markup = model.game.getMarkup();
@@ -336,6 +352,11 @@ bool GameNavigator::navigateToEnd() {
         model.board.toggleTerritoryAuto(true);
         // Apply territory from engine to our local board (graceful degradation if unsupported)
         coach->applyTerritory(boardResult);
+    }
+
+    // Restore game-over state if at end of a finished game
+    if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+        model.isGameOver = true;
     }
 
     notifyBoardChange(boardResult);

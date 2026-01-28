@@ -229,9 +229,19 @@ void GobanControl::command(const std::string& cmd) {
         }
     }
     else if (cmd == "pass") {
-        if(engine.humanToMove()) {
-            auto move = engine.getLocalMove(Move::PASS);
-            engine.playLocalMove(move);
+        if(engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS) {
+            // During navigation, use navigateToVariation (follows existing or creates new)
+            if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
+                Color colorToMove = model.game.getColorToMove();
+                Move passMove(Move::PASS, colorToMove);
+                model.start();
+                if (!engine.isRunning()) engine.run();
+                engine.navigateToVariation(passMove);
+                view.updateNavigationOverlay();
+            } else {
+                auto move = engine.getLocalMove(Move::PASS);
+                engine.playLocalMove(move);
+            }
         }
     }
     else if (cmd == "clear") {

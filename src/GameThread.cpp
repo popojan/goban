@@ -482,7 +482,7 @@ void GameThread::playLocalMove(const Move& move) {
     spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), playerToMove ? "set" : "null");
     if (playerToMove) {
         playerToMove->suggestMove(move);
-    } else if (model.started) {
+    } else if (model.started || move == Move::RESIGN) {
         queuedMove = move;
     }
 }
@@ -978,6 +978,11 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     // Load SGF and sync specified engine (or coach if none specified)
     // Call syncRemainingEngines() later when other engines are ready
 
+    // Interrupt game loop first - it may be blocked waiting on a player's genmove().
+    // Must happen before removeSgfPlayers() to avoid destroying a player mid-wait.
+    interrupt();
+    model.pause();
+
     removeSgfPlayers();
 
     // Auto-save current game if it has moves
@@ -994,9 +999,6 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     if (!model.game.loadFromSGF(fileName, gameInfo, gameIndex)) {
         return false;
     }
-
-    interrupt();
-    model.pause();
 
     // Set up model state from SGF
     model.state.komi = gameInfo.komi;
@@ -1093,7 +1095,14 @@ void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) 
     }
 
     // Set game mode based on result
-    gameMode = model.game.hasGameResult() ? GameMode::ANALYSIS : GameMode::MATCH;
+    if (model.game.hasGameResult()) {
+        // Finished game: enter Analysis mode for review/exploration
+        gameMode = GameMode::ANALYSIS;
+    } else {
+        // Unfinished game: ready to play immediately
+        gameMode = GameMode::MATCH;
+        model.start();
+    }
 
     // Start game thread for navigation
     run();

@@ -174,7 +174,12 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
             // Set winner immediately - opposite of who resigned
             state.winner = (move.col == Color::BLACK) ? Color::WHITE : Color::BLACK;
         }
-        board.toggleTerritoryAuto(true);
+        // Only show territory for double pass (scoring needed).
+        // Resignation has a known winner - no territory calculation needed,
+        // and gnugo's final_status can freeze on nearly empty boards.
+        if (isDoublePass) {
+            board.toggleTerritoryAuto(true);
+        }
         isGameOver = true;
         spdlog::debug("Main Over! Reason {}", static_cast<int>(state.reason));
     }

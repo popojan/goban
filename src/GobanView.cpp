@@ -524,6 +524,9 @@ void GobanView::updateNavigationOverlay() {
 		}
 	}
 
+	// Clear pass variation label (set below if a pass variation exists)
+	model.state.passVariationLabel.clear();
+
 	// Get all variations (branches) from current position
 	if (model.game.isNavigating()) {
 		auto variations = model.game.getVariations();
@@ -534,21 +537,21 @@ void GobanView::updateNavigationOverlay() {
 			viewPos, variations.size());
 
 		// Label variations: no letter if single child, otherwise newest gets highest letter
-		// child[0]=newest/main → 'c', child[1] → 'b', child[2]=oldest → 'a'
+		// child[0]=newest/main → 'a', child[1] → 'b', child[2] → 'c'
 		size_t idx = 0;
 		for (const auto& move : variations) {
+			std::ostringstream ss;
+			ss << nextMoveNum;
+			if (variations.size() > 1) {
+				char letter = 'a' + static_cast<char>(idx);
+				ss << letter;
+			}
+
 			if (move == Move::NORMAL) {
 				// Skip positions that have explicit markup (markup takes precedence)
 				if (markupPositions.count({move.pos.col(), move.pos.row()})) {
 					idx++;
 					continue;
-				}
-				std::ostringstream ss;
-				ss << nextMoveNum;
-				if (variations.size() > 1) {
-					// First child (main line) gets 'a', consistent with SGF convention
-					char letter = 'a' + static_cast<char>(idx);
-					ss << letter;
 				}
 				if (showOverlay) {
 					board.setBoardOverlay(move.pos, ss.str());
@@ -556,6 +559,12 @@ void GobanView::updateNavigationOverlay() {
 				navOverlays.push_back(move.pos);
 				spdlog::debug("Navigation overlay: {} at ({},{})",
 					ss.str(), move.pos.col(), move.pos.row());
+			} else if (move == Move::PASS) {
+				// Pass variation - show in message label (no board position to overlay)
+				bool isBlack = (move.col == Color::BLACK);
+				model.state.msg = isBlack ? GameState::BLACK_PASS : GameState::WHITE_PASS;
+				model.state.passVariationLabel = ss.str();
+				spdlog::debug("Navigation overlay: pass variation {}", ss.str());
 			}
 			idx++;
 		}
