@@ -31,6 +31,7 @@ struct SGFGameInfo {
     int boardSize;
     float komi;
     int gameIndex;
+    bool hasSetupStones = false;
 };
 
 // Temporarily disabled - DataSource was removed from RmlUi
@@ -66,6 +67,9 @@ public:
     
     // Explicitly load games for the selected SGF file
     void LoadSelectedFileGames();
+
+    // Check if selected game looks like a tsumego problem
+    bool isTsumegoDetected() const;
 
     // Pagination methods
     void SetFilesPage(int page);

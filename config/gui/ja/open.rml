@@ -37,6 +37,7 @@
             </div>
             <div class="bottomleft">
                 <span class="cmd button" onmouseup="refresh">更新</span>
+                <label class="checkbox_label"><input type="checkbox" id="cmdTsumego" name="tsumego"/>詰碁</label>
             </div>
         </div>
     </div>

@@ -46,6 +46,8 @@ private:
 
     static void clearGridSelection(const Rml::Element* grid);
     void requestRepaint() const;
+    void setTsumegoToggle(bool enabled) const;
+    bool isTsumegoToggled() const;
     std::string getTemplateString(const char* templateId, const char* defaultValue) const;
     void initializeLocalization();
 

@@ -87,7 +87,31 @@ std::vector<Move> GameRecord::getPathFromRoot() const {
 
 bool GameRecord::isAtRoot() const {
     if (!game || !currentNode) return true;
-    return currentNode == game->GetRootNode();
+    // currentNode is root-equivalent if it's the root itself or any non-move
+    // ancestor node (FF[3] setup nodes, empty nodes from extra semicolons)
+    auto node = currentNode;
+    auto root = game->GetRootNode();
+    while (node) {
+        if (node == root) return true;
+        if (extractMoveFromNode(node, boardSize.Columns)) return false;  // Has a move, not root-like
+        node = node->GetParent();
+    }
+    return true;
+}
+
+std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> GameRecord::findEffectiveRoot(
+        const std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>& rootNode) const {
+    // Walk from root through non-move nodes (empty nodes, setup-only nodes)
+    // Stop at the last node before actual moves begin
+    auto node = rootNode;
+    while (node->HasChildren()) {
+        auto child = node->GetFirstChild();
+        if (extractMoveFromNode(child, boardSize.Columns)) {
+            break;  // Child has a move — current node is the effective root
+        }
+        node = child;
+    }
+    return node;
 }
 
 Move GameRecord::lastMove() const {
@@ -457,6 +481,8 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
     gameHasNewMoves = false;
     unsavedChanges = false;
     gameInDocument = false;
+    loadedExternalDoc = nullptr;
+    loadedGameIndex = 0;
     
     using namespace LibSgfcPlusPlus;
     std::vector<std::shared_ptr<ISgfcProperty> > properties;
@@ -727,7 +753,7 @@ void GameRecord::undo() {
     }
 }
 
-bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo, int gameIndex) {
+bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo, int gameIndex, bool startAtRoot) {
     using namespace LibSgfcPlusPlus;
 
     std::lock_guard<std::mutex> lock(mutex);
@@ -761,77 +787,8 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         auto rootNode = loadedGame->GetRootNode();
         
         spdlog::info("Loading game {} of {} from SGF file [{}]", gameIndex + 1, games.size(), fileName);
-        
-        gameInfo.boardSize = 19;
-        gameInfo.komi = 6.5f;
-        gameInfo.handicap = 0;
-        gameInfo.blackPlayer = "Black";
-        gameInfo.whitePlayer = "White";
-        gameInfo.setupBlackStones.clear();
-        gameInfo.gameResult = LibSgfcPlusPlus::SgfcGameResult();
 
-        for (auto property : rootNode->GetProperties()) {
-            switch (property->GetPropertyType()) {
-                case T::SZ: {
-                    if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue())) {
-                        gameInfo.boardSize = numberValue->GetNumberValue();
-                    }
-                    break;
-                }
-                case T::KM: {
-                    if (auto realValue = std::dynamic_pointer_cast<ISgfcRealPropertyValue>(property->GetPropertyValue())) {
-                        gameInfo.komi = realValue->GetRealValue();
-                    }
-                    break;
-                }
-                case T::HA: {
-                    if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue())) {
-                        gameInfo.handicap = numberValue->GetNumberValue();
-                    }
-                    break;
-                }
-                case T::PB: {
-                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
-                        gameInfo.blackPlayer = textValue->GetSimpleTextValue();
-                    }
-                    break;
-                }
-                case T::PW: {
-                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
-                        gameInfo.whitePlayer = textValue->GetSimpleTextValue();
-                    }
-                    break;
-                }
-                case T::AB: {
-                    for (auto value : property->GetPropertyValues()) {
-                        if (auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value)) {
-                            auto sgfPoint = stoneValue->GetStoneValue();
-                            Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
-                            gameInfo.setupBlackStones.push_back(pos);
-                        }
-                    }
-                    break;
-                }
-                case T::AW: {
-                    for (auto value : property->GetPropertyValues()) {
-                        if (auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value)) {
-                            auto sgfPoint = stoneValue->GetStoneValue();
-                            Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
-                            gameInfo.setupWhiteStones.push_back(pos);
-                        }
-                    }
-                    break;
-                }
-                case T::RE: {
-                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
-                        gameInfo.gameResult = SgfcGameResult::FromPropertyValue(textValue->GetSimpleTextValue());
-                    }
-                    break;
-                }
-                default:
-                    ;
-            }
-        }
+        extractGameInfo(rootNode, gameInfo);
 
         // Keep the game tree (SGF is single source of truth)
         game = loadedGame;
@@ -847,24 +804,33 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
             doc = loadedDoc->GetDocument();
             numGames = games.size();
             gameInDocument = true;  // Game is already in doc, prevent re-append
+            loadedExternalDoc = nullptr;  // Daily session, not external
+            loadedGameIndex = gameIndex;
             spdlog::debug("loadFromSGF: paths match - preserving doc with {} games", numGames);
         } else {
-            // keep existing doc (daily session), game is just for viewing/navigation
-            spdlog::debug("loadFromSGF: paths differ - external SGF viewing (doc unchanged)");
+            // Preserve full external document for game cycling (PageUp/PageDown)
+            // Kept separately from doc (daily session) so both coexist
+            loadedExternalDoc = loadedDoc->GetDocument();
+            loadedGameIndex = gameIndex;
+            spdlog::debug("loadFromSGF: external SGF with {} games, viewing game {}",
+                games.size(), gameIndex);
         }
 
         boardSize.Columns = gameInfo.boardSize;
         boardSize.Rows = gameInfo.boardSize;
 
-        // Traverse to end of main line - currentNode becomes the last move
-        currentNode = rootNode;
-        auto node = rootNode->GetFirstChild();
-        while (node) {
-            currentNode = node;
-            node = node->GetFirstChild();
+        currentNode = findEffectiveRoot(rootNode);
+        if (!startAtRoot) {
+            // Traverse to end of main line - currentNode becomes the last move
+            auto node = currentNode->GetFirstChild();
+            while (node) {
+                currentNode = node;
+                node = node->GetFirstChild();
+            }
         }
 
-        spdlog::info("Successfully loaded SGF file [{}] with {} moves (navigation enabled)", fileName, getTreeDepth());
+        spdlog::info("Successfully loaded SGF file [{}] with {} moves (navigation enabled, startAtRoot={})",
+            fileName, getTreeDepth(), startAtRoot);
         return true;
 
     } catch (const std::exception& ex) {
@@ -1089,21 +1055,26 @@ Color GameRecord::getColorToMove() const {
         bool hasHandicap = false;
         bool hasWhiteSetup = false;
         if (game && game->GetRootNode()) {
-            for (const auto& prop : game->GetRootNode()->GetProperties()) {
-                if (prop->GetPropertyType() == T::PL) {
-                    // PL property explicitly sets player to move - always wins
-                    if (auto colorVal = std::dynamic_pointer_cast<ISgfcColorPropertyValue>(prop->GetPropertyValue())) {
-                        return colorVal->GetColorValue() == SgfcColor::Black
-                            ? Color::BLACK : Color::WHITE;
+            // Scan root + first child for FF[3] compat (PL may be on first child)
+            std::vector<std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>> nodes = { game->GetRootNode() };
+            if (game->GetRootNode()->HasChildren())
+                nodes.push_back(game->GetRootNode()->GetFirstChild());
+            for (const auto& node : nodes) {
+                for (const auto& prop : node->GetProperties()) {
+                    if (prop->GetPropertyType() == T::PL) {
+                        if (auto colorVal = std::dynamic_pointer_cast<ISgfcColorPropertyValue>(prop->GetPropertyValue())) {
+                            return colorVal->GetColorValue() == SgfcColor::Black
+                                ? Color::BLACK : Color::WHITE;
+                        }
                     }
-                }
-                if (prop->GetPropertyType() == T::HA) {
-                    if (auto numVal = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(prop->GetPropertyValue())) {
-                        hasHandicap = numVal->GetNumberValue() > 0;
+                    if (prop->GetPropertyType() == T::HA) {
+                        if (auto numVal = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(prop->GetPropertyValue())) {
+                            hasHandicap = numVal->GetNumberValue() > 0;
+                        }
                     }
-                }
-                if (prop->GetPropertyType() == T::AW) {
-                    hasWhiteSetup = true;
+                    if (prop->GetPropertyType() == T::AW) {
+                        hasWhiteSetup = true;
+                    }
                 }
             }
         }
@@ -1338,32 +1309,39 @@ void GameRecord::buildBoardFromMoves(Board& outBoard, Position& koPosition) cons
     outBoard.clear(boardSize.Columns);
     koPosition = Position(-1, -1);
 
-    // First, place any handicap stones from AB property in root node
+    // Place setup stones from AB/AW properties (walk root through setup nodes for FF[3])
     if (game && game->GetRootNode()) {
-        for (const auto& prop : game->GetRootNode()->GetProperties()) {
-            if (prop->GetPropertyType() == T::AB) {
-                for (const auto& value : prop->GetPropertyValues()) {
-                    if (auto stoneValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcStonePropertyValue>(value)) {
-                        auto sgfPoint = stoneValue->GetStoneValue();
-                        Position pos = Position::fromSgf(sgfPoint, boardSize.Columns);
-                        if (pos.col() >= 0 && pos.row() >= 0) {
-                            outBoard[pos].stone = Color::BLACK;
+        auto node = game->GetRootNode();
+        auto effectiveRoot = findEffectiveRoot(node);
+        // Scan from root to effective root (inclusive) for setup properties
+        while (true) {
+            for (const auto& prop : node->GetProperties()) {
+                if (prop->GetPropertyType() == T::AB) {
+                    for (const auto& value : prop->GetPropertyValues()) {
+                        if (auto stoneValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcStonePropertyValue>(value)) {
+                            auto sgfPoint = stoneValue->GetStoneValue();
+                            Position pos = Position::fromSgf(sgfPoint, boardSize.Columns);
+                            if (pos.col() >= 0 && pos.row() >= 0) {
+                                outBoard[pos].stone = Color::BLACK;
+                            }
+                        }
+                    }
+                }
+                if (prop->GetPropertyType() == T::AW) {
+                    for (const auto& value : prop->GetPropertyValues()) {
+                        if (auto stoneValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcStonePropertyValue>(value)) {
+                            auto sgfPoint = stoneValue->GetStoneValue();
+                            Position pos = Position::fromSgf(sgfPoint, boardSize.Columns);
+                            if (pos.col() >= 0 && pos.row() >= 0) {
+                                outBoard[pos].stone = Color::WHITE;
+                            }
                         }
                     }
                 }
             }
-            // Also handle AW (added white) if present
-            if (prop->GetPropertyType() == T::AW) {
-                for (const auto& value : prop->GetPropertyValues()) {
-                    if (auto stoneValue = std::dynamic_pointer_cast<LibSgfcPlusPlus::ISgfcStonePropertyValue>(value)) {
-                        auto sgfPoint = stoneValue->GetStoneValue();
-                        Position pos = Position::fromSgf(sgfPoint, boardSize.Columns);
-                        if (pos.col() >= 0 && pos.row() >= 0) {
-                            outBoard[pos].stone = Color::WHITE;
-                        }
-                    }
-                }
-            }
+            if (node == effectiveRoot) break;
+            node = node->GetFirstChild();
+            if (!node) break;
         }
     }
 
@@ -1374,4 +1352,154 @@ void GameRecord::buildBoardFromMoves(Board& outBoard, Position& koPosition) cons
 
     spdlog::debug("buildBoardFromMoves: replayed {} moves, {} black stones, {} white stones on board",
         path.size(), outBoard.stonesOnBoard(Color::BLACK), outBoard.stonesOnBoard(Color::WHITE));
+}
+
+void GameRecord::extractGameInfo(const std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>& rootNode, SGFGameInfo& gameInfo) const {
+    using namespace LibSgfcPlusPlus;
+
+    gameInfo.boardSize = 19;
+    gameInfo.komi = 6.5f;
+    gameInfo.handicap = 0;
+    gameInfo.blackPlayer = "Black";
+    gameInfo.whitePlayer = "White";
+    gameInfo.setupBlackStones.clear();
+    gameInfo.setupWhiteStones.clear();
+    gameInfo.gameResult = SgfcGameResult();
+
+    // Scan root node through effective root for FF[3] compat (setup properties AB/AW
+    // may appear on child nodes instead of root in older SGF formats)
+    auto effectiveRoot = findEffectiveRoot(rootNode);
+    auto scanNode = rootNode;
+    bool pastRoot = false;
+
+    while (true) {
+        for (auto property : scanNode->GetProperties()) {
+            // On non-root nodes, only look for setup properties
+            auto pt = property->GetPropertyType();
+            if (pastRoot && pt != T::AB && pt != T::AW)
+                continue;
+
+            switch (pt) {
+                case T::SZ: {
+                    if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue())) {
+                        gameInfo.boardSize = numberValue->GetNumberValue();
+                    }
+                    break;
+                }
+                case T::KM: {
+                    if (auto realValue = std::dynamic_pointer_cast<ISgfcRealPropertyValue>(property->GetPropertyValue())) {
+                        gameInfo.komi = realValue->GetRealValue();
+                    }
+                    break;
+                }
+                case T::HA: {
+                    if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue())) {
+                        gameInfo.handicap = numberValue->GetNumberValue();
+                    }
+                    break;
+                }
+                case T::PB: {
+                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
+                        gameInfo.blackPlayer = textValue->GetSimpleTextValue();
+                    }
+                    break;
+                }
+                case T::PW: {
+                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
+                        gameInfo.whitePlayer = textValue->GetSimpleTextValue();
+                    }
+                    break;
+                }
+                case T::AB: {
+                    for (auto value : property->GetPropertyValues()) {
+                        if (auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value)) {
+                            auto sgfPoint = stoneValue->GetStoneValue();
+                            Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
+                            gameInfo.setupBlackStones.push_back(pos);
+                        }
+                    }
+                    break;
+                }
+                case T::AW: {
+                    for (auto value : property->GetPropertyValues()) {
+                        if (auto stoneValue = std::dynamic_pointer_cast<ISgfcStonePropertyValue>(value)) {
+                            auto sgfPoint = stoneValue->GetStoneValue();
+                            Position pos = Position::fromSgf(sgfPoint, gameInfo.boardSize);
+                            gameInfo.setupWhiteStones.push_back(pos);
+                        }
+                    }
+                    break;
+                }
+                case T::RE: {
+                    if (auto textValue = std::dynamic_pointer_cast<ISgfcSimpleTextPropertyValue>(property->GetPropertyValue())) {
+                        gameInfo.gameResult = SgfcGameResult::FromPropertyValue(textValue->GetSimpleTextValue());
+                    }
+                    break;
+                }
+                default:
+                    ;
+            }
+        }
+        if (scanNode == effectiveRoot) break;
+        scanNode = scanNode->GetFirstChild();
+        if (!scanNode) break;
+        pastRoot = true;
+    }
+}
+
+size_t GameRecord::getLoadedGameCount() const {
+    if (loadedExternalDoc) {
+        return loadedExternalDoc->GetGames().size();
+    }
+    if (doc) {
+        return doc->GetGames().size();
+    }
+    return 0;
+}
+
+bool GameRecord::switchToGame(int gameIndex, SGFGameInfo& gameInfo, bool startAtRoot) {
+    std::lock_guard<std::mutex> lock(mutex);
+
+    // Determine which document to browse
+    auto browseDoc = loadedExternalDoc ? loadedExternalDoc : doc;
+    if (!browseDoc) return false;
+
+    auto games = browseDoc->GetGames();
+    if (gameIndex < 0 || gameIndex >= static_cast<int>(games.size())) {
+        return false;
+    }
+
+    auto loadedGame = games[gameIndex];
+    auto rootNode = loadedGame->GetRootNode();
+
+    spdlog::info("Switching to game {} of {}", gameIndex + 1, games.size());
+
+    extractGameInfo(rootNode, gameInfo);
+
+    game = loadedGame;
+    gameHasNewMoves = false;
+    unsavedChanges = false;
+    gameInDocument = (browseDoc == doc);  // Only true for daily session games
+    loadedGameIndex = gameIndex;
+
+    boardSize.Columns = gameInfo.boardSize;
+    boardSize.Rows = gameInfo.boardSize;
+
+    currentNode = findEffectiveRoot(rootNode);
+    if (!startAtRoot) {
+        // Traverse to end of main line
+        auto node = currentNode->GetFirstChild();
+        while (node) {
+            currentNode = node;
+            node = node->GetFirstChild();
+        }
+    }
+
+    spdlog::info("Switched to game {} with {} moves", gameIndex + 1, getTreeDepth());
+    return true;
+}
+
+bool GameRecord::isTsumego(const SGFGameInfo& info, size_t mainLineMoveCount) {
+    bool hasSetupStones = !info.setupBlackStones.empty() || !info.setupWhiteStones.empty();
+    return hasSetupStones && mainLineMoveCount <= 50;
 }

@@ -362,11 +362,27 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
                             gameInfo.date = textValue->GetSimpleTextValue();
                         }
                         break;
+                    case SgfcPropertyType::AB: // Setup black stones
+                    case SgfcPropertyType::AW: // Setup white stones
+                        gameInfo.hasSetupStones = true;
+                        break;
                     default:
                         break;
                 }
             }
             
+            // FF[3] compat: setup stones may be on first child instead of root
+            if (!gameInfo.hasSetupStones && rootNode->HasChildren()) {
+                auto firstChild = rootNode->GetFirstChild();
+                for (const auto& property : firstChild->GetProperties()) {
+                    auto pt = property->GetPropertyType();
+                    if (pt == SgfcPropertyType::AB || pt == SgfcPropertyType::AW) {
+                        gameInfo.hasSetupStones = true;
+                        break;
+                    }
+                }
+            }
+
             // Count moves by traversing the game tree
             gameInfo.moveCount = countMovesInGame(game);
             
@@ -421,6 +437,22 @@ int FileChooserDataSource::countMovesInGame(const std::shared_ptr<LibSgfcPlusPlu
     traverseNode(rootNode);
     spdlog::debug("countMovesInGame: {} nodes traversed, {} moves counted", nodeCount, moveCount);
     return moveCount;
+}
+
+bool FileChooserDataSource::isTsumegoDetected() const {
+    if (games.empty()) return false;
+    // Require setup stones in most games (>= 80%)
+    int setupCount = 0;
+    int totalMoves = 0;
+    for (const auto& g : games) {
+        if (g.hasSetupStones) setupCount++;
+        totalMoves += g.moveCount;
+    }
+    float setupRatio = static_cast<float>(setupCount) / static_cast<float>(games.size());
+    if (setupRatio < 0.8f) return false;
+    // Average moves per game: tsumego typically < 50, full games typically > 150
+    float avgMoves = static_cast<float>(totalMoves) / static_cast<float>(games.size());
+    return avgMoves <= 50;
 }
 
 void FileChooserDataSource::SetFilesPage(int page) {

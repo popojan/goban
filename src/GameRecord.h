@@ -68,7 +68,7 @@ public:
         LibSgfcPlusPlus::SgfcGameResult gameResult;
     };
 
-    bool loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo, int gameIndex = 0);
+    bool loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo, int gameIndex = 0, bool startAtRoot = false);
 
     // Get player names from currently loaded game (reads PB/PW properties)
     std::pair<std::string, std::string> getPlayerNames() const;
@@ -80,6 +80,9 @@ public:
     // Quick peek at SGF file to get board size without full parsing
     // Returns board size or -1 if file doesn't exist or can't be parsed
     static int peekBoardSize(const std::string& fileName);
+
+    // Tsumego detection heuristic (setup stones + small board + few moves)
+    static bool isTsumego(const SGFGameInfo& info, size_t mainLineMoveCount);
 
 private:
 
@@ -96,7 +99,12 @@ private:
     // Tree traversal helpers (SGF as single source of truth)
     [[nodiscard]] size_t getTreeDepth() const;  // Depth from root to currentNode
     [[nodiscard]] std::vector<Move> getPathFromRoot() const;  // All moves from root to currentNode
-    [[nodiscard]] bool isAtRoot() const;  // currentNode is root or first child of root
+    [[nodiscard]] bool isAtRoot() const;  // currentNode is root or setup-only ancestor
+
+    // FF[3] compat: find the effective root (skip empty/setup-only nodes from root)
+    // Returns the deepest non-move node before actual moves begin
+    [[nodiscard]] std::shared_ptr<LibSgfcPlusPlus::ISgfcNode> findEffectiveRoot(
+        const std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>& rootNode) const;
 
     typedef LibSgfcPlusPlus::SgfcPlusPlusFactory F;
     typedef LibSgfcPlusPlus::SgfcPropertyType T;
@@ -115,6 +123,13 @@ private:
     bool gameHasNewMoves;
     bool gameInDocument;  // True when game is already part of doc (prevent re-append)
     bool unsavedChanges = false;  // True when changes made since last save
+
+    // Loaded external SGF document (for game cycling with PageUp/PageDown)
+    std::shared_ptr<LibSgfcPlusPlus::ISgfcDocument> loadedExternalDoc;
+    int loadedGameIndex = 0;
+
+    // Helper: extract game info from root node (shared by loadFromSGF and switchToGame)
+    void extractGameInfo(const std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>& rootNode, SGFGameInfo& gameInfo) const;
 
 public:
     // Navigation methods (SGF tree-based)
@@ -171,6 +186,12 @@ public:
 
     // Get the board size from SGF
     [[nodiscard]] int getBoardSize() const { return boardSize.Columns; }
+
+    // External SGF game cycling (PageUp/PageDown)
+    [[nodiscard]] bool hasLoadedExternalDoc() const { return loadedExternalDoc != nullptr; }
+    [[nodiscard]] int getLoadedGameIndex() const { return loadedGameIndex; }
+    [[nodiscard]] size_t getLoadedGameCount() const;
+    bool switchToGame(int gameIndex, SGFGameInfo& gameInfo, bool startAtRoot = false);
 };
 
 #endif //GOBAN_GAMERECORD_H

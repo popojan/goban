@@ -245,9 +245,9 @@ void StreamHandler::ensureInitialized() {
 
 StreamHandler::~StreamHandler()
 {
+        shutdown();
         for (auto wrapper : data)
         {
                 delete wrapper;
         }
-        shutdown();
 }

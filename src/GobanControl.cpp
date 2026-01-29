@@ -50,9 +50,19 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                         spdlog::debug("Clicked on existing variation at ({},{})", coord.col(), coord.row());
                         if (engine.navigateToVariation(move)) {
                             view.updateNavigationOverlay();
+                            if (view.isTsumegoMode() && model.game.isAtEndOfNavigation()) {
+                                parent->showMessage("Correct!");
+                                view.playSound("correct", 1.0);
+                            }
                         }
                         return;
                     }
+                }
+                // In tsumego mode, only allow existing variations (no new branches)
+                if (view.isTsumegoMode()) {
+                    spdlog::debug("Tsumego mode: ignoring click on non-variation position");
+                    view.playSound("error", 0.5);
+                    return;
                 }
                 // Clicked on new position - create new variation via navigateToVariation
                 // Use SGF tree to determine correct color (model.state may be out of sync)
@@ -76,6 +86,11 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     model.updateReservoirs();  // Stone in hand reduces reservoir
                     view.requestRepaint(GobanView::UPDATE_STONES);
                 }
+                return;
+            }
+
+            // In tsumego mode at end of variation, block new moves
+            if (view.isTsumegoMode() && model.game.isAtEndOfNavigation()) {
                 return;
             }
 
@@ -183,10 +198,13 @@ void GobanControl::command(const std::string& cmd) {
             view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
         }
     }
-    else if (cmd == "toggle_overlay") {
-        checked = view.toggleOverlay();
+    else if (cmd == "toggle_last_move_overlay") {
+        checked = view.toggleLastMoveOverlay();
         view.requestRepaint();
-
+    }
+    else if (cmd == "toggle_next_move_overlay") {
+        checked = view.toggleNextMoveOverlay();
+        view.requestRepaint();
     }
     else if (cmd == "play once") {
         // Don't trigger at end of finished game
@@ -400,6 +418,30 @@ void GobanControl::command(const std::string& cmd) {
         } else {
             spdlog::warn("File chooser handler not found");
         }
+    }
+    else if (cmd == "prev_game" || cmd == "next_game") {
+        if (engine.isThinking()) return;
+        size_t gameCount = model.game.getLoadedGameCount();
+        if (gameCount <= 1) return;
+
+        int currentIdx = model.game.getLoadedGameIndex();
+        int newIdx = (cmd == "prev_game") ? currentIdx - 1 : currentIdx + 1;
+        if (newIdx < 0 || newIdx >= static_cast<int>(gameCount)) return;
+
+        bool tsumego = view.isTsumegoMode();
+        setSyncingUI(true);
+        engine.switchGame(newIdx, tsumego);  // Start at root in tsumego mode
+        parent->refreshPlayerDropdowns();
+        parent->refreshGameSettingsDropdowns();
+        setSyncingUI(false);
+
+        if (tsumego) {
+            view.setTsumegoMode(true);  // Re-apply overlay settings
+        }
+
+        view.updateLastMoveOverlay();
+        view.updateNavigationOverlay();
+        view.requestRepaint();
     }
     else if(cmd == "msg") {
         // Only clear if no active prompt (prompts require button click)

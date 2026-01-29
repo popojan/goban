@@ -18,6 +18,11 @@
                             <div class="cmd" onmouseup="archive">Archive</div>
                         </div>
                         <div class="grp">
+                            <div class="hr">Game</div>
+                            <div class="cmd" id="cmdPrevGame" onmouseup="prev_game">Previous</div>
+                            <div class="cmd" id="cmdNextGame" onmouseup="next_game">Next</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">System</div>
                             <div class="cmd" onmouseup="quit">Exit</div>
                         </div>
@@ -39,7 +44,8 @@
                         </div>
                         <div class="grp">
                             <div class="hr">Overlay</div>
-                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">Last move</div>
+                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">Last Move</div>
+                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">Next Move</div>
                         </div>
                         <!--
                         <div class="grp">

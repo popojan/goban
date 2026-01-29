@@ -745,6 +745,21 @@ void ElementGame::OnUpdate()
             OnMenuToggle("toggle_analysis_mode", analysisMode);
         }
     }
+    // Sync overlay menu toggles with view state
+    {
+        std::vector<Rml::Element*> els;
+        context->GetDocument("game_window")->GetElementsByClassName(els, "toggle_last_move_overlay");
+        if (!els.empty() && els[0]->IsClassSet("selected") != view.showLastMoveOverlay) {
+            OnMenuToggle("toggle_last_move_overlay", view.showLastMoveOverlay);
+        }
+    }
+    {
+        std::vector<Rml::Element*> els;
+        context->GetDocument("game_window")->GetElementsByClassName(els, "toggle_next_move_overlay");
+        if (!els.empty() && els[0]->IsClassSet("selected") != view.showNextMoveOverlay) {
+            OnMenuToggle("toggle_next_move_overlay", view.showNextMoveOverlay);
+        }
+    }
 
     // Update disabled state for context-sensitive menu items
     {

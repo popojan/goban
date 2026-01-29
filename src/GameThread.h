@@ -126,8 +126,9 @@ public:
 
     std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
 
-    bool loadSGF(const std::string& fileName, int gameIndex = 0);
-    bool loadSGFWithEngine(const std::string& fileName, Engine* engine = nullptr, int gameIndex = 0);  // Load SGF, sync engine
+    bool loadSGF(const std::string& fileName, int gameIndex = 0, bool startAtRoot = false);
+    bool loadSGFWithEngine(const std::string& fileName, Engine* engine = nullptr, int gameIndex = 0, bool startAtRoot = false);
+    bool switchGame(int gameIndex, bool startAtRoot = false);  // Switch game within loaded SGF doc
     void syncEngineToPosition(Engine* engine);  // Sync one engine to current game state
     void syncRemainingEngines(Engine* alreadySynced = nullptr, bool matchPlayers = true);  // Sync all engines except alreadySynced
 
@@ -142,6 +143,9 @@ private:
     std::string collectEngineComments() const;
     void processSuccessfulMove(const Move& move, const Player* movePlayer, Engine* coach,
                               Engine* kibitzEngine, bool wasKibitz);
+
+    // Apply loaded game info to model state, sync engine, build board, finalize
+    bool applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine* engine);
 
     // Helper for SGF loading - handles finished game detection and state setup
     void finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInfo& gameInfo);

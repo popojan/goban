@@ -13,7 +13,7 @@ GobanView::GobanView(GobanModel& m)
     translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f),
     startTime(0.0f), animationRunning(false), isPanning(false), isZooming(false), isRotating(false),
     cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
-    currentProgram(-1),	showOverlay(true)
+    currentProgram(-1),	showLastMoveOverlay(true), showNextMoveOverlay(true)
 {
     player.preload(config);
     player.init();
@@ -327,7 +327,7 @@ void GobanView::Render(int w, int h)
 	}
 
 	if (time - startTime >= gobanShader.animT) {
-		if (showOverlay) {
+		if (showLastMoveOverlay || showNextMoveOverlay) {
 			gobanOverlay.use();
 			gobanOverlay.draw(model, cam, 0);
 			gobanOverlay.unuse();
@@ -338,7 +338,7 @@ void GobanView::Render(int w, int h)
     glUseProgram(0);
 
 	if (time - startTime >= gobanShader.animT) {
-		if (showOverlay) {
+		if (showLastMoveOverlay || showNextMoveOverlay) {
 			gobanOverlay.use();
 			gobanOverlay.draw(model, cam, 1);
 			gobanOverlay.unuse();
@@ -351,26 +351,50 @@ void GobanView::Render(int w, int h)
 	updateFlag = UPDATE_NONE | (UPDATE_SOUND_STONE & updateFlag);
 }
 
-bool GobanView::toggleOverlay() {
-    showOverlay = !showOverlay;
-    if (!showOverlay) {
-        // Clear board patches (grid cutouts) when hiding overlay
-        for (const auto& pos : navOverlays) {
-            if (pos) board.removeBoardOverlay(pos);
-        }
-        for (const auto& pos : markupOverlays) {
-            if (pos) {
-                board.removeBoardOverlay(pos);
-                board.removeOverlay(pos);
-            }
+bool GobanView::toggleLastMoveOverlay() {
+    showLastMoveOverlay = !showLastMoveOverlay;
+    if (!showLastMoveOverlay) {
+        if (lastMove) {
+            board.removeOverlay(lastMove);
         }
         updateFlag |= UPDATE_OVERLAY | UPDATE_STONES;
     } else {
-        // Rebuild patches when showing overlay
+        updateLastMoveOverlay();
+    }
+    return showLastMoveOverlay;
+}
+
+bool GobanView::toggleNextMoveOverlay() {
+    showNextMoveOverlay = !showNextMoveOverlay;
+    if (!showNextMoveOverlay) {
+        for (const auto& pos : navOverlays) {
+            if (pos) board.removeBoardOverlay(pos);
+        }
+        updateFlag |= UPDATE_OVERLAY | UPDATE_STONES;
+    } else {
         updateNavigationOverlay();
     }
-    return showOverlay;
+    return showNextMoveOverlay;
 }
+
+void GobanView::setTsumegoMode(bool enabled) {
+    tsumegoMode = enabled;
+    if (enabled) {
+        showLastMoveOverlay = true;
+        showNextMoveOverlay = false;
+        // Clear navigation overlays (spoilers)
+        for (const auto& pos : navOverlays) {
+            if (pos) board.removeBoardOverlay(pos);
+        }
+    } else {
+        showLastMoveOverlay = true;
+        showNextMoveOverlay = true;
+        updateNavigationOverlay();
+    }
+    updateLastMoveOverlay();
+    requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
+}
+
 void GobanView::updateTranslation() {
     glm::vec4 ro(0.0f,0.0f,-3.0f,0.0f);
     glm::vec4 tt(translate, 0.0f);
@@ -484,12 +508,14 @@ void GobanView::updateLastMoveOverlay() {
 	if (moveNum > 0) {
 		auto [move, moveIndex] = model.game.lastStoneMoveIndex();
 		if (move == Move::NORMAL) {
-			std::ostringstream ss;
-			ss << moveIndex;  // Use the stone's actual move index, not total depth (which includes passes)
 			lastMove = move.pos;
-			spdlog::debug("updateLastMoveOverlay: setting '{}' at ({},{}) color={}",
-				ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
-			board.setOverlay(move.pos, ss.str(), move.col);
+			if (showLastMoveOverlay) {
+				std::ostringstream ss;
+				ss << moveIndex;  // Use the stone's actual move index, not total depth (which includes passes)
+				spdlog::debug("updateLastMoveOverlay: setting '{}' at ({},{}) color={}",
+					ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
+				board.setOverlay(move.pos, ss.str(), move.col);
+			}
 		} else {
 			spdlog::debug("updateLastMoveOverlay: lastStoneMoveIndex returned non-NORMAL");
 		}
@@ -553,7 +579,7 @@ void GobanView::updateNavigationOverlay() {
 					idx++;
 					continue;
 				}
-				if (showOverlay) {
+				if (showNextMoveOverlay) {
 					board.setBoardOverlay(move.pos, ss.str());
 				}
 				navOverlays.push_back(move.pos);
@@ -594,7 +620,7 @@ void GobanView::updateNavigationOverlay() {
 		}
 
 		if (!text.empty()) {
-			if (showOverlay) {
+			if (showLastMoveOverlay || showNextMoveOverlay) {
 				// Check if there's a stone at this position
 				Color stoneColor = board[markup.pos].stone;
 				if (stoneColor != Color::EMPTY) {

@@ -797,11 +797,11 @@ Move GameThread::getLocalMove(const Move::Special move) const {
     return {move, model.state.colorToMove};
 }
 
-bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
+bool GameThread::loadSGF(const std::string& fileName, int gameIndex, bool startAtRoot) {
     // Use unified loading path - same as startup
     Engine* coach = currentCoach();
 
-    if (!loadSGFWithEngine(fileName, coach, gameIndex)) {
+    if (!loadSGFWithEngine(fileName, coach, gameIndex, startAtRoot)) {
         return false;
     }
 
@@ -809,6 +809,29 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex) {
     // Pass coach as already-synced engine
     syncRemainingEngines(coach);
 
+    return true;
+}
+
+bool GameThread::switchGame(int gameIndex, bool startAtRoot) {
+    // Switch to a different game within the already-loaded SGF document.
+    // Unlike loadSGF(), no file I/O, no auto-save, no player removal.
+    interrupt();
+    model.pause();
+
+    GameRecord::SGFGameInfo gameInfo;
+    if (!model.game.switchToGame(gameIndex, gameInfo, startAtRoot)) {
+        return false;
+    }
+
+    if (!applyLoadedGame(gameInfo, nullptr)) {
+        return false;
+    }
+
+    // Sync remaining engines (kibitz, etc.) but don't re-match players
+    syncRemainingEngines(currentCoach(), false);
+
+    spdlog::info("Switched to game {} (board: {}, moves: {})",
+        gameIndex + 1, gameInfo.boardSize, model.game.moveCount());
     return true;
 }
 
@@ -974,33 +997,10 @@ void GameThread::matchSgfPlayers() {
     matchPlayerName(whitePlayer, 1);
 }
 
-bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, int gameIndex) {
-    // Load SGF and sync specified engine (or coach if none specified)
-    // Call syncRemainingEngines() later when other engines are ready
+bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine* engine) {
+    // Common logic for setting up model state after loading/switching a game.
+    // Called by both loadSGFWithEngine() and switchGame().
 
-    // Interrupt game loop first - it may be blocked waiting on a player's genmove().
-    // Must happen before removeSgfPlayers() to avoid destroying a player mid-wait.
-    interrupt();
-    model.pause();
-
-    removeSgfPlayers();
-
-    // Auto-save current game if it has moves
-    if (model.game.moveCount() > 0) {
-        try {
-            model.game.saveAs("");
-            spdlog::info("Auto-saved current game with {} moves before loading SGF", model.game.moveCount());
-        } catch (const std::exception& ex) {
-            spdlog::warn("Failed to auto-save current game: {}", ex.what());
-        }
-    }
-
-    GameRecord::SGFGameInfo gameInfo;
-    if (!model.game.loadFromSGF(fileName, gameInfo, gameIndex)) {
-        return false;
-    }
-
-    // Set up model state from SGF
     model.state.komi = gameInfo.komi;
     model.state.handicap = gameInfo.handicap;
     gameMode = GameMode::MATCH;
@@ -1025,7 +1025,7 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
             observer->onBoardSized(gameInfo.boardSize);
         });
 
-    // Use provided engine or fall back to coach
+    // Sync engine
     if (!engine) {
         engine = currentCoach();
     }
@@ -1063,10 +1063,36 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     // Handle finished games (resignation or double pass)
     finalizeLoadedGame(engine, gameInfo);
 
-    spdlog::info("SGF [{}] loaded. Board: {}, Moves: {}.",
-                 fileName, gameInfo.boardSize, model.game.moveCount());
-
     return true;
+}
+
+bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, int gameIndex, bool startAtRoot) {
+    // Load SGF and sync specified engine (or coach if none specified)
+    // Call syncRemainingEngines() later when other engines are ready
+
+    // Interrupt game loop first - it may be blocked waiting on a player's genmove().
+    // Must happen before removeSgfPlayers() to avoid destroying a player mid-wait.
+    interrupt();
+    model.pause();
+
+    removeSgfPlayers();
+
+    // Auto-save current game if it has moves
+    if (model.game.moveCount() > 0) {
+        try {
+            model.game.saveAs("");
+            spdlog::info("Auto-saved current game with {} moves before loading SGF", model.game.moveCount());
+        } catch (const std::exception& ex) {
+            spdlog::warn("Failed to auto-save current game: {}", ex.what());
+        }
+    }
+
+    GameRecord::SGFGameInfo gameInfo;
+    if (!model.game.loadFromSGF(fileName, gameInfo, gameIndex, startAtRoot)) {
+        return false;
+    }
+
+    return applyLoadedGame(gameInfo, engine);
 }
 
 void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) {

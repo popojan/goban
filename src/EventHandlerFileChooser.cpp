@@ -70,9 +70,12 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
                 auto context = dialogDocument->GetContext();
                 if (auto gameDoc = context->GetDocument("game_window")) {
                     if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
-                        gameElement->getGameThread().loadSGF(filePath, gameIndex);
+                        bool tsumego = isTsumegoToggled();
+                        gameElement->getGameThread().loadSGF(filePath, gameIndex, tsumego);
                         gameElement->refreshPlayerDropdowns();  // Update dropdowns with SGF player names
                         gameElement->refreshGameSettingsDropdowns();  // Sync board/komi/handicap with SGF
+                        gameElement->setTsumegoMode(tsumego);
+
                         gameElement->updateNavigationOverlay();  // Update markup and variation overlays
                         gameElement->requestRepaint();  // Ensure UI updates
                     }
@@ -432,6 +435,8 @@ void EventHandlerFileChooser::handleFileSelection(int index) {
         // It's an SGF file - populate games list
         populateGamesList();
         updatePaginationInfo();
+        // Auto-detect tsumego based on first game's properties
+        setTsumegoToggle(dataSource->isTsumegoDetected());
     }
 }
 
@@ -515,6 +520,24 @@ void EventHandlerFileChooser::requestRepaint() const {
             }
         }
     }
+}
+
+void EventHandlerFileChooser::setTsumegoToggle(bool enabled) const {
+    if (!dialogDocument) return;
+    if (auto el = dialogDocument->GetElementById("cmdTsumego")) {
+        if (enabled)
+            el->SetAttribute("checked", "");
+        else
+            el->RemoveAttribute("checked");
+    }
+}
+
+bool EventHandlerFileChooser::isTsumegoToggled() const {
+    if (!dialogDocument) return false;
+    if (auto el = dialogDocument->GetElementById("cmdTsumego")) {
+        return el->HasAttribute("checked");
+    }
+    return false;
 }
 
 std::string EventHandlerFileChooser::getTemplateString(const char* templateId, const char* defaultValue) const {

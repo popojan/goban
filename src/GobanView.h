@@ -116,7 +116,11 @@ public:
     void requestRepaint(int what = UPDATE_SOME);
     bool needsRender() const { return updateFlag != UPDATE_NONE || animationRunning; }
     void stopAudioIfInactive() { player.stopIfInactive(); }
-    bool toggleOverlay();
+    void playSound(const std::string& id, double volume = 1.0) { player.play(id, volume); }
+    bool toggleLastMoveOverlay();
+    bool toggleNextMoveOverlay();
+    void setTsumegoMode(bool enabled);
+    bool isTsumegoMode() const { return tsumegoMode; }
 
     void Update();
     void moveCursor(float, float);
@@ -146,7 +150,9 @@ public:
 
     std::atomic<int> updateFlag;  // Thread-safe: accessed from main thread and GameThread
     int currentProgram;
-    bool showOverlay;
+    bool showLastMoveOverlay;
+    bool showNextMoveOverlay;
+    bool tsumegoMode = false;
     Position lastMove;
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)

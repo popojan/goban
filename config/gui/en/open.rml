@@ -37,6 +37,7 @@
             </div>
             <div class="bottomleft">
                 <span class="cmd button" onmouseup="refresh">Refresh</span>
+                <label class="checkbox_label"><input type="checkbox" id="cmdTsumego" name="tsumego"/>Tsumego</label>
             </div>
         </div>
     </div>

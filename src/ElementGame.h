@@ -28,6 +28,14 @@ public:
         view.updateNavigationOverlay();
     }
 
+    void setTsumegoMode(bool enabled) {
+        view.setTsumegoMode(enabled);
+    }
+
+    bool isTsumegoMode() const {
+        return view.isTsumegoMode();
+    }
+
     bool needsRender() const {
         return view.needsRender();
     }

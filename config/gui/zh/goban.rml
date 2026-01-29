@@ -18,6 +18,11 @@
                             <div class="cmd" onmouseup="archive">归档</div>
                         </div>
                         <div class="grp">
+                            <div class="hr">对局</div>
+                            <div class="cmd" id="cmdPrevGame" onmouseup="prev_game">上一局</div>
+                            <div class="cmd" id="cmdNextGame" onmouseup="next_game">下一局</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">系统</div>
                             <div class="cmd" onmouseup="quit">退出</div>
                         </div>
@@ -38,8 +43,9 @@
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">全屏</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">显示手数</div>
-                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">最后一手</div>
+                            <div class="hr">标注</div>
+                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">上一手</div>
+                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">下一手</div>
                         </div>
                         <!--
                         <div class="grp">

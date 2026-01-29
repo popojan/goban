@@ -18,6 +18,11 @@
                             <div class="cmd" onmouseup="archive">보관</div>
                         </div>
                         <div class="grp">
+                            <div class="hr">대국</div>
+                            <div class="cmd" id="cmdPrevGame" onmouseup="prev_game">이전</div>
+                            <div class="cmd" id="cmdNextGame" onmouseup="next_game">다음</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">시스템</div>
                             <div class="cmd" onmouseup="quit">종료</div>
                         </div>
@@ -38,8 +43,9 @@
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">전체화면</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">오버레이</div>
-                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">마지막 수</div>
+                            <div class="hr">표시</div>
+                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">마지막 수</div>
+                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">다음 수</div>
                         </div>
                         <div class="grp">
                             <div class="hr">카메라</div>

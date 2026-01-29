@@ -215,6 +215,28 @@ span.file_type {
     margin-right: 0.5rem;
 }
 
+.checkbox_label {
+    color: #cccccc;
+    padding: 0.3rem 0.5rem;
+    margin-left: 0.5rem;
+}
+
+/* Checkbox: unchecked state */
+.checkbox_label input[type="checkbox"] {
+    width: 1.2em;
+    height: 1.2em;
+    margin-right: 0.3rem;
+    border-width: 1px;
+    border-color: #999999;
+    background-color: #333333;
+}
+
+/* Checkbox: checked state */
+.checkbox_label input[type="checkbox"]:checked {
+    background-color: #4CAF50;
+    border-color: #4CAF50;
+}
+
 .button:hover {
     color: #e0e000;
 }
