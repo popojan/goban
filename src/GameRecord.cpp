@@ -3,6 +3,8 @@
 #include "UserSettings.h"
 #include <ISgfcColorPropertyValue.h>
 #include <iomanip>
+#include <fstream>
+#include <sstream>
 #include <filesystem>
 #include <spdlog/spdlog.h>
 
@@ -639,8 +641,9 @@ void GameRecord::appendGameToDocument() {
         // Check if daily session file already exists - load it to preserve previous games
         if (std::filesystem::exists(defaultFileName)) {
             try {
+                auto sgfContent = readFileContent(defaultFileName);
                 auto reader = F::CreateDocumentReader();
-                auto readResult = reader->ReadSgfFile(defaultFileName);
+                auto readResult = sgfContent ? reader->ReadSgfContent(*sgfContent) : nullptr;
                 if (readResult && readResult->IsSgfDataValid()) {
                     doc = readResult->GetDocument();
                     numGames = doc->GetGames().size();
@@ -730,9 +733,14 @@ void GameRecord::saveAsInternal(const std::string& fileName) {
 
     const std::shared_ptr writer(F::CreateDocumentWriter());
     try {
-        (void) writer->WriteSgfFile(doc, fn);
-        unsavedChanges = false;
-        spdlog::info("Writing sgf file [{}] success!", fn);
+        std::string sgfContent;
+        auto result = writer->WriteSgfContent(doc, sgfContent);
+        if (writeFileContent(fn, sgfContent)) {
+            unsavedChanges = false;
+            spdlog::info("Writing sgf file [{}] success!", fn);
+        } else {
+            spdlog::error("Writing sgf file [{}] failed: could not write to disk", fn);
+        }
     } catch (std::exception& ex) {
         spdlog::error("Writing sgf file [{}] failed: {}", fn, ex.what());
     }
@@ -768,11 +776,16 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
     std::lock_guard<std::mutex> lock(mutex);
 
     try {
+        auto sgfContent = readFileContent(fileName);
+        if (!sgfContent) {
+            spdlog::error("Failed to read SGF file [{}]", fileName);
+            return false;
+        }
         auto reader = F::CreateDocumentReader();
-        auto loadedDoc = reader->ReadSgfFile(fileName);
-        
+        auto loadedDoc = reader->ReadSgfContent(*sgfContent);
+
         if (!loadedDoc || !loadedDoc->IsSgfDataValid()) {
-            spdlog::error("Failed to load SGF file [{}] or no games found", fileName);
+            spdlog::error("Failed to parse SGF file [{}] or no games found", fileName);
             return false;
         }
 
@@ -1339,8 +1352,10 @@ int GameRecord::peekBoardSize(const std::string& fileName) {
     }
 
     try {
+        auto sgfContent = readFileContent(fileName);
+        if (!sgfContent) return -1;
         auto reader = SgfcPlusPlusFactory::CreateDocumentReader();
-        auto loadedDoc = reader->ReadSgfFile(fileName);
+        auto loadedDoc = reader->ReadSgfContent(*sgfContent);
 
         if (!loadedDoc || !loadedDoc->IsSgfDataValid()) {
             return -1;
@@ -1568,4 +1583,21 @@ bool GameRecord::isTsumego(const SGFGameInfo& info, size_t mainLineMoveCount) {
     // Require both AB and AW setup stones to distinguish from handicap (AB only)
     bool hasBothSetup = !info.setupBlackStones.empty() && !info.setupWhiteStones.empty();
     return hasBothSetup && mainLineMoveCount <= 50;
+}
+
+std::optional<std::string> GameRecord::readFileContent(const std::string& filePath) {
+    auto path = std::filesystem::u8path(filePath);
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return std::nullopt;
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+bool GameRecord::writeFileContent(const std::string& filePath, const std::string& content) {
+    auto path = std::filesystem::u8path(filePath);
+    std::ofstream file(path, std::ios::binary);
+    if (!file) return false;
+    file << content;
+    return file.good();
 }

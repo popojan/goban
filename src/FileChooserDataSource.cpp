@@ -1,4 +1,5 @@
 #include "FileChooserDataSource.h"
+#include "GameRecord.h"
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include <fstream>
@@ -298,9 +299,14 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
     std::vector<SGFGameInfo> gameList;
     
     try {
+        auto sgfContent = GameRecord::readFileContent(filePath);
+        if (!sgfContent) {
+            spdlog::error("Failed to read SGF file: {}", filePath);
+            return gameList;
+        }
         auto reader = SgfcPlusPlusFactory::CreateDocumentReader();
-        auto result = reader->ReadSgfFile(filePath);
-        
+        auto result = reader->ReadSgfContent(*sgfContent);
+
         if (!result || !result->IsSgfDataValid()) {
             spdlog::error("Failed to parse SGF file: {}", filePath);
             return gameList;

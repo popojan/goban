@@ -86,6 +86,10 @@ public:
     // Tsumego detection heuristic (setup stones + small board + few moves)
     static bool isTsumego(const SGFGameInfo& info, size_t mainLineMoveCount);
 
+    // Unicode-safe file I/O (bypasses libsgfc's fopen which fails on non-ASCII paths)
+    static std::optional<std::string> readFileContent(const std::string& filePath);
+    static bool writeFileContent(const std::string& filePath, const std::string& content);
+
 private:
 
     void appendGameToDocument();
