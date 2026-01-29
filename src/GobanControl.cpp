@@ -239,6 +239,8 @@ void GobanControl::command(const std::string& cmd) {
                 engine.navigateToVariation(passMove);
                 view.updateNavigationOverlay();
             } else {
+                model.start();
+                if (!engine.isRunning()) engine.run();
                 auto move = engine.getLocalMove(Move::PASS);
                 engine.playLocalMove(move);
             }

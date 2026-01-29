@@ -210,8 +210,10 @@ void ElementGame::refreshPlayerDropdowns() {
     const auto targetBlack = static_cast<int>(engine.getActivePlayer(0));
     const auto targetWhite = static_cast<int>(engine.getActivePlayer(1));
 
-    // Clear and repopulate (change events during this are harmless -
-    // intermediate activatePlayer calls are corrected by final SetSelection)
+    // Suppress change events during repopulation to prevent transient
+    // player switches (e.g. briefly activating an engine during clear)
+    control.setSyncingUI(true);
+
     while (selectBlack->GetNumOptions() > 0) {
         selectBlack->Remove(selectBlack->GetNumOptions() - 1);
     }
@@ -229,9 +231,10 @@ void ElementGame::refreshPlayerDropdowns() {
         selectWhite->Add(playerName.c_str(), playerIndex.c_str());
     }
 
-    // Final selection corrects any intermediate changes from clear events
     selectBlack->SetSelection(targetBlack);
     selectWhite->SetSelection(targetWhite);
+
+    control.setSyncingUI(false);
 
     spdlog::debug("refreshPlayerDropdowns: {} players, black={}, white={}",
         players.size(), targetBlack, targetWhite);
@@ -747,7 +750,8 @@ void ElementGame::OnUpdate()
     {
         bool thinking = engine.isThinking();
         bool humanTurn = engine.humanToMove() && !thinking;
-        bool hasMoves = model.game.moveCount() > 0;
+        bool hasMoves = model.game.moveCount() > 0
+            || !model.setupBlackStones.empty() || !model.setupWhiteStones.empty();
         bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
         // Bot-bot match detection: either explicit AI vs AI mode OR both players are engines
         bool botVsBot = engine.isAiVsAi() || engine.areBothPlayersEngines();

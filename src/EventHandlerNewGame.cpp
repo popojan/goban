@@ -69,14 +69,16 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         }
     }
     else if(value == "engine") {
-        std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
-        int index = 0;
-        ss >> index;
-        if(event.GetCurrentElement()->GetId() == "selectBlack") {
-            controller.switchPlayer(0, index);
-        }
-        else if(event.GetCurrentElement()->GetId() == "selectWhite") {
-            controller.switchPlayer(1, index);
+        if (!controller.isSyncingUI()) {
+            std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
+            int index = 0;
+            ss >> index;
+            if(event.GetCurrentElement()->GetId() == "selectBlack") {
+                controller.switchPlayer(0, index);
+            }
+            else if(event.GetCurrentElement()->GetId() == "selectWhite") {
+                controller.switchPlayer(1, index);
+            }
         }
     }
     else if(value == "shader") {

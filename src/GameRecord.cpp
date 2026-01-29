@@ -87,9 +87,7 @@ std::vector<Move> GameRecord::getPathFromRoot() const {
 
 bool GameRecord::isAtRoot() const {
     if (!game || !currentNode) return true;
-    auto root = game->GetRootNode();
-    // At root if currentNode IS root, or is first child of root (setup node)
-    return currentNode == root || currentNode->GetParent() == root;
+    return currentNode == game->GetRootNode();
 }
 
 Move GameRecord::lastMove() const {

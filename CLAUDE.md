@@ -168,6 +168,17 @@ These invariants must be maintained to prevent race conditions and ensure consis
 ### Game State
 - **isGameFinished()**: True only for resign or double-pass (two consecutive passes).
 - **Territory display**: Only shown at finished game positions, not at end of unfinished variations.
+- **Loaded games stay paused**: After loading an SGF, `model.started` remains false. Human moves work through the navigation path (`navigateToVariation`). Engine play requires explicit "Start" button press (`model.start()`).
+- **`isGameOver` lifecycle during navigation**: Cleared by `model.start()` when navigating back/home from a finished game. Restored by `navigateForward`/`navigateToEnd` when reaching end of a game with `hasGameResult()`.
+
+### UI Event Suppression
+- **`syncingUI` flag**: `GobanControl::syncingUI` suppresses game actions triggered by UI change events during programmatic dropdown updates. Any method that repopulates dropdowns (player, board size, komi, handicap) must wrap the repopulation with `setSyncingUI(true/false)`. Event handlers in `EventHandlerNewGame` check `isSyncingUI()` and skip side effects when true. This prevents transient intermediate states (e.g. briefly activating an engine player during dropdown clear/repopulate) from triggering game actions.
+
+## Coding Principles
+
+- **Search before creating**: Before introducing a new flag, helper, or mechanism, search the codebase for existing patterns that solve the same problem. Use `grep` for related keywords (e.g. "suppress", "syncing", "guard", "flag"). Reusing an existing mechanism is always preferable to adding a new one.
+- **Fix at the source**: When a race condition or unwanted side effect is discovered, fix the root cause rather than adding compensating workarounds downstream. A guard at the event source is better than a deferred correction after the fact.
+- **Document new invariants**: When introducing a new invariant, flag, or cross-cutting concern, add it to the Design Invariants section above. Not all invariants can be documented upfront, but capturing them as they're discovered prevents future regressions.
 
 ## Test Scenarios
 

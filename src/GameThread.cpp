@@ -1094,17 +1094,11 @@ void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) 
         matchSgfPlayers();
     }
 
-    // Set game mode based on result
-    if (model.game.hasGameResult()) {
-        // Finished game: enter Analysis mode for review/exploration
-        gameMode = GameMode::ANALYSIS;
-    } else {
-        // Unfinished game: ready to play immediately
-        gameMode = GameMode::MATCH;
-        model.start();
-    }
+    // Set game mode based on result (but don't start yet - caller must call
+    // model.start() after UI refresh to avoid race with transient player changes)
+    gameMode = model.game.hasGameResult() ? GameMode::ANALYSIS : GameMode::MATCH;
 
-    // Start game thread for navigation
+    // Start game thread for navigation (loop waits at !model until started)
     run();
 
     spdlog::info("Kibitz engine synced (player engines will sync on demand)");
