@@ -30,6 +30,7 @@ public:
 
     void setTsumegoMode(bool enabled) {
         view.setTsumegoMode(enabled);
+        model.game.setSuppressSessionCopy(enabled);
     }
 
     bool isTsumegoMode() const {

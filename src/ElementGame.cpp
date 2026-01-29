@@ -918,7 +918,8 @@ void ElementGame::OnUpdate()
         return msg == GameState::WHITE_WON || msg == GameState::BLACK_WON ||
                msg == GameState::WHITE_RESIGNED || msg == GameState::BLACK_RESIGNED ||
                msg == GameState::BLACK_PASS || msg == GameState::WHITE_PASS ||
-               msg == GameState::CALCULATING_SCORE;
+               msg == GameState::CALCULATING_SCORE ||
+               msg == GameState::TSUMEGO_SOLVED || msg == GameState::TSUMEGO_WRONG;
     };
 
     // Update message when msg changes or position changes
@@ -990,6 +991,12 @@ void ElementGame::OnUpdate()
             showMessage(resultMsg);
             view.state.reason = model.state.reason;
         }
+            break;
+        case GameState::TSUMEGO_SOLVED:
+            showMessage(getTemplateText(context, "tplTsumegoSolved"));
+            break;
+        case GameState::TSUMEGO_WRONG:
+            showMessage(getTemplateText(context, "tplTsumegoWrong"));
             break;
         default:
             if (!engineErrors.empty()) {

@@ -213,6 +213,8 @@
     <!-- Mode label templates -->
     <div class="template" id="tplAnalysisMode">検討モード</div>
     <div class="template" id="tplTsumegoMode">詰碁モード</div>
+    <div class="template" id="tplTsumegoSolved">正解！</div>
+    <div class="template" id="tplTsumegoWrong">不正解！</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

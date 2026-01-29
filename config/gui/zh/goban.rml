@@ -225,6 +225,8 @@
     <!-- Mode label templates -->
     <div class="template" id="tplAnalysisMode">分析模式</div>
     <div class="template" id="tplTsumegoMode">诘棋模式</div>
+    <div class="template" id="tplTsumegoSolved">解答正确！</div>
+    <div class="template" id="tplTsumegoWrong">错误！</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

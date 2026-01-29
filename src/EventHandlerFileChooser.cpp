@@ -75,6 +75,9 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
                         gameElement->refreshPlayerDropdowns();  // Update dropdowns with SGF player names
                         gameElement->refreshGameSettingsDropdowns();  // Sync board/komi/handicap with SGF
                         gameElement->setTsumegoMode(tsumego);
+                        if (tsumego) {
+                            gameElement->getGameThread().autoPlayTsumegoSetup();
+                        }
 
                         gameElement->updateNavigationOverlay();  // Update markup and variation overlays
                         gameElement->requestRepaint();  // Ensure UI updates

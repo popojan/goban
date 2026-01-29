@@ -363,8 +363,11 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
                         }
                         break;
                     case SgfcPropertyType::AB: // Setup black stones
+                        gameInfo.hasSetupStones = true;
+                        break;
                     case SgfcPropertyType::AW: // Setup white stones
                         gameInfo.hasSetupStones = true;
+                        gameInfo.hasSetupWhiteStones = true;
                         break;
                     default:
                         break;
@@ -378,7 +381,8 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
                     auto pt = property->GetPropertyType();
                     if (pt == SgfcPropertyType::AB || pt == SgfcPropertyType::AW) {
                         gameInfo.hasSetupStones = true;
-                        break;
+                        if (pt == SgfcPropertyType::AW)
+                            gameInfo.hasSetupWhiteStones = true;
                     }
                 }
             }
@@ -441,13 +445,18 @@ int FileChooserDataSource::countMovesInGame(const std::shared_ptr<LibSgfcPlusPlu
 
 bool FileChooserDataSource::isTsumegoDetected() const {
     if (games.empty()) return false;
-    // Require setup stones in most games (>= 80%)
+    // Require white setup stones (AW) in most games (>= 80%)
+    // This distinguishes tsumego (AB+AW) from handicap games (AB only)
     int setupCount = 0;
+    int resultCount = 0;
     int totalMoves = 0;
     for (const auto& g : games) {
-        if (g.hasSetupStones) setupCount++;
+        if (g.hasSetupWhiteStones) setupCount++;
+        if (!g.gameResult.empty()) resultCount++;
         totalMoves += g.moveCount;
     }
+    // Games with results are completed games, not tsumego collections
+    if (resultCount > 0) return false;
     float setupRatio = static_cast<float>(setupCount) / static_cast<float>(games.size());
     if (setupRatio < 0.8f) return false;
     // Average moves per game: tsumego typically < 50, full games typically > 150

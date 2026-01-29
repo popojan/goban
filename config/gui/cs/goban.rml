@@ -225,6 +225,8 @@
     <!-- Mode label templates -->
     <div class="template" id="tplAnalysisMode">Analytický režim</div>
     <div class="template" id="tplTsumegoMode">Tsumego režim</div>
+    <div class="template" id="tplTsumegoSolved">Vyřešeno!</div>
+    <div class="template" id="tplTsumegoWrong">Špatně!</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

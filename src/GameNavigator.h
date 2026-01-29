@@ -39,7 +39,7 @@ public:
     // Navigation methods for SGF replay
     bool navigateBack();
     bool navigateForward();
-    VariationResult navigateToVariation(const Move& move);
+    VariationResult navigateToVariation(const Move& move, bool promote = true);
     bool navigateToStart();
     bool navigateToEnd();
 

@@ -14,6 +14,8 @@ bool GobanControl::newGame(unsigned boardSize) const {
     engine.interrupt();
     engine.reset();
     engine.removeSgfPlayers();  // Remove temporary SGF players from previous load
+    view.setTsumegoMode(false);
+    model.game.setSuppressSessionCopy(false);
     if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         model.createNewRecord();
         view.animateIntro();
@@ -44,47 +46,82 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     spdlog::debug("Navigation click blocked - engine is thinking");
                     return;
                 }
+                // Stone-in-hand: first click picks up, second click places
+                bool inputAllowed = engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS
+                    || view.isTsumegoMode();
+                if (!inputAllowed) return;
+
+                if (!model.state.holdsStone) {
+                    // First click: pick up stone
+                    model.state.holdsStone = true;
+                    model.updateReservoirs();
+                    view.requestRepaint(GobanView::UPDATE_STONES);
+                    return;
+                }
+
+                // Second click: place stone
+                model.state.holdsStone = false;
+                model.updateReservoirs();
+
+                // Check if click matches an existing variation
                 auto variations = model.game.getVariations();
                 for (const auto& move : variations) {
                     if (move == Move::NORMAL && move.pos == coord) {
                         spdlog::debug("Clicked on existing variation at ({},{})", coord.col(), coord.row());
                         if (engine.navigateToVariation(move)) {
                             view.updateNavigationOverlay();
-                            if (view.isTsumegoMode() && model.game.isAtEndOfNavigation()) {
-                                parent->showMessage("Correct!");
-                                view.playSound("correct", 1.0);
+                            if (view.isTsumegoMode()) {
+                                if (model.game.isOnBadMovePath()) {
+                                    model.state.msg = GameState::TSUMEGO_WRONG;
+                                    view.playSound("error", 0.5);
+                                } else if (model.game.isAtEndOfNavigation()) {
+                                    model.state.msg = GameState::TSUMEGO_SOLVED;
+                                    view.playSound("correct", 1.0);
+                                } else if (model.game.hasNextMove()) {
+                                    // Auto-play opponent's response (main line)
+                                    engine.navigateForward();
+                                    view.updateNavigationOverlay();
+                                    if (model.game.isAtEndOfNavigation()) {
+                                        model.state.msg = GameState::TSUMEGO_SOLVED;
+                                        view.playSound("correct", 1.0);
+                                    }
+                                }
                             }
                         }
                         return;
                     }
                 }
-                // In tsumego mode, only allow existing variations (no new branches)
+
+                // No matching variation — new move
                 if (view.isTsumegoMode()) {
-                    spdlog::debug("Tsumego mode: ignoring click on non-variation position");
-                    view.playSound("error", 0.5);
+                    // Wrong move: create variation with BM property
+                    // Player must manually backtrack (Left key) as penalty
+                    spdlog::debug("Tsumego: wrong move at ({},{})", coord.col(), coord.row());
+                    Color colorToMove = model.game.getColorToMove();
+                    Move wrongMove(coord, colorToMove);
+                    if (engine.navigateToVariation(wrongMove, false)) {  // Don't promote wrong moves
+                        model.game.markBadMove();
+                        view.updateNavigationOverlay();
+                        model.state.msg = GameState::TSUMEGO_WRONG;
+                        view.playSound("error", 0.5);
+                    }
                     return;
                 }
-                // Clicked on new position - create new variation via navigateToVariation
-                // Use SGF tree to determine correct color (model.state may be out of sync)
+
+                // Normal mode: create new variation
                 Color colorToMove = model.game.getColorToMove();
-                spdlog::debug("Clicked on new position during navigation - creating new variation (color={})",
+                spdlog::debug("New variation during navigation (color={})",
                     colorToMove == Color::BLACK ? "B" : "W");
-                model.start();  // New variation = game continues
+                model.start();
                 if (!engine.isRunning()) {
                     engine.run();
                 }
                 Move newMove(coord, colorToMove);
-                if (bool inputAllowed = engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS;
-                    inputAllowed && model.state.holdsStone && engine.navigateToVariation(newMove)) {
-                    //view.updateNavigationOverlay();
-                    model.start();  // New variation = game continues
+                if (engine.navigateToVariation(newMove)) {
+                    model.start();
                     if (!engine.isRunning()) {
                         engine.run();
                     }
-                } else if (inputAllowed) {
-                    model.state.holdsStone = true;
-                    model.updateReservoirs();  // Stone in hand reduces reservoir
-                    view.requestRepaint(GobanView::UPDATE_STONES);
                 }
                 return;
             }
@@ -324,6 +361,15 @@ void GobanControl::command(const std::string& cmd) {
         else if (cmd == "navigate_forward") {
             if (engine.navigateForward()) view.updateNavigationOverlay();
         }
+        // Update tsumego feedback on navigation
+        if (model.state.msg == GameState::TSUMEGO_SOLVED ||
+            model.state.msg == GameState::TSUMEGO_WRONG) {
+            if (view.isTsumegoMode() && model.game.isOnBadMovePath()) {
+                model.state.msg = GameState::TSUMEGO_WRONG;
+            } else {
+                model.state.msg = GameState::NONE;
+            }
+        }
     }
     else if (cmd == "pan camera") {
         view.endPan();
@@ -440,6 +486,8 @@ void GobanControl::command(const std::string& cmd) {
 
         if (tsumego) {
             view.setTsumegoMode(true);  // Re-apply overlay settings
+            model.game.setSuppressSessionCopy(true);
+            engine.autoPlayTsumegoSetup();
         }
 
         view.updateLastMoveOverlay();

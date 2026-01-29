@@ -285,7 +285,16 @@ int Board::updateStone(const Position& p, const Color& c) {
         ret = STONE_PLACED;
     } else {
         ret = STONE_REMOVED;
-        removeOverlay(p);
+        auto& overlay = (*this)[p].overlay;
+        if (overlay.layer > 0) {
+            // Stone-level overlay: remove with stone
+            removeOverlay(p);
+        } else if (overlay.layer == 0 && !overlay.text.empty()) {
+            // Board-level overlay (annotation): restore material and grid-centered position
+            mValue = mAnnotation;
+            glStones[idx - 2] = static_cast<float>(j) - 0.5f * static_cast<float>(boardSize) + 0.5f;
+            glStones[idx - 1] = static_cast<float>(i) - 0.5f * static_cast<float>(boardSize) + 0.5f;
+        }
     }
     glStones[idx + 0] = mValue;
     (*this)[p].stone = c;

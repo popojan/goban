@@ -182,7 +182,7 @@ bool GameNavigator::navigateForward() {
     return true;
 }
 
-GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& move) {
+GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& move, bool promote) {
     VariationResult result;
     spdlog::debug("navigateToVariation: entry, move={}", move.toString());
 
@@ -209,8 +209,7 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
 
     // Navigate to the child node in the SGF tree
     // If child doesn't exist, create a new branch
-    // promoteToMainLine=true: promote existing variations when user has new moves
-    result.newBranch = !model.game.navigateToChild(move, true);
+    result.newBranch = !model.game.navigateToChild(move, promote);
     if (result.newBranch) {
         spdlog::debug("navigateToVariation: creating new branch");
         if (model.game.hasGameResult()) {
@@ -218,11 +217,17 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
             model.game.branchFromFinishedGame(move);
         } else {
             // In-progress game: modify tree in place
-            model.game.move(move);
-            model.game.promoteCurrentPathToMainLine();
+            model.game.move(move, promote);
+            if (promote) {
+                model.game.promoteCurrentPathToMainLine();
+            }
         }
         // Clear game over state - we're continuing the game in a new branch
-        model.start();
+        // Skip for non-promoted branches (e.g. tsumego wrong moves) to stay in navigation mode.
+        // Kibitz (space key) handles its own model.start() independently.
+        if (promote) {
+            model.start();
+        }
     } else {
         spdlog::debug("navigateToVariation: following existing branch");
     }

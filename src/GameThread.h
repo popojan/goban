@@ -32,6 +32,7 @@ struct NavCommand {
     enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION };
     Type type;
     Move move;  // For TO_VARIATION
+    bool promote = true;  // For TO_VARIATION: promote to main line
     std::shared_ptr<std::promise<NavResult>> resultPromise;
 };
 
@@ -120,7 +121,7 @@ public:
     // Navigation methods for SGF replay
     bool navigateBack();   // Undo one move during navigation
     bool navigateForward();  // Play next move during navigation
-    bool navigateToVariation(const Move& move);  // Navigate to specific variation
+    bool navigateToVariation(const Move& move, bool promote = true);  // Navigate to specific variation
     bool navigateToStart();  // Go to beginning of game
     bool navigateToEnd();    // Go to end of game (main line)
 
@@ -129,6 +130,7 @@ public:
     bool loadSGF(const std::string& fileName, int gameIndex = 0, bool startAtRoot = false);
     bool loadSGFWithEngine(const std::string& fileName, Engine* engine = nullptr, int gameIndex = 0, bool startAtRoot = false);
     bool switchGame(int gameIndex, bool startAtRoot = false);  // Switch game within loaded SGF doc
+    bool autoPlayTsumegoSetup();  // Auto-play first move if it contradicts PL (non-standard tsumego convention)
     void syncEngineToPosition(Engine* engine);  // Sync one engine to current game state
     void syncRemainingEngines(Engine* alreadySynced = nullptr, bool matchPlayers = true);  // Sync all engines except alreadySynced
 

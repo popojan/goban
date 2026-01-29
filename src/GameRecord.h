@@ -30,7 +30,7 @@ public:
     [[nodiscard]] Move lastStoneMove() const;
     [[nodiscard]] std::pair<Move, size_t> lastStoneMoveIndex() const;
 
-    void move(const Move& move);
+    void move(const Move& move, bool insertAsFirst = true);
     void branchFromFinishedGame(const Move& move);  // Copy path and branch (preserves original)
 
     void annotate(const std::string& comment) const;
@@ -49,6 +49,8 @@ public:
     [[nodiscard]] size_t getNumGames() const { return numGames; }
     [[nodiscard]] bool hasNewMoves() const { return gameHasNewMoves; }
     [[nodiscard]] bool hasUnsavedChanges() const { return unsavedChanges; }
+
+    void setSuppressSessionCopy(bool suppress) { suppressSessionCopy = suppress; }
 
     void setHandicapStones(const std::vector<Position>& stones);
 
@@ -123,6 +125,7 @@ private:
     bool gameHasNewMoves;
     bool gameInDocument;  // True when game is already part of doc (prevent re-append)
     bool unsavedChanges = false;  // True when changes made since last save
+    bool suppressSessionCopy = false;  // True in tsumego mode: don't copy branches to daily session
 
     // Loaded external SGF document (for game cycling with PageUp/PageDown)
     std::shared_ptr<LibSgfcPlusPlus::ISgfcDocument> loadedExternalDoc;
@@ -172,6 +175,15 @@ public:
     [[nodiscard]] std::vector<Move> getVariations() const;
     bool navigateToChild(const Move& move, bool promoteToMainLine = false);
     void promoteCurrentPathToMainLine() const;
+
+    // Check if current node has BM (Bad Move) property
+    [[nodiscard]] bool isBadMove() const;
+
+    // Check if any node from root to current position has BM
+    [[nodiscard]] bool isOnBadMovePath() const;
+
+    // Mark current node with BM property
+    void markBadMove();
 
     // Get comment from current node (C property)
     [[nodiscard]] std::string getComment() const;

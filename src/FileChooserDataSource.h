@@ -32,6 +32,7 @@ struct SGFGameInfo {
     float komi;
     int gameIndex;
     bool hasSetupStones = false;
+    bool hasSetupWhiteStones = false;  // AW property (distinguishes tsumego from handicap)
 };
 
 // Temporarily disabled - DataSource was removed from RmlUi

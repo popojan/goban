@@ -188,7 +188,7 @@ GameRecord::GameRecord():
     defaultFileName = ss.str();
 }
 
-void GameRecord::move(const Move& move)  {
+void GameRecord::move(const Move& move, bool insertAsFirst)  {
 
     std::lock_guard<std::mutex> lock(mutex);
 
@@ -230,7 +230,11 @@ void GameRecord::move(const Move& move)  {
         std::shared_ptr<ISgfcProperty> property(pF->CreateProperty(type, value));
         properties.push_back(property);
         newNode->SetProperties(properties);
-        game->GetTreeBuilder()->InsertChild(currentNode, newNode, currentNode->GetFirstChild());
+        if (insertAsFirst) {
+            game->GetTreeBuilder()->InsertChild(currentNode, newNode, currentNode->GetFirstChild());
+        } else {
+            game->GetTreeBuilder()->AppendChild(currentNode, newNode);
+        }
         currentNode = newNode;
         unsavedChanges = true;
         if (!gameHasNewMoves) {
@@ -618,6 +622,11 @@ void GameRecord::appendGameToDocument() {
 
     if (game == nullptr) {
         spdlog::warn("appendGameToDocument: game is null, skipping");
+        return;
+    }
+
+    if (suppressSessionCopy) {
+        spdlog::debug("appendGameToDocument: suppressed (tsumego mode)");
         return;
     }
 
@@ -1059,12 +1068,23 @@ Color GameRecord::getColorToMove() const {
             std::vector<std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>> nodes = { game->GetRootNode() };
             if (game->GetRootNode()->HasChildren())
                 nodes.push_back(game->GetRootNode()->GetFirstChild());
-            for (const auto& node : nodes) {
-                for (const auto& prop : node->GetProperties()) {
-                    if (prop->GetPropertyType() == T::PL) {
+            for (size_t ni = 0; ni < nodes.size(); ++ni) {
+                const auto& node = nodes[ni];
+                auto props = node->GetProperties();
+                for (const auto& prop : props) {
+                    if (prop->GetPropertyType() == T::PL || prop->GetPropertyName() == "PL") {
                         if (auto colorVal = std::dynamic_pointer_cast<ISgfcColorPropertyValue>(prop->GetPropertyValue())) {
-                            return colorVal->GetColorValue() == SgfcColor::Black
+                            auto color = colorVal->GetColorValue() == SgfcColor::Black
                                 ? Color::BLACK : Color::WHITE;
+                            spdlog::debug("getColorToMove: PL typed value = {}", color == Color::BLACK ? "B" : "W");
+                            return color;
+                        }
+                        // FF[3] uses numeric PL: 1=Black, 2=White
+                        if (auto singleVal = std::dynamic_pointer_cast<ISgfcSinglePropertyValue>(prop->GetPropertyValue())) {
+                            auto rawValue = singleVal->GetRawValue();
+                            spdlog::debug("getColorToMove: PL raw value = '{}'", rawValue);
+                            if (rawValue == "1" || rawValue == "b" || rawValue == "B") return Color::BLACK;
+                            if (rawValue == "2" || rawValue == "w" || rawValue == "W") return Color::WHITE;
                         }
                     }
                     if (prop->GetPropertyType() == T::HA) {
@@ -1075,6 +1095,17 @@ Color GameRecord::getColorToMove() const {
                     if (prop->GetPropertyType() == T::AW) {
                         hasWhiteSetup = true;
                     }
+                }
+            }
+        }
+        // Fallback: infer from first child move's color (handles FF[3] PL[2] dropped by libsgfc)
+        if (hasWhiteSetup && currentNode) {
+            auto children = currentNode->GetChildren();
+            if (!children.empty()) {
+                if (auto firstMove = extractMoveFromNode(children[0], boardSize.Columns)) {
+                    spdlog::debug("getColorToMove: inferred from first move color = {}",
+                        firstMove->col == Color::BLACK ? "B" : "W");
+                    return firstMove->col;
                 }
             }
         }
@@ -1190,6 +1221,40 @@ void GameRecord::promoteCurrentPathToMainLine() const {
         treeBuilder->InsertChild(parent, child, siblings[0]);
         spdlog::debug("promoteCurrentPathToMainLine: promoted node to first child");
     }
+}
+
+bool GameRecord::isBadMove() const {
+    if (!currentNode) return false;
+    for (const auto& prop : currentNode->GetProperties()) {
+        if (prop->GetPropertyType() == T::BM || prop->GetPropertyName() == "BM")
+            return true;
+    }
+    return false;
+}
+
+bool GameRecord::isOnBadMovePath() const {
+    if (!game || !currentNode) return false;
+    auto root = game->GetRootNode();
+    auto node = currentNode;
+    while (node && node != root) {
+        for (const auto& prop : node->GetProperties()) {
+            if (prop->GetPropertyType() == T::BM || prop->GetPropertyName() == "BM")
+                return true;
+        }
+        node = node->GetParent();
+    }
+    return false;
+}
+
+void GameRecord::markBadMove() {
+    if (!currentNode || !game) return;
+    auto pF = F::CreatePropertyFactory();
+    auto vF = F::CreatePropertyValueFactory();
+    auto bmValue = vF->CreateNumberPropertyValue(1);
+    auto bmProp = pF->CreateProperty(T::BM, bmValue);
+    auto properties = currentNode->GetProperties();
+    properties.push_back(bmProp);
+    currentNode->SetProperties(properties);
 }
 
 std::string GameRecord::getComment() const {
@@ -1500,6 +1565,7 @@ bool GameRecord::switchToGame(int gameIndex, SGFGameInfo& gameInfo, bool startAt
 }
 
 bool GameRecord::isTsumego(const SGFGameInfo& info, size_t mainLineMoveCount) {
-    bool hasSetupStones = !info.setupBlackStones.empty() || !info.setupWhiteStones.empty();
-    return hasSetupStones && mainLineMoveCount <= 50;
+    // Require both AB and AW setup stones to distinguish from handicap (AB only)
+    bool hasBothSetup = !info.setupBlackStones.empty() && !info.setupWhiteStones.empty();
+    return hasBothSetup && mainLineMoveCount <= 50;
 }

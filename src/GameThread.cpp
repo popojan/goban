@@ -498,7 +498,7 @@ bool GameThread::navigateBack() {
     auto future = promise->get_future();
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::BACK, Move(), promise});
+        navQueue.push({NavCommand::BACK, Move(), true, promise});
     }
     wakeGameThread();
     return future.get().success;
@@ -509,18 +509,18 @@ bool GameThread::navigateForward() {
     auto future = promise->get_future();
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::FORWARD, Move(), promise});
+        navQueue.push({NavCommand::FORWARD, Move(), true, promise});
     }
     wakeGameThread();
     return future.get().success;
 }
 
-bool GameThread::navigateToVariation(const Move& move) {
+bool GameThread::navigateToVariation(const Move& move, bool promote) {
     auto promise = std::make_shared<std::promise<NavResult>>();
     auto future = promise->get_future();
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::TO_VARIATION, move, promise});
+        navQueue.push({NavCommand::TO_VARIATION, move, promote, promise});
     }
     wakeGameThread();
     NavResult result = future.get();
@@ -532,7 +532,7 @@ bool GameThread::navigateToStart() {
     auto future = promise->get_future();
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::TO_START, Move(), promise});
+        navQueue.push({NavCommand::TO_START, Move(), true, promise});
     }
     wakeGameThread();
     return future.get().success;
@@ -543,7 +543,7 @@ bool GameThread::navigateToEnd() {
     auto future = promise->get_future();
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::TO_END, Move(), promise});
+        navQueue.push({NavCommand::TO_END, Move(), true, promise});
     }
     wakeGameThread();
     return future.get().success;
@@ -606,7 +606,7 @@ NavResult GameThread::executeNavCommand(const NavCommand& cmd) {
             result.success = navigator->navigateToEnd();
             break;
         case NavCommand::TO_VARIATION: {
-            auto varResult = navigator->navigateToVariation(cmd.move);
+            auto varResult = navigator->navigateToVariation(cmd.move, cmd.promote);
             result.success = varResult.success;
             result.newBranch = varResult.newBranch;
             // In Analysis mode, auto-respond with kibitz engine after human variation
@@ -835,6 +835,21 @@ bool GameThread::switchGame(int gameIndex, bool startAtRoot) {
     return true;
 }
 
+bool GameThread::autoPlayTsumegoSetup() {
+    // Some tsumego SGFs use PL to mark "side to keep alive" rather than "side to move".
+    // Per the SGF spec, PL means "player to move first". When the first child move's color
+    // contradicts PL, auto-play that move as setup so the solver starts with the PL color.
+    if (!model.game.hasNextMove()) return false;
+    Color plColor = model.game.getColorToMove();
+    Move nextMove = model.game.getNextMove();
+    if (nextMove.col == plColor) return false;
+
+    spdlog::info("Tsumego setup: auto-playing {} move (PL={}) as setup",
+        nextMove.col == Color::BLACK ? "B" : "W",
+        plColor == Color::BLACK ? "B" : "W");
+    return navigateForward();
+}
+
 void GameThread::syncEngineToPosition(Engine* engine) {
     // Core method: sync one engine to current game position
     if (!engine) return;
@@ -1042,19 +1057,14 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
             observer->onBoardChange(result);
         });
 
-    // Set game state
+    // Set game state - use SGF tree for color to move (respects PL property)
+    model.state.colorToMove = model.game.getColorToMove();
     if (model.game.moveCount() > 0) {
-        model.state.colorToMove = Color(model.game.lastMove().col == Color::BLACK
-            ? Color::WHITE : Color::BLACK);
         const Move& lastMove = model.game.lastMove();
         if (lastMove == Move::PASS) {
             model.state.msg = (lastMove.col == Color::BLACK)
                 ? GameState::BLACK_PASS : GameState::WHITE_PASS;
         }
-    } else if (gameInfo.handicap > 0) {
-        model.state.colorToMove = Color::WHITE;
-    } else {
-        model.state.colorToMove = Color::BLACK;
     }
 
     model.state.comment = model.game.getComment();
