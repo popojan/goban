@@ -222,6 +222,9 @@ void GobanControl::command(const std::string& cmd) {
         view.requestRepaint();
     }
     else if (cmd == "toggle_analysis_mode") {
+        if (view.isTsumegoMode()) {
+            return;  // Tsumego mode exits only via new game or loading ordinary SGF
+        }
         if (engine.getGameMode() == GameMode::MATCH) {
             if (engine.setGameMode(GameMode::ANALYSIS)) {
                 checked = true;

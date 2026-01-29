@@ -210,6 +210,10 @@
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
     </game>
+    <!-- Mode label templates -->
+    <div class="template" id="tplAnalysisMode">検討モード</div>
+    <div class="template" id="tplTsumegoMode">詰碁モード</div>
+
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
     <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">はい</span> <span class="prompt-btn" onmouseup="prompt_no">いいえ</span></div>

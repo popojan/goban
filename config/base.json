@@ -86,7 +86,8 @@
     {"key": 35, "command": "fps"},
     {"key": 26, "command": "animate"},
     {"key": 31, "command": "toggle_territory"},
-    {"key": 25, "command": "toggle_overlay"},
+    {"key": 25, "command": "toggle_last_move_overlay"},
+    {"key": 24, "command": "toggle_next_move_overlay"},
     {"key": 29, "command": "resign"},
     {"key": 27, "command": "pass"},
     {"key": 14, "command": "reset camera"},
@@ -105,12 +106,16 @@
     {"key": 21, "command": "increase dof"},
     {"key": 22, "command": "decrease dof"},
     {"key": 72, "command": "toggle_analysis_mode"},
+    {"key": 86, "command": "prev_game"},
+    {"key": 87, "command": "next_game"},
     {"key": 89, "command": "navigate_start"},
     {"key": 88, "command": "navigate_end"}
   ],
   "sounds": {
     "move": "./config/sound/stone.wav",
-    "clash": "./config/sound/collision.wav"
+    "clash": "./config/sound/collision.wav",
+    "error": "./config/sound/error.wav",
+    "correct": "./config/sound/correct.wav"
   },
   "fonts": {
     "gui": [

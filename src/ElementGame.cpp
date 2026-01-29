@@ -736,13 +736,26 @@ void ElementGame::OnUpdate()
             OnMenuToggle("toggle_territory", model.board.showTerritory);
         }
     }
-    // Sync game mode menu toggle with engine state
+    // Sync game mode menu toggle with engine state (analysis or tsumego)
     {
-        std::vector<Rml::Element*> els;
-        context->GetDocument("game_window")->GetElementsByClassName(els, "toggle_analysis_mode");
+        auto doc = context->GetDocument("game_window");
+        auto* cmdEl = doc->GetElementById("cmdAnalysisMode");
+        bool tsumego = view.isTsumegoMode();
         bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
-        if (!els.empty() && els[0]->IsClassSet("selected") != analysisMode) {
-            OnMenuToggle("toggle_analysis_mode", analysisMode);
+        bool checked = tsumego || analysisMode;
+        if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
+            OnMenuToggle("toggle_analysis_mode", checked);
+        }
+        // Swap label between analysis and tsumego mode
+        if (cmdEl) {
+            const char* tplId = tsumego ? "tplTsumegoMode" : "tplAnalysisMode";
+            if (auto* tpl = doc->GetElementById(tplId)) {
+                Rml::String current = cmdEl->GetInnerRML();
+                Rml::String target = tpl->GetInnerRML();
+                if (current != target) {
+                    cmdEl->SetInnerRML(target);
+                }
+            }
         }
     }
     // Sync overlay menu toggles with view state

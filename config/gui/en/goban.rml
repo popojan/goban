@@ -222,6 +222,10 @@
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
     </game>
+    <!-- Mode label templates -->
+    <div class="template" id="tplAnalysisMode">Analysis Mode</div>
+    <div class="template" id="tplTsumegoMode">Tsumego Mode</div>
+
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
     <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">Yes</span> <span class="prompt-btn" onmouseup="prompt_no">No</span></div>
