@@ -266,6 +266,12 @@ void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
     Position koPosition;
     model.game.buildBoardFromMoves(result, koPosition);
 
+    // Preserve territory display flags set by onGameMove (e.g. double pass
+    // enables showTerritory).  The fresh result board has showTerritory=false,
+    // and updateStones would overwrite the model's flag back to false.
+    result.showTerritory = model.board.showTerritory;
+    result.showTerritoryAuto = model.board.showTerritoryAuto;
+
     // Notify observers of the board state
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&result](GameObserver* observer) {
