@@ -80,7 +80,7 @@ bool GameNavigator::navigateBack() {
     // Keep colorToMove in sync with SGF tree position
     model.state.colorToMove = model.game.getColorToMove();
 
-    // Update comment from current SGF node
+    // Update comment/markup from current SGF node
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
@@ -162,7 +162,7 @@ bool GameNavigator::navigateForward() {
     // Keep colorToMove in sync with SGF tree position
     model.state.colorToMove = model.game.getColorToMove();
 
-    // Update comment from current SGF node
+    // Update comment/markup from current SGF node
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
@@ -235,7 +235,7 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
     // Keep colorToMove in sync with SGF tree position
     model.state.colorToMove = model.game.getColorToMove();
 
-    // Update comment from current SGF node
+    // Update comment/markup from current SGF node
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
 
@@ -345,7 +345,6 @@ bool GameNavigator::navigateToEnd() {
     model.state.colorToMove = model.game.getColorToMove();
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
-
     model.state.msg = GameState::NONE;
 
     // Always build stones from SGF (local capture logic, reliable)

@@ -123,6 +123,7 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
     // All engines now start from empty board - they're synced
     enginesSyncedToPosition = true;
+    kibitzNeedsSync = false;
 
     // Always notify observers of board size, even if engine failed
     // This ensures the board renders correctly regardless of engine state
@@ -598,6 +599,16 @@ void GameThread::processScoring() {
 }
 
 void GameThread::processNavigationQueue() {
+    // Lazy-sync kibitz engine on the game thread (deferred from UI thread)
+    if (kibitzNeedsSync.exchange(false)) {
+        Engine* kibitz = currentKibitz();
+        Engine* coach = currentCoach();
+        if (kibitz && kibitz != coach && kibitz->isTypeOf(Player::ENGINE)) {
+            spdlog::info("Lazy-syncing kibitz engine on game thread");
+            syncEngineToPosition(kibitz);
+        }
+    }
+
     while (true) {
         NavCommand cmd;
         {
@@ -1110,12 +1121,13 @@ void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) 
     Engine* coach = alreadySynced ? alreadySynced : currentCoach();
     Engine* kibitz = currentKibitz();
 
-    spdlog::info("Syncing kibitz engine for SGF viewing (board: {}, moves: {})",
+    spdlog::info("Setting up SGF viewing (board: {}, moves: {})",
                  model.getBoardSize(), model.game.moveCount());
 
-    // Only sync kibitz if it's different from coach and is an engine
+    // Defer kibitz sync to the game thread to avoid blocking the UI thread.
+    // The game thread will sync kibitz before processing the first navigation command.
     if (kibitz && kibitz != coach && kibitz->isTypeOf(Player::ENGINE)) {
-        syncEngineToPosition(kibitz);
+        kibitzNeedsSync = true;
     }
 
     // Mark player engines as needing sync (will be done when they play)
@@ -1134,7 +1146,7 @@ void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) 
     // Start game thread for navigation (loop waits at !model until started)
     run();
 
-    spdlog::info("Kibitz engine synced (player engines will sync on demand)");
+    spdlog::info("SGF viewing ready (kibitz will sync on game thread)");
 }
 
 void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const {

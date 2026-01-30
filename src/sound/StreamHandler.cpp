@@ -36,6 +36,10 @@ int StreamHandler::PortAudioCallback(const void * input,
 {
         StreamHandler * handler = static_cast<StreamHandler *>(userData);
 
+        // Clamp to pre-allocated buffer size (PortAudio may request more)
+        if (frameCount > static_cast<unsigned long>(handler->FRAMES_PER_BUFFER))
+                frameCount = handler->FRAMES_PER_BUFFER;
+
         unsigned long stereoFrameCount = frameCount * handler->CHANNEL_COUNT;
         memset((int *) output, 0, stereoFrameCount * sizeof(int));
 
@@ -89,18 +93,18 @@ int StreamHandler::PortAudioCallback(const void * input,
                         }
                         int * outputCursor = static_cast<int *>(output);
                         if (audioFile->fh.channels() == 1) {
-                                for (unsigned long i = 0; i < stereoFrameCount; ++i)
+                                // Mono → stereo: duplicate each mono sample to L+R
+                                for (unsigned long i = 0; i < frameCount; ++i)
                                 {
-                                        *outputCursor += (data->volume * 0.5 * outputBuffer[i]);
-                                        ++outputCursor;
-                                        *outputCursor += (data->volume * 0.5 * outputBuffer[i]);
-                                        ++outputCursor;
+                                        int sample = static_cast<int>(data->volume * 0.5 * outputBuffer[i]);
+                                        outputCursor[2 * i]     += sample;
+                                        outputCursor[2 * i + 1] += sample;
                                 }
                         } else {
+                                // Stereo: copy L+R pairs directly
                                 for (unsigned long i = 0; i < stereoFrameCount; ++i)
                                 {
-                                        *outputCursor += (data->volume * 0.5 * outputBuffer[i]);
-                                        ++outputCursor;
+                                        outputCursor[i] += static_cast<int>(data->volume * 0.5 * outputBuffer[i]);
                                 }
                         }
 

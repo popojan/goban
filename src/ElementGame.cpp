@@ -926,6 +926,13 @@ void ElementGame::OnUpdate()
     // Don't let engine error changes override important messages
     bool msgChanged = view.state.msg != model.state.msg;
     bool posChanged = view.board.positionNumber.load() != model.board.positionNumber.load();
+
+    // Only read comment when position changed — atomic positionNumber ordering
+    // guarantees the game thread's comment write is complete
+    std::string commentSnapshot = view.state.comment;
+    if (posChanged) {
+        commentSnapshot = model.state.comment;
+    }
     bool shouldUpdateForErrors = errorsChanged && !isImportantMessage(model.state.msg);
 
     if (msgChanged || posChanged || shouldUpdateForErrors) {
@@ -941,13 +948,13 @@ void ElementGame::OnUpdate()
             break;
         case GameState::BLACK_RESIGNED: {
             std::string msg = getTemplateText(context, "templateResignWhiteWon");
-            if (!model.state.comment.empty()) msg += "\n\n" + model.state.comment;
+            if (!commentSnapshot.empty()) msg += "\n\n" + commentSnapshot;
             showMessage(msg);
             break;
         }
         case GameState::WHITE_RESIGNED: {
             std::string msg = getTemplateText(context, "templateResignBlackWon");
-            if (!model.state.comment.empty()) msg += "\n\n" + model.state.comment;
+            if (!commentSnapshot.empty()) msg += "\n\n" + commentSnapshot;
             showMessage(msg);
             break;
         }
@@ -985,8 +992,8 @@ void ElementGame::OnUpdate()
                     getTemplateText(context, "templateBlackWon").c_str(),
                     std::abs(model.state.scoreDelta)).c_str();
             // Append SGF comment if present (user-authored content takes priority)
-            if (!model.state.comment.empty()) {
-                resultMsg += "\n\n" + model.state.comment;
+            if (!commentSnapshot.empty()) {
+                resultMsg += "\n\n" + commentSnapshot;
             }
             showMessage(resultMsg);
             view.state.reason = model.state.reason;
@@ -1012,10 +1019,10 @@ void ElementGame::OnUpdate()
         // to ensure UPDATE_STONES flag is set before positionNumber is consumed
     }
     // Show SGF comment if available, but don't overwrite important game messages
-    if (view.state.comment != model.state.comment || errorsChanged) {
-        spdlog::debug("Comment changed: '{}' -> '{}'", view.state.comment.substr(0, 30), model.state.comment.substr(0, 30));
-        if (!model.state.comment.empty() && !isImportantMessage(model.state.msg)) {
-            showWithErrors(model.state.comment);
+    if (view.state.comment != commentSnapshot || errorsChanged) {
+        spdlog::debug("Comment changed: '{}' -> '{}'", view.state.comment.substr(0, 30), commentSnapshot.substr(0, 30));
+        if (!commentSnapshot.empty() && !isImportantMessage(model.state.msg)) {
+            showWithErrors(commentSnapshot);
             // Scroll to bottom to show latest content
             if (auto msg = context->GetDocument("game_window")->GetElementById("lblMessage")) {
                 msg->SetScrollTop(msg->GetScrollHeight() - msg->GetClientHeight());
@@ -1027,7 +1034,7 @@ void ElementGame::OnUpdate()
                 clearMessage();
             }
         }
-        view.state.comment = model.state.comment;
+        view.state.comment = commentSnapshot;
     }
     view.Update();
 }

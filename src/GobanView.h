@@ -109,7 +109,7 @@ public:
 
     void resetView();
     void saveView();
-    void shadeIt(float time, const GobanShader &shader) const;
+    void shadeIt(float time, const GobanShader &shader, int flags) const;
 
     void animateIntro();
 

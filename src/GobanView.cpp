@@ -260,19 +260,19 @@ void GobanView::requestRepaint(int what) {
     }
 }
 
-void GobanView::shadeIt(float time, const GobanShader& shader) const {
+void GobanView::shadeIt(float time, const GobanShader& shader, int flags) const {
 	shader.use();
 
 	shader.setTime(lastTime);
 	shader.setRotation(cam.setView());
 	shader.setPan(newTranslate);
 
-	if (updateFlag & UPDATE_SHADER) {
+	if (flags & UPDATE_SHADER) {
 		spdlog::debug("setMetrics");
 		shader.setMetrics(model.metrics);
 	}
 
-	shader.draw(model, updateFlag, time);
+	shader.draw(model, flags, time);
 	shader.unuse();
 }
 
@@ -296,20 +296,23 @@ void GobanView::Render(int w, int h)
 	glClear(GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
 
+    // Atomically grab and clear the pending flags so nothing is lost
+    // if the game thread sets new flags while we render.
+    int flags = updateFlag.exchange(UPDATE_NONE);
 
-    if(updateFlag & UPDATE_SOUND_STONE) {
-        updateFlag &= ~UPDATE_SOUND_STONE;
+    if(flags & UPDATE_SOUND_STONE) {
+        board.setRandomStoneRotation();
         spdlog::debug("Playing stone sound in repaint");
         player.play("move", 1.0);
     }
 
-	if (updateFlag & UPDATE_STONES) {
+	if (flags & UPDATE_STONES) {
 	    board.updateStones(model.board);
         updateCursor();
 
         double vol = board.collision;
         if(vol > 0) {
-            updateFlag |= UPDATE_OVERLAY;
+            flags |= UPDATE_OVERLAY;
             if(player.playbackCount() < 5){
 	            player.play("clash", vol);
             }
@@ -317,12 +320,14 @@ void GobanView::Render(int w, int h)
 	    }
 	}
 
-    shadeIt(time, gobanShader);
+    shadeIt(time, gobanShader, flags);
 
    	glEnable(GL_BLEND);
 
 	glEnable(GL_DEPTH_TEST);
-	if (updateFlag & UPDATE_OVERLAY){
+	if (flags & UPDATE_OVERLAY){
+        updateLastMoveOverlay();
+        updateNavigationOverlay();
         gobanOverlay.Update(board, model);
 	}
 
@@ -347,8 +352,6 @@ void GobanView::Render(int w, int h)
 	}
 
 	glEnable(GL_BLEND);
-
-	updateFlag = UPDATE_NONE | (UPDATE_SOUND_STONE & updateFlag);
 }
 
 bool GobanView::toggleLastMoveOverlay() {
@@ -654,25 +657,9 @@ void GobanView::onStonePlaced(const Move& move) {
         move == Move::NORMAL ? "NORMAL" : (move == Move::PASS ? "PASS" : "OTHER"));
 
     if (move == Move::NORMAL) {
-        board.setRandomStoneRotation();
-
-        // Clear old overlay and set new one directly from the move
-        if (lastMove) {
-            spdlog::debug("onStonePlaced: removing old overlay at ({},{})", lastMove.col(), lastMove.row());
-            board.removeOverlay(lastMove);
-        }
-        lastMove = move.pos;
-
-        // Get move number from SGF tree depth
-        size_t moveIndex = model.game.moveCount();
-        std::ostringstream ss;
-        ss << moveIndex;
-        spdlog::debug("onStonePlaced: setting overlay '{}' at ({},{}) color={} (navAware)",
-            ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
-        board.setOverlay(move.pos, ss.str(), move.col);
-
-        spdlog::debug("onStonePlaced: requesting UPDATE_SOUND_STONE");
-        requestRepaint(UPDATE_SOUND_STONE | UPDATE_OVERLAY);
+        // Overlay updates happen on the UI thread in Render (updateLastMoveOverlay).
+        // Just request sound and repaint.
+        requestRepaint(UPDATE_SOUND_STONE | UPDATE_STONES | UPDATE_OVERLAY);
     }
 }
 
@@ -682,14 +669,7 @@ void GobanView::onGameMove(const Move& move, const std::string& comment) {
 }
 
 void GobanView::onBoardChange(const Board& newBoard) {
-	this->board.updateStones(newBoard);
-	updateLastMoveOverlay();
-	updateNavigationOverlay();
-	// Play sounds based on game state (set by game thread)
-	if (model.state.msg == GameState::TSUMEGO_WRONG) {
-		playSound("error", 0.5);
-	} else if (model.state.msg == GameState::TSUMEGO_SOLVED) {
-		playSound("correct", 1.0);
-	}
+	// Model already has the board (GobanModel::onBoardChange stores it).
+	// UI thread copies from model.board and updates overlays in Render().
 	requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);
 }
