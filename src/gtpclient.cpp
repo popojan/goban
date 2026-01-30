@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <spdlog/spdlog.h>
 
 #ifdef _WIN32
@@ -27,13 +28,14 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
     SetHandleInformation(hStdoutRead_, HANDLE_FLAG_INHERIT, 0);
     SetHandleInformation(hStderrRead_, HANDLE_FLAG_INHERIT, 0);
 
-    // Build command line
+    // Build command line as wide string for Unicode support
     std::string cmdLine = "\"" + program + "\"";
     for (const auto& arg : args) {
         cmdLine += " " + arg;
     }
+    auto wCmdLine = std::filesystem::u8path(cmdLine).wstring();
 
-    STARTUPINFOA si;
+    STARTUPINFOW si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
@@ -44,46 +46,48 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
 
     ZeroMemory(&pi, sizeof(pi));
 
-    // Build environment block with workDir added to PATH
+    // Build wide environment block with workDir added to PATH
     // This ensures child process can find DLLs in its working directory
     // Windows searches PATH during process creation for DLL loading
-    std::string envBlock;
+    std::wstring wEnvBlock;
+    std::wstring wWorkDir;
     if (!workDir.empty()) {
-        char* currentEnv = GetEnvironmentStrings();
+        wWorkDir = std::filesystem::u8path(workDir).wstring();
+        wchar_t* currentEnv = GetEnvironmentStringsW();
         if (currentEnv) {
-            char* var = currentEnv;
+            wchar_t* var = currentEnv;
             bool pathFound = false;
             while (*var) {
-                std::string varStr(var);
+                std::wstring varStr(var);
                 // Case-insensitive check for PATH (Windows env vars are case-insensitive)
-                std::string varUpper = varStr.substr(0, 5);
-                for (auto& c : varUpper) c = toupper(c);
-                if (varUpper == "PATH=") {
+                std::wstring varUpper = varStr.substr(0, 5);
+                for (auto& c : varUpper) c = towupper(c);
+                if (varUpper == L"PATH=") {
                     // Prepend workDir to existing PATH
-                    envBlock += varStr.substr(0, varStr.find('=') + 1) + workDir + ";" + varStr.substr(varStr.find('=') + 1);
+                    wEnvBlock += varStr.substr(0, varStr.find(L'=') + 1) + wWorkDir + L";" + varStr.substr(varStr.find(L'=') + 1);
                     pathFound = true;
                 } else {
-                    envBlock += varStr;
+                    wEnvBlock += varStr;
                 }
-                envBlock += '\0';
-                var += strlen(var) + 1;
+                wEnvBlock += L'\0';
+                var += wcslen(var) + 1;
             }
             if (!pathFound) {
-                envBlock += "PATH=" + workDir;
-                envBlock += '\0';
+                wEnvBlock += L"PATH=" + wWorkDir;
+                wEnvBlock += L'\0';
             }
-            envBlock += '\0'; // Double null terminator
-            FreeEnvironmentStrings(currentEnv);
+            wEnvBlock += L'\0'; // Double null terminator
+            FreeEnvironmentStringsW(currentEnv);
         }
     }
 
-    // Create the child process
-    if (!CreateProcessA(
+    // Create the child process with Unicode support
+    if (!CreateProcessW(
         NULL,
-        const_cast<char*>(cmdLine.c_str()),
-        NULL, NULL, TRUE, 0,
-        envBlock.empty() ? NULL : const_cast<char*>(envBlock.c_str()),
-        workDir.empty() ? NULL : workDir.c_str(),
+        const_cast<wchar_t*>(wCmdLine.c_str()),
+        NULL, NULL, TRUE, CREATE_UNICODE_ENVIRONMENT,
+        wEnvBlock.empty() ? NULL : const_cast<wchar_t*>(wEnvBlock.c_str()),
+        wWorkDir.empty() ? NULL : wWorkDir.c_str(),
         &si, &pi)) {
         CloseHandle(hStdinRead);
         CloseHandle(hStdoutWrite);
@@ -365,15 +369,15 @@ static std::string findExecutable(const std::string& exe, const std::string& pat
                         (lastSlash == std::string::npos || lastDot > lastSlash));
 
 #ifdef _WIN32
-    // On Windows, CreateProcessA searches for exe in parent's current directory,
+    // On Windows, CreateProcessW searches for exe in parent's current directory,
     // not in lpCurrentDirectory. So we must return the full path.
     if (!hasExtension) {
         std::string withExe = fullPath + ".exe";
-        if (GetFileAttributesA(withExe.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        if (std::filesystem::exists(std::filesystem::u8path(withExe))) {
             return withExe;  // Return full path including .exe
         }
     }
-    if (GetFileAttributesA(fullPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+    if (std::filesystem::exists(std::filesystem::u8path(fullPath))) {
         return fullPath;  // Return full path
     }
 #else

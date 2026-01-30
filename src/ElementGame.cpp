@@ -93,7 +93,7 @@ void ElementGame::populateUIElements() {
 
         // Get current language from config's gui path (e.g., "./config/gui/zh" -> "zh")
         std::string currentGui = config->data.value("gui", "./config/gui/en");
-        std::string currentLang = fs::path(currentGui).filename().string();
+        std::string currentLang = fs::path(currentGui).filename().u8string();
         int currentLangIndex = -1;
 
         try {
@@ -107,7 +107,7 @@ void ElementGame::populateUIElements() {
                             file >> cfg;
                             if (cfg.contains("language_name")) {
                                 std::string langName = cfg["language_name"].get<std::string>();
-                                std::string langFile = entry.path().stem().string();  // e.g., "en" from "en.json"
+                                std::string langFile = entry.path().stem().u8string();  // e.g., "en" from "en.json"
                                 selectLanguage->Add(langName.c_str(), langFile.c_str());
                                 spdlog::info("Found language: {} ({})", langName, langFile);
                                 if (langFile == currentLang) {
@@ -116,7 +116,7 @@ void ElementGame::populateUIElements() {
                                 index++;
                             }
                         } catch (const std::exception& e) {
-                            spdlog::warn("Failed to parse {}: {}", entry.path().string(), e.what());
+                            spdlog::warn("Failed to parse {}: {}", entry.path().u8string(), e.what());
                         }
                     }
                 }

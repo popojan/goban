@@ -467,7 +467,7 @@ void EventHandlerFileChooser::updateCurrentPath() const {
     if (!dialogDocument) return;
 
     if (auto pathElement = dialogDocument->GetElementById("current_path")) {
-        pathElement->SetInnerRML(dataSource->GetCurrentPath().string().c_str());
+        pathElement->SetInnerRML(dataSource->GetCurrentPath().u8string().c_str());
     }
 }
 

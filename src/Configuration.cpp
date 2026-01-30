@@ -1,10 +1,11 @@
 #include "Configuration.h"
 
+#include <filesystem>
 #include <fstream>
 #include <spdlog/spdlog.h>
 
 bool Configuration::load(const std::string& fileName) {
-    std::ifstream fin(fileName);
+    std::ifstream fin(std::filesystem::u8path(fileName));
     if (!fin.is_open()) {
         spdlog::error("Failed to open config file: {}", fileName);
         return false;

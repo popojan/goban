@@ -33,7 +33,7 @@ void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::str
                 } else if (columns[i] == "type") {
                     row.push_back(std::string(strUp.c_str()));
                 } else if (columns[i] == "path") {
-                    row.push_back(std::string(currentPath.parent_path().string().c_str()));
+                    row.push_back(std::string(currentPath.parent_path().u8string().c_str()));
                 }
             }
             return;
@@ -66,7 +66,7 @@ void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::str
             } else if (columns[i] == "type") {
                 row.push_back(std::string(file.type.c_str()));
             } else if (columns[i] == "path") {
-                row.push_back(std::string(file.fullPath.string().c_str()));
+                row.push_back(std::string(file.fullPath.u8string().c_str()));
             }
         }
     }
@@ -176,7 +176,7 @@ void FileChooserDataSource::refreshFileList() {
         if (std::filesystem::exists(currentPath) && std::filesystem::is_directory(currentPath)) {
             for (const auto& entry : std::filesystem::directory_iterator(currentPath)) {
                 FileEntry fileEntry;
-                fileEntry.name = entry.path().filename().string();
+                fileEntry.name = entry.path().filename().u8string();
                 fileEntry.fullPath = entry.path();
                 
                 // Use status() once instead of multiple calls
@@ -257,14 +257,14 @@ int FileChooserDataSource::GetSelectedGameIndex() const {
 std::string FileChooserDataSource::GetSelectedFilePath() const {
     const FileEntry* file = GetSelectedFile();
     if (file && !file->isDirectory) {
-        return file->fullPath.string();
+        return file->fullPath.u8string();
     }
     return "";
 }
 
 int FileChooserDataSource::FindFileByPath(const std::string& path) const {
     for (size_t i = 0; i < files.size(); ++i) {
-        if (files[i].fullPath.string() == path) {
+        if (files[i].fullPath.u8string() == path) {
             return static_cast<int>(i);
         }
     }
@@ -274,7 +274,7 @@ int FileChooserDataSource::FindFileByPath(const std::string& path) const {
 void FileChooserDataSource::LoadSelectedFileGames() {
     const FileEntry* file = GetSelectedFile();
     if (file && !file->isDirectory && file->fullPath.extension() == ".sgf") {
-        previewSGF(file->fullPath.string());
+        previewSGF(file->fullPath.u8string());
     }
 }
 
