@@ -1071,7 +1071,10 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
     model.state.markup = model.game.getMarkup();
 
     // Handle finished games (resignation or double pass)
-    finalizeLoadedGame(engine, gameInfo);
+    // Only finalize when at the end of the game - not when viewing from root
+    if (model.game.isAtEndOfNavigation()) {
+        finalizeLoadedGame(engine, gameInfo);
+    }
 
     return true;
 }
