@@ -7,7 +7,6 @@
 #include <string>
 #include <memory>
 #include <queue>
-#include <future>
 #include <functional>
 #include <condition_variable>
 
@@ -21,19 +20,13 @@
 
 extern std::shared_ptr<Configuration> config;
 
-/** \brief Result of a navigation command executed on the game thread */
-struct NavResult {
-    bool success = false;
-    bool newBranch = false;
-};
-
 /** \brief Navigation command queued for execution on the game thread */
 struct NavCommand {
     enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION };
     Type type;
     Move move;  // For TO_VARIATION
     bool promote = true;  // For TO_VARIATION: promote to main line
-    std::shared_ptr<std::promise<NavResult>> resultPromise;
+    bool tsumegoMarkBad = false;  // For TO_VARIATION: mark as bad move (BM property)
 };
 
 /** \brief Game mode determining player interaction behavior
@@ -66,6 +59,9 @@ public:
     std::string getName(size_t id) const { return playerManager->getName(id); }
 
     void interrupt();
+
+    /// Forceful shutdown: kill all engine processes (unblocks game thread), then interrupt.
+    void shutdown();
 
     // Check if genmove is in progress (engine is thinking)
     bool isThinking() const;
@@ -118,12 +114,12 @@ public:
         gameObservers.push_back(pobserver);
     }
 
-    // Navigation methods for SGF replay
-    bool navigateBack();   // Undo one move during navigation
-    bool navigateForward();  // Play next move during navigation
-    bool navigateToVariation(const Move& move, bool promote = true);  // Navigate to specific variation
-    bool navigateToStart();  // Go to beginning of game
-    bool navigateToEnd();    // Go to end of game (main line)
+    // Navigation methods for SGF replay (fire-and-forget, processed on game thread)
+    void navigateBack();
+    void navigateForward();
+    void navigateToVariation(const Move& move, bool promote = true, bool tsumegoMarkBad = false);
+    void navigateToStart();
+    void navigateToEnd();
 
     std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
 
@@ -182,7 +178,8 @@ private:
     std::condition_variable navQueueCV;
 
     void processNavigationQueue();
-    NavResult executeNavCommand(const NavCommand& cmd);
+    void executeNavCommand(const NavCommand& cmd);
+    void processScoring();
     void wakeGameThread();
     void waitForCommandOrTimeout(int ms);
 };

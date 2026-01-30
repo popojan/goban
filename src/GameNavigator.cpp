@@ -212,11 +212,11 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
     result.newBranch = !model.game.navigateToChild(move, promote);
     if (result.newBranch) {
         spdlog::debug("navigateToVariation: creating new branch");
-        if (model.game.hasGameResult()) {
+        if (promote && model.game.hasGameResult()) {
             // Finished game: create a fresh copy to preserve the historical record
             model.game.branchFromFinishedGame(move);
         } else {
-            // In-progress game: modify tree in place
+            // In-progress game or non-promoted branch: modify tree in place
             model.game.move(move, promote);
             if (promote) {
                 model.game.promoteCurrentPathToMainLine();
@@ -352,19 +352,17 @@ bool GameNavigator::navigateToEnd() {
     Board boardResult(model.game.getBoardSize());
     buildBoardFromSGF(boardResult);
 
-    // Show territory if at a scored game ending
-    if (model.game.shouldShowTerritory()) {
-        model.board.toggleTerritoryAuto(true);
-        // Apply territory from engine to our local board (graceful degradation if unsupported)
-        coach->applyTerritory(boardResult);
-    }
-
     // Restore game-over state if at end of a finished game
     if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
     }
 
     notifyBoardChange(boardResult);
+
+    // Set territory flag after notifyBoardChange — updateStones would overwrite it
+    if (model.game.shouldShowTerritory()) {
+        model.board.toggleTerritoryAuto(true);
+    }
 
     spdlog::debug("navigateToEnd: at end, move {}/{}, colorToMove={}, playedMoves={}",
         model.game.getViewPosition(), model.game.getLoadedMovesCount(),

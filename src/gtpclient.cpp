@@ -2,8 +2,10 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <thread>
 #include <spdlog/spdlog.h>
 
 #ifdef _WIN32
@@ -186,6 +188,15 @@ int Process::wait() const {
     return static_cast<int>(exitCode);
 }
 
+bool Process::waitFor(int timeoutMs) const {
+    if (hProcess_ == INVALID_HANDLE_VALUE) return true;
+    return WaitForSingleObject(hProcess_, timeoutMs) == WAIT_OBJECT_0;
+}
+
+void Process::terminate() {
+    if (hProcess_ != INVALID_HANDLE_VALUE) TerminateProcess(hProcess_, 1);
+}
+
 bool Process::running() const {
     if (hProcess_ == INVALID_HANDLE_VALUE) return false;
     DWORD exitCode;
@@ -324,6 +335,21 @@ int Process::wait() const {
     int status;
     waitpid(pid_, &status, 0);
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
+bool Process::waitFor(int timeoutMs) const {
+    if (pid_ < 0) return true;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+    while (std::chrono::steady_clock::now() < deadline) {
+        int status;
+        if (waitpid(pid_, &status, WNOHANG) != 0) return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return false;
+}
+
+void Process::terminate() {
+    if (pid_ > 0) kill(pid_, SIGKILL);
 }
 
 bool Process::running() const {
@@ -551,14 +577,24 @@ bool GtpClient::success(const CommandOutput& ret) {
 }
 
 GtpClient::~GtpClient() {
-    issueCommand("quit");
+    // Send quit without waiting for response — engine may be stuck on a
+    // blocking command (e.g. final_status_list dead on empty board).
+    proc_->write("quit\n");
 
     if (stderrReader_) {
         stderrReader_->stop();
     }
 
     proc_->closeStdin();
+    if (!proc_->waitFor(2000)) {
+        spdlog::warn("Engine did not exit gracefully, force-terminating");
+        proc_->terminate();
+    }
     (void) proc_->wait();
+}
+
+void GtpClient::terminateProcess() {
+    if (proc_) proc_->terminate();
 }
 
 void GtpClient::interpolate(std::string& out) {

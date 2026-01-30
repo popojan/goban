@@ -685,5 +685,11 @@ void GobanView::onBoardChange(const Board& newBoard) {
 	this->board.updateStones(newBoard);
 	updateLastMoveOverlay();
 	updateNavigationOverlay();
+	// Play sounds based on game state (set by game thread)
+	if (model.state.msg == GameState::TSUMEGO_WRONG) {
+		playSound("error", 0.5);
+	} else if (model.state.msg == GameState::TSUMEGO_SOLVED) {
+		playSound("correct", 1.0);
+	}
 	requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);
 }

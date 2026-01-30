@@ -35,6 +35,8 @@ public:
     bool readLineStderr(std::string& line);
     void closeStdin();
     int wait() const;
+    bool waitFor(int timeoutMs) const;
+    void terminate();
     bool running() const;
 
 private:
@@ -108,6 +110,9 @@ public:
     CommandOutput issueCommand(const std::string &command);
 
     static bool success(const CommandOutput &ret);
+
+    /// Kill the engine process immediately (unblocks any blocking readLine).
+    void terminateProcess();
 };
 
 #endif // GTPCLIENT_H

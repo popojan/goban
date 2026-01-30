@@ -994,9 +994,11 @@ void ElementGame::OnUpdate()
             break;
         case GameState::TSUMEGO_SOLVED:
             showMessage(getTemplateText(context, "tplTsumegoSolved"));
+            if (msgChanged) view.playSound("correct", 1.0);
             break;
         case GameState::TSUMEGO_WRONG:
             showMessage(getTemplateText(context, "tplTsumegoWrong"));
+            if (msgChanged) view.playSound("error", 0.5);
             break;
         default:
             if (!engineErrors.empty()) {

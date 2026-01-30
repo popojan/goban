@@ -80,6 +80,7 @@ public:
     Board board;
 
     std::atomic<bool> isGameOver{true};
+    std::atomic<bool> tsumegoMode{false};
     bool started;
     GameState state;
 

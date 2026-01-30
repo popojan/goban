@@ -76,11 +76,29 @@ Player* GameThread::currentPlayer() const {
 void GameThread::interrupt() {
     if (thread) {
         interruptRequested = true;
+        // Clear stale nav commands before joining — prevents them from executing
+        // on a new game state after loadSGF/switchGame replaces model.game.
+        {
+            std::lock_guard<std::mutex> lock(navQueueMutex);
+            std::queue<NavCommand> empty;
+            navQueue.swap(empty);
+        }
         navQueueCV.notify_one();
         playLocalMove(Move(Move::INTERRUPT, model.state.colorToMove));
         thread->join();
         thread.reset();
     }
+}
+
+void GameThread::shutdown() {
+    // Kill all engine processes so any blocking readLine() returns immediately,
+    // allowing the game thread to check interruptRequested and exit.
+    for (auto* player : playerManager->getPlayers()) {
+        if (player->isTypeOf(Player::ENGINE)) {
+            dynamic_cast<GtpEngine*>(player)->terminateProcess();
+        }
+    }
+    interrupt();
 }
 
 void GameThread::removeSgfPlayers() const {
@@ -292,18 +310,8 @@ void GameThread::processSuccessfulMove(const Move& move, const Player* movePlaye
     // 3. Notify observers with move and comments
     notifyMoveComplete(coach, move, kibitzEngine, wasKibitz, engineComments);
 
-    // 4. Update territory display if enabled (double pass detected)
-    if (model.board.showTerritory) {
-        // Build board locally and apply territory from coach (engine-independent)
-        Board result(model.game.getBoardSize());
-        Position koPosition;
-        model.game.buildBoardFromMoves(result, koPosition);
-        coach->applyTerritory(result);
-        std::for_each(
-            gameObservers.begin(), gameObservers.end(),
-            [&result](GameObserver* observer) { observer->onBoardChange(result); }
-        );
-    }
+    // Territory scoring is handled in the game loop idle section —
+    // isGameOver + showTerritory flags trigger it on the next iteration.
 }
 
 void GameThread::gameLoop() {
@@ -319,6 +327,7 @@ void GameThread::gameLoop() {
 
         // When model is inactive or game is over, just wait for nav commands
         if (!model || model.isGameOver) {
+            processScoring();
             waitForCommandOrTimeout(100);
             continue;
         }
@@ -383,6 +392,13 @@ void GameThread::gameLoop() {
                           || coach->play(move);
             }
 
+            // Release lock before processSuccessfulMove — it may block on
+            // territory scoring (GTP final_status_list), and the UI thread
+            // needs playerMutex for isThinking()/humanToMove().
+            playerToMove = nullptr;
+            lock.unlock();
+            locked = false;
+
             if (success) {
                 processSuccessfulMove(move, humanPlayer, coach, kibitzEngine, wasKibitz);
 
@@ -390,12 +406,7 @@ void GameThread::gameLoop() {
                 if (!wasKibitz && !model.isGameOver && kibitzEngine) {
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis: triggering kibitz response for {}", responseColor.toString());
-                    // Release lock during genmove to allow main thread rendering
-                    lock.unlock();
-                    locked = false;
                     Move response = kibitzEngine->genmove(responseColor);
-                    lock.lock();
-                    locked = true;
                     if (response && response != Move::RESIGN) {
                         if (kibitzEngine == coach || coach->play(response)) {
                             processSuccessfulMove(response, kibitzEngine, coach, kibitzEngine, false);
@@ -405,7 +416,6 @@ void GameThread::gameLoop() {
             }
 
             if (model.isGameOver) {
-                playerToMove = nullptr;
                 continue;
             }
 
@@ -457,12 +467,18 @@ void GameThread::gameLoop() {
                           || coach->play(move);
             }
 
+            // Release lock before processSuccessfulMove — it may block on
+            // territory scoring (GTP final_status_list), and the UI thread
+            // needs playerMutex for isThinking()/humanToMove().
+            playerToMove = nullptr;
+            lock.unlock();
+            locked = false;
+
             if(success) {
                 processSuccessfulMove(move, player, coach, kibitzEngine, kibitzed);
             }
 
             if(model.isGameOver) {
-                playerToMove = nullptr;
                 continue;
             }
 
@@ -493,60 +509,34 @@ void GameThread::playKibitzMove() const {
     if(playerToMove) playerToMove->suggestMove(kibitzed);
 }
 
-bool GameThread::navigateBack() {
-    auto promise = std::make_shared<std::promise<NavResult>>();
-    auto future = promise->get_future();
-    {
-        std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::BACK, Move(), true, promise});
-    }
+void GameThread::navigateBack() {
+    std::lock_guard<std::mutex> lock(navQueueMutex);
+    navQueue.push({NavCommand::BACK});
     wakeGameThread();
-    return future.get().success;
 }
 
-bool GameThread::navigateForward() {
-    auto promise = std::make_shared<std::promise<NavResult>>();
-    auto future = promise->get_future();
-    {
-        std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::FORWARD, Move(), true, promise});
-    }
+void GameThread::navigateForward() {
+    std::lock_guard<std::mutex> lock(navQueueMutex);
+    navQueue.push({NavCommand::FORWARD});
     wakeGameThread();
-    return future.get().success;
 }
 
-bool GameThread::navigateToVariation(const Move& move, bool promote) {
-    auto promise = std::make_shared<std::promise<NavResult>>();
-    auto future = promise->get_future();
-    {
-        std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::TO_VARIATION, move, promote, promise});
-    }
+void GameThread::navigateToVariation(const Move& move, bool promote, bool tsumegoMarkBad) {
+    std::lock_guard<std::mutex> lock(navQueueMutex);
+    navQueue.push({NavCommand::TO_VARIATION, move, promote, tsumegoMarkBad});
     wakeGameThread();
-    NavResult result = future.get();
-    return result.success;
 }
 
-bool GameThread::navigateToStart() {
-    auto promise = std::make_shared<std::promise<NavResult>>();
-    auto future = promise->get_future();
-    {
-        std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::TO_START, Move(), true, promise});
-    }
+void GameThread::navigateToStart() {
+    std::lock_guard<std::mutex> lock(navQueueMutex);
+    navQueue.push({NavCommand::TO_START});
     wakeGameThread();
-    return future.get().success;
 }
 
-bool GameThread::navigateToEnd() {
-    auto promise = std::make_shared<std::promise<NavResult>>();
-    auto future = promise->get_future();
-    {
-        std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::TO_END, Move(), true, promise});
-    }
+void GameThread::navigateToEnd() {
+    std::lock_guard<std::mutex> lock(navQueueMutex);
+    navQueue.push({NavCommand::TO_END});
     wakeGameThread();
-    return future.get().success;
 }
 
 void GameThread::waitForCommandOrTimeout(int ms) {
@@ -563,6 +553,50 @@ void GameThread::wakeGameThread() {
     }
 }
 
+void GameThread::processScoring() {
+    if (!model.board.showTerritory || model.board.territoryReady)
+        return;
+
+    Engine* coach = currentCoach();
+    if (!coach) return;
+
+    model.state.msg = GameState::CALCULATING_SCORE;
+
+    Board result(model.game.getBoardSize());
+    Position koPosition;
+    model.game.buildBoardFromMoves(result, koPosition);
+    coach->applyTerritory(result);
+
+    if (interruptRequested) return;
+
+    // Fallback: if coach scoring failed, try other engines
+    if (result.territoryReady && std::abs(result.score) < 0.1f) {
+        for (auto* player : playerManager->getPlayers()) {
+            if (player != coach && player->isTypeOf(Player::ENGINE)) {
+                auto* gtpEngine = dynamic_cast<GtpEngine*>(player);
+                if (gtpEngine) {
+                    spdlog::info("Coach scoring failed, trying {} for final_score",
+                        gtpEngine->getName());
+                    syncEngineToPosition(gtpEngine);
+                    float altScore = gtpEngine->final_score();
+                    if (std::abs(altScore) > 0.1f) {
+                        spdlog::info("Using {} score: {:.1f}", gtpEngine->getName(), altScore);
+                        result.score = altScore;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (result.territoryReady) {
+        model.state.scoreDelta = result.score;
+    }
+
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&result](GameObserver* observer) { observer->onBoardChange(result); });
+}
+
 void GameThread::processNavigationQueue() {
     while (true) {
         NavCommand cmd;
@@ -572,45 +606,71 @@ void GameThread::processNavigationQueue() {
             cmd = std::move(navQueue.front());
             navQueue.pop();
         }
-        NavResult result = executeNavCommand(cmd);
-        cmd.resultPromise->set_value(result);
+        executeNavCommand(cmd);
     }
 }
 
-NavResult GameThread::executeNavCommand(const NavCommand& cmd) {
-    NavResult result;
+void GameThread::executeNavCommand(const NavCommand& cmd) {
     switch (cmd.type) {
-        case NavCommand::BACK:
-            result.success = navigator->navigateBack();
-            break;
-        case NavCommand::FORWARD:
-            result.success = navigator->navigateForward();
-            // Territory consolidation: if at scored game end, show territory atomically
-            if (result.success && model.game.isAtEndOfNavigation()
-                && model.game.shouldShowTerritory()) {
-                if (Engine* coach = currentCoach()) {
-                    model.board.toggleTerritoryAuto(true);
-                    // Build board locally and apply territory (engine-independent)
-                    Board territory(model.game.getBoardSize());
-                    Position koPosition;
-                    model.game.buildBoardFromMoves(territory, koPosition);
-                    coach->applyTerritory(territory);
-                    navigator->notifyBoardChange(territory);
+        case NavCommand::BACK: {
+            bool success = navigator->navigateBack();
+            // Update tsumego feedback on back-navigation
+            if (success && model.tsumegoMode) {
+                if (model.game.isOnBadMovePath()) {
+                    model.state.msg = GameState::TSUMEGO_WRONG;
+                } else {
+                    model.state.msg = GameState::NONE;
                 }
             }
             break;
+        }
+        case NavCommand::FORWARD: {
+            bool success = navigator->navigateForward();
+            // If at scored game end, set flags — scoring handled in game loop idle section
+            if (success && model.game.isAtEndOfNavigation()
+                && model.game.shouldShowTerritory()) {
+                model.board.toggleTerritoryAuto(true);
+            }
+            // Update tsumego feedback on forward-navigation
+            if (success && model.tsumegoMode) {
+                if (model.game.isOnBadMovePath()) {
+                    model.state.msg = GameState::TSUMEGO_WRONG;
+                } else {
+                    model.state.msg = GameState::NONE;
+                }
+            }
+            break;
+        }
         case NavCommand::TO_START:
-            result.success = navigator->navigateToStart();
+            navigator->navigateToStart();
             break;
         case NavCommand::TO_END:
-            result.success = navigator->navigateToEnd();
+            navigator->navigateToEnd();
             break;
         case NavCommand::TO_VARIATION: {
             auto varResult = navigator->navigateToVariation(cmd.move, cmd.promote);
-            result.success = varResult.success;
-            result.newBranch = varResult.newBranch;
+
+            // Tsumego logic (moved from GobanControl to game thread)
+            if (varResult.success && model.tsumegoMode) {
+                if (cmd.tsumegoMarkBad) {
+                    // Wrong move: mark with BM property
+                    model.game.markBadMove();
+                    model.state.msg = GameState::TSUMEGO_WRONG;
+                } else if (model.game.isOnBadMovePath()) {
+                    model.state.msg = GameState::TSUMEGO_WRONG;
+                } else if (model.game.isAtEndOfNavigation()) {
+                    model.state.msg = GameState::TSUMEGO_SOLVED;
+                } else if (model.game.hasNextMove()) {
+                    // Auto-play opponent's response (main line)
+                    navigator->navigateForward();
+                    if (model.game.isAtEndOfNavigation()) {
+                        model.state.msg = GameState::TSUMEGO_SOLVED;
+                    }
+                }
+            }
+
             // In Analysis mode, auto-respond with kibitz engine after human variation
-            if (result.success && gameMode == GameMode::ANALYSIS) {
+            if (varResult.success && gameMode == GameMode::ANALYSIS) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
                 if (kibitz && coach && !model.isGameOver) {
@@ -627,7 +687,6 @@ NavResult GameThread::executeNavCommand(const NavCommand& cmd) {
             break;
         }
     }
-    return result;
 }
 
 bool GameThread::setGameMode(GameMode mode) {
@@ -847,7 +906,8 @@ bool GameThread::autoPlayTsumegoSetup() {
     spdlog::info("Tsumego setup: auto-playing {} move (PL={}) as setup",
         nextMove.col == Color::BLACK ? "B" : "W",
         plColor == Color::BLACK ? "B" : "W");
-    return navigateForward();
+    navigateForward();
+    return true;
 }
 
 void GameThread::syncEngineToPosition(Engine* engine) {
@@ -898,77 +958,11 @@ void GameThread::finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInf
     // Set the game state for finished game
     model.state.reason = endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
 
-    if (engine) {
+    // Set flags — actual scoring happens in the game loop idle section
+    if (endedWithPasses) {
         model.board.toggleTerritoryAuto(true);
-        // Build board locally and apply territory (engine-independent)
-        Board result(model.game.getBoardSize());
-        Position koPosition;
-        model.game.buildBoardFromMoves(result, koPosition);
-
-        if (endedWithPasses) {
-            engine->applyTerritory(result);
-
-            // Score verification for scored games
-            float coachScore = result.score;
-            float finalScore = coachScore;
-
-            // If coach scoring failed (returned 0.0), try other engines' final_score
-            if (std::abs(coachScore) < 0.1f) {
-                for (auto* player : playerManager->getPlayers()) {
-                    if (player != engine && player->isTypeOf(Player::ENGINE)) {
-                        auto* gtpEngine = dynamic_cast<GtpEngine*>(player);
-                        if (gtpEngine) {
-                            spdlog::info("Coach scoring failed, trying {} for final_score", gtpEngine->getName());
-                            syncEngineToPosition(gtpEngine);
-                            float altScore = gtpEngine->final_score();
-                            if (std::abs(altScore) > 0.1f) {
-                                spdlog::info("Using {} score: {:.1f}", gtpEngine->getName(), altScore);
-                                finalScore = altScore;
-                                result.score = altScore;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Verify against SGF result if available
-            if (gameInfo.gameResult.WinType == LibSgfcPlusPlus::SgfcWinType::WinWithScore) {
-                float sgfScore = gameInfo.gameResult.Score;
-                if (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::WhiteWin) {
-                    sgfScore = -sgfScore;
-                }
-
-                // Use SGF score as final fallback when all engines fail
-                if (std::abs(finalScore) < 0.1f && std::abs(sgfScore) > 0.1f) {
-                    spdlog::warn("All engine scoring failed, using SGF score: {:.1f}", sgfScore);
-                    finalScore = sgfScore;
-                    result.score = sgfScore;
-                } else if (std::abs(finalScore) > 0.1f) {
-                    float scoreDifference = std::abs(finalScore - sgfScore);
-                    if (scoreDifference > 0.1f) {
-                        spdlog::warn("Score discrepancy: Engine {:.1f}, SGF {:.1f} (diff={:.1f})",
-                            finalScore, sgfScore, scoreDifference);
-                        spdlog::warn("  komi={:.1f}, moves={}, prisoners: black={}, white={}",
-                            model.state.komi, model.game.moveCount(),
-                            result.capturedCount(Color::BLACK), result.capturedCount(Color::WHITE));
-                    }
-                }
-            }
-            model.state.scoreDelta = finalScore;
-        }
-
-        // Set isGameOver BEFORE onBoardChange so territory display logic works
-        model.isGameOver = true;
-
-        // Notify all observers of board change (triggers territory display via onBoardChange)
-        std::for_each(gameObservers.begin(), gameObservers.end(),
-            [&result](GameObserver* observer) {
-                observer->onBoardChange(result);
-            });
-    } else {
-        model.isGameOver = true;
     }
+    model.isGameOver = true;
 
     if (endedByResignation) {
         bool blackWon = (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin);

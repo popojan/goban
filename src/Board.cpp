@@ -342,14 +342,12 @@ int Board::updateStones(const Board& board) {
     this->capturedBlack = board.capturedBlack;
     this->capturedWhite = board.capturedWhite;
     this->koPosition = board.koPosition;
-    // Copy territory display flags if source has territory - needed for view.board
-    // which doesn't get toggleTerritoryAuto() called directly
-    if (board.territoryReady) {
-        this->territoryReady = true;
-        this->score = board.score;
-        this->showTerritory = board.showTerritory;
-        this->showTerritoryAuto = board.showTerritoryAuto;
-    }
+    // Always sync territory state from source board — loading a new game must
+    // clear stale territory from a previously scored game.
+    this->territoryReady = board.territoryReady;
+    this->score = board.score;
+    this->showTerritory = board.showTerritory;
+    this->showTerritoryAuto = board.showTerritoryAuto;
 
     if(newSize != boardSize) {
         spdlog::debug("updateStones: size mismatch this={} source={}, resizing", boardSize, newSize);

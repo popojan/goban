@@ -564,7 +564,7 @@ int main(int argc, char** argv)
     if (auto gameDoc = context->GetDocument("game_window")) {
         if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
             gameElement->getController().saveCurrentGame();
-            gameElement->getGameThread().interrupt();
+            gameElement->getGameThread().shutdown();
         }
     }
 

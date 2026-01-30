@@ -15,6 +15,7 @@ bool GobanControl::newGame(unsigned boardSize) const {
     engine.reset();
     engine.removeSgfPlayers();  // Remove temporary SGF players from previous load
     view.setTsumegoMode(false);
+    model.tsumegoMode = false;
     model.game.setSuppressSessionCopy(false);
     if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         model.createNewRecord();
@@ -68,26 +69,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 for (const auto& move : variations) {
                     if (move == Move::NORMAL && move.pos == coord) {
                         spdlog::debug("Clicked on existing variation at ({},{})", coord.col(), coord.row());
-                        if (engine.navigateToVariation(move)) {
-                            view.updateNavigationOverlay();
-                            if (view.isTsumegoMode()) {
-                                if (model.game.isOnBadMovePath()) {
-                                    model.state.msg = GameState::TSUMEGO_WRONG;
-                                    view.playSound("error", 0.5);
-                                } else if (model.game.isAtEndOfNavigation()) {
-                                    model.state.msg = GameState::TSUMEGO_SOLVED;
-                                    view.playSound("correct", 1.0);
-                                } else if (model.game.hasNextMove()) {
-                                    // Auto-play opponent's response (main line)
-                                    engine.navigateForward();
-                                    view.updateNavigationOverlay();
-                                    if (model.game.isAtEndOfNavigation()) {
-                                        model.state.msg = GameState::TSUMEGO_SOLVED;
-                                        view.playSound("correct", 1.0);
-                                    }
-                                }
-                            }
-                        }
+                        engine.navigateToVariation(move);
                         return;
                     }
                 }
@@ -95,16 +77,10 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 // No matching variation — new move
                 if (view.isTsumegoMode()) {
                     // Wrong move: create variation with BM property
-                    // Player must manually backtrack (Left key) as penalty
                     spdlog::debug("Tsumego: wrong move at ({},{})", coord.col(), coord.row());
                     Color colorToMove = model.game.getColorToMove();
                     Move wrongMove(coord, colorToMove);
-                    if (engine.navigateToVariation(wrongMove, false)) {  // Don't promote wrong moves
-                        model.game.markBadMove();
-                        view.updateNavigationOverlay();
-                        model.state.msg = GameState::TSUMEGO_WRONG;
-                        view.playSound("error", 0.5);
-                    }
+                    engine.navigateToVariation(wrongMove, false, true);  // Don't promote, mark bad
                     return;
                 }
 
@@ -117,12 +93,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     engine.run();
                 }
                 Move newMove(coord, colorToMove);
-                if (engine.navigateToVariation(newMove)) {
-                    model.start();
-                    if (!engine.isRunning()) {
-                        engine.run();
-                    }
-                }
+                engine.navigateToVariation(newMove);
                 return;
             }
 
@@ -295,7 +266,6 @@ void GobanControl::command(const std::string& cmd) {
                 model.start();
                 if (!engine.isRunning()) engine.run();
                 engine.navigateToVariation(passMove);
-                view.updateNavigationOverlay();
             } else {
                 model.start();
                 if (!engine.isRunning()) engine.run();
@@ -336,9 +306,7 @@ void GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "undo move") {
         if (!engine.isThinking()) {
-            if (engine.navigateBack()) {
-                view.updateNavigationOverlay();
-            }
+            engine.navigateBack();
         }
     }
     else if (cmd == "navigate_start" || cmd == "navigate_end" ||
@@ -350,25 +318,16 @@ void GobanControl::command(const std::string& cmd) {
             spdlog::debug("Navigation command '{}' blocked - engine is thinking", cmd);
         }
         else if (cmd == "navigate_start") {
-            if (engine.navigateToStart()) view.updateNavigationOverlay();
+            engine.navigateToStart();
         }
         else if (cmd == "navigate_end") {
-            if (engine.navigateToEnd()) view.updateNavigationOverlay();
+            engine.navigateToEnd();
         }
         else if (cmd == "navigate_back") {
-            if (engine.navigateBack()) view.updateNavigationOverlay();
+            engine.navigateBack();
         }
         else if (cmd == "navigate_forward") {
-            if (engine.navigateForward()) view.updateNavigationOverlay();
-        }
-        // Update tsumego feedback on navigation
-        if (model.state.msg == GameState::TSUMEGO_SOLVED ||
-            model.state.msg == GameState::TSUMEGO_WRONG) {
-            if (view.isTsumegoMode() && model.game.isOnBadMovePath()) {
-                model.state.msg = GameState::TSUMEGO_WRONG;
-            } else {
-                model.state.msg = GameState::NONE;
-            }
+            engine.navigateForward();
         }
     }
     else if (cmd == "pan camera") {
@@ -486,6 +445,7 @@ void GobanControl::command(const std::string& cmd) {
 
         if (tsumego) {
             view.setTsumegoMode(true);  // Re-apply overlay settings
+            model.tsumegoMode = true;
             model.game.setSuppressSessionCopy(true);
             engine.autoPlayTsumegoSetup();
         }
@@ -543,12 +503,8 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         // Space/Right: navigate forward (or trigger kibitz at end of unfinished branch)
         if (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT) {
             if (model.game.hasNextMove()) {
-                if (engine.navigateForward()) {
-                    spdlog::debug("Navigation: forward to move {}/{}",
-                        model.game.getViewPosition(), model.game.getLoadedMovesCount());
-                    view.updateNavigationOverlay();
-                    return;  // Handled navigation
-                }
+                engine.navigateForward();
+                return;  // Handled navigation
             }
             // At end of finished game - nothing more to do
             if (model.game.isAtFinishedGame()) {
@@ -561,11 +517,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
             spdlog::debug("Navigation: at end of branch, Space falls through to kibitz");
         }
         if (key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK) {
-            if (engine.navigateBack()) {
-                spdlog::debug("Navigation: back to move {}/{}",
-                    model.game.getViewPosition(), model.game.getLoadedMovesCount());
-                view.updateNavigationOverlay();
-            }
+            engine.navigateBack();
             return;
         }
     }
