@@ -185,8 +185,10 @@ double Board::placeFuzzy(const Position& p, bool noFix){
     if(p.x == 0 && p.y == 0) {
         x = static_cast<float>(j) - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
         y = static_cast<float>(i) - halfN + std::max(-3.0f * r1, std::min(3.0f * r1, dist(generator)));
+        spdlog::trace("placeFuzzy NEW random at ({},{}) -> ({},{})", j, i, x, y);
     }
     else {
+        spdlog::trace("placeFuzzy PRESERVE at ({},{}) x={} y={}", j, i, x - halfN, y - halfN);
         x = x - halfN;
         y = y - halfN;
     }
@@ -280,10 +282,22 @@ int Board::updateStone(const Position& p, const Color& c) {
     else if(c == Color::BLACK)
         mValue = mBlack;
     if(c == Color::WHITE || c == Color::BLACK) {
-        double collides = placeFuzzy(p);
+        spdlog::trace("updateStone: PLACE {} at ({},{})", c == Color::BLACK ? "B" : "W", j, i);
+        // Preserve existing fuzzy position from cursor stone if available.
+        // When the game thread confirms a move, model.board has x=0,y=0 but
+        // the view board's Point still has the cursor's fuzzy offset.
+        Position placePos(p);
+        Point& existing = (*this)[p];
+        if (placePos.x == 0 && placePos.y == 0 && (existing.x != 0 || existing.y != 0)) {
+            float halfN = 0.5f * static_cast<float>(boardSize) - 0.5f;
+            placePos.x = existing.x + halfN;
+            placePos.y = existing.y + halfN;
+        }
+        double collides = placeFuzzy(placePos);
         collision = std::max(collision, collides);
         ret = STONE_PLACED;
     } else {
+        spdlog::trace("updateStone: REMOVE at ({},{})", j, i);
         ret = STONE_REMOVED;
         auto& overlay = (*this)[p].overlay;
         if (overlay.layer > 0) {
