@@ -185,7 +185,10 @@ void GobanView::animateCamera(const DDG::Quaternion& targetRotation,
 }
 
 void GobanView::zoomRelative(float percentage) {
-    distance += percentage * distance * 0.2f - 0.01f;
+    // Scale the camera-to-board distance (6 - distance) proportionally.
+    // Closer to board → smaller steps; can never reach board (distance=6).
+    float camDist = (6.0f - distance) * (1.0f + percentage * 0.2f);
+    distance = 6.0f - camDist;
     baseDistance = distance;
     requestRepaint();
 }
@@ -199,14 +202,15 @@ void GobanView::mouseMoved(float x, float y) {
     }
     else if (isZooming) {
         float delta = -6.0f * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
-        distance = baseDistance + delta * (baseDistance / 3.0f);
+        float camDist = (6.0f - baseDistance) * std::exp(delta);
+        distance = 6.0f - camDist;
         requestRepaint();
     }
     else if (isPanning) {
-        float scale = 2.0f * distance / 3.0f;
+        float scale = 2.0f * (6.0f - distance) / 3.0f;
         float dx = -scale * (x - startX) / static_cast<float>(WINDOW_HEIGHT);
         float dy =  scale * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
-        glm::mat4 m(cam.getView(true));
+        glm::mat4 m(cam.setView());
         glm::vec3 cu = glm::normalize(glm::vec3(m * glm::vec4(1, 0, 0, 0)));
         glm::vec3 cv = glm::normalize(glm::vec3(m * glm::vec4(0, 1, 0, 0)));
         pan.x = basePan.x + dx * cu.x + dy * cv.x;
@@ -411,7 +415,7 @@ void GobanView::setTsumegoMode(bool enabled) {
 }
 
 glm::vec3 GobanView::computeWorldTranslation() const {
-    glm::mat4 m(cam.getView(true));
+    glm::mat4 m(cam.setView());
     glm::vec3 viewDir = glm::normalize(glm::vec3(m * glm::vec4(0, 0, -3, 0)));
     return glm::vec3(pan.x, 0.0f, pan.y) + (3.0f - distance) * viewDir;
 }
