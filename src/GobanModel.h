@@ -81,6 +81,8 @@ public:
 
     std::atomic<bool> isGameOver{true};
     std::atomic<bool> tsumegoMode{false};
+    std::string tsumegoHintBlack;  // Localized "Black to move", set on UI thread
+    std::string tsumegoHintWhite;  // Localized "White to move", set on UI thread
     bool started;
     GameState state;
 

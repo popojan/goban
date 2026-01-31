@@ -215,6 +215,8 @@
     <div class="template" id="tplTsumegoMode">쓰메고 모드</div>
     <div class="template" id="tplTsumegoSolved">정답!</div>
     <div class="template" id="tplTsumegoWrong">오답!</div>
+    <div class="template" id="tplBlackToMove">흑선</div>
+    <div class="template" id="tplWhiteToMove">백선</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

@@ -227,6 +227,8 @@
     <div class="template" id="tplTsumegoMode">Tsumego režim</div>
     <div class="template" id="tplTsumegoSolved">Vyřešeno!</div>
     <div class="template" id="tplTsumegoWrong">Špatně!</div>
+    <div class="template" id="tplBlackToMove">Černý na tahu</div>
+    <div class="template" id="tplWhiteToMove">Bílý na tahu</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

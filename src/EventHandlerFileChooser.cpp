@@ -71,10 +71,10 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
                 if (auto gameDoc = context->GetDocument("game_window")) {
                     if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
                         bool tsumego = isTsumegoToggled();
+                        gameElement->setTsumegoMode(tsumego);
                         gameElement->getGameThread().loadSGF(filePath, gameIndex, tsumego);
                         gameElement->refreshPlayerDropdowns();  // Update dropdowns with SGF player names
                         gameElement->refreshGameSettingsDropdowns();  // Sync board/komi/handicap with SGF
-                        gameElement->setTsumegoMode(tsumego);
                         if (tsumego) {
                             gameElement->getGameThread().autoPlayTsumegoSetup();
                         }

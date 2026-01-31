@@ -32,11 +32,16 @@ public:
         view.setTsumegoMode(enabled);
         model.tsumegoMode = enabled;
         model.game.setSuppressSessionCopy(enabled);
+        if (enabled) {
+            cacheTsumegoHints();
+        }
     }
 
     bool isTsumegoMode() const {
         return view.isTsumegoMode();
     }
+
+    void cacheTsumegoHints();
 
     bool needsRender() const {
         return view.needsRender();

@@ -227,6 +227,8 @@
     <div class="template" id="tplTsumegoMode">Tsumego Mode</div>
     <div class="template" id="tplTsumegoSolved">Solved!</div>
     <div class="template" id="tplTsumegoWrong">Wrong!</div>
+    <div class="template" id="tplBlackToMove">Black to move</div>
+    <div class="template" id="tplWhiteToMove">White to move</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

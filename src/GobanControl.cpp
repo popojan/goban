@@ -76,11 +76,10 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
 
                 // No matching variation — new move
                 if (view.isTsumegoMode()) {
-                    // Wrong move: create variation with BM property
-                    spdlog::debug("Tsumego: wrong move at ({},{})", coord.col(), coord.row());
+                    // Game thread infers BM marking from context
                     Color colorToMove = model.game.getColorToMove();
-                    Move wrongMove(coord, colorToMove);
-                    engine.navigateToVariation(wrongMove, false, true);  // Don't promote, mark bad
+                    Move newMove(coord, colorToMove);
+                    engine.navigateToVariation(newMove, false);
                     return;
                 }
 
@@ -97,8 +96,23 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                 return;
             }
 
-            // In tsumego mode at end of variation, block new moves
+            // In tsumego mode at end of variation
             if (view.isTsumegoMode() && model.game.isAtEndOfNavigation()) {
+                if (!model.game.isOnBadMovePath()) {
+                    return;  // Solved — stay blocked
+                }
+                // Dead branch: allow exploration
+                if (!model.state.holdsStone) {
+                    model.state.holdsStone = true;
+                    model.updateReservoirs();
+                    view.requestRepaint(GobanView::UPDATE_STONES);
+                    return;
+                }
+                model.state.holdsStone = false;
+                model.updateReservoirs();
+                Color colorToMove = model.game.getColorToMove();
+                Move newMove(coord, colorToMove);
+                engine.navigateToVariation(newMove, false);
                 return;
             }
 
@@ -513,6 +527,13 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
             // At end of unfinished branch - Space falls through to kibitz
             if (key == Rml::Input::KI_RIGHT) {
                 return;  // Right key doesn't trigger kibitz
+            }
+            // Tsumego: request engine move on dead branch via navigation
+            if (view.isTsumegoMode()) {
+                if (model.game.isOnBadMovePath()) {
+                    engine.requestKibitzNav();
+                }
+                return;  // Don't fall through to "play once" — would break navigation
             }
             spdlog::debug("Navigation: at end of branch, Space falls through to kibitz");
         }

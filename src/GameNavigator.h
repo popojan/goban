@@ -64,6 +64,9 @@ private:
     // Helper to sync move across all engines
     void syncEngines(const Move& move, Engine* coach, bool isUndo) const;
 
+    // Apply tsumego "X to move" hint when comment is empty
+    void applyTsumegoHint();
+
     GobanModel& model;
     CoachProvider getCoach;
     ActivePlayersProvider getActivePlayers;

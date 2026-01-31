@@ -528,9 +528,15 @@ void GameThread::navigateForward() {
     wakeGameThread();
 }
 
-void GameThread::navigateToVariation(const Move& move, bool promote, bool tsumegoMarkBad) {
+void GameThread::navigateToVariation(const Move& move, bool promote) {
     std::lock_guard<std::mutex> lock(navQueueMutex);
-    navQueue.push({NavCommand::TO_VARIATION, move, promote, tsumegoMarkBad});
+    navQueue.push({NavCommand::TO_VARIATION, move, promote});
+    wakeGameThread();
+}
+
+void GameThread::requestKibitzNav() {
+    std::lock_guard<std::mutex> lock(navQueueMutex);
+    navQueue.push({NavCommand::KIBITZ_NAV});
     wakeGameThread();
 }
 
@@ -667,18 +673,19 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
         case NavCommand::TO_VARIATION: {
             auto varResult = navigator->navigateToVariation(cmd.move, cmd.promote);
 
-            // Tsumego logic (moved from GobanControl to game thread)
+            // Tsumego logic: infer BM marking from context
             if (varResult.success && model.tsumegoMode) {
-                if (cmd.tsumegoMarkBad) {
-                    // Wrong move: mark with BM property
+                if (varResult.newBranch && !model.game.isOnBadMovePath()) {
+                    // New branch from correct tree → first wrong move
                     model.game.markBadMove();
-                    model.state.msg = GameState::TSUMEGO_WRONG;
-                } else if (model.game.isOnBadMovePath()) {
+                }
+
+                if (model.game.isOnBadMovePath()) {
                     model.state.msg = GameState::TSUMEGO_WRONG;
                 } else if (model.game.isAtEndOfNavigation()) {
                     model.state.msg = GameState::TSUMEGO_SOLVED;
                 } else if (model.game.hasNextMove()) {
-                    // Auto-play opponent's response (main line)
+                    // Correct path: auto-play opponent's response from SGF
                     navigator->navigateForward();
                     if (model.game.isAtEndOfNavigation()) {
                         model.state.msg = GameState::TSUMEGO_SOLVED;
@@ -691,6 +698,10 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
                 if (kibitz && coach && !model.isGameOver) {
+                    // Navigation only syncs active players; a separate kibitz may be stale
+                    if (kibitz != coach) {
+                        syncEngineToPosition(kibitz);
+                    }
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis nav: triggering kibitz response for {}", responseColor.toString());
                     Move response = kibitz->genmove(responseColor);
@@ -703,7 +714,29 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             }
             break;
         }
+        case NavCommand::KIBITZ_NAV: {
+            Engine* kibitz = currentKibitz();
+            Engine* coach = currentCoach();
+            if (!kibitz || !coach) break;
+
+            // Sync kibitz engine if it differs from coach (coach is kept in sync
+            // during navigation, but a separate kibitz engine may be stale)
+            if (kibitz != coach) {
+                syncEngineToPosition(kibitz);
+            }
+
+            Color responseColor = model.state.colorToMove;
+            spdlog::debug("KIBITZ_NAV: requesting move for {}", responseColor.toString());
+            Move response = kibitz->genmove(responseColor);
+            if (!response || response == Move::RESIGN) break;
+
+            if (kibitz == coach || coach->play(response)) {
+                processSuccessfulMove(response, kibitz, coach, kibitz, false);
+            }
+            break;
+        }
     }
+
 }
 
 bool GameThread::setGameMode(GameMode mode) {
@@ -923,7 +956,7 @@ bool GameThread::autoPlayTsumegoSetup() {
     spdlog::info("Tsumego setup: auto-playing {} move (PL={}) as setup",
         nextMove.col == Color::BLACK ? "B" : "W",
         plColor == Color::BLACK ? "B" : "W");
-    navigateForward();
+    navigateForward();  // Async — hint applied in executeNavCommand after FORWARD completes
     return true;
 }
 
@@ -933,7 +966,10 @@ void GameThread::syncEngineToPosition(Engine* engine) {
 
     int boardSize = model.getBoardSize();
     float komi = model.state.komi;
-    spdlog::debug("syncEngineToPosition: {} boardSize={} komi={}", engine->getName(), boardSize, komi);
+    spdlog::debug("syncEngineToPosition: {} boardSize={} komi={} setupB={} setupW={} moves={}",
+        engine->getName(), boardSize, komi,
+        model.setupBlackStones.size(), model.setupWhiteStones.size(),
+        model.game.moveCount());
 
     engine->boardsize(boardSize);
     engine->clear();
@@ -1031,10 +1067,11 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
     model.state.handicap = gameInfo.handicap;
     gameMode = GameMode::MATCH;
 
-    // Handle setup stones in model (always update, even if empty, to clear old state)
+    // Copy setup stones to model (always update, even if empty, to clear old state).
+    // The SGF tree already has AB/AW properties — don't call setHandicapStones() here,
+    // it would duplicate them onto root for FF[3] files where setup is on a child node.
     model.setupBlackStones = gameInfo.setupBlackStones;
     model.setupWhiteStones = gameInfo.setupWhiteStones;
-    model.game.setHandicapStones(gameInfo.setupBlackStones);
     if (!gameInfo.setupBlackStones.empty() || !gameInfo.setupWhiteStones.empty()) {
         model.board.clear(gameInfo.boardSize);
         for (const auto& stone : gameInfo.setupBlackStones) {
@@ -1059,16 +1096,9 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
         syncEngineToPosition(engine);
     }
 
-    // Build board from SGF using local capture logic (engine-independent)
-    Board result(model.game.getBoardSize());
-    Position koPosition;
-    model.game.buildBoardFromMoves(result, koPosition);
-    std::for_each(gameObservers.begin(), gameObservers.end(),
-        [&result](GameObserver* observer) {
-            observer->onBoardChange(result);
-        });
-
-    // Set game state - use SGF tree for color to move (respects PL property)
+    // Set game state before onBoardChange — the render loop reads comment/colorToMove
+    // when it detects positionNumber change, so these must be ready first.
+    model.state.msg = GameState::NONE;
     model.state.colorToMove = model.game.getColorToMove();
     if (model.game.moveCount() > 0) {
         const Move& lastMove = model.game.lastMove();
@@ -1080,6 +1110,23 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
 
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
+
+    // Tsumego "to move" hint for the loaded position
+    if (model.tsumegoMode && model.state.comment.empty()) {
+        model.state.comment = (model.state.colorToMove == Color::BLACK)
+            ? model.tsumegoHintBlack : model.tsumegoHintWhite;
+    }
+
+    // Build board from SGF using local capture logic (engine-independent)
+    // This triggers onBoardChange → positionNumber increment, which the render
+    // loop uses to detect changes and read the state set above.
+    Board result(model.game.getBoardSize());
+    Position koPosition;
+    model.game.buildBoardFromMoves(result, koPosition);
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [&result](GameObserver* observer) {
+            observer->onBoardChange(result);
+        });
 
     // Handle finished games (resignation or double pass)
     // Only finalize when at the end of the game - not when viewing from root

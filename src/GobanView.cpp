@@ -24,6 +24,22 @@ GobanView::GobanView(GobanModel& m)
     translate[1] = newTranslate[1];
     translate[2] = newTranslate[2];
     resetView();
+
+    // Load saved shader (or default to 0) — must happen before setReady()
+    int shaderIdx = 0;
+    auto& settings = UserSettings::instance();
+    if (settings.hasShaderSettings()) {
+        std::string savedName = settings.getShaderName();
+        auto shaders = config->data.value("shaders", nlohmann::json::array());
+        for (int i = 0; i < static_cast<int>(shaders.size()); i++) {
+            if (shaders[i].value("name", "") == savedName) {
+                shaderIdx = i;
+                break;
+            }
+        }
+    }
+    gobanShader.choose(shaderIdx);
+
     updateFlag |= GobanView::UPDATE_ALL;  // Ensure full render on startup
     gobanShader.setReady();
     gobanOverlay.setReady();
@@ -99,17 +115,6 @@ void GobanView::resetView() {
     }
 
     if (settings.hasShaderSettings()) {
-        // Restore shader by name
-        std::string savedName = settings.getShaderName();
-        if (!savedName.empty()) {
-            auto shaders = config->data.value("shaders", nlohmann::json::array());
-            for (int i = 0; i < static_cast<int>(shaders.size()); i++) {
-                if (shaders[i].value("name", "") == savedName) {
-                    switchShader(i);
-                    break;
-                }
-            }
-        }
         gobanShader.setEof(settings.getShaderEof());
         gobanShader.setDof(settings.getShaderDof());
         gobanShader.setGamma(settings.getShaderGamma());

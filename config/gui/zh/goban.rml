@@ -227,6 +227,8 @@
     <div class="template" id="tplTsumegoMode">诘棋模式</div>
     <div class="template" id="tplTsumegoSolved">解答正确！</div>
     <div class="template" id="tplTsumegoWrong">错误！</div>
+    <div class="template" id="tplBlackToMove">黑先</div>
+    <div class="template" id="tplWhiteToMove">白先</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

@@ -22,11 +22,10 @@ extern std::shared_ptr<Configuration> config;
 
 /** \brief Navigation command queued for execution on the game thread */
 struct NavCommand {
-    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION };
+    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION, KIBITZ_NAV };
     Type type;
     Move move;  // For TO_VARIATION
     bool promote = true;  // For TO_VARIATION: promote to main line
-    bool tsumegoMarkBad = false;  // For TO_VARIATION: mark as bad move (BM property)
 };
 
 /** \brief Game mode determining player interaction behavior
@@ -117,9 +116,10 @@ public:
     // Navigation methods for SGF replay (fire-and-forget, processed on game thread)
     void navigateBack();
     void navigateForward();
-    void navigateToVariation(const Move& move, bool promote = true, bool tsumegoMarkBad = false);
+    void navigateToVariation(const Move& move, bool promote = true);
     void navigateToStart();
     void navigateToEnd();
+    void requestKibitzNav();  // Request engine move via navigation (for tsumego dead branches)
 
     std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
 

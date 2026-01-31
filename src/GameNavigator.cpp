@@ -4,6 +4,13 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 
+void GameNavigator::applyTsumegoHint() {
+    if (model.tsumegoMode && model.state.comment.empty()) {
+        model.state.comment = (model.state.colorToMove == Color::BLACK)
+            ? model.tsumegoHintBlack : model.tsumegoHintWhite;
+    }
+}
+
 GameNavigator::GameNavigator(GobanModel& model, CoachProvider getCoach,
                              ActivePlayersProvider getActivePlayers, ObserverList& observers)
     : model(model), getCoach(std::move(getCoach)), getActivePlayers(std::move(getActivePlayers)), gameObservers(observers)
@@ -83,6 +90,7 @@ bool GameNavigator::navigateBack() {
     // Update comment/markup from current SGF node
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
+    applyTsumegoHint();
 
     // Show pass message if we just undid a pass (shows the state we're viewing)
     if (undoneMove == Move::PASS) {
@@ -165,6 +173,7 @@ bool GameNavigator::navigateForward() {
     // Update comment/markup from current SGF node
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
+    applyTsumegoHint();
 
     // Restore game-over state if we've reached the end of a finished game
     if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
@@ -238,6 +247,7 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
     // Update comment/markup from current SGF node
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
+    applyTsumegoHint();
 
     // Build board from SGF (local capture logic, no engine dependency)
     Board boardResult(model.game.getBoardSize());
@@ -293,6 +303,7 @@ bool GameNavigator::navigateToStart() {
         model.state.comment = model.game.getComment();
         model.state.markup = model.game.getMarkup();
         model.state.msg = GameState::NONE;
+        applyTsumegoHint();
 
         // Build board from SGF (local capture logic, no engine dependency)
         Board result(model.game.getBoardSize());
@@ -346,6 +357,7 @@ bool GameNavigator::navigateToEnd() {
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
     model.state.msg = GameState::NONE;
+    applyTsumegoHint();
 
     // Always build stones from SGF (local capture logic, reliable)
     Board boardResult(model.game.getBoardSize());

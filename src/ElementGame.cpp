@@ -495,6 +495,13 @@ void ElementGame::updateLoadingStatus(const std::string& message) {
     view.requestRepaint();
 }
 
+void ElementGame::cacheTsumegoHints() {
+    auto context = GetContext();
+    if (!context) return;
+    model.tsumegoHintBlack = getTemplateText(context, "tplBlackToMove");
+    model.tsumegoHintWhite = getTemplateText(context, "tplWhiteToMove");
+}
+
 void ElementGame::showMessage(const std::string& text) {
     // Don't overwrite active prompts (quit confirmation, clear board, etc.)
     if (hasActivePrompt()) return;
@@ -620,6 +627,10 @@ void ElementGame::clearMessage() {
     if (!doc) return;
 
     if (auto msgLabel = doc->GetElementById("lblMessage")) {
+        std::string current = msgLabel->GetInnerRML();
+        if (!current.empty()) {
+            spdlog::debug("clearMessage: clearing '{}'", current.substr(0, 40));
+        }
         msgLabel->SetInnerRML("");
     }
     view.requestRepaint();
@@ -1019,7 +1030,7 @@ void ElementGame::OnUpdate()
         // to ensure UPDATE_STONES flag is set before positionNumber is consumed
     }
     // Show SGF comment if available, but don't overwrite important game messages
-    if (view.state.comment != commentSnapshot || errorsChanged) {
+    if (view.state.comment != commentSnapshot || errorsChanged || posChanged) {
         spdlog::debug("Comment changed: '{}' -> '{}'", view.state.comment.substr(0, 30), commentSnapshot.substr(0, 30));
         if (!commentSnapshot.empty() && !isImportantMessage(model.state.msg)) {
             showWithErrors(commentSnapshot);
