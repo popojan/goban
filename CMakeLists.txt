@@ -19,6 +19,7 @@ function(build_glyphy)
     if(WIN32)
         ExternalProject_Add(project_glyphy
             GIT_REPOSITORY  https://github.com/behdad/glyphy.git
+            GIT_TAG 68a5f8d8ae64e0158d776b21581d0ecb70ec8304
             SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/glyphy
             BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/glyphy/build
             CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy
@@ -36,6 +37,7 @@ function(build_glyphy)
     else()
         ExternalProject_Add(project_glyphy
             GIT_REPOSITORY  https://github.com/behdad/glyphy.git
+            GIT_TAG 68a5f8d8ae64e0158d776b21581d0ecb70ec8304
             SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/glyphy
             BINARY_DIR    ${PROJECT_BINARY_DIR}/deps/glyphy/build
             CONFIGURE_COMMAND
@@ -58,7 +60,7 @@ function(build_libsgfcplusplus)
     MESSAGE("build type = ${CMAKE_BUILD_TYPE}")
     ExternalProject_Add(project_libsgfcplusplus
             GIT_REPOSITORY  https://github.com/herzbube/libsgfcplusplus.git
-            GIT_TAG master
+            GIT_TAG 2.0.1
             CMAKE_ARGS  ${CL_ARGS}
             BUILD_COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus -DENABLE_TESTS=0
             COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE}
@@ -160,7 +162,7 @@ function(fetch_rmlui)
 
     FetchContent_Declare(rmlui
             GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
-            GIT_TAG master)  # Using master for GCC 15 fix (PR #766)
+            GIT_TAG 6.2)
 
     FetchContent_MakeAvailable(rmlui)
 
