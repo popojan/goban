@@ -583,6 +583,11 @@ void GameThread::processScoring() {
 
     model.state.msg = GameState::CALCULATING_SCORE;
 
+    // Ensure coach has the correct position before asking for territory.
+    // The lazy sync in the main game loop only runs when !isGameOver,
+    // so scoring at startup (loaded finished game) would query an empty board.
+    syncEngineToPosition(coach);
+
     Board result(model.game.getBoardSize());
     Position koPosition;
     model.game.buildBoardFromMoves(result, koPosition);
