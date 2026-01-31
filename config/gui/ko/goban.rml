@@ -123,8 +123,8 @@
                             <div class="template" id="templateBlackWon">흑 %.1f집 승</div>
                             <div class="template" id="templateWhiteResigns">백 불계</div>
                             <div class="template" id="templateBlackResigns">흑 불계</div>
-                            <div class="template" id="templateWhitePasses">백 패스</div>
-                            <div class="template" id="templateBlackPasses">흑 패스</div>
+                            <div class="template" id="templateWhitePasses">({0}) 백 패스</div>
+                            <div class="template" id="templateBlackPasses">({0}) 흑 패스</div>
                             <div class="template" id="templateCalculatingScore">계산 중...</div>
                             <div class="template" id="templateClearBoard">바둑판 지우기?</div>
                             <div class="template" id="templateQuitWithoutFinishing">진행 중인 대국을 종료하시겠습니까?</div>

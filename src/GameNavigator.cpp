@@ -4,6 +4,13 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 
+void GameNavigator::setPassMessage(const Move& passMove) {
+    model.state.msg = (passMove.col == Color::BLACK)
+        ? GameState::BLACK_PASS : GameState::WHITE_PASS;
+    size_t moveNum = model.game.getViewPosition();
+    model.state.passVariationLabel = std::to_string(moveNum);
+}
+
 void GameNavigator::applyTsumegoHint() {
     if (model.tsumegoMode && model.state.comment.empty()) {
         model.state.comment = (model.state.colorToMove == Color::BLACK)
@@ -92,11 +99,10 @@ bool GameNavigator::navigateBack() {
     model.state.markup = model.game.getMarkup();
     applyTsumegoHint();
 
-    // Show pass message if we just undid a pass (shows the state we're viewing)
-    if (undoneMove == Move::PASS) {
-        model.state.msg = (undoneMove.col == Color::BLACK)
-            ? GameState::BLACK_PASS
-            : GameState::WHITE_PASS;
+    // Show pass message if the move at the current position is a pass
+    Move currentMove = model.game.lastMove();
+    if (currentMove == Move::PASS) {
+        setPassMessage(currentMove);
     } else {
         model.state.msg = GameState::NONE;
     }
@@ -159,10 +165,7 @@ bool GameNavigator::navigateForward() {
 
     // Set message for pass moves, clear for stone moves
     if (isPass) {
-        model.state.msg = (nextMove.col == Color::BLACK)
-            ? GameState::BLACK_PASS
-            : GameState::WHITE_PASS;
-        spdlog::debug("navigateForward: showing pass message for {}", nextMove.col == Color::BLACK ? "Black" : "White");
+        setPassMessage(nextMove);
     } else {
         model.state.msg = GameState::NONE;
     }
@@ -248,6 +251,13 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
     applyTsumegoHint();
+
+    // Set message for pass moves, clear for stone moves
+    if (move == Move::PASS) {
+        setPassMessage(move);
+    } else {
+        model.state.msg = GameState::NONE;
+    }
 
     // Build board from SGF (local capture logic, no engine dependency)
     Board boardResult(model.game.getBoardSize());

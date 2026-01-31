@@ -194,6 +194,10 @@ bool GameThread::setFixedHandicap(int handicap) {
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&stones](GameObserver* observer) { observer->onHandicapChange(stones); });
 
+    // Notify view so handicap stones are rendered
+    std::for_each(gameObservers.begin(), gameObservers.end(),
+        [this](GameObserver* observer) { observer->onBoardChange(model.board); });
+
     return true;
 }
 void GameThread::run() {
@@ -343,6 +347,19 @@ void GameThread::gameLoop() {
         Engine* kibitzEngine = currentKibitz();
         Player* player = currentPlayer();
 
+        // Lazy sync: ensure all engines have correct board size and position
+        if (!enginesSyncedToPosition) {
+            auto allPlayers = playerManager->getPlayers();
+            for (auto* p : allPlayers) {
+                if (p->isTypeOf(Player::ENGINE)) {
+                    auto* eng = static_cast<Engine*>(p);
+                    spdlog::info("Lazy syncing engine {} to position", eng->getName());
+                    syncEngineToPosition(eng);
+                }
+            }
+            enginesSyncedToPosition = true;
+        }
+
         std::unique_lock<std::mutex> lock(playerMutex, std::defer_lock);
         bool locked = false;
 
@@ -439,15 +456,6 @@ void GameThread::gameLoop() {
                 suggestedMove = queuedMove;
                 queuedMove = Move(Move::INVALID, model.state.colorToMove);
                 playerToMove = player;
-            }
-
-            // Lazy sync: ensure player engine is synced before it plays
-            if (!enginesSyncedToPosition && player->isTypeOf(Player::ENGINE)) {
-                Engine* engine = static_cast<Engine*>(player);
-                if (engine != coach && engine != kibitzEngine) {
-                    spdlog::info("Lazy syncing player engine {} before play", engine->getName());
-                    syncEngineToPosition(engine);
-                }
             }
 
             player->suggestMove(suggestedMove);
@@ -869,6 +877,9 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
 
         std::for_each(gameObservers.begin(), gameObservers.end(),
             [boardSize](GameObserver* observer) { observer->onBoardSized(boardSize); });
+
+        setFixedHandicap(settings.getHandicap());
+        model.createNewRecord();
     }
 
     // Notify that first engine is ready (for UI update)
@@ -1105,6 +1116,7 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
         if (lastMove == Move::PASS) {
             model.state.msg = (lastMove.col == Color::BLACK)
                 ? GameState::BLACK_PASS : GameState::WHITE_PASS;
+            model.state.passVariationLabel = std::to_string(model.game.moveCount());
         }
     }
 

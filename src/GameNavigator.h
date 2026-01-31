@@ -67,6 +67,9 @@ private:
     // Apply tsumego "X to move" hint when comment is empty
     void applyTsumegoHint();
 
+    // Set pass message with variation label (e.g. "11a Black passes")
+    void setPassMessage(const Move& passMove);
+
     GobanModel& model;
     CoachProvider getCoach;
     ActivePlayersProvider getActivePlayers;

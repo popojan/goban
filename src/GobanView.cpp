@@ -311,6 +311,13 @@ void GobanView::Render(int w, int h)
         player.play("move", 1.0);
     }
 
+	// Update overlays before stone upload so annotation material changes
+	// (grid-erasing patches) are included in the glBufferData upload.
+	if (flags & UPDATE_OVERLAY){
+        updateLastMoveOverlay();
+        updateNavigationOverlay();
+	}
+
 	if (flags & UPDATE_STONES) {
 	    board.updateStones(model.board);
         updateCursor();
@@ -331,8 +338,6 @@ void GobanView::Render(int w, int h)
 
 	glEnable(GL_DEPTH_TEST);
 	if (flags & UPDATE_OVERLAY){
-        updateLastMoveOverlay();
-        updateNavigationOverlay();
         gobanOverlay.Update(board, model);
 	}
 
@@ -558,9 +563,6 @@ void GobanView::updateNavigationOverlay() {
 		}
 	}
 
-	// Clear pass variation label (set below if a pass variation exists)
-	model.state.passVariationLabel.clear();
-
 	// Get all variations (branches) from current position
 	if (model.game.isNavigating()) {
 		auto variations = model.game.getVariations();
@@ -594,10 +596,6 @@ void GobanView::updateNavigationOverlay() {
 				spdlog::debug("Navigation overlay: {} at ({},{})",
 					ss.str(), move.pos.col(), move.pos.row());
 			} else if (move == Move::PASS) {
-				// Pass variation - show in message label (no board position to overlay)
-				bool isBlack = (move.col == Color::BLACK);
-				model.state.msg = isBlack ? GameState::BLACK_PASS : GameState::WHITE_PASS;
-				model.state.passVariationLabel = ss.str();
 				spdlog::debug("Navigation overlay: pass variation {}", ss.str());
 			}
 			idx++;
@@ -643,8 +641,6 @@ void GobanView::updateNavigationOverlay() {
 		}
 	}
 
-	// UPDATE_STONES needed to upload mAnnotation material changes for grid patches
-	requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
 }
 
 void GobanView::onBoardSized(int newBoardSize) {

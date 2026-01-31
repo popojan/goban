@@ -123,8 +123,8 @@
                             <div class="template" id="templateBlackWon">黒 %.1f目勝ち</div>
                             <div class="template" id="templateWhiteResigns">白投了</div>
                             <div class="template" id="templateBlackResigns">黒投了</div>
-                            <div class="template" id="templateWhitePasses">白パス</div>
-                            <div class="template" id="templateBlackPasses">黒パス</div>
+                            <div class="template" id="templateWhitePasses">({0}) 白パス</div>
+                            <div class="template" id="templateBlackPasses">({0}) 黒パス</div>
                             <div class="template" id="templateCalculatingScore">計算中...</div>
                             <div class="template" id="templateClearBoard">盤面をクリア？</div>
                             <div class="template" id="templateQuitWithoutFinishing">対局を終了しますか？</div>

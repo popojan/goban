@@ -49,7 +49,6 @@ public:
     void createNewRecord() {
         game.initGame(board.getSize(), state.komi, setupBlackStones.size(), state.black, state.white);
         game.setHandicapStones(setupBlackStones);
-        start();
     }
 
     void pause() {

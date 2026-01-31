@@ -135,8 +135,8 @@
                             <div class="template" id="templateBlackWon">Black wins by %.1f</div>
                             <div class="template" id="templateWhiteResigns">White resigns</div>
                             <div class="template" id="templateBlackResigns">Black resigns</div>
-                            <div class="template" id="templateWhitePasses">White passes</div>
-                            <div class="template" id="templateBlackPasses">Black passes</div>
+                            <div class="template" id="templateWhitePasses">({0}) White passes</div>
+                            <div class="template" id="templateBlackPasses">({0}) Black passes</div>
                             <div class="template" id="templateCalculatingScore">Calculating score...</div>
                             <div class="template" id="templateClearBoard">Clear board?</div>
                             <div class="template" id="templateQuitWithoutFinishing">Quit without finishing?</div>

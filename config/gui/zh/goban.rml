@@ -135,8 +135,8 @@
                             <div class="template" id="templateBlackWon">黑胜%.1f目</div>
                             <div class="template" id="templateWhiteResigns">白方认输</div>
                             <div class="template" id="templateBlackResigns">黑方认输</div>
-                            <div class="template" id="templateWhitePasses">白方虚着</div>
-                            <div class="template" id="templateBlackPasses">黑方虚着</div>
+                            <div class="template" id="templateWhitePasses">({0}) 白方虚着</div>
+                            <div class="template" id="templateBlackPasses">({0}) 黑方虚着</div>
                             <div class="template" id="templateCalculatingScore">计算得分中...</div>
                             <div class="template" id="templateClearBoard">清空棋盘？</div>
                             <div class="template" id="templateQuitWithoutFinishing">退出未完成的对局？</div>

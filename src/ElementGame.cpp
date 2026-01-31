@@ -971,15 +971,17 @@ void ElementGame::OnUpdate()
         }
         case GameState::BLACK_PASS: {
             std::string msg = getTemplateText(context, "templateBlackPasses");
-            if (!model.state.passVariationLabel.empty())
-                msg = model.state.passVariationLabel + " " + msg;
+            auto pos = msg.find("{0}");
+            if (pos != std::string::npos)
+                msg.replace(pos, 3, model.state.passVariationLabel);
             showMessage(msg);
             break;
         }
         case GameState::WHITE_PASS: {
             std::string msg = getTemplateText(context, "templateWhitePasses");
-            if (!model.state.passVariationLabel.empty())
-                msg = model.state.passVariationLabel + " " + msg;
+            auto pos = msg.find("{0}");
+            if (pos != std::string::npos)
+                msg.replace(pos, 3, model.state.passVariationLabel);
             showMessage(msg);
             break;
         }

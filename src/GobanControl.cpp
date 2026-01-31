@@ -19,6 +19,7 @@ bool GobanControl::newGame(unsigned boardSize) const {
     model.game.setSuppressSessionCopy(false);
     if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         model.createNewRecord();
+        model.start();
         view.animateIntro();
         parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
         // Save game settings so fresh start uses these values
@@ -602,6 +603,7 @@ bool GobanControl::setKomi(float komi) const {
 bool GobanControl::setHandicap(int handicap) const {
     bool isOver = model.state.reason != GameState::NO_REASON;
     bool isRunning = engine.isRunning();
+    spdlog::debug("setHandicap: handicap={} isRunning={} isOver={}", handicap, isRunning, isOver);
     bool success = false;
     if(!isRunning && !isOver) {
         model.state.handicap = handicap;

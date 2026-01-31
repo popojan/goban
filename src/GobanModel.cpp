@@ -187,6 +187,7 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
         state.msg = state.colorToMove == Color::BLACK
             ? GameState::BLACK_PASS
             : GameState::WHITE_PASS;
+        state.passVariationLabel = std::to_string(game.moveCount());
     }
     else {
         state.msg = GameState::NONE;
