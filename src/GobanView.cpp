@@ -184,10 +184,9 @@ void GobanView::animateCamera(const DDG::Quaternion& targetRotation,
 }
 
 void GobanView::zoomRelative(float percentage) {
-    // Scale the camera-to-board distance (6 - distance) proportionally.
-    // Closer to board → smaller steps; can never reach board (distance=6).
-    float camDist = (6.0f - cameraDistance) * (1.0f + percentage * 0.2f);
-    cameraDistance = 6.0f - camDist;
+    // Scale camera distance proportionally.
+    // Closer to board → smaller steps; distance stays positive.
+    cameraDistance *= (1.0f + percentage * 0.2f);
     baseCameraDistance = cameraDistance;
     requestRepaint();
 }
@@ -201,12 +200,11 @@ void GobanView::mouseMoved(float x, float y) {
     }
     else if (isZooming) {
         float delta = -6.0f * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
-        float camDist = (6.0f - baseCameraDistance) * std::exp(delta);
-        cameraDistance = 6.0f - camDist;
+        cameraDistance = baseCameraDistance * std::exp(delta);
         requestRepaint();
     }
     else if (isPanning) {
-        float scale = 2.0f * (6.0f - cameraDistance) / 3.0f;
+        float scale = 2.0f * cameraDistance / 3.0f;
         float dx = -scale * (x - startX) / static_cast<float>(WINDOW_HEIGHT);
         float dy =  scale * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
         glm::mat4 m(cam.setView());
@@ -256,7 +254,8 @@ void GobanView::shadeIt(float time, const GobanShader& shader, int flags) const 
 
 	shader.setTime(lastTime);
 	shader.setRotation(cam.setView());
-	shader.setPan(computeWorldTranslation());
+	shader.setCameraPan(cameraPan);
+	shader.setCameraDistance(cameraDistance);
 
 	if (flags & UPDATE_SHADER) {
 		spdlog::debug("setMetrics");
@@ -453,24 +452,21 @@ Position GobanView::getBoardCoordinate(float x, float y) const {
 
 glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     using namespace glm;
-    vec4 ta = vec4(.0f, .0f, .0f, .0f);
-    vec4 ro = vec4(.0f, .0f, -3.0f, 0.0f);
-    vec4 up = vec4(.0f, .1f, .0f, 0.0f);
-    mat4x4 m = cam.setView();
-    glm::vec3 wt = computeWorldTranslation();
-    vec4 tt = vec4(wt, 0.0f);
-    vec4 roo = m*ro + tt;
-    ta += tt;
-    up = normalize(m*up);
-    vec3 cw = vec3(normalize(ta - roo));
-    vec3 cu = normalize(cross(vec3(up), cw));
+    mat4 m = cam.setView();
+    // Match shader camera model: ta = pan on board plane, camera behind along viewDir
+    vec3 ta = vec3(cameraPan.x, 0.0f, cameraPan.y);
+    vec3 viewDir = normalize(vec3(m * vec4(0, 0, 1, 0)));
+    vec3 roo = ta - cameraDistance * viewDir;
+    vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
+    vec3 cw = viewDir;  // forward = toward board
+    vec3 cu = normalize(cross(up, cw));
     vec3 cv = cross(cw, cu);
-    float ratio = resolution.x/resolution.y;
-    vec2 q0 = vec2(ratio*2.0f*(x/resolution.x-0.5f), 2.0f*(0.5f - y/resolution.y));
-    vec3 rdb = q0.x * cu + q0.y * cv +  3.0f * cw;
-    vec3 nBoard = vec3(.0f,1.0f,.0f);
-    auto t = dot(-vec3(roo), nBoard)/dot(rdb, nBoard);
-    vec3 ip = vec3(roo) + vec3(rdb)*t;
+    float ratio = resolution.x / resolution.y;
+    vec2 q0 = vec2(ratio * 2.0f * (x / resolution.x - 0.5f), 2.0f * (0.5f - y / resolution.y));
+    vec3 rdb = q0.x * cu + q0.y * cv + 3.0f * cw;
+    // Intersect ray with board plane (y=0)
+    auto t = -roo.y / rdb.y;
+    vec3 ip = roo + rdb * t;
     return {ip.x, ip.z};
 }
 

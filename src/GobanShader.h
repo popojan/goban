@@ -34,7 +34,8 @@ public:
     void use() const;
     static void unuse() ;
     void setTime(float) const;
-    void setPan(glm::vec3) const;
+    void setCameraPan(glm::vec2) const;
+    void setCameraDistance(float) const;
     void setRotation(glm::mat4x4) const;
     void setResolution(float, float);
     void setGamma(float);
@@ -103,7 +104,8 @@ private:
     static const std::array<GLfloat, 16> vertexBufferData;
     static const GLushort elementBufferData[];
 
-    GLint iTranslate = -1;
+    GLint iCameraPan = -1;
+    GLint iCameraDistance = -1;
     GLint iTime = -1;
     GLint iAnimT = -1;
 

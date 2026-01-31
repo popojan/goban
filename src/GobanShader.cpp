@@ -109,7 +109,8 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     glBindBufferRange(GL_UNIFORM_BUFFER, blockBindingPoint, bufStones, 0, 4 * sizeof(float)* Board::BOARD_SIZE);
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     iDim = glGetUniformLocation(gobanProgram, "NDIM");
-    iTranslate = glGetUniformLocation(gobanProgram, "iTranslate");
+    iCameraPan = glGetUniformLocation(gobanProgram, "cameraPan");
+    iCameraDistance = glGetUniformLocation(gobanProgram, "cameraDistance");
     iTime = glGetUniformLocation(gobanProgram, "iTime");
     iResolution = glGetUniformLocation(gobanProgram, "iResolution");
     iGamma = glGetUniformLocation(gobanProgram, "gamma");
@@ -297,8 +298,8 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) cons
         glUniform2fv(fsu_cursor, 1, cur);
     }
 
-    glm::vec3 worldTrans = view.computeWorldTranslation();
-    glUniform3fv(iTranslate, 1, glm::value_ptr(worldTrans));
+    glUniform2fv(iCameraPan, 1, glm::value_ptr(view.cameraPan));
+    glUniform1f(iCameraDistance, view.cameraDistance);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, static_cast<void *>(nullptr));
@@ -361,8 +362,12 @@ void GobanShader::setTime(float time) const {
     glUniform1f(iTime, time);
 }
 
-void GobanShader::setPan(glm::vec3 pan) const {
-    glUniform3fv(iTranslate, 1, glm::value_ptr(pan));
+void GobanShader::setCameraPan(glm::vec2 pan) const {
+    glUniform2fv(iCameraPan, 1, glm::value_ptr(pan));
+}
+
+void GobanShader::setCameraDistance(float dist) const {
+    glUniform1f(iCameraDistance, dist);
 }
 
 void GobanShader::setRotation(glm::mat4x4 m) const {

@@ -7,23 +7,24 @@ flat out vec3 roo;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform mat4 glModelViewMatrix;
-uniform vec3 iTranslate;
+uniform vec2 cameraPan;
+uniform float cameraDistance;
 uniform float iAnimT;
 
 void main() {
 	gl_Position = vertex; //gl_Vertex;
 
-    vec3 ta = vec3(0.0,0.0,0.0);
-    vec3 ro = vec3(0.0,0.0,-3.0-100.0*max(0.0,iAnimT-iTime));
+    float introZoom = 100.0*max(0.0,iAnimT-iTime);
     vec3 up = vec3(0.0,1.0,0.0);
 
     float a = 3.0*3.1415926*max(0.0, iAnimT-iTime);
     vec4 col = vec4(cos(a),0.0,sin(a),0.0);
     mat4 m = mat4(col.x,0.0,col.z,0.0,0.0,1.0,0.0,0.0,-col.z,0.0,col.x,0.0,0.0,0.0,0.0,1.0)*glModelViewMatrix;
+    mat4 introM = mat4(col.x,0.0,col.z,0.0,0.0,1.0,0.0,0.0,-col.z,0.0,col.x,0.0,0.0,0.0,0.0,1.0);
 
-    vec3 tt = (mat4(col.x,0.0,col.z,0.0,0.0,1.0,0.0,0.0,-col.z,0.0,col.x,0.0,0.0,0.0,0.0,1.0)*vec4(iTranslate,1.0)).xyz;
-    roo = (m*vec4(ro, 1.0)).xyz + tt;
-    ta = ta + tt;
+    vec3 ta = (introM * vec4(cameraPan.x, 0.0, cameraPan.y, 1.0)).xyz;
+    vec3 viewDir = normalize((m * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+    roo = ta - (cameraDistance + introZoom) * viewDir;
     up = normalize((m*vec4(up, 1.0)).xyz);
 
     vec3 cw = normalize(ta - roo);

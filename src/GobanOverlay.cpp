@@ -138,19 +138,23 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 		st->fast_setup();
 
 		using namespace glm;
-		vec4 ta = vec4(.0f, -layers[layer].height*model.metrics.h*view.gobanShader.getStoneHeight(), .0f, 0.0f);//-0.5*stoneh
-		glm::vec3 wt = view.computeWorldTranslation();
-		vec4 tt = vec4(wt[0], wt[1], wt[2], 0.0f);
-		ta += tt;
+		// Board target with layer height offset, in world space
+		vec3 boardTarget(view.cameraPan.x,
+		                 -layers[layer].height * model.metrics.h * view.gobanShader.getStoneHeight(),
+		                 view.cameraPan.y);
+		// Transform to camera-local space (transpose(m) = m^-1 for rotation)
+		vec3 ta_cam = vec3(transpose(m) * vec4(boardTarget, 0.0f));
+		// Camera is cameraDistance away along +Z in camera space
+		ta_cam.z += 3.0f - view.cameraDistance;
 
 		glyphy_extents_t extents;
 		buffer[layer]->extents(nullptr, &extents);
 		float content_scale = std::min(static_cast<float>(height) / 2.0f, 10000.0f);
 		float text_scale = content_scale;
 		{
-			float x = -content_scale * (transpose(m) * ta).x;
-			float y = -content_scale * (transpose(m)* ta).y;
-			float z = content_scale * (transpose(m) * ta).z;
+			float x = -content_scale * ta_cam.x;
+			float y = -content_scale * ta_cam.y;
+			float z = content_scale * ta_cam.z;
 
 			auto d = static_cast<float>(height);
 			float near = d;
