@@ -374,10 +374,8 @@ bool GobanView::toggleLastMoveOverlay() {
         if (lastMove) {
             board.removeOverlay(lastMove);
         }
-        updateFlag |= UPDATE_OVERLAY | UPDATE_STONES;
-    } else {
-        updateLastMoveOverlay();
     }
+    requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
     return showLastMoveOverlay;
 }
 
@@ -387,10 +385,8 @@ bool GobanView::toggleNextMoveOverlay() {
         for (const auto& pos : navOverlays) {
             if (pos) board.removeBoardOverlay(pos);
         }
-        updateFlag |= UPDATE_OVERLAY | UPDATE_STONES;
-    } else {
-        updateNavigationOverlay();
     }
+    requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
     return showNextMoveOverlay;
 }
 
