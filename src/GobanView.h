@@ -115,10 +115,6 @@ public:
                        const glm::vec2& targetPan, float targetDistance,
                        float duration = 0.6f);
 
-    glm::vec3 computeWorldTranslation() const;
-    static void decomposeTranslation(const glm::vec3& tt, const DDG::Quaternion& rot,
-                                     glm::vec2& outPan, float& outDist);
-
     void animateIntro();
 
     void requestRepaint(int what = UPDATE_SOME);
@@ -146,8 +142,8 @@ public:
     float VIEWPORT_WIDTH, VIEWPORT_HEIGHT;
     glm::vec2 cameraPan{0.0f, 0.0f};          // board-plane look-at point (x, z)
     glm::vec2 baseCameraPan{0.0f, 0.0f};      // committed pan (drag baseline)
-    float cameraDistance = 3.0f;               // distance from camera to board
-    float baseCameraDistance = 3.0f;            // committed distance (drag baseline)
+    float cameraDistance = 3.5f;               // distance from camera to board
+    float baseCameraDistance = 3.5f;            // committed distance (drag baseline)
     glm::vec2 resolution;
     float lastTime, startTime;
     bool animationRunning;

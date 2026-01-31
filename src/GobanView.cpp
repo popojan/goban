@@ -155,14 +155,13 @@ void GobanView::clearView() {
     // Default camera: same values as initCam()
     DDG::Quaternion targetRot(-1.0, 1.0, 0.0, 0.0);
     targetRot.normalize();
-    glm::vec2 targetPan;
-    float targetDist;
-    decomposeTranslation(glm::vec3(0, 0.5, 0), targetRot, targetPan, targetDist);
+    glm::vec2 targetPan(0.0f, 0.0f);
+    float targetDist = 3.5f;
 
     gobanShader.setGamma(1.0);
     gobanShader.setContrast(0.0);
-    gobanShader.setEof(0.0075);
-    gobanShader.setDof(0.01);
+    gobanShader.setEof(0.0725);
+    gobanShader.setDof(0.0925);
     updateFlag |= UPDATE_SHADER;
 
     animateCamera(targetRot, targetPan, targetDist);
@@ -222,7 +221,8 @@ void GobanView::initCam() {
     cam.rLast[2]=0.0;
     cam.rLast[3]=0.0;
     cam.rLast.normalize();
-    decomposeTranslation(glm::vec3(0, 0.5, 0), cam.rLast, cameraPan, cameraDistance);
+    cameraPan = glm::vec2(0.0f, 0.0f);
+    cameraDistance = 3.5f;
     baseCameraPan = cameraPan;
     baseCameraDistance = cameraDistance;
 }
@@ -410,32 +410,6 @@ void GobanView::setTsumegoMode(bool enabled) {
     }
     updateLastMoveOverlay();
     requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
-}
-
-glm::vec3 GobanView::computeWorldTranslation() const {
-    glm::mat4 m(cam.setView());
-    glm::vec3 viewDir = glm::normalize(glm::vec3(m * glm::vec4(0, 0, -3, 0)));
-    return glm::vec3(cameraPan.x, 0.0f, cameraPan.y) + (3.0f - cameraDistance) * viewDir;
-}
-
-void GobanView::decomposeTranslation(const glm::vec3& tt, const DDG::Quaternion& rot,
-                                     glm::vec2& outPan, float& outDist) {
-    DDG::Quaternion rc = rot.conj();
-    float w = static_cast<float>(rc[0]);
-    float x = static_cast<float>(rc[1]);
-    float y = static_cast<float>(rc[2]);
-    float z = static_cast<float>(rc[3]);
-    glm::mat4 m{
-        1.f-2.f*y*y-2.f*z*z, 2.f*x*y+2.f*w*z, 2.f*x*z-2.f*w*y, 0.f,
-        2.f*x*y-2.f*w*z, 1.f-2.f*x*x-2.f*z*z, 2.f*y*z+2.f*w*x, 0.f,
-        2.f*x*z+2.f*w*y, 2.f*y*z-2.f*w*x, 1.f-2.f*x*x-2.f*y*y, 0.f,
-        0.f, 0.f, 0.f, 1.f
-    };
-    glm::vec3 viewDir = glm::normalize(glm::vec3(m * glm::vec4(0, 0, -3, 0)));
-    float vy = viewDir.y;
-    outDist = (std::abs(vy) > 1e-3f) ? 3.0f - tt.y / vy : 3.0f;
-    glm::vec3 ip = tt - (3.0f - outDist) * viewDir;
-    outPan = glm::vec2(ip.x, ip.z);
 }
 
 Position GobanView::getBoardCoordinate(float x, float y) const {
