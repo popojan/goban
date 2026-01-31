@@ -1,7 +1,3 @@
-//
-// Created by jan on 7.5.17.
-//
-
 #ifndef GOBAN_GOBANMODEL_H
 #define GOBAN_GOBANMODEL_H
 

@@ -1,7 +1,3 @@
-//
-// Created by jan on 21.6.17.
-//
-
 #ifndef GOBAN_GOBANOVERLAY_H
 #define GOBAN_GOBANOVERLAY_H
 

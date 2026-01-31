@@ -1,7 +1,3 @@
-//
-// Created by jan on 7.5.17.
-//
-
 #include "ElementGame.h"
 #include "GobanModel.h"
 #include "UserSettings.h"

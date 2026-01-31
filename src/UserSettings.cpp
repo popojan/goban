@@ -77,12 +77,12 @@ void UserSettings::load() {
                 cameraRotZ = rot.value("z", cameraRotZ);
                 cameraRotW = rot.value("w", cameraRotW);
             }
-            if (camera.contains("translation")) {
-                auto& trans = camera["translation"];
-                cameraTransX = trans.value("x", cameraTransX);
-                cameraTransY = trans.value("y", cameraTransY);
-                cameraTransZ = trans.value("z", cameraTransZ);
+            if (camera.contains("pan")) {
+                auto& pan = camera["pan"];
+                cameraPanX = pan.value("x", cameraPanX);
+                cameraPanY = pan.value("y", cameraPanY);
             }
+            cameraDistVal = camera.value("distance", cameraDistVal);
         }
 
         spdlog::debug("User settings loaded");
@@ -125,11 +125,11 @@ void UserSettings::save() {
         {"w", cameraRotW}
     };
 
-    user["camera"]["translation"] = {
-        {"x", cameraTransX},
-        {"y", cameraTransY},
-        {"z", cameraTransZ}
+    user["camera"]["pan"] = {
+        {"x", cameraPanX},
+        {"y", cameraPanY}
     };
+    user["camera"]["distance"] = cameraDistVal;
 
     std::ofstream fout(SETTINGS_FILE);
     if (fout) {
@@ -194,10 +194,13 @@ void UserSettings::setCameraRotation(float x, float y, float z, float w) {
     cameraRotW = w;
 }
 
-void UserSettings::setCameraTranslation(float x, float y, float z) {
-    cameraTransX = x;
-    cameraTransY = y;
-    cameraTransZ = z;
+void UserSettings::setCameraPan(float x, float y) {
+    cameraPanX = x;
+    cameraPanY = y;
+}
+
+void UserSettings::setCameraDistance(float d) {
+    cameraDistVal = d;
 }
 
 void UserSettings::setBoardSize(int value) {

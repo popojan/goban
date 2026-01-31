@@ -60,8 +60,8 @@ void GobanView::initRotation(float x, float y) {
 
 void GobanView::endRotation() {
     cam.mouse(0, lastX, lastY, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
-    basePan = pan;
-    baseDistance = distance;
+    baseCameraPan = cameraPan;
+    baseCameraDistance = cameraDistance;
     isRotating = false;
 }
 
@@ -74,7 +74,7 @@ void GobanView::initPan(float x, float y) {
 }
 
 void GobanView::endPan() {
-    basePan = pan;
+    baseCameraPan = cameraPan;
     isPanning = false;
 }
 
@@ -88,25 +88,24 @@ void GobanView::initZoom(float x, float y) {
 
 void GobanView::endZoom() {
     isZooming = false;
-    baseDistance = distance;
+    baseCameraDistance = cameraDistance;
 }
 
 void GobanView::resetView() {
     auto& settings = UserSettings::instance();
 
     DDG::Quaternion targetRot = cam.rLast;
-    glm::vec2 targetPan = pan;
-    float targetDist = distance;
+    glm::vec2 targetPan = cameraPan;
+    float targetDist = cameraDistance;
 
     if (settings.hasCameraSettings()) {
         targetRot[0] = settings.getCameraRotationX();
         targetRot[1] = settings.getCameraRotationY();
         targetRot[2] = settings.getCameraRotationZ();
         targetRot[3] = settings.getCameraRotationW();
-        glm::vec3 savedTrans(settings.getCameraTranslationX(),
-                             settings.getCameraTranslationY(),
-                             settings.getCameraTranslationZ());
-        decomposeTranslation(savedTrans, targetRot, targetPan, targetDist);
+        targetRot.normalize();
+        targetPan = glm::vec2(settings.getCameraPanX(), settings.getCameraPanY());
+        targetDist = settings.getCameraDistance();
     }
 
     if (settings.hasShaderSettings()) {
@@ -139,8 +138,8 @@ void GobanView::saveView() {
     auto& settings = UserSettings::instance();
 
     settings.setCameraRotation(cam.rLast[0], cam.rLast[1], cam.rLast[2], cam.rLast[3]);
-    glm::vec3 wt = computeWorldTranslation();
-    settings.setCameraTranslation(wt[0], wt[1], wt[2]);
+    settings.setCameraPan(cameraPan.x, cameraPan.y);
+    settings.setCameraDistance(cameraDistance);
 
     settings.setShaderEof(gobanShader.getEof());
     settings.setShaderDof(gobanShader.getDof());
@@ -174,10 +173,10 @@ void GobanView::animateCamera(const DDG::Quaternion& targetRotation,
                               float duration) {
     cameraAnim.startRotation = cam.rLast;
     cameraAnim.targetRotation = targetRotation;
-    cameraAnim.startPan = pan;
-    cameraAnim.targetPan = targetPan;
-    cameraAnim.startDistance = distance;
-    cameraAnim.targetDistance = targetDistance;
+    cameraAnim.startCameraPan = cameraPan;
+    cameraAnim.targetCameraPan = targetPan;
+    cameraAnim.startCameraDistance = cameraDistance;
+    cameraAnim.targetCameraDistance = targetDistance;
     cameraAnim.startTime = static_cast<float>(glfwGetTime());
     cameraAnim.duration = duration;
     cameraAnim.active = true;
@@ -187,9 +186,9 @@ void GobanView::animateCamera(const DDG::Quaternion& targetRotation,
 void GobanView::zoomRelative(float percentage) {
     // Scale the camera-to-board distance (6 - distance) proportionally.
     // Closer to board → smaller steps; can never reach board (distance=6).
-    float camDist = (6.0f - distance) * (1.0f + percentage * 0.2f);
-    distance = 6.0f - camDist;
-    baseDistance = distance;
+    float camDist = (6.0f - cameraDistance) * (1.0f + percentage * 0.2f);
+    cameraDistance = 6.0f - camDist;
+    baseCameraDistance = cameraDistance;
     requestRepaint();
 }
 
@@ -202,19 +201,19 @@ void GobanView::mouseMoved(float x, float y) {
     }
     else if (isZooming) {
         float delta = -6.0f * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
-        float camDist = (6.0f - baseDistance) * std::exp(delta);
-        distance = 6.0f - camDist;
+        float camDist = (6.0f - baseCameraDistance) * std::exp(delta);
+        cameraDistance = 6.0f - camDist;
         requestRepaint();
     }
     else if (isPanning) {
-        float scale = 2.0f * (6.0f - distance) / 3.0f;
+        float scale = 2.0f * (6.0f - cameraDistance) / 3.0f;
         float dx = -scale * (x - startX) / static_cast<float>(WINDOW_HEIGHT);
         float dy =  scale * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
         glm::mat4 m(cam.setView());
         glm::vec3 cu = glm::normalize(glm::vec3(m * glm::vec4(1, 0, 0, 0)));
         glm::vec3 cv = glm::normalize(glm::vec3(m * glm::vec4(0, 1, 0, 0)));
-        pan.x = basePan.x + dx * cu.x + dy * cv.x;
-        pan.y = basePan.y + dx * cu.z + dy * cv.z;
+        cameraPan.x = baseCameraPan.x + dx * cu.x + dy * cv.x;
+        cameraPan.y = baseCameraPan.y + dx * cu.z + dy * cv.z;
         requestRepaint();
     }
 }
@@ -225,9 +224,9 @@ void GobanView::initCam() {
     cam.rLast[2]=0.0;
     cam.rLast[3]=0.0;
     cam.rLast.normalize();
-    decomposeTranslation(glm::vec3(0, 0.5, 0), cam.rLast, pan, distance);
-    basePan = pan;
-    baseDistance = distance;
+    decomposeTranslation(glm::vec3(0, 0.5, 0), cam.rLast, cameraPan, cameraDistance);
+    baseCameraPan = cameraPan;
+    baseCameraDistance = cameraDistance;
 }
 
 void GobanView::reshape(int width, int height) {
@@ -297,16 +296,16 @@ void GobanView::Render(int w, int h)
         float t = (time - cameraAnim.startTime) / cameraAnim.duration;
         if (t >= 1.0f) {
             cam.rLast = cameraAnim.targetRotation;
-            pan = cameraAnim.targetPan;
-            distance = cameraAnim.targetDistance;
-            basePan = pan;
-            baseDistance = distance;
+            cameraPan = cameraAnim.targetCameraPan;
+            cameraDistance = cameraAnim.targetCameraDistance;
+            baseCameraPan = cameraPan;
+            baseCameraDistance = cameraDistance;
             cameraAnim.active = false;
         } else {
             t = t * t * (3.0f - 2.0f * t); // smoothstep easing
             cam.rLast = DDG::slerp(cameraAnim.startRotation, cameraAnim.targetRotation, t);
-            pan = glm::mix(cameraAnim.startPan, cameraAnim.targetPan, t);
-            distance = glm::mix(cameraAnim.startDistance, cameraAnim.targetDistance, t);
+            cameraPan = glm::mix(cameraAnim.startCameraPan, cameraAnim.targetCameraPan, t);
+            cameraDistance = glm::mix(cameraAnim.startCameraDistance, cameraAnim.targetCameraDistance, t);
         }
         flags |= UPDATE_SHADER;
     }
@@ -417,7 +416,7 @@ void GobanView::setTsumegoMode(bool enabled) {
 glm::vec3 GobanView::computeWorldTranslation() const {
     glm::mat4 m(cam.setView());
     glm::vec3 viewDir = glm::normalize(glm::vec3(m * glm::vec4(0, 0, -3, 0)));
-    return glm::vec3(pan.x, 0.0f, pan.y) + (3.0f - distance) * viewDir;
+    return glm::vec3(cameraPan.x, 0.0f, cameraPan.y) + (3.0f - cameraDistance) * viewDir;
 }
 
 void GobanView::decomposeTranslation(const glm::vec3& tt, const DDG::Quaternion& rot,

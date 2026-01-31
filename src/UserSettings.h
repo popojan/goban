@@ -67,11 +67,12 @@ public:
     float getCameraRotationW() const { return cameraRotW; }
     void setCameraRotation(float x, float y, float z, float w);
 
-    // Camera translation
-    float getCameraTranslationX() const { return cameraTransX; }
-    float getCameraTranslationY() const { return cameraTransY; }
-    float getCameraTranslationZ() const { return cameraTransZ; }
-    void setCameraTranslation(float x, float y, float z);
+    // Camera pan and distance
+    float getCameraPanX() const { return cameraPanX; }
+    float getCameraPanY() const { return cameraPanY; }
+    float getCameraDistance() const { return cameraDistVal; }
+    void setCameraPan(float x, float y);
+    void setCameraDistance(float d);
 
     // Check if settings were loaded (file existed)
     bool hasSettings() const { return settingsLoaded; }
@@ -123,10 +124,10 @@ private:
     float cameraRotZ = 0.0f;
     float cameraRotW = 1.0f;
 
-    // Camera translation
-    float cameraTransX = 0.0f;
-    float cameraTransY = 0.0f;
-    float cameraTransZ = 0.0f;
+    // Camera pan and distance
+    float cameraPanX = 0.0f;
+    float cameraPanY = 0.0f;
+    float cameraDistVal = 3.0f;
 };
 
 #endif

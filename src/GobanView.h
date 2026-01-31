@@ -144,10 +144,10 @@ public:
     bool MAX_FPS;
     int WINDOW_WIDTH = 0, WINDOW_HEIGHT = 0;
     float VIEWPORT_WIDTH, VIEWPORT_HEIGHT;
-    glm::vec2 pan{0.0f, 0.0f};          // board-plane look-at point (x, z)
-    glm::vec2 basePan{0.0f, 0.0f};      // committed pan (drag baseline)
-    float distance = 3.0f;               // ray distance to board
-    float baseDistance = 3.0f;            // committed distance (drag baseline)
+    glm::vec2 cameraPan{0.0f, 0.0f};          // board-plane look-at point (x, z)
+    glm::vec2 baseCameraPan{0.0f, 0.0f};      // committed pan (drag baseline)
+    float cameraDistance = 3.0f;               // distance from camera to board
+    float baseCameraDistance = 3.0f;            // committed distance (drag baseline)
     glm::vec2 resolution;
     float lastTime, startTime;
     bool animationRunning;
@@ -160,10 +160,10 @@ public:
     struct CameraAnimation {
         DDG::Quaternion startRotation;
         DDG::Quaternion targetRotation;
-        glm::vec2 startPan{};
-        glm::vec2 targetPan{};
-        float startDistance = 0;
-        float targetDistance = 0;
+        glm::vec2 startCameraPan{};
+        glm::vec2 targetCameraPan{};
+        float startCameraDistance = 0;
+        float targetCameraDistance = 0;
         float startTime = 0;
         float duration = 0.6f;
         bool active = false;
