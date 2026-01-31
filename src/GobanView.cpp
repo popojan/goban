@@ -104,14 +104,17 @@ void GobanView::endZoom() {
 void GobanView::resetView() {
     auto& settings = UserSettings::instance();
 
+    DDG::Quaternion targetRot = cam.rLast;
+    glm::vec3 targetTrans = newTranslate;
+
     if (settings.hasCameraSettings()) {
-        cam.rLast[0] = settings.getCameraRotationX();
-        cam.rLast[1] = settings.getCameraRotationY();
-        cam.rLast[2] = settings.getCameraRotationZ();
-        cam.rLast[3] = settings.getCameraRotationW();
-        newTranslate[0] = settings.getCameraTranslationX();
-        newTranslate[1] = settings.getCameraTranslationY();
-        newTranslate[2] = settings.getCameraTranslationZ();
+        targetRot[0] = settings.getCameraRotationX();
+        targetRot[1] = settings.getCameraRotationY();
+        targetRot[2] = settings.getCameraRotationZ();
+        targetRot[3] = settings.getCameraRotationW();
+        targetTrans[0] = settings.getCameraTranslationX();
+        targetTrans[1] = settings.getCameraTranslationY();
+        targetTrans[2] = settings.getCameraTranslationZ();
     }
 
     if (settings.hasShaderSettings()) {
@@ -121,15 +124,8 @@ void GobanView::resetView() {
         gobanShader.setContrast(settings.getShaderContrast());
     }
 
-    translate[0] = newTranslate[0];
-    translate[1] = newTranslate[1];
-    translate[2] = newTranslate[2];
     updateFlag |= UPDATE_SHADER;
-
-    lastTime = 0.0;
-    startTime = static_cast<float>(glfwGetTime());
-    animationRunning = true;
-    requestRepaint();
+    animateCamera(targetRot, targetTrans);
 }
 
 void GobanView::switchShader(int idx) {
@@ -163,17 +159,30 @@ void GobanView::saveView() {
 
 void GobanView::clearView() {
     std::remove("user.json");
-    initCam();
-    updateTranslation();
-    translate[0] = newTranslate[0];
-    translate[1] = newTranslate[1];
-    translate[2] = newTranslate[2];
+
+    // Default camera: same values as initCam()
+    DDG::Quaternion targetRot(-1.0, 1.0, 0.0, 0.0);
+    targetRot.normalize();
+    glm::vec3 targetTrans(0.0f, 0.5f, 0.0f);
+
     gobanShader.setGamma(1.0);
     gobanShader.setContrast(0.0);
     gobanShader.setEof(0.0075);
     gobanShader.setDof(0.01);
     updateFlag |= UPDATE_SHADER;
-    saveView();
+
+    animateCamera(targetRot, targetTrans);
+}
+
+void GobanView::animateCamera(const DDG::Quaternion& targetRotation,
+                              const glm::vec3& targetTranslation, float duration) {
+    cameraAnim.startRotation = cam.rLast;
+    cameraAnim.targetRotation = targetRotation;
+    cameraAnim.startTranslation = newTranslate;
+    cameraAnim.targetTranslation = targetTranslation;
+    cameraAnim.startTime = static_cast<float>(glfwGetTime());
+    cameraAnim.duration = duration;
+    cameraAnim.active = true;
     requestRepaint();
 }
 
@@ -304,6 +313,82 @@ void GobanView::Render(int w, int h)
     // Atomically grab and clear the pending flags so nothing is lost
     // if the game thread sets new flags while we render.
     int flags = updateFlag.exchange(UPDATE_NONE);
+
+    // Smooth camera animation via quaternion slerp + view-space translation interpolation.
+    // Translation encodes zoom as movement along the camera's view direction, so naive
+    // world-space lerp takes an arc that can pass through the board (black frames).
+    // Instead, we decompose each translation into a board-plane intersection point (pan)
+    // and a signed distance along the view ray (zoom), interpolate those separately,
+    // and reconstruct the world-space translation at each frame.
+    if (cameraAnim.active) {
+        float t = (time - cameraAnim.startTime) / cameraAnim.duration;
+        if (t >= 1.0f) {
+            cam.rLast = cameraAnim.targetRotation;
+            newTranslate = cameraAnim.targetTranslation;
+            translate = newTranslate;
+            cameraAnim.active = false;
+        } else {
+            t = t * t * (3.0f - 2.0f * t); // smoothstep easing
+
+            // Slerp rotation first — intermediate rotation determines view direction
+            cam.rLast = DDG::slerp(cameraAnim.startRotation, cameraAnim.targetRotation, t);
+
+            // Decompose start and target translations into board intersection + distance.
+            // Camera origin in local space is ro = (0, 0, -3).
+            // In world space: roo = M * ro + tt, looking toward ta = (0,0,0) + tt.
+            // View direction: dir = normalize(M * ro).
+            // Board plane: y = 0, normal = (0, 1, 0).
+            // Ray-plane distance: d = dot(-tt, n) / dot(dir, n).
+            // Intersection point: ip = tt + d * dir.
+            // Build rotation matrix from quaternion conjugate, matching getView(true)
+            auto quatToMat = [](const DDG::Quaternion& q) -> glm::mat4 {
+                DDG::Quaternion r = q.conj();
+                float w = static_cast<float>(r[0]);
+                float x = static_cast<float>(r[1]);
+                float y = static_cast<float>(r[2]);
+                float z = static_cast<float>(r[3]);
+                return glm::mat4{
+                    1.f-2.f*y*y-2.f*z*z, 2.f*x*y+2.f*w*z, 2.f*x*z-2.f*w*y, 0.f,
+                    2.f*x*y-2.f*w*z, 1.f-2.f*x*x-2.f*z*z, 2.f*y*z+2.f*w*x, 0.f,
+                    2.f*x*z+2.f*w*y, 2.f*y*z-2.f*w*x, 1.f-2.f*x*x-2.f*y*y, 0.f,
+                    0.f, 0.f, 0.f, 1.f
+                };
+            };
+
+            // Decompose translation into board-plane intersection point and ray distance.
+            // Camera view direction: dir = normalize(M * ro), ro = (0, 0, -3).
+            // Board plane: y = 0, normal n = (0, 1, 0).
+            // Ray distance to board: d = dot(-tt, n) / dot(dir, n).
+            // Intersection point: ip = tt + d * dir.
+            auto decompose = [&quatToMat](const DDG::Quaternion& rot, const glm::vec3& tt) {
+                glm::mat4 m = quatToMat(rot);
+                glm::vec4 ro(0.0f, 0.0f, -3.0f, 0.0f);
+                glm::vec4 dir = glm::normalize(m * ro);
+                glm::vec4 nBoard(0.0f, 1.0f, 0.0f, 0.0f);
+                float denom = glm::dot(dir, nBoard);
+                float d = (std::abs(denom) > 1e-3f)
+                    ? glm::dot(glm::vec4(-tt, 0.0f), nBoard) / denom
+                    : 0.0f;
+                glm::vec3 ip = tt + d * glm::vec3(dir);
+                return std::make_pair(ip, d);
+            };
+
+            auto [startIp, startDist] = decompose(cameraAnim.startRotation, cameraAnim.startTranslation);
+            auto [targetIp, targetDist] = decompose(cameraAnim.targetRotation, cameraAnim.targetTranslation);
+
+            // Interpolate board intersection (pan) and distance (zoom) separately
+            glm::vec3 ip = glm::mix(startIp, targetIp, t);
+            float dist = glm::mix(startDist, targetDist, t);
+
+            // Reconstruct translation for the current interpolated rotation
+            glm::mat4 m = quatToMat(cam.rLast);
+            glm::vec4 ro(0.0f, 0.0f, -3.0f, 0.0f);
+            glm::vec4 dir = glm::normalize(m * ro);
+            newTranslate = ip - dist * glm::vec3(dir);
+            translate = newTranslate;
+        }
+        flags |= UPDATE_SHADER;
+    }
 
     if(flags & UPDATE_SOUND_STONE) {
         board.setRandomStoneRotation();

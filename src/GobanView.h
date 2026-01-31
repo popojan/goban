@@ -111,10 +111,14 @@ public:
     void saveView();
     void shadeIt(float time, const GobanShader &shader, int flags) const;
 
+    // Smooth camera transition via quaternion slerp + linear translation lerp
+    void animateCamera(const DDG::Quaternion& targetRotation,
+                       const glm::vec3& targetTranslation, float duration = 0.6f);
+
     void animateIntro();
 
     void requestRepaint(int what = UPDATE_SOME);
-    bool needsRender() const { return updateFlag != UPDATE_NONE || animationRunning; }
+    bool needsRender() const { return updateFlag != UPDATE_NONE || animationRunning || cameraAnim.active; }
     void stopAudioIfInactive() { player.stopIfInactive(); }
     void playSound(const std::string& id, double volume = 1.0) { player.play(id, volume); }
     bool toggleLastMoveOverlay();
@@ -145,6 +149,16 @@ public:
     float startX, startY, lastX, lastY;
 
     Board board;
+
+    struct CameraAnimation {
+        DDG::Quaternion startRotation;
+        DDG::Quaternion targetRotation;
+        glm::vec3 startTranslation{};
+        glm::vec3 targetTranslation{};
+        float startTime = 0;
+        float duration = 0.6f;
+        bool active = false;
+    } cameraAnim;
 
     GameState state;
 

@@ -150,7 +150,10 @@ namespace DDG
    
    Quaternion operator*( double c, const Quaternion& q );
    // left scalar multiplication
-   
+
+   Quaternion slerp( const Quaternion& q0, const Quaternion& q1, double t );
+   // spherical-linear interpolation
+
    std::ostream& operator<<( std::ostream& os, const Quaternion& q );
    // prints components
 }
