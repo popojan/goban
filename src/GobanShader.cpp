@@ -301,7 +301,8 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) cons
         glUniform2fv(fsu_cursor, 1, cur);
     }
 
-    glUniform3fv(iTranslate, 1, glm::value_ptr(view.newTranslate));
+    glm::vec3 worldTrans = view.computeWorldTranslation();
+    glUniform3fv(iTranslate, 1, glm::value_ptr(worldTrans));
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, static_cast<void *>(nullptr));

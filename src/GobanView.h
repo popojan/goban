@@ -43,7 +43,6 @@ public:
 
     void Render(int, int);
 
-    void updateTranslation();
     //bool invalidate(int inc = 1);
     void reshape(int, int);
 
@@ -111,9 +110,14 @@ public:
     void saveView();
     void shadeIt(float time, const GobanShader &shader, int flags) const;
 
-    // Smooth camera transition via quaternion slerp + linear translation lerp
+    // Smooth camera transition via quaternion slerp + pan/distance lerp
     void animateCamera(const DDG::Quaternion& targetRotation,
-                       const glm::vec3& targetTranslation, float duration = 0.6f);
+                       const glm::vec2& targetPan, float targetDistance,
+                       float duration = 0.6f);
+
+    glm::vec3 computeWorldTranslation() const;
+    static void decomposeTranslation(const glm::vec3& tt, const DDG::Quaternion& rot,
+                                     glm::vec2& outPan, float& outDist);
 
     void animateIntro();
 
@@ -140,7 +144,10 @@ public:
     bool MAX_FPS;
     int WINDOW_WIDTH = 0, WINDOW_HEIGHT = 0;
     float VIEWPORT_WIDTH, VIEWPORT_HEIGHT;
-    glm::vec3 translate, newTranslate;
+    glm::vec2 pan{0.0f, 0.0f};          // board-plane look-at point (x, z)
+    glm::vec2 basePan{0.0f, 0.0f};      // committed pan (drag baseline)
+    float distance = 3.0f;               // ray distance to board
+    float baseDistance = 3.0f;            // committed distance (drag baseline)
     glm::vec2 resolution;
     float lastTime, startTime;
     bool animationRunning;
@@ -153,8 +160,10 @@ public:
     struct CameraAnimation {
         DDG::Quaternion startRotation;
         DDG::Quaternion targetRotation;
-        glm::vec3 startTranslation{};
-        glm::vec3 targetTranslation{};
+        glm::vec2 startPan{};
+        glm::vec2 targetPan{};
+        float startDistance = 0;
+        float targetDistance = 0;
         float startTime = 0;
         float duration = 0.6f;
         bool active = false;

@@ -10,7 +10,7 @@
 GobanView::GobanView(GobanModel& m)
     :
     gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),
-    translate(0.0, 0.0, 0.0), newTranslate(0.0, 0.0, 0.0), resolution(1024.0, 768.0), lastTime(0.0f),
+    resolution(1024.0, 768.0), lastTime(0.0f),
     startTime(0.0f), animationRunning(false), isPanning(false), isZooming(false), isRotating(false),
     cam(1.0, 0.0, 0.0, 0.0), startX(0), startY(0), lastX(.0f), lastY(.0f), updateFlag(0),
     currentProgram(-1),	showLastMoveOverlay(true), showNextMoveOverlay(true)
@@ -19,10 +19,6 @@ GobanView::GobanView(GobanModel& m)
     player.init();
 
     initCam();
-    updateTranslation();
-    translate[0] = newTranslate[0];
-    translate[1] = newTranslate[1];
-    translate[2] = newTranslate[2];
     resetView();
 
     // Load saved shader (or default to 0) — must happen before setReady()
@@ -64,10 +60,8 @@ void GobanView::initRotation(float x, float y) {
 
 void GobanView::endRotation() {
     cam.mouse(0, lastX, lastY, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
-    translate[0] = newTranslate[0];
-    translate[1] = newTranslate[1];
-    translate[2] = newTranslate[2];
-    updateTranslation();
+    basePan = pan;
+    baseDistance = distance;
     isRotating = false;
 }
 
@@ -80,9 +74,7 @@ void GobanView::initPan(float x, float y) {
 }
 
 void GobanView::endPan() {
-    translate[0] = newTranslate[0];
-    translate[1] = newTranslate[1];
-    translate[2] = newTranslate[2];
+    basePan = pan;
     isPanning = false;
 }
 
@@ -96,25 +88,25 @@ void GobanView::initZoom(float x, float y) {
 
 void GobanView::endZoom() {
     isZooming = false;
-    translate[0] = newTranslate[0];
-    translate[1] = newTranslate[1];
-    translate[2] = newTranslate[2];
+    baseDistance = distance;
 }
 
 void GobanView::resetView() {
     auto& settings = UserSettings::instance();
 
     DDG::Quaternion targetRot = cam.rLast;
-    glm::vec3 targetTrans = newTranslate;
+    glm::vec2 targetPan = pan;
+    float targetDist = distance;
 
     if (settings.hasCameraSettings()) {
         targetRot[0] = settings.getCameraRotationX();
         targetRot[1] = settings.getCameraRotationY();
         targetRot[2] = settings.getCameraRotationZ();
         targetRot[3] = settings.getCameraRotationW();
-        targetTrans[0] = settings.getCameraTranslationX();
-        targetTrans[1] = settings.getCameraTranslationY();
-        targetTrans[2] = settings.getCameraTranslationZ();
+        glm::vec3 savedTrans(settings.getCameraTranslationX(),
+                             settings.getCameraTranslationY(),
+                             settings.getCameraTranslationZ());
+        decomposeTranslation(savedTrans, targetRot, targetPan, targetDist);
     }
 
     if (settings.hasShaderSettings()) {
@@ -125,7 +117,7 @@ void GobanView::resetView() {
     }
 
     updateFlag |= UPDATE_SHADER;
-    animateCamera(targetRot, targetTrans);
+    animateCamera(targetRot, targetPan, targetDist);
 }
 
 void GobanView::switchShader(int idx) {
@@ -147,7 +139,8 @@ void GobanView::saveView() {
     auto& settings = UserSettings::instance();
 
     settings.setCameraRotation(cam.rLast[0], cam.rLast[1], cam.rLast[2], cam.rLast[3]);
-    settings.setCameraTranslation(newTranslate[0], newTranslate[1], newTranslate[2]);
+    glm::vec3 wt = computeWorldTranslation();
+    settings.setCameraTranslation(wt[0], wt[1], wt[2]);
 
     settings.setShaderEof(gobanShader.getEof());
     settings.setShaderDof(gobanShader.getDof());
@@ -163,7 +156,9 @@ void GobanView::clearView() {
     // Default camera: same values as initCam()
     DDG::Quaternion targetRot(-1.0, 1.0, 0.0, 0.0);
     targetRot.normalize();
-    glm::vec3 targetTrans(0.0f, 0.5f, 0.0f);
+    glm::vec2 targetPan;
+    float targetDist;
+    decomposeTranslation(glm::vec3(0, 0.5, 0), targetRot, targetPan, targetDist);
 
     gobanShader.setGamma(1.0);
     gobanShader.setContrast(0.0);
@@ -171,15 +166,18 @@ void GobanView::clearView() {
     gobanShader.setDof(0.01);
     updateFlag |= UPDATE_SHADER;
 
-    animateCamera(targetRot, targetTrans);
+    animateCamera(targetRot, targetPan, targetDist);
 }
 
 void GobanView::animateCamera(const DDG::Quaternion& targetRotation,
-                              const glm::vec3& targetTranslation, float duration) {
+                              const glm::vec2& targetPan, float targetDistance,
+                              float duration) {
     cameraAnim.startRotation = cam.rLast;
     cameraAnim.targetRotation = targetRotation;
-    cameraAnim.startTranslation = newTranslate;
-    cameraAnim.targetTranslation = targetTranslation;
+    cameraAnim.startPan = pan;
+    cameraAnim.targetPan = targetPan;
+    cameraAnim.startDistance = distance;
+    cameraAnim.targetDistance = targetDistance;
     cameraAnim.startTime = static_cast<float>(glfwGetTime());
     cameraAnim.duration = duration;
     cameraAnim.active = true;
@@ -187,20 +185,8 @@ void GobanView::animateCamera(const DDG::Quaternion& targetRotation,
 }
 
 void GobanView::zoomRelative(float percentage) {
-    glm::vec4 ro(0.0f, 0.0f, -3.0f, 0.0f);
-    glm::vec4 tt(newTranslate[0], newTranslate[1], newTranslate[2], 0.0f);
-    glm::mat4 m0 = cam.getView(true);
-    glm::vec4 dir = glm::normalize(m0*ro);
-    glm::vec4 nBoard = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
-    float t = glm::dot(-tt-ro, nBoard) / glm::dot(dir, nBoard);
-    glm::vec4 a(0.0f, 0.0f, percentage*(-3.0+t) * 0.2f - 0.01f, 1.0);
-    a = cam.getView(true) * a;
-    newTranslate[0] = translate[0] + a.x;
-    newTranslate[1] = translate[1] + a.y;
-    newTranslate[2] = translate[2] + a.z;
-    translate[0] = newTranslate[0];
-    translate[1] = newTranslate[1];
-    translate[2] = newTranslate[2];
+    distance += percentage * distance * 0.2f - 0.01f;
+    baseDistance = distance;
     requestRepaint();
 }
 
@@ -208,48 +194,36 @@ void GobanView::mouseMoved(float x, float y) {
     lastX = x;
     lastY = y;
     if (isRotating){
-        cam.motion(x - translate.x, y - translate.y, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
-        updateTranslation();
+        cam.motion(x, y, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
         requestRepaint();
     }
     else if (isZooming) {
-        glm::vec4 a(0.0f, 0.0f, -6.0f * (y - startY)/static_cast<float>(WINDOW_HEIGHT), 1.0);
-        a = cam.getView(true) * a;
-        newTranslate[0] = translate[0] + a.x;
-        newTranslate[1] = translate[1] + a.y;
-        newTranslate[2] = translate[2] + a.z;
+        float delta = -6.0f * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
+        distance = baseDistance + delta * (baseDistance / 3.0f);
         requestRepaint();
     }
     else if (isPanning) {
-        glm::vec4 ro(0.0f, 0.0f, -3.0f, 0.0f);
-        glm::vec4 tt(newTranslate[0], newTranslate[1], newTranslate[2], 0.0f);
-        glm::mat4 m0 = cam.getView(true);
-        glm::vec4 dir = glm::normalize(m0*ro);
-        glm::vec4 nBoard = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
-        float t = glm::dot(-tt - ro, nBoard) / glm::dot(dir, nBoard);//<float, glm::precision::defaultp, glm::tvec4>
-        float scale = 2.0f*(3.0f - t) / 3.0f;
-        glm::vec4 a(
-                -scale * (x - startX) / static_cast<float>(WINDOW_HEIGHT),
-                 scale * (y - startY) / static_cast<float>(WINDOW_HEIGHT),
-                 0.0, 1.0);
-        a = cam.getView(true) * a;
-        newTranslate[0] = translate[0] + a.x;
-        newTranslate[1] = translate[1] + a.y;
-        newTranslate[2] = translate[2] + a.z;
+        float scale = 2.0f * distance / 3.0f;
+        float dx = -scale * (x - startX) / static_cast<float>(WINDOW_HEIGHT);
+        float dy =  scale * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
+        glm::mat4 m(cam.getView(true));
+        glm::vec3 cu = glm::normalize(glm::vec3(m * glm::vec4(1, 0, 0, 0)));
+        glm::vec3 cv = glm::normalize(glm::vec3(m * glm::vec4(0, 1, 0, 0)));
+        pan.x = basePan.x + dx * cu.x + dy * cv.x;
+        pan.y = basePan.y + dx * cu.z + dy * cv.z;
         requestRepaint();
     }
 }
 
 void GobanView::initCam() {
-	cam.rLast[0]=-1.0;
+    cam.rLast[0]=-1.0;
     cam.rLast[1]=1.0;
     cam.rLast[2]=0.0;
     cam.rLast[3]=0.0;
-	cam.rLast.normalize();
-    translate.x = translate.z = newTranslate.x = newTranslate.z = 0.0;
-    translate.y = newTranslate.y = 0.5;
-    updateTranslation();
-    translate = newTranslate;
+    cam.rLast.normalize();
+    decomposeTranslation(glm::vec3(0, 0.5, 0), cam.rLast, pan, distance);
+    basePan = pan;
+    baseDistance = distance;
 }
 
 void GobanView::reshape(int width, int height) {
@@ -279,7 +253,7 @@ void GobanView::shadeIt(float time, const GobanShader& shader, int flags) const 
 
 	shader.setTime(lastTime);
 	shader.setRotation(cam.setView());
-	shader.setPan(newTranslate);
+	shader.setPan(computeWorldTranslation());
 
 	if (flags & UPDATE_SHADER) {
 		spdlog::debug("setMetrics");
@@ -314,78 +288,21 @@ void GobanView::Render(int w, int h)
     // if the game thread sets new flags while we render.
     int flags = updateFlag.exchange(UPDATE_NONE);
 
-    // Smooth camera animation via quaternion slerp + view-space translation interpolation.
-    // Translation encodes zoom as movement along the camera's view direction, so naive
-    // world-space lerp takes an arc that can pass through the board (black frames).
-    // Instead, we decompose each translation into a board-plane intersection point (pan)
-    // and a signed distance along the view ray (zoom), interpolate those separately,
-    // and reconstruct the world-space translation at each frame.
+    // Smooth camera animation via quaternion slerp + pan/distance interpolation
     if (cameraAnim.active) {
         float t = (time - cameraAnim.startTime) / cameraAnim.duration;
         if (t >= 1.0f) {
             cam.rLast = cameraAnim.targetRotation;
-            newTranslate = cameraAnim.targetTranslation;
-            translate = newTranslate;
+            pan = cameraAnim.targetPan;
+            distance = cameraAnim.targetDistance;
+            basePan = pan;
+            baseDistance = distance;
             cameraAnim.active = false;
         } else {
             t = t * t * (3.0f - 2.0f * t); // smoothstep easing
-
-            // Slerp rotation first — intermediate rotation determines view direction
             cam.rLast = DDG::slerp(cameraAnim.startRotation, cameraAnim.targetRotation, t);
-
-            // Decompose start and target translations into board intersection + distance.
-            // Camera origin in local space is ro = (0, 0, -3).
-            // In world space: roo = M * ro + tt, looking toward ta = (0,0,0) + tt.
-            // View direction: dir = normalize(M * ro).
-            // Board plane: y = 0, normal = (0, 1, 0).
-            // Ray-plane distance: d = dot(-tt, n) / dot(dir, n).
-            // Intersection point: ip = tt + d * dir.
-            // Build rotation matrix from quaternion conjugate, matching getView(true)
-            auto quatToMat = [](const DDG::Quaternion& q) -> glm::mat4 {
-                DDG::Quaternion r = q.conj();
-                float w = static_cast<float>(r[0]);
-                float x = static_cast<float>(r[1]);
-                float y = static_cast<float>(r[2]);
-                float z = static_cast<float>(r[3]);
-                return glm::mat4{
-                    1.f-2.f*y*y-2.f*z*z, 2.f*x*y+2.f*w*z, 2.f*x*z-2.f*w*y, 0.f,
-                    2.f*x*y-2.f*w*z, 1.f-2.f*x*x-2.f*z*z, 2.f*y*z+2.f*w*x, 0.f,
-                    2.f*x*z+2.f*w*y, 2.f*y*z-2.f*w*x, 1.f-2.f*x*x-2.f*y*y, 0.f,
-                    0.f, 0.f, 0.f, 1.f
-                };
-            };
-
-            // Decompose translation into board-plane intersection point and ray distance.
-            // Camera view direction: dir = normalize(M * ro), ro = (0, 0, -3).
-            // Board plane: y = 0, normal n = (0, 1, 0).
-            // Ray distance to board: d = dot(-tt, n) / dot(dir, n).
-            // Intersection point: ip = tt + d * dir.
-            auto decompose = [&quatToMat](const DDG::Quaternion& rot, const glm::vec3& tt) {
-                glm::mat4 m = quatToMat(rot);
-                glm::vec4 ro(0.0f, 0.0f, -3.0f, 0.0f);
-                glm::vec4 dir = glm::normalize(m * ro);
-                glm::vec4 nBoard(0.0f, 1.0f, 0.0f, 0.0f);
-                float denom = glm::dot(dir, nBoard);
-                float d = (std::abs(denom) > 1e-3f)
-                    ? glm::dot(glm::vec4(-tt, 0.0f), nBoard) / denom
-                    : 0.0f;
-                glm::vec3 ip = tt + d * glm::vec3(dir);
-                return std::make_pair(ip, d);
-            };
-
-            auto [startIp, startDist] = decompose(cameraAnim.startRotation, cameraAnim.startTranslation);
-            auto [targetIp, targetDist] = decompose(cameraAnim.targetRotation, cameraAnim.targetTranslation);
-
-            // Interpolate board intersection (pan) and distance (zoom) separately
-            glm::vec3 ip = glm::mix(startIp, targetIp, t);
-            float dist = glm::mix(startDist, targetDist, t);
-
-            // Reconstruct translation for the current interpolated rotation
-            glm::mat4 m = quatToMat(cam.rLast);
-            glm::vec4 ro(0.0f, 0.0f, -3.0f, 0.0f);
-            glm::vec4 dir = glm::normalize(m * ro);
-            newTranslate = ip - dist * glm::vec3(dir);
-            translate = newTranslate;
+            pan = glm::mix(cameraAnim.startPan, cameraAnim.targetPan, t);
+            distance = glm::mix(cameraAnim.startDistance, cameraAnim.targetDistance, t);
         }
         flags |= UPDATE_SHADER;
     }
@@ -493,22 +410,30 @@ void GobanView::setTsumegoMode(bool enabled) {
     requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
 }
 
-void GobanView::updateTranslation() {
-    glm::vec4 ro(0.0f,0.0f,-3.0f,0.0f);
-    glm::vec4 tt(translate, 0.0f);
-    glm::mat4 m0 = cam.getView(true);
-    glm::mat4 m = cam.setView();
-    glm::vec4 dir = glm::normalize(m0*ro);
-    glm::vec4 nBoard = glm::vec4(0.0f,1.0f,0.0f,0.0f);
-	float denom = glm::dot(dir, nBoard);
-	float t = glm::dot(-tt, nBoard)/denom;//<float, glm::defaultp, glm::tvec4>
-    if(denom < 1e-3) {
-        t = 0.0;
-    }
-	glm::vec4 ip = tt +t*dir;
-	dir = glm::normalize(m* ro);
-    tt = ip - t*dir;
-	newTranslate = glm::vec3(tt);
+glm::vec3 GobanView::computeWorldTranslation() const {
+    glm::mat4 m(cam.getView(true));
+    glm::vec3 viewDir = glm::normalize(glm::vec3(m * glm::vec4(0, 0, -3, 0)));
+    return glm::vec3(pan.x, 0.0f, pan.y) + (3.0f - distance) * viewDir;
+}
+
+void GobanView::decomposeTranslation(const glm::vec3& tt, const DDG::Quaternion& rot,
+                                     glm::vec2& outPan, float& outDist) {
+    DDG::Quaternion rc = rot.conj();
+    float w = static_cast<float>(rc[0]);
+    float x = static_cast<float>(rc[1]);
+    float y = static_cast<float>(rc[2]);
+    float z = static_cast<float>(rc[3]);
+    glm::mat4 m{
+        1.f-2.f*y*y-2.f*z*z, 2.f*x*y+2.f*w*z, 2.f*x*z-2.f*w*y, 0.f,
+        2.f*x*y-2.f*w*z, 1.f-2.f*x*x-2.f*z*z, 2.f*y*z+2.f*w*x, 0.f,
+        2.f*x*z+2.f*w*y, 2.f*y*z-2.f*w*x, 1.f-2.f*x*x-2.f*y*y, 0.f,
+        0.f, 0.f, 0.f, 1.f
+    };
+    glm::vec3 viewDir = glm::normalize(glm::vec3(m * glm::vec4(0, 0, -3, 0)));
+    float vy = viewDir.y;
+    outDist = (std::abs(vy) > 1e-3f) ? 3.0f - tt.y / vy : 3.0f;
+    glm::vec3 ip = tt - (3.0f - outDist) * viewDir;
+    outPan = glm::vec2(ip.x, ip.z);
 }
 
 Position GobanView::getBoardCoordinate(float x, float y) const {
@@ -529,7 +454,8 @@ glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     vec4 ro = vec4(.0f, .0f, -3.0f, 0.0f);
     vec4 up = vec4(.0f, .1f, .0f, 0.0f);
     mat4x4 m = cam.setView();
-    vec4 tt = vec4(newTranslate, 0.0f);
+    glm::vec3 wt = computeWorldTranslation();
+    vec4 tt = vec4(wt, 0.0f);
     vec4 roo = m*ro + tt;
     ta += tt;
     up = normalize(m*up);

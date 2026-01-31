@@ -139,7 +139,8 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 
 		using namespace glm;
 		vec4 ta = vec4(.0f, -layers[layer].height*model.metrics.h*view.gobanShader.getStoneHeight(), .0f, 0.0f);//-0.5*stoneh
-		vec4 tt = vec4(view.newTranslate[0], view.newTranslate[1], view.newTranslate[2], 0.0f);
+		glm::vec3 wt = view.computeWorldTranslation();
+		vec4 tt = vec4(wt[0], wt[1], wt[2], 0.0f);
 		ta += tt;
 
 		glyphy_extents_t extents;
