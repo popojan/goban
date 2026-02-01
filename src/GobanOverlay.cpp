@@ -145,7 +145,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 		// Transform to camera-local space (transpose(m) = m^-1 for rotation)
 		vec3 ta_cam = vec3(transpose(m) * vec4(boardTarget, 0.0f));
 		// Camera is cameraDistance away along +Z in camera space
-		ta_cam.z += 3.0f - view.cameraDistance;
+		ta_cam.z += GobanView::FOCAL_LENGTH - view.cameraDistance;
 
 		glyphy_extents_t extents;
 		buffer[layer]->extents(nullptr, &extents);

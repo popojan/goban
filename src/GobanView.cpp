@@ -203,7 +203,7 @@ void GobanView::mouseMoved(float x, float y) {
         requestRepaint();
     }
     else if (isPanning) {
-        float scale = 2.0f * cameraDistance / 3.0f;
+        float scale = 2.0f * cameraDistance / FOCAL_LENGTH;
         float dx = -scale * (x - startX) / static_cast<float>(WINDOW_HEIGHT);
         float dy =  scale * (y - startY) / static_cast<float>(WINDOW_HEIGHT);
         glm::mat4 m(cam.setView());
@@ -449,13 +449,38 @@ void GobanView::zoomToRect(const Position& minPos, const Position& maxPos) {
         float ou = dot(o, cu);
         float ov = dot(o, cv);
         float ow = dot(o, cw);
-        float dFromX = 3.0f * std::abs(ou) / ratio - ow;
-        float dFromY = 3.0f * std::abs(ov) - ow;
+        float dFromX = FOCAL_LENGTH * std::abs(ou) / ratio - ow;
+        float dFromY = FOCAL_LENGTH * std::abs(ov) - ow;
         targetDist = std::max(targetDist, std::max(dFromX, dFromY));
     }
     // Screen-space margin: uniform visual padding regardless of tilt
     targetDist *= 1.15f;
     targetDist = std::clamp(targetDist, 0.5f, 10.0f);
+
+    // With tilt, near corners subtend larger angles than far corners,
+    // making the rect appear shifted. Compute the visual midpoint of
+    // each axis and shift targetPan so the rect is visually centered.
+    // For opposite edges at offsets ±half along an axis:
+    //   q+ = 3*proj / (ow+ + d),  q- = -3*proj / (ow- + d)
+    // Visual center = (q+ + q-) / 2; we shift pan to zero this out.
+    vec3 oPos(halfW, 0, halfH);   // +X, +Z corner offset
+    vec3 oNeg(-halfW, 0, -halfH); // -X, -Z corner offset
+    float owPos = dot(oPos, cw) + targetDist;
+    float owNeg = dot(oNeg, cw) + targetDist;
+    // Screen positions of +/- edges along cu axis
+    float quPos = FOCAL_LENGTH * dot(oPos, cu) / owPos;
+    float quNeg = FOCAL_LENGTH * dot(oNeg, cu) / owNeg;
+    float uShift = (quPos + quNeg) * 0.5f; // visual center offset in screen space
+    // Screen positions of +/- edges along cv axis
+    float qvPos = FOCAL_LENGTH * dot(oPos, cv) / owPos;
+    float qvNeg = FOCAL_LENGTH * dot(oNeg, cv) / owNeg;
+    float vShift = (qvPos + qvNeg) * 0.5f;
+    // Convert screen-space shift back to board-plane pan offset
+    float panShiftU = uShift * targetDist / FOCAL_LENGTH;
+    float panShiftV = vShift * targetDist / FOCAL_LENGTH;
+    vec3 worldShift = panShiftU * cu + panShiftV * cv;
+    targetPan.x += worldShift.x;
+    targetPan.y += worldShift.z;
 
     animateCamera(cam.rLast, targetPan, targetDist);
 }
@@ -492,7 +517,7 @@ glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     vec3 cv = cross(cw, cu);
     float ratio = resolution.x / resolution.y;
     vec2 q0 = vec2(ratio * 2.0f * (x / resolution.x - 0.5f), 2.0f * (0.5f - y / resolution.y));
-    vec3 rdb = q0.x * cu + q0.y * cv + 3.0f * cw;
+    vec3 rdb = q0.x * cu + q0.y * cv + FOCAL_LENGTH * cw;
     // Intersect ray with board plane (y=0)
     auto t = -roo.y / rdb.y;
     vec3 ip = roo + rdb * t;

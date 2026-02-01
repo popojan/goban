@@ -143,6 +143,7 @@ public:
     bool MAX_FPS;
     int WINDOW_WIDTH = 0, WINDOW_HEIGHT = 0;
     float VIEWPORT_WIDTH, VIEWPORT_HEIGHT;
+    static constexpr float FOCAL_LENGTH = 3.0f; // must match vertex shaders
     glm::vec2 cameraPan{0.0f, 0.0f};          // board-plane look-at point (x, z)
     glm::vec2 baseCameraPan{0.0f, 0.0f};      // committed pan (drag baseline)
     float cameraDistance = 3.5f;               // distance from camera to board

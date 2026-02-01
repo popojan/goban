@@ -16,6 +16,8 @@ uniform float iAnimT;
 uniform float eof;
 uniform float dof;
 
+const float focalLength = 3.0;
+
 void main() {
     gl_Position = vertex; //gl_Vertex;
     vec4 eoff = vec4(eof,0.0,0.0, 0.0);
@@ -39,8 +41,7 @@ void main() {
     vec3 cv = cross(cw, cu);
 
     // Scale stereo base with distance
-    float refDist = 3.0;
-    float scaleFactor = (cameraDistance + introZoom) / refDist;
+    float scaleFactor = (cameraDistance + introZoom) / focalLength;
     vec3 scaledEye = scaleFactor * eoff.xyz;
 
     // Left eye at negative X, right eye at positive X in camera space
@@ -51,6 +52,6 @@ void main() {
     vec2 q0 = (vertex.xy + (vec2(0.5,0.5))/iResolution) * ratio;
 
     // Parallel cameras with horizontal image shift (HIT) for convergence control
-    rdbl = normalize((q0.x + dof)*cu + q0.y*cv + 3.0*cw);
-    rdbr = normalize((q0.x - dof)*cu + q0.y*cv + 3.0*cw);
+    rdbl = normalize((q0.x + dof)*cu + q0.y*cv + focalLength*cw);
+    rdbr = normalize((q0.x - dof)*cu + q0.y*cv + focalLength*cw);
 }

@@ -11,6 +11,8 @@ uniform vec2 cameraPan;
 uniform float cameraDistance;
 uniform float iAnimT;
 
+const float focalLength = 3.0;
+
 void main() {
 	gl_Position = vertex; //gl_Vertex;
 
@@ -33,5 +35,5 @@ void main() {
 
     vec2 ratio = vec2(iResolution.x/iResolution.y, 1.0);
     vec2 q0 = (vertex.xy + vec2(0.5,0.5)/iResolution) * ratio;
-	rdb = normalize(q0.x*cu + q0.y*cv + 3.0*cw);
+	rdb = normalize(q0.x*cu + q0.y*cv + focalLength*cw);
 }
