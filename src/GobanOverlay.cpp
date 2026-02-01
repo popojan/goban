@@ -152,20 +152,23 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 		float content_scale = std::min(static_cast<float>(height) / 2.0f, 10000.0f);
 		float text_scale = content_scale;
 		{
-			float x = -content_scale * ta_cam.x;
-			float y = -content_scale * ta_cam.y;
-			float z = content_scale * ta_cam.z;
+			float F = GobanView::FOCAL_LENGTH;
+			float cs = content_scale;
 
-			auto d = static_cast<float>(height);
-			float near = d;
-			float factor = 0.01f * near / (2 * near + d);
-			float far = near + 10.0f * d;
-			mat = frustum(
-                -static_cast<float>(width) * factor, static_cast<float>(width) * factor,
-                -static_cast<float>(height) * factor, static_cast<float>(height) * factor,
-                0.01f * near, far
-            );
-			mat = translate(mat, vec3(x, y, -0.5f*d - near + z));
+			float x = -cs * ta_cam.x;
+			float y = -cs * ta_cam.y;
+			float z = cs * ta_cam.z;
+
+			// Frustum matching ray-traced FOV: tan(halfFOV) = 1/F
+			float nearPlane = 0.01f * height;
+			float farPlane = 11.0f * height;
+			float halfH = nearPlane / F;
+			float halfW = halfH * static_cast<float>(width) / static_cast<float>(height);
+			mat = frustum(-halfW, halfW, -halfH, halfH, nearPlane, farPlane);
+
+			// Position overlay at focal plane: F/2 * height from near plane
+			float baseZ = -(F / 2.0f) * static_cast<float>(height);
+			mat = translate(mat, vec3(x, y, baseZ + z));
 		}
 		mat = scale(mat, vec3(1, 1, -1));
 		mat4 rm(transpose(m)*rotate(mat4(1.0f), 3.141592656f / 2, vec3(1.0f, 0.0f, 0.0f)));
