@@ -431,7 +431,7 @@ int FileChooserDataSource::countMovesInGame(const std::shared_ptr<LibSgfcPlusPlu
             auto propertyType = property->GetPropertyType();
             if (propertyType == SgfcPropertyType::B || propertyType == SgfcPropertyType::W) {
                 moveCount++;
-                spdlog::debug("countMovesInGame: node {} has {} move, total={}", nodeCount,
+                spdlog::trace("countMovesInGame: node {} has {} move, total={}", nodeCount,
                     propertyType == SgfcPropertyType::B ? "B" : "W", moveCount);
                 break; // Only count once per node
             }

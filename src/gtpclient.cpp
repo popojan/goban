@@ -564,7 +564,7 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
         if(!error) {
             spdlog::info("{1} >> {0}", line, exe);
         } else {
-            spdlog::error("{1} >> {0}", line, exe);
+            spdlog::error("{} >> {} (command: {})", exe, line, command);
         }
         if (line.empty()) break;
         ret.push_back(line);

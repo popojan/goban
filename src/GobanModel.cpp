@@ -230,7 +230,7 @@ void GobanModel::onBoardChange(const Board& result) {
     bool shouldShow = game.shouldShowTerritory();
     spdlog::debug("onBoardChange: territoryReady={}, shouldShowTerritory={}", result.territoryReady, shouldShow);
 
-    if (result.territoryReady && shouldShow) {
+    if (isGameOver && result.territoryReady && shouldShow) {
         // At end of scored game - compute result message
         spdlog::debug("onBoardChange: ENTERING result block, score={}", result.score);
         board.score = result.score;  // Copy score from result board
@@ -244,7 +244,7 @@ void GobanModel::onBoardChange(const Board& result) {
             game.finalizeGame(state.scoreDelta);
             game.saveAs("");
         }
-    } else if (game.isAtEndOfNavigation() && game.isResignationResult()) {
+    } else if (isGameOver && game.isAtEndOfNavigation() && game.isResignationResult()) {
         // At end of resigned game - show resignation message
         state.msg = game.getResultMessage();
     }
