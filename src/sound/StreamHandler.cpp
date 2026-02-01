@@ -55,6 +55,12 @@ int StreamHandler::PortAudioCallback(const void * input,
                         Playback * data = (*it);
                         AudioFile * audioFile = data->audioFile;
 
+                        if (!audioFile->data) {
+                                it = handler->data.erase(it);
+                                delete data;
+                                continue;
+                        }
+
                         int * bufferCursor = outputBuffer;
                         int channels = audioFile->fh.channels();
 
