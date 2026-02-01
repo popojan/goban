@@ -247,58 +247,35 @@ The Go board is rendered using ray tracing in GLSL fragment shaders. The vertex 
 - **Z-axis**: Points toward viewer (camera is at negative z)
 - **X-axis**: Points right (completes right-handed system)
 
-### Mono Vertex Shader (`config/shaders/vertex/mono.glsl`)
+### Camera Model
 
-Sets up a single camera for standard rendering.
+The camera is parameterized by three independent values passed as uniforms:
+- `cameraPan` (vec2): Look-at point on the board plane (x, z)
+- `cameraDistance` (float): Distance from camera to look-at point (default 3.5)
+- `glModelViewMatrix`: Rotation quaternion (via OpenGL model-view matrix)
 
-**Key variables:**
-- `ro = (0, 0, -3)`: Base camera position, 3 units back on z-axis
-- `ta = (0, 0, 0)`: Target/look-at point (board center)
-- `up = (0, 1, 0)`: World up vector
-- `m`: Model-view matrix (includes user rotation via `glModelViewMatrix` and intro animation)
-- `tt`: Translation from `iTranslate` (pan/zoom offset)
-
-**Camera setup:**
+**Vertex shader camera setup** (`config/shaders/vertex/mono.glsl`):
 ```
-roo = m * ro + tt          // Final camera position in world space
-ta = ta + tt               // Translated target point
-cw = normalize(ta - roo)   // Forward direction (toward target)
-cu = normalize(cross(up, cw))  // Right direction
-cv = cross(cw, cu)         // Up direction (orthogonal to cw, cu)
+ta = (cameraPan.x, 0, cameraPan.y)         // Target on board plane
+viewDir = normalize(m * (0, 0, 1, 0))      // View direction (rotated +Z)
+roo = ta - cameraDistance * viewDir         // Camera position behind target
+cw = viewDir                               // Forward = toward board
+cu = normalize(cross(up, cw))              // Right
+cv = cross(cw, cu)                         // Up
 ```
 
 **Ray direction:**
 ```
-q0 = vertex.xy * aspectRatio   // Screen coordinate (-1 to 1, aspect corrected)
+q0 = vertex.xy * aspectRatio               // Screen coordinate (-1 to 1)
 rdb = normalize(q0.x*cu + q0.y*cv + 3.0*cw)
 ```
-The `3.0` is the focal length - rays spread from camera through a virtual screen at distance 3.0.
+The `3.0` is the focal length — rays spread from camera through a virtual screen at distance 3.0.
+
+**C++ side** (`GobanView`): `cameraPan`, `cameraDistance`, and `cam.rLast` (quaternion) are the authoritative state. `boardCoordinate()` replicates the same camera model for screen→board ray casting. `zoomToRect()` projects board-plane corners into camera space to compute the exact distance for framing.
 
 ### Stereo Vertex Shader (`config/shaders/vertex/stereo.glsl`)
 
-Sets up two cameras (left/right eyes) for stereoscopic 3D rendering (anaglyph, etc.).
-
-**Additional uniforms:**
-- `eof`: Eye offset factor (stereo base = 2 × eof)
-- `dof`: Unused (kept for compatibility)
-
-**Stereo camera setup (parallel cameras):**
-```
-// Constant stereo base, like human IPD
-// Left eye at -X, right eye at +X in camera space
-rool = (m * vec4(ro - eoff.xyz, 1.0)).xyz + tt  // Left eye
-roor = (m * vec4(ro + eoff.xyz, 1.0)).xyz + tt  // Right eye
-
-// Parallel cameras: both eyes share the same view direction
-roo = 0.5 * (rool + roor)      // Center position
-cw = normalize(tt - roo)       // Shared view direction (toward target)
-cu = normalize(cross(up, cw))  // Shared right vector
-cv = cross(cw, cu)             // Shared up vector
-
-// Same ray direction for both eyes, different origins
-rd = normalize(q0.x*cu + q0.y*cv + 3.0*cw)
-rdbl = rdbr = rd
-```
+Same `cameraPan`/`cameraDistance` uniforms. Eye positions are lateral offsets from the center camera position, scaled by distance to maintain consistent stereo base angle.
 
 ### Stereoscopic Deviation Theory
 

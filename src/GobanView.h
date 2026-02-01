@@ -126,6 +126,9 @@ public:
     void setTsumegoMode(bool enabled);
     bool isTsumegoMode() const { return tsumegoMode; }
 
+    void zoomToRect(const Position& minPos, const Position& maxPos);
+    void zoomToStones();
+
     void Update();
     void moveCursor(float, float);
     void updateCursor();

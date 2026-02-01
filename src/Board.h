@@ -198,6 +198,10 @@ public:
     [[nodiscard]] int capturedCount(const Color::Value& whose) const;
     [[nodiscard]] int stonesOnBoard(const Color::Value& whose) const;
 
+    // Returns bounding rect of all stones (grid coords), with margin clamped to board.
+    // Returns false if no stones on board.
+    bool stoneBounds(Position& minPos, Position& maxPos, int margin = 1) const;
+
     void clear(int boardSize = DEFAULT_SIZE);
     void clearTerritory() {
         for(auto & point : points) {

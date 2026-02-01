@@ -408,6 +408,65 @@ void GobanView::setTsumegoMode(bool enabled) {
     requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
 }
 
+void GobanView::zoomToRect(const Position& minPos, const Position& maxPos) {
+    const auto& metrics = model.metrics;
+    float halfN = 0.5f * metrics.fNDIM;
+
+    // Convert grid bounds to world coords
+    // Shader uses: (col - 0.5*fNDIM + 0.5) * squareSize
+    float x0 = (minPos.col() + 0.5f - halfN) * metrics.squareSizeX;
+    float x1 = (maxPos.col() + 0.5f - halfN) * metrics.squareSizeX;
+    float z0 = (minPos.row() + 0.5f - halfN) * metrics.squareSizeY;
+    float z1 = (maxPos.row() + 0.5f - halfN) * metrics.squareSizeY;
+
+    glm::vec2 targetPan((x0 + x1) * 0.5f, (z0 + z1) * 0.5f);
+    float halfW = (x1 - x0) * 0.5f;
+    float halfH = (z1 - z0) * 0.5f;
+
+    // Solve for cameraDistance directly by projecting stone rect corners
+    // into camera space. For each corner offset o from target:
+    //   q0.x = 3 * dot(o,cu) / (dot(o,cw) + d)  must fit in [-ratio, ratio]
+    //   q0.y = 3 * dot(o,cv) / (dot(o,cw) + d)  must fit in [-1, 1]
+    // => d >= 3 * |dot(o,cu)| / ratio - dot(o,cw)  and similarly for cv.
+    using namespace glm;
+    mat4 m = cam.setView();
+    vec3 viewDir = normalize(vec3(m * vec4(0, 0, 1, 0)));
+    vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
+    vec3 cw = viewDir;
+    vec3 cu = normalize(cross(up, cw));
+    vec3 cv = cross(cw, cu);
+    float ratio = resolution.x / resolution.y;
+
+    vec3 corners[4] = {
+        {-halfW, 0, -halfH},
+        { halfW, 0, -halfH},
+        {-halfW, 0,  halfH},
+        { halfW, 0,  halfH}
+    };
+
+    float targetDist = 0.5f;
+    for (const auto& o : corners) {
+        float ou = dot(o, cu);
+        float ov = dot(o, cv);
+        float ow = dot(o, cw);
+        float dFromX = 3.0f * std::abs(ou) / ratio - ow;
+        float dFromY = 3.0f * std::abs(ov) - ow;
+        targetDist = std::max(targetDist, std::max(dFromX, dFromY));
+    }
+    // Screen-space margin: uniform visual padding regardless of tilt
+    targetDist *= 1.15f;
+    targetDist = std::clamp(targetDist, 0.5f, 10.0f);
+
+    animateCamera(cam.rLast, targetPan, targetDist);
+}
+
+void GobanView::zoomToStones() {
+    Position minPos, maxPos;
+    if (model.board.stoneBounds(minPos, maxPos)) {
+        zoomToRect(minPos, maxPos);
+    }
+}
+
 Position GobanView::getBoardCoordinate(float x, float y) const {
     glm::vec2 p = boardCoordinate(x, y);
     float xx = p.x/model.metrics.squareSizeX + 0.5f*model.metrics.fNDIM;

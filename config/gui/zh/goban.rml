@@ -62,6 +62,7 @@
                             <!--<div class="cmd" onmouseup="free camera toggle">Toggle free</div>-->
                             <div class="cmd" onmouseup="reset camera">复位</div>
                             <div class="cmd" onmouseup="animate">播放动画</div>
+                            <div class="cmd" onmouseup="zoom stones">聚焦棋子</div>
                             <div class="hr">视角预设</div>
                             <div class="cmd" onmouseup="save camera">保存</div>
                             <div class="cmd" onmouseup="delete camera">还原</div>

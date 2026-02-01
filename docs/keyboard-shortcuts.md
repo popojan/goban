@@ -29,6 +29,7 @@ When an SGF game is loaded or during game review:
 
 | Key | Function |
 |-----|----------|
+| **B** | Zoom to stones (fit all stones in view) |
 | **C** | Center camera (top-down view) |
 | **A** + mouse move | Rotate view |
 | **S** + mouse move | Zoom view |

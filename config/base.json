@@ -109,7 +109,8 @@
     {"key": 86, "command": "prev_game"},
     {"key": 87, "command": "next_game"},
     {"key": 89, "command": "navigate_start"},
-    {"key": 88, "command": "navigate_end"}
+    {"key": 88, "command": "navigate_end"},
+    {"key": 13, "command": "zoom stones"}
   ],
   "sounds": {
     "move": "./config/sound/stone.wav",

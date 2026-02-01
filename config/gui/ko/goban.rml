@@ -51,6 +51,7 @@
                             <div class="hr">카메라</div>
                             <div class="cmd" onmouseup="reset camera">초기화</div>
                             <div class="cmd" onmouseup="animate">애니메이션</div>
+                            <div class="cmd" onmouseup="zoom stones">돌에 확대</div>
                             <div class="hr">카메라 프리셋</div>
                             <div class="cmd" onmouseup="save camera">저장</div>
                             <div class="cmd" onmouseup="delete camera">삭제</div>

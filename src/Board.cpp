@@ -422,6 +422,30 @@ int Board::stonesOnBoard(const Color::Value& whose) const {
     return count;
 }
 
+bool Board::stoneBounds(Position& minPos, Position& maxPos, int margin) const {
+    int minCol = boardSize, maxCol = -1, minRow = boardSize, maxRow = -1;
+    for (int col = 0; col < boardSize; ++col) {
+        for (int row = 0; row < boardSize; ++row) {
+            if (points[col * MAX_BOARD + row].stone != Color::EMPTY) {
+                minCol = std::min(minCol, col);
+                maxCol = std::max(maxCol, col);
+                minRow = std::min(minRow, row);
+                maxRow = std::max(maxRow, row);
+            }
+        }
+    }
+    if (maxCol < 0) return false;
+
+    minCol -= margin;
+    maxCol += margin;
+    minRow -= margin;
+    maxRow += margin;
+
+    minPos = Position(minCol, minRow);
+    maxPos = Position(maxCol, maxRow);
+    return true;
+}
+
 void Board::clear(int boardsize) {
 
     this->boardSize = boardsize;

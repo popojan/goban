@@ -319,6 +319,9 @@ void GobanControl::command(const std::string& cmd) {
     else if (cmd == "delete camera") {
         view.clearView();
     }
+    else if (cmd == "zoom stones") {
+        view.zoomToStones();
+    }
     else if (cmd == "undo move") {
         if (!engine.isThinking()) {
             engine.navigateBack();

@@ -51,6 +51,7 @@
                             <div class="hr">カメラ</div>
                             <div class="cmd" onmouseup="reset camera">リセット</div>
                             <div class="cmd" onmouseup="animate">アニメーション</div>
+                            <div class="cmd" onmouseup="zoom stones">石にズーム</div>
                             <div class="hr">カメラプリセット</div>
                             <div class="cmd" onmouseup="save camera">保存</div>
                             <div class="cmd" onmouseup="delete camera">クリア</div>
