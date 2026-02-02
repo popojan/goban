@@ -190,8 +190,10 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
         // Reservoir counts now calculated in updateReservoirs(), called from onBoardChange()
     }
     // On first move, update PB/PW to capture actual players after setup
-    if (game.moveCount() == 0) {
+    if (game.moveCount() == 0 && !state.black.empty() && !state.white.empty()) {
         game.updatePlayers(state.black, state.white);
+    } else if (game.moveCount() == 0) {
+        spdlog::warn("onGameMove: state.black or state.white empty at first move — skipping updatePlayers");
     }
     game.move(move);
     if(!comment.empty()) {
@@ -247,6 +249,14 @@ void GobanModel::onBoardChange(const Board& result) {
     } else if (isGameOver && game.isAtEndOfNavigation() && game.isResignationResult()) {
         // At end of resigned game - show resignation message
         state.msg = game.getResultMessage();
+        // Auto-save resigned game (RE property already set by GameRecord::move)
+        if (!game.hasGameResult()) {
+            // Shouldn't happen — RE was set during move(RESIGN) — but guard anyway
+            spdlog::warn("onBoardChange: resignation detected but no RE property found");
+        }
+        if (game.hasUnsavedChanges()) {
+            game.saveAs("");
+        }
     }
 }
 

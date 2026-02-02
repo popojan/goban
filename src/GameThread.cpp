@@ -244,7 +244,10 @@ void GameThread::syncOtherEngines(const Move& move, const Player* player, const 
     for (auto p : playerManager->getPlayers()) {
         if (p != reinterpret_cast<const Player*>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
             spdlog::debug("syncOtherEngines: syncing player {}", p->getName());
-            p->play(move);
+            if (!p->play(move)) {
+                spdlog::error("syncOtherEngines: {} rejected move {} — engines may be out of sync!",
+                    p->getName(), move.toString());
+            }
         }
     }
 }
@@ -584,9 +587,41 @@ void GameThread::processScoring() {
     model.state.msg = GameState::CALCULATING_SCORE;
 
     // Ensure coach has the correct position before asking for territory.
-    // The lazy sync in the main game loop only runs when !isGameOver,
-    // so scoring at startup (loaded finished game) would query an empty board.
-    syncEngineToPosition(coach);
+    // Skip sync if engines are already at the correct position (live game) —
+    // re-syncing can fail (e.g. superko) and destroy a good board state.
+    // Sync is needed for loaded finished games where engines start empty.
+    if (!enginesSyncedToPosition) {
+        int syncedMoves = 0;
+        if (!syncEngineToPosition(coach, &syncedMoves)) {
+            spdlog::error("processScoring: engine sync failed at move {}, navigating to error position",
+                syncedMoves + 1);
+
+            // Navigate SGF tree back to the last valid position
+            size_t currentPos = model.game.getViewPosition();
+            while (model.game.getViewPosition() > static_cast<size_t>(syncedMoves)
+                   && model.game.hasPreviousMove()) {
+                model.game.undo();
+            }
+            spdlog::info("processScoring: navigated from move {} to move {}",
+                currentPos, model.game.getViewPosition());
+
+            // Clear game-over state — we're no longer at the end
+            model.isGameOver = false;
+            model.board.showTerritory = false;
+            model.board.showTerritoryAuto = false;
+
+            // Rebuild board at the error position and notify observers
+            Board result(model.game.getBoardSize());
+            navigator->buildBoardFromSGF(result);
+            navigator->notifyBoardChange(result);
+
+            model.state.colorToMove = model.game.getColorToMove();
+            model.state.comment = model.game.getComment();
+            model.state.markup = model.game.getMarkup();
+            model.state.msg = GameState::SCORING_FAILED;
+            return;
+        }
+    }
 
     Board result(model.game.getBoardSize());
     Position koPosition;
@@ -603,7 +638,7 @@ void GameThread::processScoring() {
                 if (gtpEngine) {
                     spdlog::info("Coach scoring failed, trying {} for final_score",
                         gtpEngine->getName());
-                    syncEngineToPosition(gtpEngine);
+                    if (!syncEngineToPosition(gtpEngine)) continue;
                     float altScore = gtpEngine->final_score();
                     if (std::abs(altScore) > 0.1f) {
                         spdlog::info("Using {} score: {:.1f}", gtpEngine->getName(), altScore);
@@ -976,9 +1011,9 @@ bool GameThread::autoPlayTsumegoSetup() {
     return true;
 }
 
-void GameThread::syncEngineToPosition(Engine* engine) {
+bool GameThread::syncEngineToPosition(Engine* engine, int* syncedMoves) {
     // Core method: sync one engine to current game position
-    if (!engine) return;
+    if (!engine) return false;
 
     int boardSize = model.getBoardSize();
     float komi = model.state.komi;
@@ -987,8 +1022,14 @@ void GameThread::syncEngineToPosition(Engine* engine) {
         model.setupBlackStones.size(), model.setupWhiteStones.size(),
         model.game.moveCount());
 
-    engine->boardsize(boardSize);
-    engine->clear();
+    if (!engine->boardsize(boardSize)) {
+        spdlog::error("syncEngineToPosition: {} failed boardsize({})", engine->getName(), boardSize);
+        return false;
+    }
+    if (!engine->clear()) {
+        spdlog::error("syncEngineToPosition: {} failed clear_board", engine->getName());
+        return false;
+    }
     engine->komi(komi);
 
     // Replay setup stones (AB: black, AW: white)
@@ -999,10 +1040,22 @@ void GameThread::syncEngineToPosition(Engine* engine) {
         engine->play(Move(stone, Color::WHITE));
     }
 
-    // Replay all moves
+    // Replay all moves — stop on first failure (fail early)
+    int moveNum = 0;
+    bool replayFailed = false;
     model.game.replay([&](const Move& move) {
-        engine->play(move);
+        if (replayFailed) return;
+        ++moveNum;
+        if (!engine->play(move)) {
+            spdlog::error("syncEngineToPosition: {} rejected move #{} {} — aborting replay",
+                engine->getName(), moveNum, move.toString());
+            model.state.scoringError = "Illegal move #" + std::to_string(moveNum)
+                + " " + move.toString();
+            replayFailed = true;
+        }
     });
+    if (syncedMoves) *syncedMoves = replayFailed ? moveNum - 1 : moveNum;
+    return !replayFailed;
 }
 
 void GameThread::finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInfo& gameInfo) {
@@ -1057,7 +1110,7 @@ void GameThread::matchSgfPlayers() {
         for (size_t i = 0; i < players.size(); i++) {
             if (players[i]->getName() == sgfName && !players[i]->isTypeOf(Player::SGF_PLAYER)) {
                 spdlog::info("Matched SGF player '{}' to existing player at index {}", sgfName, i);
-                playerManager->setActivePlayer(which, i);
+                playerManager->activatePlayer(which, i);
                 return;
             }
         }
@@ -1066,7 +1119,7 @@ void GameThread::matchSgfPlayers() {
         auto* sgfPlayer = new LocalHumanPlayer(sgfName);
         sgfPlayer->addType(Player::SGF_PLAYER);
         size_t newIndex = addPlayer(sgfPlayer);
-        playerManager->setActivePlayer(which, newIndex);
+        playerManager->activatePlayer(which, newIndex);
         spdlog::info("Created SGF player '{}' at index {}", sgfName, newIndex);
     };
 
@@ -1127,12 +1180,7 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
 
     model.state.comment = model.game.getComment();
     model.state.markup = model.game.getMarkup();
-
-    // Tsumego "to move" hint for the loaded position
-    if (model.tsumegoMode && model.state.comment.empty()) {
-        model.state.comment = (model.state.colorToMove == Color::BLACK)
-            ? model.tsumegoHintBlack : model.tsumegoHintWhite;
-    }
+    navigator->applyTsumegoHint();
 
     // Build board from SGF using local capture logic (engine-independent)
     // This triggers onBoardChange → positionNumber increment, which the render

@@ -161,6 +161,15 @@ void PlayerManager::loadHumanPlayers(const std::shared_ptr<Configuration>& confi
     activePlayer[0] = human;
     activePlayer[1] = (coach != 0) ? coach : human;
 
+    // Notify observers so state.black/state.white reflect initial active players
+    std::for_each(
+        gameObservers.begin(), gameObservers.end(),
+        [this](GameObserver* observer) {
+            observer->onPlayerChange(0, players[activePlayer[0]]->getName());
+            observer->onPlayerChange(1, players[activePlayer[1]]->getName());
+        }
+    );
+
     // Default kibitz to coach if not set
     if (kibitz == 0 && coach != 0) {
         kibitz = coach;
