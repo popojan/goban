@@ -65,7 +65,7 @@ public:
     void calcCaptured(Metrics& m, int capturedBlack, int capturedWhite);
     void updateReservoirs();
 
-    operator bool() const { return !isGameOver && started; }
+    explicit operator bool() const { return !isGameOver && started; }
 
     void setCursor(const Position& p) { cursor = p;}
 

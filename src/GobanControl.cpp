@@ -19,7 +19,6 @@ bool GobanControl::newGame(unsigned boardSize) const {
     model.game.setSuppressSessionCopy(false);
     if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         model.createNewRecord();
-        model.start();
         view.animateIntro();
         parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
         // Save game settings so fresh start uses these values
