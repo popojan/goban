@@ -53,6 +53,9 @@ public:
     // Build board state from SGF without engine dependency (local capture logic)
     void buildBoardFromSGF(Board& outBoard) const;
 
+    // Apply tsumego "X to move" hint at initial position when comment is empty
+    void applyTsumegoHint();
+
 private:
     // Scope guard to set/clear navigationInProgress flag
     struct NavigationGuard {
@@ -63,9 +66,6 @@ private:
 
     // Helper to sync move across all engines
     void syncEngines(const Move& move, Engine* coach, bool isUndo) const;
-
-    // Apply tsumego "X to move" hint when comment is empty
-    void applyTsumegoHint();
 
     // Set pass message with variation label (e.g. "11a Black passes")
     void setPassMessage(const Move& passMove);

@@ -121,17 +121,11 @@ void GobanView::resetView() {
 
 void GobanView::switchShader(int idx) {
     updateFlag |= GobanView::UPDATE_ALL;
-    // Show loading message if UI is ready
-    if (model.parent && model.parent->GetContext()) {
-        model.parent->showMessage("Loading shaders...");
-    }
     gobanShader.choose(idx);
     state.metricsReady = false;
     gobanShader.setReady();
-    // Clear message after compilation
-    if (model.parent && model.parent->GetContext()) {
-        model.parent->clearMessage();
-    }
+    // Force OnUpdate to re-evaluate the game state message
+    state.msg = GameState::NONE;
 }
 
 void GobanView::saveView() {
@@ -408,88 +402,114 @@ void GobanView::setTsumegoMode(bool enabled) {
     requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
 }
 
-void GobanView::zoomToRect(const Position& minPos, const Position& maxPos) {
-    const auto& metrics = model.metrics;
-    float halfN = 0.5f * metrics.fNDIM;
 
-    // Convert grid bounds to world coords
-    // Shader uses: (col - 0.5*fNDIM + 0.5) * squareSize
-    float x0 = (minPos.col() + 0.5f - halfN) * metrics.squareSizeX;
-    float x1 = (maxPos.col() + 0.5f - halfN) * metrics.squareSizeX;
-    float z0 = (minPos.row() + 0.5f - halfN) * metrics.squareSizeY;
-    float z1 = (maxPos.row() + 0.5f - halfN) * metrics.squareSizeY;
-
-    glm::vec2 targetPan((x0 + x1) * 0.5f, (z0 + z1) * 0.5f);
-    float halfW = (x1 - x0) * 0.5f;
-    float halfH = (z1 - z0) * 0.5f;
-
-    // Solve for cameraDistance directly by projecting stone rect corners
-    // into camera space. For each corner offset o from target:
-    //   q0.x = 3 * dot(o,cu) / (dot(o,cw) + d)  must fit in [-ratio, ratio]
-    //   q0.y = 3 * dot(o,cv) / (dot(o,cw) + d)  must fit in [-1, 1]
-    // => d >= 3 * |dot(o,cu)| / ratio - dot(o,cw)  and similarly for cv.
+void GobanView::zoomToStones() {
     using namespace glm;
+    const auto& metrics = model.metrics;
+    int boardSize = board.getSize();
+
+    // Collect world-space positions of all stones (using fuzzy placement offsets)
+    // Read from view's board (not model.board) — shader renders view.board.glStones
+    std::vector<vec3> stones;
+    for (int col = 0; col < boardSize; ++col) {
+        for (int row = 0; row < boardSize; ++row) {
+            const auto& pt = board[Position(col, row)];
+            if (pt.stone != Color::EMPTY) {
+                float x = pt.x * metrics.squareSizeX;
+                float z = pt.y * metrics.squareSizeY;
+                stones.push_back({x, 0.0f, z});
+            }
+        }
+    }
+    if (stones.empty()) return;
+
+    // Camera basis
     mat4 m = cam.setView();
-    vec3 viewDir = normalize(vec3(m * vec4(0, 0, 1, 0)));
+    vec3 cw = normalize(vec3(m * vec4(0, 0, 1, 0)));
     vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
-    vec3 cw = viewDir;
     vec3 cu = normalize(cross(up, cw));
     vec3 cv = cross(cw, cu);
     float ratio = resolution.x / resolution.y;
+    float r = metrics.stoneRadius + std::max(metrics.squareSizeX, metrics.squareSizeY);
 
-    vec3 corners[4] = {
-        {-halfW, 0, -halfH},
-        { halfW, 0, -halfH},
-        {-halfW, 0,  halfH},
-        { halfW, 0,  halfH}
-    };
+    // Initial center from orthographic projection onto screen axes
+    float puMin = dot(stones[0], cu), puMax = puMin;
+    float pvMin = dot(stones[0], cv), pvMax = pvMin;
+    for (size_t i = 1; i < stones.size(); ++i) {
+        float pu = dot(stones[i], cu);
+        float pv = dot(stones[i], cv);
+        puMin = std::min(puMin, pu); puMax = std::max(puMax, pu);
+        pvMin = std::min(pvMin, pv); pvMax = std::max(pvMax, pv);
+    }
+    float puMid = (puMax + puMin) * 0.5f;
+    float pvMid = (pvMax + pvMin) * 0.5f;
+    float t = -(puMid * cu.y + pvMid * cv.y) / cw.y;
+    vec3 center = puMid * cu + pvMid * cv + t * cw;
+    vec2 targetPan(center.x, center.z);
 
+    // Iterate: compute distance + perspective-correct centering until converged
     float targetDist = 0.5f;
-    for (const auto& o : corners) {
-        float ou = dot(o, cu);
-        float ov = dot(o, cv);
-        float ow = dot(o, cw);
-        float dFromX = FOCAL_LENGTH * std::abs(ou) / ratio - ow;
-        float dFromY = FOCAL_LENGTH * std::abs(ov) - ow;
-        targetDist = std::max(targetDist, std::max(dFromX, dFromY));
+    for (int iter = 0; iter < 8; ++iter) {
+        // Screen-space bbox from two levels per stone:
+        // - board plane (y=0): stone base, no radius
+        // - equator (y=stoneHeight*0.5*h): widest point, full stoneRadius
+        // stoneHeight is shader-dependent (0.85 for 3D, 0.0 for 2D)
+        float quMin = 1e9f, quMax = -1e9f, qvMin = 1e9f, qvMax = -1e9f;
+        vec3 panOff(targetPan.x, 0.0f, targetPan.y);
+        float stoneH = gobanShader.getStoneHeight() * 0.5f * metrics.h;
+        vec3 yOff(0.0f, stoneH, 0.0f);
+        for (const auto& s : stones) {
+            vec3 o0 = s - panOff;
+            // Board level (no radius)
+            float d0 = dot(o0, cw) + targetDist;
+            float qu0 = FOCAL_LENGTH * dot(o0, cu) / d0;
+            float qv0 = FOCAL_LENGTH * dot(o0, cv) / d0;
+            quMin = std::min(quMin, qu0); quMax = std::max(quMax, qu0);
+            qvMin = std::min(qvMin, qv0); qvMax = std::max(qvMax, qv0);
+            // Equator level (full radius)
+            vec3 oH = o0 + yOff;
+            float dH = dot(oH, cw) + targetDist;
+            float rScr = FOCAL_LENGTH * r / dH;
+            float quH = FOCAL_LENGTH * dot(oH, cu) / dH;
+            float qvH = FOCAL_LENGTH * dot(oH, cv) / dH;
+            quMin = std::min(quMin, quH - rScr); quMax = std::max(quMax, quH + rScr);
+            qvMin = std::min(qvMin, qvH - rScr); qvMax = std::max(qvMax, qvH + rScr);
+        }
+        float quMid = (quMax + quMin) * 0.5f;
+        float qvMid = (qvMax + qvMin) * 0.5f;
+        float quHalf = (quMax - quMin) * 0.5f;
+        float qvHalf = (qvMax - qvMin) * 0.5f;
+
+        // Scale distance so the bbox fits the viewport
+        float scale = std::max(quHalf / ratio, qvHalf);
+
+        // Shift pan to center the screen-space bbox on board plane
+        // Use current targetDist (before scaling) since quMid was measured at this distance
+        float shiftU = quMid * targetDist / FOCAL_LENGTH;
+        float shiftV = qvMid * targetDist / FOCAL_LENGTH;
+
+        if (scale > 0.01f)
+            targetDist *= scale;
+        targetDist = std::max(targetDist, 0.01f);
+
+        spdlog::debug("zoomToStones[{}]: pan=({:.3f},{:.3f}) dist={:.3f} "
+                      "qu=[{:.3f},{:.3f}]/{:.3f} qv=[{:.3f},{:.3f}]/1.0 mid=({:.4f},{:.4f})",
+                      iter, targetPan.x, targetPan.y, targetDist,
+                      quMin, quMax, ratio, qvMin, qvMax, quMid, qvMid);
+
+        // Converged when centered and fitting
+        if (std::abs(quMid) < 0.0001f && std::abs(qvMid) < 0.0001f
+            && std::abs(scale - 1.0f) < 0.0001f)
+            break;
+        vec3 worldShift = shiftU * cu + shiftV * cv;
+        float ty = -worldShift.y / cw.y;
+        worldShift += ty * cw;
+        targetPan.x += worldShift.x;
+        targetPan.y += worldShift.z;
     }
-    // Screen-space margin: uniform visual padding regardless of tilt
-    targetDist *= 1.15f;
-    targetDist = std::clamp(targetDist, 0.5f, 10.0f);
 
-    // With tilt, near corners subtend larger angles than far corners,
-    // making the rect appear shifted. Compute the visual midpoint of
-    // each axis and shift targetPan so the rect is visually centered.
-    // For opposite edges at offsets ±half along an axis:
-    //   q+ = 3*proj / (ow+ + d),  q- = -3*proj / (ow- + d)
-    // Visual center = (q+ + q-) / 2; we shift pan to zero this out.
-    vec3 oPos(halfW, 0, halfH);   // +X, +Z corner offset
-    vec3 oNeg(-halfW, 0, -halfH); // -X, -Z corner offset
-    float owPos = dot(oPos, cw) + targetDist;
-    float owNeg = dot(oNeg, cw) + targetDist;
-    // Screen positions of +/- edges along cu axis
-    float quPos = FOCAL_LENGTH * dot(oPos, cu) / owPos;
-    float quNeg = FOCAL_LENGTH * dot(oNeg, cu) / owNeg;
-    float uShift = (quPos + quNeg) * 0.5f; // visual center offset in screen space
-    // Screen positions of +/- edges along cv axis
-    float qvPos = FOCAL_LENGTH * dot(oPos, cv) / owPos;
-    float qvNeg = FOCAL_LENGTH * dot(oNeg, cv) / owNeg;
-    float vShift = (qvPos + qvNeg) * 0.5f;
-    // Convert screen-space shift back to board-plane pan offset
-    float panShiftU = uShift * targetDist / FOCAL_LENGTH;
-    float panShiftV = vShift * targetDist / FOCAL_LENGTH;
-    vec3 worldShift = panShiftU * cu + panShiftV * cv;
-    targetPan.x += worldShift.x;
-    targetPan.y += worldShift.z;
-
+    targetDist = std::clamp(targetDist, 0.01f, 10.0f);
     animateCamera(cam.rLast, targetPan, targetDist);
-}
-
-void GobanView::zoomToStones() {
-    Position minPos, maxPos;
-    if (model.board.stoneBounds(minPos, maxPos)) {
-        zoomToRect(minPos, maxPos);
-    }
 }
 
 Position GobanView::getBoardCoordinate(float x, float y) const {

@@ -223,8 +223,8 @@ public:
     // Uses internal koPosition for ko rule checking
     bool isValidMove(const Position& pos, const Color& color) const;
 
-    // Build board state by replaying moves (for SGF navigation without engine)
-    void replayMoves(const std::vector<Move>& moves);
+    // Build board state by replaying moves (stops on illegal move, returns count applied)
+    int replayMoves(const std::vector<Move>& moves);
 
     // Sync glStones visual array from points logical state (call after replayMoves)
     void syncVisualState();

@@ -414,7 +414,8 @@ void ElementGame::checkEngineLoadingComplete() {
         // (result messages like "Black won" should not be overwritten)
         auto msg = model.state.msg;
         bool isImportantMessage = msg == GameState::WHITE_WON || msg == GameState::BLACK_WON ||
-                                  msg == GameState::WHITE_RESIGNED || msg == GameState::BLACK_RESIGNED;
+                                  msg == GameState::WHITE_RESIGNED || msg == GameState::BLACK_RESIGNED ||
+                                  msg == GameState::SCORING_FAILED;
         if (!isImportantMessage) {
             updateLoadingStatus("");  // Clear loading message
         }
@@ -929,7 +930,7 @@ void ElementGame::OnUpdate()
         return msg == GameState::WHITE_WON || msg == GameState::BLACK_WON ||
                msg == GameState::WHITE_RESIGNED || msg == GameState::BLACK_RESIGNED ||
                msg == GameState::BLACK_PASS || msg == GameState::WHITE_PASS ||
-               msg == GameState::CALCULATING_SCORE ||
+               msg == GameState::CALCULATING_SCORE || msg == GameState::SCORING_FAILED ||
                msg == GameState::TSUMEGO_SOLVED || msg == GameState::TSUMEGO_WRONG;
     };
 
@@ -950,6 +951,9 @@ void ElementGame::OnUpdate()
         switch (model.state.msg) {
         case GameState::CALCULATING_SCORE:
             showMessage(getTemplateText(context, "templateCalculatingScore"));
+            break;
+        case GameState::SCORING_FAILED:
+            showMessage("Scoring failed: " + model.state.scoringError);
             break;
         case GameState::BLACK_RESIGNS:
             showMessage(getTemplateText(context, "templateBlackResigns"));

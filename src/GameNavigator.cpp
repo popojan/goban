@@ -12,7 +12,8 @@ void GameNavigator::setPassMessage(const Move& passMove) {
 }
 
 void GameNavigator::applyTsumegoHint() {
-    if (model.tsumegoMode && model.state.comment.empty()) {
+    if (model.tsumegoMode && model.state.comment.empty()
+        && model.game.getViewPosition() == 0) {
         model.state.comment = (model.state.colorToMove == Color::BLACK)
             ? model.tsumegoHintBlack : model.tsumegoHintWhite;
     }

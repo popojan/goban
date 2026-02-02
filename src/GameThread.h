@@ -127,7 +127,7 @@ public:
     bool loadSGFWithEngine(const std::string& fileName, Engine* engine = nullptr, int gameIndex = 0, bool startAtRoot = false);
     bool switchGame(int gameIndex, bool startAtRoot = false);  // Switch game within loaded SGF doc
     bool autoPlayTsumegoSetup();  // Auto-play first move if it contradicts PL (non-standard tsumego convention)
-    void syncEngineToPosition(Engine* engine);  // Sync one engine to current game state
+    bool syncEngineToPosition(Engine* engine, int* syncedMoves = nullptr);  // Sync one engine to current game state (returns false on failure)
     void syncRemainingEngines(Engine* alreadySynced = nullptr, bool matchPlayers = true);  // Sync all engines except alreadySynced
 
 private:

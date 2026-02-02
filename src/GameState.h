@@ -42,11 +42,12 @@ public:
     enum Message {
         NONE, WHITE_PASS, BLACK_PASS, WHITE_RESIGNS, BLACK_RESIGNS,
         BLACK_RESIGNED, WHITE_RESIGNED, WHITE_WON, BLACK_WON, PAUSED,
-        CALCULATING_SCORE, TSUMEGO_SOLVED, TSUMEGO_WRONG
+        CALCULATING_SCORE, SCORING_FAILED, TSUMEGO_SOLVED, TSUMEGO_WRONG
     };
 
     Message msg;
     std::string passVariationLabel;  // e.g. "11b" when a pass variation exists during navigation
+    std::string scoringError;  // Error detail for SCORING_FAILED message
 
     GameState(): colorToMove(Color::BLACK), capturedBlack(0), capturedWhite(0),
                  reservoirBlack(32), reservoirWhite(32),

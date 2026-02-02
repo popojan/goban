@@ -921,13 +921,29 @@ bool Board::isValidMove(const Position& pos, const Color& color) const {
     return ownLiberties > 0 || connectsToFriendlyGroup;
 }
 
-// Build board state by replaying moves
-void Board::replayMoves(const std::vector<Move>& moves) {
+// Build board state by replaying moves (stops on illegal move, returns count of moves applied)
+int Board::replayMoves(const std::vector<Move>& moves) {
     koPosition = Position(-1, -1);
+    int applied = 0;
 
     for (const auto& move : moves) {
-        if (move == Move::NORMAL || move == Move::PASS) {
-            applyMoveWithCaptures(move);  // Handles ko expiration on pass
+        if (move == Move::NORMAL) {
+            if (points[ord(move.pos)].stone != Color::EMPTY) {
+                spdlog::warn("replayMoves: stopping at move #{} {} — position ({},{}) occupied by {}",
+                    applied + 1, move.toString(), move.pos.col(), move.pos.row(),
+                    points[ord(move.pos)].stone == Color::BLACK ? "B" : "W");
+                break;
+            }
+            if (move.pos == koPosition) {
+                spdlog::warn("replayMoves: stopping at move #{} {} — ko violation at ({},{})",
+                    applied + 1, move.toString(), move.pos.col(), move.pos.row());
+                break;
+            }
+            applyMoveWithCaptures(move);
+        } else if (move == Move::PASS) {
+            applyMoveWithCaptures(move);
         }
+        ++applied;
     }
+    return applied;
 }
