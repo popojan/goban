@@ -54,8 +54,7 @@ public:
     void Reshape();
     void gameLoop();
     void populateUIElements();  // Populate engine-independent UI elements immediately
-    void populateEngines();     // Populate player dropdowns (requires engines loaded)
-    void refreshPlayerDropdowns();  // Clear and repopulate player dropdowns
+    void refreshPlayerDropdowns();  // Clear and repopulate player dropdowns from active players
     void refreshGameSettingsDropdowns();  // Sync board/komi/handicap dropdowns with model state
     GobanControl& getController() { return control; }
     GameThread& getGameThread() { return engine; }

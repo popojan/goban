@@ -46,11 +46,8 @@ ElementGame::ElementGame(const Rml::String& tag)
     engine.addGameObserver(&model);
     engine.addGameObserver(&view);
 
-    // Create initial game record (doesn't require engines)
-    model.createNewRecord();
-
+    // Game record creation deferred to loadEnginesParallel (after board size/komi/handicap known)
     // Engine loading is deferred to async thread - board renders immediately
-    // Player initialization moved to "load" event (from SGF or user settings)
 }
 
 void ElementGame::populateUIElements() {
@@ -158,39 +155,6 @@ void ElementGame::populateUIElements() {
         selectBlack->Add("Human", "0");
         selectWhite->Add("Human", "0");
         selectBlack->SetSelection(0);
-        selectWhite->SetSelection(0);
-    }
-}
-
-void ElementGame::populateEngines() {
-    // Populate player dropdowns with all available players (requires engines loaded)
-    auto selectBlack = dynamic_cast<Rml::ElementFormControlSelect*>(
-            GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
-    auto selectWhite = dynamic_cast<Rml::ElementFormControlSelect*>(
-            GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
-    const auto players(engine.getPlayers());
-
-    if(!selectBlack) {
-        spdlog::warn("missing GUI element [selectBlack]");
-    }
-    if(!selectWhite) {
-        spdlog::warn("missing GUI element [selectWhite]");
-    }
-
-    if(selectBlack && selectWhite) {
-        // Clear placeholder items
-        while (selectBlack->GetNumOptions() > 0) selectBlack->Remove(0);
-        while (selectWhite->GetNumOptions() > 0) selectWhite->Remove(0);
-
-        for (unsigned i = 0; i < players.size(); ++i) {
-            std::ostringstream ss;
-            ss << i;
-            std::string playerName(players[i]->getName());
-            std::string playerIndex(ss.str());
-            selectBlack->Add(playerName.c_str(), playerIndex.c_str());
-            selectWhite->Add(playerName.c_str(), playerIndex.c_str());
-        }
-        selectBlack->SetSelection(static_cast<int>(players.size()) - 1);
         selectWhite->SetSelection(0);
     }
 }
@@ -435,9 +399,6 @@ void ElementGame::performDeferredInitialization() {
 
     spdlog::info("Performing deferred initialization");
 
-    // Populate engine dropdowns
-    populateEngines();
-
     // Clear startFresh flag if it was set
     if (UserSettings::instance().getStartFresh()) {
         spdlog::info("Starting fresh (board was cleared last session)");
@@ -471,9 +432,7 @@ void ElementGame::performDeferredInitialization() {
         if (whiteIdx >= 0) control.switchPlayer(1, whiteIdx);
 
         refreshPlayerDropdowns();
-        if (settings.hasGameSettings()) {
-            refreshGameSettingsDropdowns();
-        }
+        refreshGameSettingsDropdowns();
     }
 
     control.finishInitialization();

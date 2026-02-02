@@ -14,7 +14,7 @@ const float Board::safeDist = 1.01f;
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
     generator(std::random_device()()), dist(0.0f, 0.05f), invalidated(false), squareYtoXRatio(1.0), showTerritory(false),
     showTerritoryAuto(false), territoryReady(false),
-    cursor({0, 0}), collision(0.0)
+    cursor({0, 0}), collision(0.0), score(0.0f)
 {
     clear(size);
     positionNumber = generator();
