@@ -55,9 +55,10 @@ public:
     void gameLoop();
     void populateUIElements();  // Populate engine-independent UI elements immediately
     void refreshPlayerDropdowns();  // Clear and repopulate player dropdowns from active players
-    void refreshGameSettingsDropdowns();  // Sync board/komi/handicap dropdowns with model state
+    // Game settings dropdowns (board/komi/handicap) are synced automatically in OnUpdate
     GobanControl& getController() { return control; }
     GameThread& getGameThread() { return engine; }
+    const GobanModel& getModel() const { return model; }
     void OnMenuToggle(const std::string& cmd, bool checked) const;
     void setElementDisabled(const std::string& elementId, bool disabled) const;
 
@@ -104,6 +105,9 @@ private:
 
     // Determine initial board size by peeking at SGF that will be loaded
     static int determineInitialBoardSize();
+
+    // Sync a dropdown selection to match a value string (with syncingUI guard)
+    void syncDropdown(Rml::Element* container, const char* elementId, const std::string& value);
 
     // Prompt system callback storage
     std::function<void(bool)> pendingPromptCallback;

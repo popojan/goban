@@ -80,9 +80,11 @@ static void EnsureHoverListenersForAllDocuments() {
             // Events that can change CSS visual state and need repaint:
             // :hover -> mouseover/mouseout (shows submenus via CSS)
             // click  -> complete click cycle (RmlUi select dropdowns, buttons with onmouseup)
+            // change -> dropdown selection changes (from syncDropdown in OnUpdate)
             doc->AddEventListener(Rml::EventId::Mouseover, &g_hoverListener);
             doc->AddEventListener(Rml::EventId::Mouseout, &g_hoverListener);
             doc->AddEventListener(Rml::EventId::Click, &g_hoverListener);
+            doc->AddEventListener(Rml::EventId::Change, &g_hoverListener);
             g_documentsWithHoverListener.insert(doc);
             spdlog::debug("Added hover listeners to document: {}", doc->GetSourceURL().c_str());
         }
@@ -267,7 +269,6 @@ static void GlfwCursorPosCallback(GLFWwindow* window, double xpos, double ypos) 
 static void GlfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     (void)window;
     if (!context) return;
-
     RmlGLFW::ProcessMouseButtonCallback(context, button, action, mods);
 }
 

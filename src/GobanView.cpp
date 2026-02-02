@@ -300,7 +300,7 @@ void GobanView::Render(int w, int h)
             cameraPan = glm::mix(cameraAnim.startCameraPan, cameraAnim.targetCameraPan, t);
             cameraDistance = glm::mix(cameraAnim.startCameraDistance, cameraAnim.targetCameraDistance, t);
         }
-        flags |= UPDATE_SHADER;
+        // Camera uniforms are set unconditionally in shadeIt — no UPDATE_SHADER needed
     }
 
     if(flags & UPDATE_SOUND_STONE) {

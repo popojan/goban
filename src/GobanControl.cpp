@@ -457,7 +457,6 @@ void GobanControl::command(const std::string& cmd) {
         setSyncingUI(true);
         engine.switchGame(newIdx, tsumego);  // Start at root in tsumego mode
         parent->refreshPlayerDropdowns();
-        parent->refreshGameSettingsDropdowns();
         setSyncingUI(false);
 
         if (tsumego) {

@@ -22,7 +22,9 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
     spdlog::debug("EventHandlerNewGame recieved event");
     auto doc = event.GetCurrentElement()->GetContext()->GetDocument("game_window");
     if(!doc) return;
-    GobanControl& controller = dynamic_cast<ElementGame*>(doc->GetElementById("game"))->getController();
+    auto* gameElement = dynamic_cast<ElementGame*>(doc->GetElementById("game"));
+    GobanControl& controller = gameElement->getController();
+    const auto& model = gameElement->getModel();
 
     if (value == "boardsize") {
         std::istringstream ss(event.GetParameter<Rml::String>("value", "19").c_str());
@@ -31,7 +33,8 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selBoard"));
         if (controller.isSyncingUI()) {
-            // Just syncing UI to match state, don't trigger action
+            if (select) lastBoardSelection = select->GetSelection();
+        } else if (static_cast<int>(model.getBoardSize()) == boardSize) {
             if (select) lastBoardSelection = select->GetSelection();
         } else if(!controller.newGame(boardSize)) {
             spdlog::error("setting boardsize failed");
@@ -61,6 +64,8 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectHandicap"));
         if (controller.isSyncingUI()) {
             if (select) lastHandicapSelection = select->GetSelection();
+        } else if (model.state.handicap == handicap) {
+            if (select) lastHandicapSelection = select->GetSelection();
         } else if(!controller.setHandicap(handicap)) {
             spdlog::error("setting handicap failed");
             select->SetSelection(lastHandicapSelection);
@@ -73,11 +78,14 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
             std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
             int index = 0;
             ss >> index;
+            auto& engine = gameElement->getGameThread();
             if(event.GetCurrentElement()->GetId() == "selectBlack") {
-                controller.switchPlayer(0, index);
+                if (static_cast<int>(engine.getActivePlayer(0)) != index)
+                    controller.switchPlayer(0, index);
             }
             else if(event.GetCurrentElement()->GetId() == "selectWhite") {
-                controller.switchPlayer(1, index);
+                if (static_cast<int>(engine.getActivePlayer(1)) != index)
+                    controller.switchPlayer(1, index);
             }
         }
     }
@@ -95,6 +103,8 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
         if (controller.isSyncingUI()) {
+            if (select) lastKomiSelection = select->GetSelection();
+        } else if (model.state.komi == komi) {
             if (select) lastKomiSelection = select->GetSelection();
         } else if(!controller.setKomi(komi)) {
             spdlog::error("setting komi failed");

@@ -175,9 +175,11 @@ bool GameThread::setFixedHandicap(int handicap) {
 
     std::vector<Position> stones;
     if (handicap >= 2) {
-        int boardSize = model.board.getSize();
-        coach->boardsize(boardSize);
-        coach->clear();
+        // Handicap games use 0.5 komi by convention
+        model.state.komi = 0.5f;
+        coach->komi(0.5f);
+        model.game.updateKomi(0.5f);
+        UserSettings::instance().setKomi(0.5f);
         if (!coach->fixed_handicap(handicap, stones)) {
             return setFixedHandicap(0);  // Fall back to no handicap
         }
@@ -899,15 +901,25 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
     if (!sgfPath.empty() && firstReadyEngine) {
         spdlog::info("Loading SGF with first engine: {}", sgfPath);
         loadSGFWithEngine(sgfPath, firstReadyEngine, -1);
-    } else if (firstReadyEngine) {
-        // No SGF - apply saved game settings
+    } else {
+        // No SGF - wait for coach engine specifically (it handles handicap/scoring)
+        Engine* coach = nullptr;
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [this, &coach]() {
+                coach = currentCoach();
+                return coach != nullptr;
+            });
+        }
+
         auto& settings = UserSettings::instance();
         int boardSize = settings.getBoardSize();
         float komi = settings.getKomi();
 
-        firstReadyEngine->boardsize(boardSize);
-        firstReadyEngine->komi(komi);
-        firstReadyEngine->clear();
+        // Set up coach engine with saved board size/komi
+        coach->boardsize(boardSize);
+        coach->komi(komi);
+        coach->clear();
 
         // Update model state with saved settings
         spdlog::debug("Setting model.state.komi = {} from settings", komi);
@@ -918,6 +930,7 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
         std::for_each(gameObservers.begin(), gameObservers.end(),
             [boardSize](GameObserver* observer) { observer->onBoardSized(boardSize); });
 
+        // Coach board is already clear — setFixedHandicap sends fixed_handicap
         setFixedHandicap(settings.getHandicap());
         model.createNewRecord();
     }

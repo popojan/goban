@@ -10,6 +10,7 @@
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 // Escape special characters for safe RML display
 static std::string escapeRml(const std::string& text) {
@@ -160,76 +161,54 @@ void ElementGame::populateUIElements() {
 }
 
 void ElementGame::refreshPlayerDropdowns() {
-    auto selectBlack = dynamic_cast<Rml::ElementFormControlSelect*>(
-            GetContext()->GetDocument("game_window")->GetElementById("selectBlack"));
-    auto selectWhite = dynamic_cast<Rml::ElementFormControlSelect*>(
-            GetContext()->GetDocument("game_window")->GetElementById("selectWhite"));
+    auto doc = GetContext()->GetDocument("game_window");
+    auto selectBlack = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectBlack"));
+    auto selectWhite = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectWhite"));
 
     if (!selectBlack || !selectWhite) {
         spdlog::warn("refreshPlayerDropdowns: missing dropdown elements");
         return;
     }
 
-    // Save target selections BEFORE clearing
-    const auto targetBlack = static_cast<int>(engine.getActivePlayer(0));
-    const auto targetWhite = static_cast<int>(engine.getActivePlayer(1));
-
     // Suppress change events during repopulation to prevent transient
     // player switches (e.g. briefly activating an engine during clear)
     control.setSyncingUI(true);
 
-    while (selectBlack->GetNumOptions() > 0) {
+    while (selectBlack->GetNumOptions() > 0)
         selectBlack->Remove(selectBlack->GetNumOptions() - 1);
-    }
-    while (selectWhite->GetNumOptions() > 0) {
+    while (selectWhite->GetNumOptions() > 0)
         selectWhite->Remove(selectWhite->GetNumOptions() - 1);
-    }
 
     const auto players = engine.getPlayers();
     for (unsigned i = 0; i < players.size(); ++i) {
-        std::ostringstream ss;
-        ss << i;
-        std::string playerName(players[i]->getName());
-        std::string playerIndex(ss.str());
-        selectBlack->Add(playerName.c_str(), playerIndex.c_str());
-        selectWhite->Add(playerName.c_str(), playerIndex.c_str());
+        std::string idx = std::to_string(i);
+        std::string name(players[i]->getName());
+        selectBlack->Add(name.c_str(), idx.c_str());
+        selectWhite->Add(name.c_str(), idx.c_str());
     }
 
-    selectBlack->SetSelection(targetBlack);
-    selectWhite->SetSelection(targetWhite);
+    // Set selection immediately to avoid single-frame glitch after repopulation
+    selectBlack->SetSelection(static_cast<int>(engine.getActivePlayer(0)));
+    selectWhite->SetSelection(static_cast<int>(engine.getActivePlayer(1)));
 
     control.setSyncingUI(false);
 
-    spdlog::debug("refreshPlayerDropdowns: {} players, black={}, white={}",
-        players.size(), targetBlack, targetWhite);
+    spdlog::debug("refreshPlayerDropdowns: {} players", players.size());
 }
 
-void ElementGame::refreshGameSettingsDropdowns() {
-    auto doc = GetContext()->GetDocument("game_window");
-    if (!doc) return;
-
-    // Helper to sync dropdown selection by value
-    auto setSelectByValue = [doc](const char* elementId, const std::string& value) {
-        auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById(elementId));
-        if (!select) return;
-        for (int i = 0; i < select->GetNumOptions(); i++) {
-            if (select->GetOption(i)->GetAttribute("value", Rml::String()) == value) {
+void ElementGame::syncDropdown(Rml::Element* container, const char* elementId, const std::string& value) {
+    auto select = dynamic_cast<Rml::ElementFormControlSelect*>(container->GetElementById(elementId));
+    if (!select) return;
+    int current = select->GetSelection();
+    for (int i = 0; i < select->GetNumOptions(); i++) {
+        if (select->GetOption(i)->GetAttribute("value", Rml::String()) == value) {
+            if (i != current) {
                 select->SetSelection(i);
-                break;
+                requestRepaint();
             }
+            return;
         }
-    };
-
-    control.setSyncingUI(true);
-    setSelectByValue("selBoard", std::to_string(model.getBoardSize()));
-    std::ostringstream komiStr;
-    komiStr << model.state.komi;
-    setSelectByValue("selectKomi", komiStr.str());
-    setSelectByValue("selectHandicap", std::to_string(model.state.handicap));
-    control.setSyncingUI(false);
-
-    spdlog::info("refreshGameSettingsDropdowns: board={}, komi={}, handicap={}",
-        model.getBoardSize(), model.state.komi, model.state.handicap);
+    }
 }
 
 // File-scope statics for FPS tracking (shared between gameLoop and getIdleTimeout)
@@ -408,7 +387,6 @@ void ElementGame::performDeferredInitialization() {
     // SGF was already loaded in loadEnginesParallel()
     if (!sgfToLoad.empty()) {
         refreshPlayerDropdowns();
-        refreshGameSettingsDropdowns();
     } else {
         // Apply user settings if no SGF was loaded
         auto& settings = UserSettings::instance();
@@ -432,10 +410,17 @@ void ElementGame::performDeferredInitialization() {
         if (whiteIdx >= 0) control.switchPlayer(1, whiteIdx);
 
         refreshPlayerDropdowns();
-        refreshGameSettingsDropdowns();
     }
 
     control.finishInitialization();
+
+    // Invalidate view state to force OnUpdate to sync all dropdowns
+    // (model and view start with identical defaults, so diffs won't fire otherwise)
+    view.state.komi = -1.0f;
+    view.state.handicap = -1;
+    view.state.black.clear();
+    view.state.white.clear();
+
     view.requestRepaint();
 }
 
@@ -839,20 +824,40 @@ void ElementGame::OnUpdate()
         requestRepaint();
     }
     if (view.state.handicap != model.state.handicap) {
-        Rml::Element* hand = context->GetDocument("game_window")->GetElementById("lblHandicap");
+        auto doc = context->GetDocument("game_window");
+        Rml::Element* hand = doc->GetElementById("lblHandicap");
         if (hand != nullptr) {
             hand->SetInnerRML(Rml::CreateString( "Handicap: %d", model.state.handicap).c_str());
             requestRepaint();
-            view.state.handicap = model.state.handicap;
         }
+        syncDropdown(doc, "selectHandicap", std::to_string(model.state.handicap));
+        view.state.handicap = model.state.handicap;
     }
     if (view.state.komi != model.state.komi) {
-        Rml::Element* elKomi = context->GetDocument("game_window")->GetElementById("lblKomi");
+        auto doc = context->GetDocument("game_window");
+        Rml::Element* elKomi = doc->GetElementById("lblKomi");
         if (elKomi != nullptr) {
             elKomi->SetInnerRML(Rml::CreateString( "Komi: %.1f", model.state.komi).c_str());
-            view.state.komi = model.state.komi;
             requestRepaint();
         }
+        std::ostringstream komiStr;
+        komiStr << model.state.komi;
+        syncDropdown(doc, "selectKomi", komiStr.str());
+        view.state.komi = model.state.komi;
+    }
+    if (view.board.getSize() != model.board.getSize()) {
+        auto doc = context->GetDocument("game_window");
+        syncDropdown(doc, "selBoard", std::to_string(model.board.getSize()));
+    }
+    if (view.state.black != model.state.black) {
+        auto doc = context->GetDocument("game_window");
+        syncDropdown(doc, "selectBlack", std::to_string(engine.getActivePlayer(0)));
+        view.state.black = model.state.black;
+    }
+    if (view.state.white != model.state.white) {
+        auto doc = context->GetDocument("game_window");
+        syncDropdown(doc, "selectWhite", std::to_string(engine.getActivePlayer(1)));
+        view.state.white = model.state.white;
     }
     // Collect engine errors FIRST (before message display, so we can combine them)
     std::string engineErrors;
