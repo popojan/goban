@@ -234,16 +234,19 @@ void UserSettings::setShaderContrast(float value) {
 
 void UserSettings::setBoardSize(int value) {
     boardSize = value;
+    gameSettingsLoaded = true;
     save();
 }
 
 void UserSettings::setKomi(float value) {
     komi = value;
+    gameSettingsLoaded = true;
     save();
 }
 
 void UserSettings::setHandicap(int value) {
     handicap = value;
+    gameSettingsLoaded = true;
     save();
 }
 

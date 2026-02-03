@@ -180,6 +180,13 @@ void Process::closeStdin() {
     }
 }
 
+void Process::closeStderr() {
+    if (hStderrRead_ != INVALID_HANDLE_VALUE) {
+        CloseHandle(hStderrRead_);
+        hStderrRead_ = INVALID_HANDLE_VALUE;
+    }
+}
+
 int Process::wait() const {
     if (hProcess_ == INVALID_HANDLE_VALUE) return -1;
     WaitForSingleObject(hProcess_, INFINITE);
@@ -194,6 +201,8 @@ bool Process::waitFor(int timeoutMs) const {
 }
 
 void Process::terminate() {
+    // Close stderr first to unblock any ReadFile() call in StderrReaderThread
+    closeStderr();
     if (hProcess_ != INVALID_HANDLE_VALUE) TerminateProcess(hProcess_, 1);
 }
 
@@ -330,6 +339,13 @@ void Process::closeStdin() {
     }
 }
 
+void Process::closeStderr() {
+    if (stderrFd_ >= 0) {
+        close(stderrFd_);
+        stderrFd_ = -1;
+    }
+}
+
 int Process::wait() const {
     if (pid_ < 0) return -1;
     int status;
@@ -349,6 +365,8 @@ bool Process::waitFor(int timeoutMs) const {
 }
 
 void Process::terminate() {
+    // Close stderr first to unblock any read() call in StderrReaderThread
+    closeStderr();
     if (pid_ > 0) kill(pid_, SIGKILL);
 }
 

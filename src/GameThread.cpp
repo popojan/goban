@@ -900,10 +900,22 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
         });
     }
 
-    // Wait for first engine to be ready
+    // Wait for first engine to be ready (or all engines to fail)
     {
         std::unique_lock<std::mutex> lock(mtx);
-        cv.wait(lock, [&firstReadyEngine]() { return firstReadyEngine != nullptr; });
+        cv.wait(lock, [&firstReadyEngine, &enginesLoaded, totalEngines]() {
+            return firstReadyEngine != nullptr || enginesLoaded >= totalEngines;
+        });
+    }
+
+    if (!firstReadyEngine) {
+        spdlog::error("All engines failed to load!");
+        // Join threads before returning
+        for (auto& t : threads) {
+            t.join();
+        }
+        playerManager->loadHumanPlayers(conf);
+        return;
     }
 
     // Load SGF with first ready engine (stones appear now!)

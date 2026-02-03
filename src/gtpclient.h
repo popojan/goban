@@ -34,6 +34,7 @@ public:
     bool readLine(std::string& line);
     bool readLineStderr(std::string& line);
     void closeStdin();
+    void closeStderr();
     int wait() const;
     bool waitFor(int timeoutMs) const;
     void terminate();
