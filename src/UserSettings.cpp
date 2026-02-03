@@ -129,13 +129,15 @@ void UserSettings::save() {
     }
     user["start_fresh"] = startFresh;
 
-    user["game"] = {
-        {"board_size", boardSize},
-        {"komi", komi},
-        {"handicap", handicap},
-        {"black_player", blackPlayer},
-        {"white_player", whitePlayer}
-    };
+    if (gameSettingsLoaded) {
+        user["game"] = {
+            {"board_size", boardSize},
+            {"komi", komi},
+            {"handicap", handicap},
+            {"black_player", blackPlayer},
+            {"white_player", whitePlayer}
+        };
+    }
 
     user["shader"] = {
         {"name", shaderName},
@@ -258,6 +260,17 @@ void UserSettings::setWhitePlayer(const std::string& value) {
 void UserSettings::setPlayers(const std::string& black, const std::string& white) {
     blackPlayer = black;
     whitePlayer = white;
+    save();
+}
+
+void UserSettings::setGameSettings(int newBoardSize, float newKomi, int newHandicap,
+                                   const std::string& black, const std::string& white) {
+    boardSize = newBoardSize;
+    komi = newKomi;
+    handicap = newHandicap;
+    blackPlayer = black;
+    whitePlayer = white;
+    gameSettingsLoaded = true;
     save();
 }
 

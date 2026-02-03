@@ -102,6 +102,7 @@ private:
     // Session restoration state
     int sessionTreePathLength{0};
     std::vector<int> sessionTreePath;  // Branch choices only (at multi-child nodes)
+    bool sessionIsExternal{false};
     bool sessionTsumegoMode{false};
     bool sessionAnalysisMode{false};
     bool sessionRestoreNeeded{false};

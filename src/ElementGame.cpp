@@ -303,6 +303,7 @@ void ElementGame::startAsyncEngineLoading() {
     sgfGameIndex = -1;
     sessionTreePathLength = 0;
     sessionTreePath.clear();
+    sessionIsExternal = false;
     sessionTsumegoMode = false;
     sessionAnalysisMode = false;
     sessionRestoreNeeded = false;
@@ -315,6 +316,7 @@ void ElementGame::startAsyncEngineLoading() {
             sgfGameIndex = settings.getSessionGameIndex();
             sessionTreePathLength = settings.getSessionTreePathLength();
             sessionTreePath = settings.getSessionTreePath();
+            sessionIsExternal = settings.getSessionIsExternal();
             sessionTsumegoMode = settings.getSessionTsumegoMode();
             sessionAnalysisMode = settings.getSessionAnalysisMode();
             sessionRestoreNeeded = true;
@@ -452,6 +454,27 @@ void ElementGame::performDeferredInitialization() {
             spdlog::info("Session restore: analysis mode enabled");
         }
 
+        // Bootstrap UserSettings from daily session if no game settings exist yet
+        // This ensures "Nová hra" uses consistent settings instead of mixing defaults with session
+        auto& settings = UserSettings::instance();
+        if (sessionRestoreNeeded && !sessionIsExternal && !settings.hasGameSettings()) {
+            auto players = engine.getPlayers();
+            size_t blackIdx = engine.getActivePlayer(0);
+            size_t whiteIdx = engine.getActivePlayer(1);
+            std::string blackName = (blackIdx < players.size()) ? players[blackIdx]->getName() : "Human";
+            std::string whiteName = (whiteIdx < players.size()) ? players[whiteIdx]->getName() : "Human";
+
+            settings.setGameSettings(
+                model.getBoardSize(),
+                model.state.komi,
+                model.state.handicap,
+                blackName,
+                whiteName);
+            spdlog::info("Bootstrapped UserSettings from daily session: {}x{}, komi={}, handicap={}, players={}/{}",
+                model.getBoardSize(), model.getBoardSize(), model.state.komi, model.state.handicap,
+                blackName, whiteName);
+        }
+
         refreshPlayerDropdowns();
         sessionRestoreNeeded = false;  // Consumed
     } else {
@@ -473,6 +496,17 @@ void ElementGame::performDeferredInitialization() {
 
         int blackIdx = findPlayer(blackName);
         int whiteIdx = findPlayer(whiteName);
+
+        // Fallback to Human if saved player not found (engine removed from config)
+        if (blackIdx < 0) {
+            spdlog::warn("Saved black player '{}' not found, falling back to Human", blackName);
+            blackIdx = findPlayer("Human");
+        }
+        if (whiteIdx < 0) {
+            spdlog::warn("Saved white player '{}' not found, falling back to Human", whiteName);
+            whiteIdx = findPlayer("Human");
+        }
+
         if (blackIdx >= 0) control.switchPlayer(0, blackIdx);
         if (whiteIdx >= 0) control.switchPlayer(1, whiteIdx);
 

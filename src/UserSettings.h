@@ -50,6 +50,8 @@ public:
     std::string getWhitePlayer() const { return whitePlayer; }
     void setWhitePlayer(const std::string& value);
     void setPlayers(const std::string& black, const std::string& white);
+    void setGameSettings(int boardSize, float komi, int handicap,
+                         const std::string& black, const std::string& white);
     bool hasGameSettings() const { return gameSettingsLoaded; }
 
     // Shader

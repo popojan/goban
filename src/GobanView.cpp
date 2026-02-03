@@ -21,17 +21,22 @@ GobanView::GobanView(GobanModel& m)
     initCam();
 
     // Restore current camera if available (auto-saved on last exit)
-    // This is separate from resetView() which applies the user's saved preset
+    // Fall back to saved preset if no current camera (e.g., fresh user.json with only preset)
     auto& settings = UserSettings::instance();
+    const CameraState* camToRestore = nullptr;
     if (settings.hasCurrentCamera()) {
-        const auto& camState = settings.getCurrentCamera();
-        cam.rLast[0] = camState.rotX;
-        cam.rLast[1] = camState.rotY;
-        cam.rLast[2] = camState.rotZ;
-        cam.rLast[3] = camState.rotW;
+        camToRestore = &settings.getCurrentCamera();
+    } else if (settings.hasSavedCamera()) {
+        camToRestore = &settings.getSavedCamera();
+    }
+    if (camToRestore) {
+        cam.rLast[0] = camToRestore->rotX;
+        cam.rLast[1] = camToRestore->rotY;
+        cam.rLast[2] = camToRestore->rotZ;
+        cam.rLast[3] = camToRestore->rotW;
         cam.rLast.normalize();
-        cameraPan = glm::vec2(camState.panX, camState.panY);
-        cameraDistance = camState.distance;
+        cameraPan = glm::vec2(camToRestore->panX, camToRestore->panY);
+        cameraDistance = camToRestore->distance;
         baseCameraPan = cameraPan;
         baseCameraDistance = cameraDistance;
     }
