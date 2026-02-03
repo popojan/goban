@@ -1,4 +1,5 @@
 #include "PlayerManager.h"
+#include "UserSettings.h"
 #include "gtpclient.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -199,12 +200,19 @@ void PlayerManager::removeSgfPlayers() {
 
     numPlayers = players.size();
 
-    // Reset to defaults if the active player was an SGF player
+    // Restore active players from UserSettings if they were SGF players
+    auto& settings = UserSettings::instance();
+    auto findByName = [this](const std::string& name, size_t fallback) -> size_t {
+        for (size_t i = 0; i < players.size(); i++) {
+            if (players[i]->getName() == name) return i;
+        }
+        return fallback;
+    };
     if (blackWasSgf) {
-        activePlayer[0] = human;
+        activePlayer[0] = findByName(settings.getBlackPlayer(), human);
     }
     if (whiteWasSgf) {
-        activePlayer[1] = coach;
+        activePlayer[1] = findByName(settings.getWhitePlayer(), coach);
     }
 
     // Notify observers so state.black/state.white reflect the new active players

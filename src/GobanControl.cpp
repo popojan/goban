@@ -118,12 +118,8 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
 
             bool playNow = true;
             if (model.isGameOver) {
-                // Clicking on finished game - confirm before starting new game
-                parent->showPromptYesNoTemplate("templateClearBoard", [this](bool confirmed) {
-                    if (confirmed) {
-                        (void) newGame(model.getBoardSize());
-                    }
-                });
+                // Clicking on finished game - reuse "clear" which handles save + settings restore
+                command("clear");
                 playNow = false;
             }
             else if(!model.isGameOver) {
@@ -290,13 +286,18 @@ void GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "clear") {
         // Use different prompt for game in progress vs finished game
-        const char* templateId = engine.isRunning() && !model.isGameOver
+        const char* templateId = engine.isRunning() && !model.isGameOver && !model.tsumegoMode
             ? "templateQuitWithoutFinishing"
             : "templateClearBoard";
         parent->showPromptYesNoTemplate(templateId, [this](bool confirmed) {
             if (confirmed) {
                 saveCurrentGame();  // Save before clearing
-                (void) newGame(model.getBoardSize());  // newGame handles engine.interrupt() + reset()
+                // Restore game settings from UserSettings — model values may be from SGF/tsumego
+                auto& settings = UserSettings::instance();
+                int savedSize = settings.getBoardSize();
+                model.state.komi = settings.getKomi();
+                model.state.handicap = settings.getHandicap();
+                (void) newGame(savedSize > 0 ? savedSize : model.getBoardSize());
             }
         });
     }
@@ -591,7 +592,7 @@ void GobanControl::mouseMove(int x, int y){
 }
 
 bool GobanControl::setKomi(float komi) const {
-    if(bool isRunning = engine.isRunning(); !isRunning) {
+    if (!model.started) {
         engine.setKomi(komi);
         model.state.komi = komi;
         model.game.updateKomi(komi);  // Keep game record in sync
@@ -603,10 +604,9 @@ bool GobanControl::setKomi(float komi) const {
 
 bool GobanControl::setHandicap(int handicap) const {
     bool isOver = model.state.reason != GameState::NO_REASON;
-    bool isRunning = engine.isRunning();
-    spdlog::debug("setHandicap: handicap={} isRunning={} isOver={}", handicap, isRunning, isOver);
+    spdlog::debug("setHandicap: handicap={} started={} isOver={}", handicap, model.started, isOver);
     bool success = false;
-    if(!isRunning && !isOver) {
+    if(!model.started && !isOver) {
         model.state.handicap = handicap;
         success = newGame(model.getBoardSize());
         if (success) {
@@ -620,6 +620,14 @@ bool GobanControl::setHandicap(int handicap) const {
 void GobanControl::switchPlayer(int which, int newPlayerIndex) const {
     engine.activatePlayer(which, static_cast<size_t>(newPlayerIndex));
     model.state.holdsStone = false;
+    // Persist player choice — only switchPlayer saves to UserSettings,
+    // so SGF player activations (matchSgfPlayers) don't leak into user.json.
+    auto players = engine.getPlayers();
+    if (newPlayerIndex >= 0 && newPlayerIndex < static_cast<int>(players.size())) {
+        const std::string& name = players[newPlayerIndex]->getName();
+        if (which == 0) UserSettings::instance().setBlackPlayer(name);
+        else UserSettings::instance().setWhitePlayer(name);
+    }
 }
 
 void GobanControl::switchShader(int newShaderIndex) const {

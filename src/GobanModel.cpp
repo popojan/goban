@@ -183,7 +183,6 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
         state.msg = state.colorToMove == Color::BLACK
             ? GameState::BLACK_PASS
             : GameState::WHITE_PASS;
-        state.passVariationLabel = std::to_string(game.moveCount());
     }
     else {
         state.msg = GameState::NONE;
@@ -196,6 +195,10 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
         spdlog::warn("onGameMove: state.black or state.white empty at first move — skipping updatePlayers");
     }
     game.move(move);
+    // Set pass label after game.move() so moveCount() reflects this move
+    if (move == Move::PASS && !isDoublePass) {
+        state.passVariationLabel = std::to_string(game.moveCount());
+    }
     if(!comment.empty()) {
         game.annotate(comment);
     }
@@ -270,10 +273,8 @@ void GobanModel::onKomiChange(float newKomi) {
 void GobanModel::onPlayerChange(int which, const std::string& name) {
     if (which == 0) {
         state.black = name;
-        UserSettings::instance().setBlackPlayer(name);
     } else {
         state.white = name;
-        UserSettings::instance().setWhitePlayer(name);
     }
 
     // Only annotate player switches after first move, and not on finished games
