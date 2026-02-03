@@ -350,8 +350,8 @@ void ElementGame::startAsyncEngineLoading() {
     // Start intro animation so board is visible and responsive during loading
     view.animateIntro();
 
-    // Set default filename for SGF saving
-    if (!sgfToLoad.empty()) {
+    // Set default filename for SGF saving (only for daily session, not external files)
+    if (!sgfToLoad.empty() && !sessionIsExternal) {
         model.game.setDefaultFileName(sgfToLoad);
     }
 
@@ -837,7 +837,8 @@ void ElementGame::OnUpdate()
         bool thinking = engine.isThinking();
         bool humanTurn = engine.humanToMove() && !thinking;
         bool hasMoves = model.game.moveCount() > 0
-            || !model.setupBlackStones.empty() || !model.setupWhiteStones.empty();
+            || !model.setupBlackStones.empty() || !model.setupWhiteStones.empty()
+            || model.game.getLoadedMovesCount() > 0;
         bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
         // Bot-bot match detection: either explicit AI vs AI mode OR both players are engines
         bool botVsBot = engine.isAiVsAi() || engine.areBothPlayersEngines();
@@ -865,7 +866,7 @@ void ElementGame::OnUpdate()
         // Territory: disabled when game not over
         setElementDisabled("cmdTerritory", !model.isGameOver);
 
-        // Clear: disabled when board is empty (no moves made)
+        // Clear: disabled when board is empty (no moves or loaded content)
         setElementDisabled("cmdClear", !hasMoves);
 
         // Save: disabled when no unsaved changes

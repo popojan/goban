@@ -268,6 +268,11 @@ bool GameNavigator::navigateToStart() {
         return false;
     }
 
+    if (!model.game.hasPreviousMove()) {
+        spdlog::debug("navigateToStart: already at start");
+        return false;
+    }
+
     Engine* coach = getCoach();
     if (!coach) {
         spdlog::warn("navigateToStart: no coach engine available");
@@ -276,32 +281,56 @@ bool GameNavigator::navigateToStart() {
 
     NavigationGuard guard(navigationInProgress);
 
-    bool success = false;
+    // Navigate game record to root
     while (model.game.hasPreviousMove()) {
-        if (!coach->undo()) break;
-
-        syncEngines(Move(), coach, true);
         model.game.undo();
-        success = true;
     }
 
-    if (success) {
-        model.board.showTerritory = false;
-        model.board.showTerritoryAuto = false;
+    // Use "clear and replay" approach to sync engines (avoids undo limitations)
+    int boardSize = model.game.getBoardSize();
+    coach->boardsize(boardSize);
+    coach->clear();
+    coach->komi(model.state.komi);
 
-        // Clear game-over state when navigating away from end
-        if (model.isGameOver) {
-            model.start();
+    // Replay setup stones
+    for (const auto& stone : model.setupBlackStones) {
+        coach->play(Move(stone, Color::BLACK));
+    }
+    for (const auto& stone : model.setupWhiteStones) {
+        coach->play(Move(stone, Color::WHITE));
+    }
+
+    // Sync other active players
+    for (auto player : getActivePlayers()) {
+        if (player != reinterpret_cast<Player*>(coach)) {
+            player->boardsize(boardSize);
+            player->clear();
+            for (const auto& stone : model.setupBlackStones) {
+                player->play(Move(stone, Color::BLACK));
+            }
+            for (const auto& stone : model.setupWhiteStones) {
+                player->play(Move(stone, Color::WHITE));
+            }
         }
-
-        model.state.msg = GameState::NONE;
-        syncStateAfterNavigation();
-
-        Board result(model.game.getBoardSize());
-        buildBoardFromSGF(result);
-        notifyBoardChange(result);
     }
-    return success;
+
+    model.board.showTerritory = false;
+    model.board.showTerritoryAuto = false;
+
+    // Clear game-over state when navigating away from end
+    if (model.isGameOver) {
+        model.start();
+    }
+
+    model.state.msg = GameState::NONE;
+    syncStateAfterNavigation();
+
+    Board result(model.game.getBoardSize());
+    buildBoardFromSGF(result);
+    notifyBoardChange(result);
+
+    spdlog::debug("navigateToStart: success, now at move 0");
+    return true;
 }
 
 bool GameNavigator::navigateToEnd() {
@@ -348,6 +377,11 @@ bool GameNavigator::navigateToEnd() {
     // Restore game-over state if at end of a finished game
     if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
+        // Set result message (resignation or win)
+        auto resultMsg = model.game.getResultMessage();
+        if (resultMsg != GameState::NONE) {
+            model.state.msg = resultMsg;
+        }
     }
 
     Board boardResult(model.game.getBoardSize());
@@ -432,6 +466,11 @@ bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& b
     // Restore game-over state if at end of a finished game
     if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
+        // Set result message (resignation or win)
+        auto resultMsg = model.game.getResultMessage();
+        if (resultMsg != GameState::NONE) {
+            model.state.msg = resultMsg;
+        }
     }
 
     Board boardResult(model.game.getBoardSize());
