@@ -107,7 +107,8 @@ public:
     [[nodiscard]] glm::vec2 boardCoordinate(float x, float y) const;
 
     void resetView();
-    void saveView();
+    void saveView();          // Save current camera to preset (user-triggered)
+    void saveCurrentView();   // Save current camera for session restore (auto on exit)
     void shadeIt(float time, const GobanShader &shader, int flags) const;
 
     // Smooth camera transition via quaternion slerp + pan/distance lerp

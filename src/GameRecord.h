@@ -134,6 +134,7 @@ private:
     // Loaded external SGF document (for game cycling with PageUp/PageDown)
     std::shared_ptr<LibSgfcPlusPlus::ISgfcDocument> loadedExternalDoc;
     int loadedGameIndex = 0;
+    std::string loadedFilePath;  // Path of currently loaded SGF file (for session restore)
 
     // Helper: extract game info from root node (shared by loadFromSGF and switchToGame)
     void extractGameInfo(const std::shared_ptr<LibSgfcPlusPlus::ISgfcNode>& rootNode, SGFGameInfo& gameInfo) const;
@@ -207,7 +208,16 @@ public:
     [[nodiscard]] bool hasLoadedExternalDoc() const { return loadedExternalDoc != nullptr; }
     [[nodiscard]] int getLoadedGameIndex() const { return loadedGameIndex; }
     [[nodiscard]] size_t getLoadedGameCount() const;
+    [[nodiscard]] const std::string& getLoadedFilePath() const { return loadedFilePath; }
     bool switchToGame(int gameIndex, SGFGameInfo& gameInfo, bool startAtRoot = false);
+
+    // Tree path for session persistence (compact format)
+    struct TreePath {
+        int length = 0;                    // Total navigation depth
+        std::vector<int> branchChoices;    // Choices at multi-child nodes only
+    };
+    [[nodiscard]] TreePath getTreePath() const;
+    bool navigateToTreePath(int pathLength, const std::vector<int>& branchChoices);
 };
 
 #endif //GOBAN_GAMERECORD_H

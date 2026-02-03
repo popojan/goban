@@ -489,6 +489,7 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
     gameInDocument = false;
     loadedExternalDoc = nullptr;
     loadedGameIndex = 0;
+    loadedFilePath.clear();  // Clear loaded file path for fresh game
     
     using namespace LibSgfcPlusPlus;
     std::vector<std::shared_ptr<ISgfcProperty> > properties;
@@ -817,6 +818,7 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
         gameHasNewMoves = false;
         unsavedChanges = false;
         gameInDocument = false;
+        loadedFilePath = fileName;  // Track loaded file for session restore
 
         // Only preserve doc when loading daily session file (for appending)
         // External SGFs are ephemeral - if modified, they become part of daily session
@@ -1600,4 +1602,81 @@ bool GameRecord::writeFileContent(const std::string& filePath, const std::string
     if (!file) return false;
     file << content;
     return file.good();
+}
+
+GameRecord::TreePath GameRecord::getTreePath() const {
+    TreePath result;
+    if (!game || !currentNode) return result;
+
+    auto rootNode = game->GetRootNode();
+    auto effectiveRoot = findEffectiveRoot(rootNode);
+    auto node = currentNode;
+
+    // Walk from currentNode back to effectiveRoot
+    std::vector<std::pair<int, size_t>> steps;  // (childIndex, numChildren)
+    while (node && node != effectiveRoot) {
+        auto parent = node->GetParent();
+        if (!parent) break;
+        auto children = parent->GetChildren();
+        for (size_t i = 0; i < children.size(); i++) {
+            if (children[i] == node) {
+                steps.insert(steps.begin(), {static_cast<int>(i), children.size()});
+                break;
+            }
+        }
+        node = parent;
+    }
+
+    result.length = static_cast<int>(steps.size());
+    // Only store choices at multi-child nodes (branch points)
+    for (const auto& [childIdx, numChildren] : steps) {
+        if (numChildren > 1) {
+            result.branchChoices.push_back(childIdx);
+        }
+    }
+    return result;
+}
+
+bool GameRecord::navigateToTreePath(int pathLength, const std::vector<int>& branchChoices) {
+    if (!game) return false;
+
+    auto rootNode = game->GetRootNode();
+    auto effectiveRoot = findEffectiveRoot(rootNode);
+
+    // Navigate in a temp variable - only commit on success
+    auto node = effectiveRoot;
+    size_t branchIdx = 0;  // Index into branchChoices array
+
+    for (int step = 0; step < pathLength; step++) {
+        auto children = node->GetChildren();
+        if (children.empty()) {
+            spdlog::warn("navigateToTreePath: no children at step {} of {}", step, pathLength);
+            // Stay at root on failure (consistent with file-load state)
+            currentNode = effectiveRoot;
+            return false;
+        }
+
+        int childIdx = 0;  // Default: follow first child (main line)
+        if (children.size() > 1) {
+            // Branch point: consume next choice from branchChoices
+            if (branchIdx >= branchChoices.size()) {
+                spdlog::warn("navigateToTreePath: ran out of branch choices at step {}", step);
+                currentNode = effectiveRoot;
+                return false;
+            }
+            childIdx = branchChoices[branchIdx++];
+        }
+
+        if (childIdx < 0 || childIdx >= static_cast<int>(children.size())) {
+            spdlog::warn("navigateToTreePath: invalid child index {} at step {} (children={})",
+                childIdx, step, children.size());
+            currentNode = effectiveRoot;
+            return false;
+        }
+        node = children[childIdx];
+    }
+
+    // Success - commit the navigation
+    currentNode = node;
+    return true;
 }

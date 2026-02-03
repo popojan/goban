@@ -67,22 +67,49 @@ void UserSettings::load() {
             shaderContrast = shader.value("contrast", shaderContrast);
         }
 
+        // Helper to parse camera state from JSON
+        auto parseCamera = [](const nlohmann::json& j, CameraState& cam) {
+            if (j.contains("rotation")) {
+                auto& rot = j["rotation"];
+                cam.rotX = rot.value("x", cam.rotX);
+                cam.rotY = rot.value("y", cam.rotY);
+                cam.rotZ = rot.value("z", cam.rotZ);
+                cam.rotW = rot.value("w", cam.rotW);
+            }
+            if (j.contains("pan")) {
+                auto& pan = j["pan"];
+                cam.panX = pan.value("x", cam.panX);
+                cam.panY = pan.value("y", cam.panY);
+            }
+            cam.distance = j.value("distance", cam.distance);
+        };
+
         if (user.contains("camera")) {
-            cameraLoaded = true;
-            auto& camera = user["camera"];
-            if (camera.contains("rotation")) {
-                auto& rot = camera["rotation"];
-                cameraRotX = rot.value("x", cameraRotX);
-                cameraRotY = rot.value("y", cameraRotY);
-                cameraRotZ = rot.value("z", cameraRotZ);
-                cameraRotW = rot.value("w", cameraRotW);
+            savedCameraLoaded = true;
+            parseCamera(user["camera"], savedCamera);
+        }
+
+        if (user.contains("camera_current")) {
+            currentCameraLoaded = true;
+            parseCamera(user["camera_current"], currentCamera);
+        }
+
+        if (user.contains("session")) {
+            auto& session = user["session"];
+            if (session.contains("file")) {
+                sessionFile = session["file"].get<std::string>();
             }
-            if (camera.contains("pan")) {
-                auto& pan = camera["pan"];
-                cameraPanX = pan.value("x", cameraPanX);
-                cameraPanY = pan.value("y", cameraPanY);
+            sessionGameIndex = session.value("game_index", 0);
+            sessionTreePathLength = session.value("tree_path_length", 0);
+            if (session.contains("tree_path") && session["tree_path"].is_array()) {
+                sessionTreePath.clear();
+                for (const auto& idx : session["tree_path"]) {
+                    sessionTreePath.push_back(idx.get<int>());
+                }
             }
-            cameraDistVal = camera.value("distance", cameraDistVal);
+            sessionIsExternal = session.value("is_external", false);
+            sessionTsumegoMode = session.value("tsumego_mode", false);
+            sessionAnalysisMode = session.value("analysis_mode", false);
         }
 
         spdlog::debug("User settings loaded");
@@ -118,18 +145,34 @@ void UserSettings::save() {
         {"contrast", shaderContrast}
     };
 
-    user["camera"]["rotation"] = {
-        {"x", cameraRotX},
-        {"y", cameraRotY},
-        {"z", cameraRotZ},
-        {"w", cameraRotW}
+    // Helper to serialize camera state to JSON
+    auto serializeCamera = [](const CameraState& cam) {
+        return nlohmann::json{
+            {"rotation", {{"x", cam.rotX}, {"y", cam.rotY}, {"z", cam.rotZ}, {"w", cam.rotW}}},
+            {"pan", {{"x", cam.panX}, {"y", cam.panY}}},
+            {"distance", cam.distance}
+        };
     };
 
-    user["camera"]["pan"] = {
-        {"x", cameraPanX},
-        {"y", cameraPanY}
-    };
-    user["camera"]["distance"] = cameraDistVal;
+    if (savedCameraLoaded) {
+        user["camera"] = serializeCamera(savedCamera);
+    }
+
+    if (currentCameraLoaded) {
+        user["camera_current"] = serializeCamera(currentCamera);
+    }
+
+    if (!sessionFile.empty()) {
+        user["session"] = {
+            {"file", sessionFile},
+            {"game_index", sessionGameIndex},
+            {"tree_path_length", sessionTreePathLength},
+            {"tree_path", sessionTreePath},
+            {"is_external", sessionIsExternal},
+            {"tsumego_mode", sessionTsumegoMode},
+            {"analysis_mode", sessionAnalysisMode}
+        };
+    }
 
     std::ofstream fout(SETTINGS_FILE);
     if (fout) {
@@ -187,22 +230,6 @@ void UserSettings::setShaderContrast(float value) {
     shaderContrast = value;
 }
 
-void UserSettings::setCameraRotation(float x, float y, float z, float w) {
-    cameraRotX = x;
-    cameraRotY = y;
-    cameraRotZ = z;
-    cameraRotW = w;
-}
-
-void UserSettings::setCameraPan(float x, float y) {
-    cameraPanX = x;
-    cameraPanY = y;
-}
-
-void UserSettings::setCameraDistance(float d) {
-    cameraDistVal = d;
-}
-
 void UserSettings::setBoardSize(int value) {
     boardSize = value;
     save();
@@ -226,4 +253,20 @@ void UserSettings::setBlackPlayer(const std::string& value) {
 void UserSettings::setWhitePlayer(const std::string& value) {
     whitePlayer = value;
     save();
+}
+
+void UserSettings::setPlayers(const std::string& black, const std::string& white) {
+    blackPlayer = black;
+    whitePlayer = white;
+    save();
+}
+
+void UserSettings::clearSessionState() {
+    sessionFile.clear();
+    sessionGameIndex = 0;
+    sessionTreePathLength = 0;
+    sessionTreePath.clear();
+    sessionIsExternal = false;
+    sessionTsumegoMode = false;
+    sessionAnalysisMode = false;
 }

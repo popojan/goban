@@ -19,6 +19,14 @@ void GameNavigator::applyTsumegoHint() {
     }
 }
 
+void GameNavigator::syncStateAfterNavigation() {
+    // Update state from current SGF node (caller handles msg, game-over, territory, board notify)
+    model.state.colorToMove = model.game.getColorToMove();
+    model.state.comment = model.game.getComment();
+    model.state.markup = model.game.getMarkup();
+    applyTsumegoHint();
+}
+
 GameNavigator::GameNavigator(GobanModel& model, CoachProvider getCoach,
                              ActivePlayersProvider getActivePlayers, ObserverList& observers)
     : model(model), getCoach(std::move(getCoach)), getActivePlayers(std::move(getActivePlayers)), gameObservers(observers)
@@ -92,14 +100,6 @@ bool GameNavigator::navigateBack() {
         model.start();
     }
 
-    // Keep colorToMove in sync with SGF tree position
-    model.state.colorToMove = model.game.getColorToMove();
-
-    // Update comment/markup from current SGF node
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
-    applyTsumegoHint();
-
     // Show pass message if the move at the current position is a pass
     Move currentMove = model.game.lastMove();
     if (currentMove == Move::PASS) {
@@ -108,7 +108,8 @@ bool GameNavigator::navigateBack() {
         model.state.msg = GameState::NONE;
     }
 
-    // Build board from SGF (local capture logic, no engine dependency)
+    syncStateAfterNavigation();
+
     Board result(model.game.getBoardSize());
     buildBoardFromSGF(result);
     notifyBoardChange(result);
@@ -171,26 +172,16 @@ bool GameNavigator::navigateForward() {
         model.state.msg = GameState::NONE;
     }
 
-    // Keep colorToMove in sync with SGF tree position
-    model.state.colorToMove = model.game.getColorToMove();
-
-    // Update comment/markup from current SGF node
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
-    applyTsumegoHint();
+    syncStateAfterNavigation();
 
     // Restore game-over state if we've reached the end of a finished game
     if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
     }
 
-    // Build board from SGF (local capture logic, no engine dependency)
     Board boardResult(model.game.getBoardSize());
     buildBoardFromSGF(boardResult);
-    spdlog::debug("navigateForward: notifying {} observers, colorToMove={}",
-        gameObservers.size(), model.state.colorToMove == Color::BLACK ? "B" : "W");
     notifyBoardChangeWithMove(boardResult, nextMove);
-    spdlog::debug("navigateForward: done");
 
     return true;
 }
@@ -245,14 +236,6 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
         spdlog::debug("navigateToVariation: following existing branch");
     }
 
-    // Keep colorToMove in sync with SGF tree position
-    model.state.colorToMove = model.game.getColorToMove();
-
-    // Update comment/markup from current SGF node
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
-    applyTsumegoHint();
-
     // Set message for pass moves, clear for stone moves
     if (move == Move::PASS) {
         setPassMessage(move);
@@ -260,7 +243,8 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
         model.state.msg = GameState::NONE;
     }
 
-    // Build board from SGF (local capture logic, no engine dependency)
+    syncStateAfterNavigation();
+
     Board boardResult(model.game.getBoardSize());
     buildBoardFromSGF(boardResult);
     notifyBoardChangeWithMove(boardResult, move);
@@ -310,18 +294,12 @@ bool GameNavigator::navigateToStart() {
             model.start();
         }
 
-        model.state.colorToMove = model.game.getColorToMove();
-        model.state.comment = model.game.getComment();
-        model.state.markup = model.game.getMarkup();
         model.state.msg = GameState::NONE;
-        applyTsumegoHint();
+        syncStateAfterNavigation();
 
-        // Build board from SGF (local capture logic, no engine dependency)
         Board result(model.game.getBoardSize());
         buildBoardFromSGF(result);
         notifyBoardChange(result);
-        spdlog::debug("navigateToStart: at beginning, colorToMove={}",
-            model.state.colorToMove == Color::BLACK ? "B" : "W");
     }
     return success;
 }
@@ -364,31 +342,22 @@ bool GameNavigator::navigateToEnd() {
     }
 
     // Always show result at end (whether we played moves or were already there)
-    model.state.colorToMove = model.game.getColorToMove();
-    model.state.comment = model.game.getComment();
-    model.state.markup = model.game.getMarkup();
     model.state.msg = GameState::NONE;
-    applyTsumegoHint();
-
-    // Always build stones from SGF (local capture logic, reliable)
-    Board boardResult(model.game.getBoardSize());
-    buildBoardFromSGF(boardResult);
+    syncStateAfterNavigation();
 
     // Restore game-over state if at end of a finished game
     if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
     }
 
+    Board boardResult(model.game.getBoardSize());
+    buildBoardFromSGF(boardResult);
     notifyBoardChange(boardResult);
 
     // Set territory flag after notifyBoardChange — updateStones would overwrite it
     if (model.game.shouldShowTerritory()) {
         model.board.toggleTerritoryAuto(true);
     }
-
-    spdlog::debug("navigateToEnd: at end, move {}/{}, colorToMove={}, playedMoves={}",
-        model.game.getViewPosition(), model.game.getLoadedMovesCount(),
-        model.state.colorToMove == Color::BLACK ? "B" : "W", playedMoves);
 
     return true;  // Always return true - we're at the end now
 }
@@ -398,4 +367,84 @@ void GameNavigator::buildBoardFromSGF(Board& outBoard) const {
     model.game.buildBoardFromMoves(outBoard, koPosition);
     spdlog::debug("buildBoardFromSGF: built board from SGF, koPosition=({},{})",
         koPosition.col(), koPosition.row());
+}
+
+bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& branchChoices) {
+    if (!model.game.isNavigating()) {
+        spdlog::debug("navigateToTreePath: not in navigation mode");
+        return false;
+    }
+
+    Engine* coach = getCoach();
+    if (!coach) {
+        spdlog::warn("navigateToTreePath: no coach engine available");
+        return false;
+    }
+
+    NavigationGuard guard(navigationInProgress);
+
+    // Navigate the game record to the tree path
+    if (!model.game.navigateToTreePath(pathLength, branchChoices)) {
+        spdlog::warn("navigateToTreePath: failed to navigate (path invalid or SGF changed)");
+        return false;
+    }
+
+    // Sync coach engine to new position: clear and replay all moves
+    int boardSize = model.game.getBoardSize();
+    coach->boardsize(boardSize);
+    coach->clear();
+    coach->komi(model.state.komi);
+
+    // Replay setup stones
+    for (const auto& stone : model.setupBlackStones) {
+        coach->play(Move(stone, Color::BLACK));
+    }
+    for (const auto& stone : model.setupWhiteStones) {
+        coach->play(Move(stone, Color::WHITE));
+    }
+
+    // Replay all moves from root to current position
+    model.game.replay([&coach](const Move& move) {
+        coach->play(move);
+    });
+
+    // Sync other active players
+    for (auto player : getActivePlayers()) {
+        if (player != reinterpret_cast<Player*>(coach)) {
+            player->boardsize(boardSize);
+            player->clear();
+            for (const auto& stone : model.setupBlackStones) {
+                player->play(Move(stone, Color::BLACK));
+            }
+            for (const auto& stone : model.setupWhiteStones) {
+                player->play(Move(stone, Color::WHITE));
+            }
+            model.game.replay([player](const Move& move) {
+                player->play(move);
+            });
+        }
+    }
+
+    // Sync state and notify
+    model.state.msg = GameState::NONE;
+    syncStateAfterNavigation();
+
+    // Restore game-over state if at end of a finished game
+    if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+        model.isGameOver = true;
+    }
+
+    Board boardResult(model.game.getBoardSize());
+    buildBoardFromSGF(boardResult);
+    notifyBoardChange(boardResult);
+
+    // Show territory if at end of finished game (after notifyBoardChange)
+    if (model.game.shouldShowTerritory()) {
+        model.board.toggleTerritoryAuto(true);
+    }
+
+    spdlog::info("navigateToTreePath: navigated {} steps ({} branch choices), now at move {}",
+        pathLength, branchChoices.size(), model.game.getViewPosition());
+
+    return true;
 }

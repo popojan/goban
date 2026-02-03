@@ -565,6 +565,13 @@ void GameThread::navigateToEnd() {
     wakeGameThread();
 }
 
+bool GameThread::navigateToTreePath(int pathLength, const std::vector<int>& branchChoices) {
+    // Direct call (not queued) - safe during initialization when game loop is blocked on !model.
+    // Must not be called while game loop is running (use queued navigation instead).
+    if (!navigator) return false;
+    return navigator->navigateToTreePath(pathLength, branchChoices);
+}
+
 void GameThread::waitForCommandOrTimeout(int ms) {
     std::unique_lock<std::mutex> lock(navQueueMutex);
     navQueueCV.wait_for(lock, std::chrono::milliseconds(ms),
@@ -842,7 +849,9 @@ void GameThread::loadEngines(const std::shared_ptr<Configuration> conf) const {
 
 void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
                                       const std::string& sgfPath,
-                                      std::function<void()> onFirstEngineReady) {
+                                      std::function<void()> onFirstEngineReady,
+                                      int gameIndex,
+                                      bool startAtRoot) {
     auto bots = conf->data.find("bots");
     if (bots == conf->data.end()) {
         spdlog::warn("No bots configured");
@@ -899,8 +908,8 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
 
     // Load SGF with first ready engine (stones appear now!)
     if (!sgfPath.empty() && firstReadyEngine) {
-        spdlog::info("Loading SGF with first engine: {}", sgfPath);
-        loadSGFWithEngine(sgfPath, firstReadyEngine, -1);
+        spdlog::info("Loading SGF with first engine: {} (gameIndex={}, startAtRoot={})", sgfPath, gameIndex, startAtRoot);
+        loadSGFWithEngine(sgfPath, firstReadyEngine, gameIndex, startAtRoot);
     } else {
         // No SGF - wait for coach engine specifically (it handles handicap/scoring)
         Engine* coach = nullptr;
@@ -1022,6 +1031,15 @@ bool GameThread::autoPlayTsumegoSetup() {
         plColor == Color::BLACK ? "B" : "W");
     navigateForward();  // Async — hint applied in executeNavCommand after FORWARD completes
     return true;
+}
+
+bool GameThread::syncCoachToCurrentPosition() {
+    Engine* coach = currentCoach();
+    if (!coach) {
+        spdlog::warn("syncCoachToCurrentPosition: no coach engine available");
+        return false;
+    }
+    return syncEngineToPosition(coach);
 }
 
 bool GameThread::syncEngineToPosition(Engine* engine, int* syncedMoves) {

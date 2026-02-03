@@ -22,9 +22,12 @@ bool GobanControl::newGame(unsigned boardSize) const {
         view.animateIntro();
         parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
         // Save game settings so fresh start uses these values
-        UserSettings::instance().setBoardSize(static_cast<int>(boardSize));
-        UserSettings::instance().setKomi(model.state.komi);
-        UserSettings::instance().setHandicap(model.state.handicap);
+        auto& settings = UserSettings::instance();
+        settings.setBoardSize(static_cast<int>(boardSize));
+        settings.setKomi(model.state.komi);
+        settings.setHandicap(model.state.handicap);
+        // Clear session state - user explicitly started fresh
+        settings.clearSessionState();
         return true;
     }
     return false;
@@ -622,11 +625,15 @@ void GobanControl::switchPlayer(int which, int newPlayerIndex) const {
     model.state.holdsStone = false;
     // Persist player choice — only switchPlayer saves to UserSettings,
     // so SGF player activations (matchSgfPlayers) don't leak into user.json.
+    // Save BOTH players to ensure consistency (other player may have been set from SGF
+    // without updating UserSettings, and would otherwise revert to stale default).
     auto players = engine.getPlayers();
-    if (newPlayerIndex >= 0 && newPlayerIndex < static_cast<int>(players.size())) {
-        const std::string& name = players[newPlayerIndex]->getName();
-        if (which == 0) UserSettings::instance().setBlackPlayer(name);
-        else UserSettings::instance().setWhitePlayer(name);
+    size_t blackIdx = engine.getActivePlayer(0);
+    size_t whiteIdx = engine.getActivePlayer(1);
+    if (blackIdx < players.size() && whiteIdx < players.size()) {
+        UserSettings::instance().setPlayers(
+            players[blackIdx]->getName(),
+            players[whiteIdx]->getName());
     }
 }
 
@@ -647,12 +654,42 @@ void GobanControl::destroy() const {
 }
 
 void GobanControl::saveCurrentGame() const {
+    auto& settings = UserSettings::instance();
+
     if (model.game.moveCount() > 0) {
         model.game.saveAs("");
-        UserSettings::instance().setLastSgfPath(model.game.getDefaultFileName());
-        UserSettings::instance().setStartFresh(false);
+        settings.setLastSgfPath(model.game.getDefaultFileName());
+        settings.setStartFresh(false);
     } else {
         // Board was cleared, start fresh on next launch
-        UserSettings::instance().setStartFresh(true);
+        settings.setStartFresh(true);
     }
+
+    // Save session state for position restoration on restart
+    bool isExternal = model.game.hasLoadedExternalDoc();
+    std::string sessionFile = isExternal
+        ? model.game.getLoadedFilePath()
+        : model.game.getDefaultFileName();
+
+    // Only save session if there's a file to restore from
+    if (!sessionFile.empty() && (model.game.moveCount() > 0 || isExternal)) {
+        auto treePath = model.game.getTreePath();
+        settings.setSessionFile(sessionFile);
+        settings.setSessionGameIndex(model.game.getLoadedGameIndex());
+        settings.setSessionTreePathLength(treePath.length);
+        settings.setSessionTreePath(treePath.branchChoices);
+        settings.setSessionIsExternal(isExternal);
+        settings.setSessionTsumegoMode(model.tsumegoMode);
+        settings.setSessionAnalysisMode(engine.getGameMode() == GameMode::ANALYSIS);
+        spdlog::info("Saved session state: file={}, gameIndex={}, pathLen={}, branchChoices={}, tsumego={}, analysis={}",
+            sessionFile, model.game.getLoadedGameIndex(), treePath.length, treePath.branchChoices.size(),
+            model.tsumegoMode.load(), engine.getGameMode() == GameMode::ANALYSIS);
+    } else {
+        settings.clearSessionState();
+    }
+
+    // Save current camera for session restore (auto-saved, not the preset)
+    view.saveCurrentView();
+
+    settings.save();
 }

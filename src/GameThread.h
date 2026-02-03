@@ -97,9 +97,13 @@ public:
     // Parallel engine loading with early SGF display
     // Callback is invoked when first engine is ready (for SGF loading)
     // Returns when all engines are loaded and synced
+    // gameIndex: -1 = last game (default), 0+ = specific game index
+    // startAtRoot: true = stay at root (for session restoration with tree path)
     void loadEnginesParallel(std::shared_ptr<Configuration> config,
                              const std::string& sgfPath,
-                             std::function<void()> onFirstEngineReady);
+                             std::function<void()> onFirstEngineReady,
+                             int gameIndex = -1,
+                             bool startAtRoot = false);
 
 	size_t activatePlayer(int which, size_t newIndex) const;
 
@@ -119,6 +123,7 @@ public:
     void navigateToVariation(const Move& move, bool promote = true);
     void navigateToStart();
     void navigateToEnd();
+    bool navigateToTreePath(int pathLength, const std::vector<int>& branchChoices);  // Navigate to specific tree position (for session restore)
     void requestKibitzNav();  // Request engine move via navigation (for tsumego dead branches)
 
     std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
@@ -128,6 +133,7 @@ public:
     bool switchGame(int gameIndex, bool startAtRoot = false);  // Switch game within loaded SGF doc
     bool autoPlayTsumegoSetup();  // Auto-play first move if it contradicts PL (non-standard tsumego convention)
     bool syncEngineToPosition(Engine* engine, int* syncedMoves = nullptr);  // Sync one engine to current game state (returns false on failure)
+    bool syncCoachToCurrentPosition();  // Sync coach engine to current game tree position (for session restoration)
     void syncRemainingEngines(Engine* alreadySynced = nullptr, bool matchPlayers = true);  // Sync all engines except alreadySynced
 
 private:

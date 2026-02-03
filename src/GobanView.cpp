@@ -19,11 +19,33 @@ GobanView::GobanView(GobanModel& m)
     player.init();
 
     initCam();
-    resetView();
+
+    // Restore current camera if available (auto-saved on last exit)
+    // This is separate from resetView() which applies the user's saved preset
+    auto& settings = UserSettings::instance();
+    if (settings.hasCurrentCamera()) {
+        const auto& camState = settings.getCurrentCamera();
+        cam.rLast[0] = camState.rotX;
+        cam.rLast[1] = camState.rotY;
+        cam.rLast[2] = camState.rotZ;
+        cam.rLast[3] = camState.rotW;
+        cam.rLast.normalize();
+        cameraPan = glm::vec2(camState.panX, camState.panY);
+        cameraDistance = camState.distance;
+        baseCameraPan = cameraPan;
+        baseCameraDistance = cameraDistance;
+    }
+
+    // Load shader settings (separate from camera)
+    if (settings.hasShaderSettings()) {
+        gobanShader.setEof(settings.getShaderEof());
+        gobanShader.setDof(settings.getShaderDof());
+        gobanShader.setGamma(settings.getShaderGamma());
+        gobanShader.setContrast(settings.getShaderContrast());
+    }
 
     // Load saved shader (or default to 0) — must happen before setReady()
     int shaderIdx = 0;
-    auto& settings = UserSettings::instance();
     if (settings.hasShaderSettings()) {
         std::string savedName = settings.getShaderName();
         auto shaders = config->data.value("shaders", nlohmann::json::array());
@@ -98,14 +120,15 @@ void GobanView::resetView() {
     glm::vec2 targetPan = cameraPan;
     float targetDist = cameraDistance;
 
-    if (settings.hasCameraSettings()) {
-        targetRot[0] = settings.getCameraRotationX();
-        targetRot[1] = settings.getCameraRotationY();
-        targetRot[2] = settings.getCameraRotationZ();
-        targetRot[3] = settings.getCameraRotationW();
+    if (settings.hasSavedCamera()) {
+        const auto& cam = settings.getSavedCamera();
+        targetRot[0] = cam.rotX;
+        targetRot[1] = cam.rotY;
+        targetRot[2] = cam.rotZ;
+        targetRot[3] = cam.rotW;
         targetRot.normalize();
-        targetPan = glm::vec2(settings.getCameraPanX(), settings.getCameraPanY());
-        targetDist = settings.getCameraDistance();
+        targetPan = glm::vec2(cam.panX, cam.panY);
+        targetDist = cam.distance;
     }
 
     if (settings.hasShaderSettings()) {
@@ -131,9 +154,15 @@ void GobanView::switchShader(int idx) {
 void GobanView::saveView() {
     auto& settings = UserSettings::instance();
 
-    settings.setCameraRotation(cam.rLast[0], cam.rLast[1], cam.rLast[2], cam.rLast[3]);
-    settings.setCameraPan(cameraPan.x, cameraPan.y);
-    settings.setCameraDistance(cameraDistance);
+    CameraState camState;
+    camState.rotX = cam.rLast[0];
+    camState.rotY = cam.rLast[1];
+    camState.rotZ = cam.rLast[2];
+    camState.rotW = cam.rLast[3];
+    camState.panX = cameraPan.x;
+    camState.panY = cameraPan.y;
+    camState.distance = cameraDistance;
+    settings.setSavedCamera(camState);
 
     settings.setShaderEof(gobanShader.getEof());
     settings.setShaderDof(gobanShader.getDof());
@@ -141,6 +170,21 @@ void GobanView::saveView() {
     settings.setShaderContrast(gobanShader.getContrast());
 
     settings.save();
+}
+
+void GobanView::saveCurrentView() {
+    auto& settings = UserSettings::instance();
+
+    CameraState camState;
+    camState.rotX = cam.rLast[0];
+    camState.rotY = cam.rLast[1];
+    camState.rotZ = cam.rLast[2];
+    camState.rotW = cam.rLast[3];
+    camState.panX = cameraPan.x;
+    camState.panY = cameraPan.y;
+    camState.distance = cameraDistance;
+    settings.setCurrentCamera(camState);
+    // Note: caller is responsible for settings.save()
 }
 
 void GobanView::clearView() {
@@ -712,7 +756,8 @@ void GobanView::updateNavigationOverlay() {
 		if (!text.empty()) {
 			if (showLastMoveOverlay || showNextMoveOverlay) {
 				// Check if there's a stone at this position
-				Color stoneColor = board[markup.pos].stone;
+				// Use model.board (always up-to-date) not view.board (synced later in render)
+				Color stoneColor = model.board[markup.pos].stone;
 				if (stoneColor != Color::EMPTY) {
 					// Use stone-level overlay (renders on top of stone)
 					board.setOverlay(markup.pos, text, stoneColor);

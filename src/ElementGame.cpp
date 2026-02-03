@@ -297,11 +297,37 @@ void ElementGame::startAsyncEngineLoading() {
     spdlog::info("Starting parallel engine loading");
     updateLoadingStatus("Loading engines...");
 
-    // Determine which SGF (if any) we'll load - same logic as determineInitialBoardSize()
+    // Determine which SGF (if any) we'll load - check session state first
     auto& settings = UserSettings::instance();
     sgfToLoad.clear();
+    sgfGameIndex = -1;
+    sessionTreePathLength = 0;
+    sessionTreePath.clear();
+    sessionTsumegoMode = false;
+    sessionAnalysisMode = false;
+    sessionRestoreNeeded = false;
 
-    if (!settings.getStartFresh()) {
+    if (!settings.getStartFresh() && settings.hasSessionState()) {
+        // Try session restoration
+        std::string sessionFile = settings.getSessionFile();
+        if (!sessionFile.empty() && std::filesystem::exists(sessionFile)) {
+            sgfToLoad = sessionFile;
+            sgfGameIndex = settings.getSessionGameIndex();
+            sessionTreePathLength = settings.getSessionTreePathLength();
+            sessionTreePath = settings.getSessionTreePath();
+            sessionTsumegoMode = settings.getSessionTsumegoMode();
+            sessionAnalysisMode = settings.getSessionAnalysisMode();
+            sessionRestoreNeeded = true;
+            spdlog::info("Session restoration: file={}, gameIndex={}, pathLen={}, branchChoices={}, tsumego={}, analysis={}",
+                sessionFile, sgfGameIndex, sessionTreePathLength, sessionTreePath.size(), sessionTsumegoMode, sessionAnalysisMode);
+        } else {
+            spdlog::warn("Session file not found: {}, falling back to default loading", sessionFile);
+            settings.clearSessionState();
+        }
+    }
+
+    if (sgfToLoad.empty() && !settings.getStartFresh()) {
+        // Fallback to old behavior
         std::string lastSgf = settings.getLastSgfPath();
         if (!lastSgf.empty() && std::filesystem::exists(lastSgf)) {
             sgfToLoad = lastSgf;
@@ -316,8 +342,8 @@ void ElementGame::startAsyncEngineLoading() {
 
     // Store initial board size from model (already set by determineInitialBoardSize())
     initialBoardSize = model.getBoardSize();
-    spdlog::info("Initial board size: {}, SGF to load: {}", initialBoardSize,
-                 sgfToLoad.empty() ? "(none)" : sgfToLoad);
+    spdlog::info("Initial board size: {}, SGF to load: {} (gameIndex={})", initialBoardSize,
+                 sgfToLoad.empty() ? "(none)" : sgfToLoad, sgfGameIndex);
 
     // Start intro animation so board is visible and responsive during loading
     view.animateIntro();
@@ -328,12 +354,15 @@ void ElementGame::startAsyncEngineLoading() {
     }
 
     // Load all engines in parallel - first ready engine loads SGF, rest sync
-    engineLoadFuture = std::async(std::launch::async, [this]() {
+    // Start at root if: tsumego mode OR we have a session tree path to navigate to
+    int gameIdx = sgfGameIndex;  // Capture for lambda
+    bool loadAtRoot = sessionRestoreNeeded && (sessionTsumegoMode || sessionTreePathLength > 0);
+    engineLoadFuture = std::async(std::launch::async, [this, gameIdx, loadAtRoot]() {
         engine.loadEnginesParallel(config, sgfToLoad, [this]() {
             // Called when first engine is ready and SGF is loaded
             stonesDisplayed = true;
             view.requestRepaint();
-        });
+        }, gameIdx, loadAtRoot);
         spdlog::info("All engines loaded");
     });
 }
@@ -386,7 +415,45 @@ void ElementGame::performDeferredInitialization() {
 
     // SGF was already loaded in loadEnginesParallel()
     if (!sgfToLoad.empty()) {
+        // Session restoration: navigate to saved tree path
+        // Verify current file matches session file (user may have loaded different file via dialog)
+        bool fileMatches = model.game.getLoadedFilePath() == sgfToLoad;
+        if (sessionRestoreNeeded && !fileMatches) {
+            spdlog::warn("Session restore: skipping - file changed from {} to {}",
+                sgfToLoad, model.game.getLoadedFilePath());
+            sessionRestoreNeeded = false;
+        }
+
+        if (sessionRestoreNeeded && sessionTreePathLength > 0) {
+            // For tsumego, ignore tree path - always start at root
+            if (sessionTsumegoMode) {
+                spdlog::info("Session restore: tsumego mode - staying at root");
+            } else {
+                if (engine.navigateToTreePath(sessionTreePathLength, sessionTreePath)) {
+                    spdlog::info("Session restore: navigated {} steps ({} branch choices)",
+                        sessionTreePathLength, sessionTreePath.size());
+                } else {
+                    spdlog::warn("Session restore: failed to navigate to tree path (SGF structure changed?)");
+                    // Clear session state to prevent repeated failures
+                    UserSettings::instance().clearSessionState();
+                }
+            }
+        }
+
+        // Restore tsumego mode
+        if (sessionRestoreNeeded && sessionTsumegoMode) {
+            setTsumegoMode(true);
+            spdlog::info("Session restore: tsumego mode enabled");
+        }
+
+        // Restore analysis mode
+        if (sessionRestoreNeeded && sessionAnalysisMode) {
+            engine.setGameMode(GameMode::ANALYSIS);
+            spdlog::info("Session restore: analysis mode enabled");
+        }
+
         refreshPlayerDropdowns();
+        sessionRestoreNeeded = false;  // Consumed
     } else {
         // Apply user settings if no SGF was loaded
         auto& settings = UserSettings::instance();

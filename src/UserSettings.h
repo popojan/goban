@@ -2,7 +2,14 @@
 #define GOBAN_USERSETTINGS_H
 
 #include <string>
+#include <vector>
 #include <nlohmann/json.hpp>
+
+struct CameraState {
+    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f, rotW = 1.0f;
+    float panX = 0.0f, panY = 0.0f;
+    float distance = 3.0f;
+};
 
 class UserSettings {
 public:
@@ -42,6 +49,7 @@ public:
     void setBlackPlayer(const std::string& value);
     std::string getWhitePlayer() const { return whitePlayer; }
     void setWhitePlayer(const std::string& value);
+    void setPlayers(const std::string& black, const std::string& white);
     bool hasGameSettings() const { return gameSettingsLoaded; }
 
     // Shader
@@ -60,23 +68,36 @@ public:
     float getShaderContrast() const { return shaderContrast; }
     void setShaderContrast(float value);
 
-    // Camera rotation
-    float getCameraRotationX() const { return cameraRotX; }
-    float getCameraRotationY() const { return cameraRotY; }
-    float getCameraRotationZ() const { return cameraRotZ; }
-    float getCameraRotationW() const { return cameraRotW; }
-    void setCameraRotation(float x, float y, float z, float w);
+    // Camera preset (saved via "save camera", applied via "reset camera")
+    const CameraState& getSavedCamera() const { return savedCamera; }
+    void setSavedCamera(const CameraState& state) { savedCamera = state; }
+    bool hasSavedCamera() const { return savedCameraLoaded; }
 
-    // Camera pan and distance
-    float getCameraPanX() const { return cameraPanX; }
-    float getCameraPanY() const { return cameraPanY; }
-    float getCameraDistance() const { return cameraDistVal; }
-    void setCameraPan(float x, float y);
-    void setCameraDistance(float d);
+    // Current camera (auto-saved on exit, restored on startup)
+    const CameraState& getCurrentCamera() const { return currentCamera; }
+    void setCurrentCamera(const CameraState& state) { currentCamera = state; currentCameraLoaded = true; }
+    bool hasCurrentCamera() const { return currentCameraLoaded; }
+
+    // Session restoration
+    std::string getSessionFile() const { return sessionFile; }
+    void setSessionFile(const std::string& value) { sessionFile = value; }
+    int getSessionGameIndex() const { return sessionGameIndex; }
+    void setSessionGameIndex(int value) { sessionGameIndex = value; }
+    const std::vector<int>& getSessionTreePath() const { return sessionTreePath; }
+    void setSessionTreePath(const std::vector<int>& value) { sessionTreePath = value; }
+    int getSessionTreePathLength() const { return sessionTreePathLength; }
+    void setSessionTreePathLength(int value) { sessionTreePathLength = value; }
+    bool getSessionIsExternal() const { return sessionIsExternal; }
+    void setSessionIsExternal(bool value) { sessionIsExternal = value; }
+    bool getSessionTsumegoMode() const { return sessionTsumegoMode; }
+    void setSessionTsumegoMode(bool value) { sessionTsumegoMode = value; }
+    bool getSessionAnalysisMode() const { return sessionAnalysisMode; }
+    void setSessionAnalysisMode(bool value) { sessionAnalysisMode = value; }
+    bool hasSessionState() const { return !sessionFile.empty(); }
+    void clearSessionState();
 
     // Check if settings were loaded (file existed)
     bool hasSettings() const { return settingsLoaded; }
-    bool hasCameraSettings() const { return cameraLoaded; }
     bool hasShaderSettings() const { return shaderLoaded; }
 
 private:
@@ -87,7 +108,8 @@ private:
     static constexpr const char* SETTINGS_FILE = "user.json";
 
     bool settingsLoaded = false;
-    bool cameraLoaded = false;
+    bool savedCameraLoaded = false;
+    bool currentCameraLoaded = false;
     bool shaderLoaded = false;
     bool gameSettingsLoaded = false;
 
@@ -118,16 +140,18 @@ private:
     float shaderGamma = 1.0f;
     float shaderContrast = 0.0f;
 
-    // Camera rotation (quaternion)
-    float cameraRotX = 0.0f;
-    float cameraRotY = 0.0f;
-    float cameraRotZ = 0.0f;
-    float cameraRotW = 1.0f;
+    // Camera states
+    CameraState savedCamera;    // Preset saved via menu
+    CameraState currentCamera;  // Auto-saved on exit
 
-    // Camera pan and distance
-    float cameraPanX = 0.0f;
-    float cameraPanY = 0.0f;
-    float cameraDistVal = 3.0f;
+    // Session restoration
+    std::string sessionFile;
+    int sessionGameIndex = 0;
+    int sessionTreePathLength = 0;
+    std::vector<int> sessionTreePath;  // Branch choices only (consumed at multi-child nodes)
+    bool sessionIsExternal = false;
+    bool sessionTsumegoMode = false;
+    bool sessionAnalysisMode = false;
 };
 
 #endif

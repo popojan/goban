@@ -42,6 +42,7 @@ public:
     VariationResult navigateToVariation(const Move& move, bool promote = true);
     bool navigateToStart();
     bool navigateToEnd();
+    bool navigateToTreePath(int pathLength, const std::vector<int>& branchChoices);  // Navigate to specific tree position (for session restore)
 
     // Check if navigation is in progress (for blocking genmove)
     bool isNavigating() const { return navigationInProgress.load(); }
@@ -69,6 +70,9 @@ private:
 
     // Set pass message with variation label (e.g. "11a Black passes")
     void setPassMessage(const Move& passMove);
+
+    // Sync model state after navigation (color, comment, markup, board)
+    void syncStateAfterNavigation();
 
     GobanModel& model;
     CoachProvider getCoach;

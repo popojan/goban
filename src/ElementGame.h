@@ -97,6 +97,14 @@ private:
     // Initial state determined before engine loading
     int initialBoardSize{19};
     std::string sgfToLoad;  // Empty if starting fresh or no file exists
+    int sgfGameIndex{-1};   // Game index to load (-1 = last game)
+
+    // Session restoration state
+    int sessionTreePathLength{0};
+    std::vector<int> sessionTreePath;  // Branch choices only (at multi-child nodes)
+    bool sessionTsumegoMode{false};
+    bool sessionAnalysisMode{false};
+    bool sessionRestoreNeeded{false};
 
     void startAsyncEngineLoading();
     void checkEngineLoadingComplete();
