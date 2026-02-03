@@ -39,6 +39,12 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     mouseY = static_cast<float>(y);
     view.mouseMoved(mouseX, mouseY);
 
+    // Click anywhere (except No button, handled by RmlUI) confirms active prompt
+    if (button == 0 && state == 1 && parent->hasActivePrompt()) {
+        parent->handlePromptResponse(true);
+        return;
+    }
+
     Position coord = view.getBoardCoordinate(static_cast<float>(x), static_cast<float>(y));
     spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
