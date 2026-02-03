@@ -42,6 +42,8 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     Position coord = view.getBoardCoordinate(static_cast<float>(x), static_cast<float>(y));
     spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
+        // Block stone placement until initialization is complete (players set)
+        if (syncingUI) return;
         if (button == 0 && state == 1) {
             // During navigation (not at end), handle clicks specially
             if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
@@ -228,6 +230,7 @@ void GobanControl::command(const std::string& cmd) {
         view.requestRepaint();
     }
     else if (cmd == "play once") {
+        if (syncingUI) return;  // Block until initialization complete
         // Don't trigger at end of finished game
         if (model.game.isAtFinishedGame()) {
             return;
@@ -265,12 +268,14 @@ void GobanControl::command(const std::string& cmd) {
         view.requestRepaint();
     }
     else if(cmd == "resign") {
+        if (syncingUI) return;  // Block until initialization complete
         if(engine.humanToMove()) {
             auto move = engine.getLocalMove(Move::RESIGN);
             engine.playLocalMove(move);
         }
     }
     else if (cmd == "pass") {
+        if (syncingUI) return;  // Block until initialization complete
         if(engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS) {
             // During navigation, use navigateToVariation (follows existing or creates new)
             if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
@@ -288,6 +293,7 @@ void GobanControl::command(const std::string& cmd) {
         }
     }
     else if (cmd == "clear") {
+        if (syncingUI) return;  // Block until initialization complete
         // Use different prompt for game in progress vs finished game
         const char* templateId = engine.isRunning() && !model.isGameOver && !model.tsumegoMode
             ? "templateQuitWithoutFinishing"
@@ -305,6 +311,7 @@ void GobanControl::command(const std::string& cmd) {
         });
     }
     else if (cmd == "start") {
+        if (syncingUI) return;  // Block until initialization complete
         if (!model.isGameOver) {
             model.start();
             if (!engine.isRunning()) {
@@ -413,32 +420,43 @@ void GobanControl::command(const std::string& cmd) {
         parent->showMessage(model.game.getDefaultFileName());
     }
     else if(cmd == "archive") {
-        // Only archive if there are games or moves to archive
-        if (model.game.getNumGames() == 0 && model.game.moveCount() == 0) {
+        // Save any pending changes to the daily file
+        std::string dailyFile = model.game.getDefaultFileName();
+        model.game.saveAs("");
+
+        // Check if there's actually a file to archive
+        if (!std::filesystem::exists(dailyFile)) {
             parent->showMessage("Nothing to archive");
             return;
         }
-        // Save current game and remember the archived filename
-        std::string archivedFile = model.game.getDefaultFileName();
-        model.game.saveAs("");
-        // Clear session doc so new session starts fresh (prevents games from being duplicated)
-        model.game.clearSession();
-        // Create new timestamped filename for next session
+
+        // Rename daily file to timestamped archive name
         std::time_t t = std::time(nullptr);
         std::tm time {};
         time = *std::localtime(&t);
         std::ostringstream ss;
-        std::string gamesPath = "./games";
-        if (config && config->data.contains("sgf_dialog")) {
-            gamesPath = config->data["sgf_dialog"].value("games_path", "./games");
+        auto dailyPath = std::filesystem::path(dailyFile);
+        ss << dailyPath.parent_path().string() << "/"
+           << std::put_time(&time, "%Y-%m-%dT%H-%M-%S") << ".sgf";
+        std::string archivedFile = ss.str();
+
+        try {
+            std::filesystem::rename(dailyFile, archivedFile);
+            spdlog::info("Renamed {} to {}", dailyFile, archivedFile);
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to rename session file: {}", e.what());
+            parent->showMessage("Archive failed");
+            return;
         }
-        ss << gamesPath << "/" << std::put_time(&time, "%Y-%m-%dT%H-%M-%S") << ".sgf";
-        model.game.setDefaultFileName(ss.str());
-        // Save new session path so it's used after restart
-        UserSettings::instance().setLastSgfPath(model.game.getDefaultFileName());
-        // Show feedback with archived filename (where games went)
+
+        // Clear session doc so new session starts fresh
+        model.game.clearSession();
+        // defaultFileName stays as daily pattern (e.g., games/2026-02-03.sgf)
+        // No need to change it - next save will create fresh daily file
+
+        // Show feedback with archived filename
         parent->showMessage(archivedFile);
-        spdlog::info("Archived to {}, new session: {}", archivedFile, model.game.getDefaultFileName());
+        spdlog::info("Archived to {}, daily session continues as {}", archivedFile, dailyFile);
     }
     else if(cmd == "load") {
         // Get the file chooser handler and show the dialog

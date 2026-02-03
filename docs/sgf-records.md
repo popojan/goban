@@ -9,8 +9,8 @@ By default, games are saved to and loaded from the `games/` directory in the app
 ```
 goban/
 ├── games/
-│   ├── 2024-01-15_game001.sgf
-│   ├── 2024-01-15_game002.sgf
+│   ├── 2024-01-15.sgf              # Current daily session
+│   ├── 2024-01-14T18-30-45.sgf     # Archived session
 │   └── ...
 ├── goban
 └── ...
@@ -32,9 +32,13 @@ Games are automatically saved:
 
 ### File Naming
 
-Auto-saved files use the format: `YYYY-MM-DD_gameNNN.sgf`
+The **daily session** file uses the format: `YYYY-MM-DD.sgf`
 
-Example: `2024-01-15_game001.sgf`
+All games played during a day are appended to this file as separate game records. When you use the **Archive** command (Game menu), the daily session is renamed to a timestamped archive file: `YYYY-MM-DDTHH-MM-SS.sgf`
+
+Examples:
+- `2024-01-15.sgf` — today's daily session (multi-game file)
+- `2024-01-14T18-30-45.sgf` — archived session from yesterday
 
 ## Loading Games
 

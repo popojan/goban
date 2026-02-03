@@ -678,6 +678,7 @@ void GameRecord::appendGameToDocument() {
 
     doc->AppendGame(game);
     ++numGames;
+    loadedGameIndex = numGames - 1;  // Track actual position for session restore
     gameInDocument = true;
     spdlog::info("appendGameToDocument: appended game #{} to doc (total: {})", numGames, numGames);
 }
@@ -822,15 +823,28 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
 
         // Only preserve doc when loading daily session file (for appending)
         // External SGFs are ephemeral - if modified, they become part of daily session
-        spdlog::debug("loadFromSGF: comparing fileName='{}' with defaultFileName='{}'",
-            fileName, defaultFileName);
-        if (fileName == defaultFileName && doc == nullptr) {
+        // Invariant: daily session = today's YYYY-MM-DD.sgf in games folder
+        bool isDailySession = false;
+        auto stem = std::filesystem::path(fileName).stem().string();
+        // Get today's date string for comparison
+        std::time_t now = std::time(nullptr);
+        std::tm tm = *std::localtime(&now);
+        std::ostringstream todayStr;
+        todayStr << std::put_time(&tm, "%Y-%m-%d");
+        // Daily session: filename matches today's date exactly
+        if (stem == todayStr.str()) {
+            isDailySession = true;
+            // Update defaultFileName to match loaded path for consistency
+            defaultFileName = fileName;
+            spdlog::debug("loadFromSGF: detected today's daily session '{}'", stem);
+        }
+        if (isDailySession && doc == nullptr) {
             doc = loadedDoc->GetDocument();
             numGames = games.size();
             gameInDocument = true;  // Game is already in doc, prevent re-append
             loadedExternalDoc = nullptr;  // Daily session, not external
             loadedGameIndex = gameIndex;
-            spdlog::debug("loadFromSGF: paths match - preserving doc with {} games", numGames);
+            spdlog::debug("loadFromSGF: daily session - preserving doc with {} games", numGames);
         } else {
             // Preserve full external document for game cycling (PageUp/PageDown)
             // Kept separately from doc (daily session) so both coexist
