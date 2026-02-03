@@ -656,7 +656,8 @@ void GobanControl::destroy() const {
 void GobanControl::saveCurrentGame() const {
     auto& settings = UserSettings::instance();
 
-    if (model.game.moveCount() > 0) {
+    bool hasContent = model.game.moveCount() > 0 || model.game.getLoadedMovesCount() > 0;
+    if (hasContent) {
         model.game.saveAs("");
         settings.setLastSgfPath(model.game.getDefaultFileName());
         settings.setStartFresh(false);
@@ -672,7 +673,7 @@ void GobanControl::saveCurrentGame() const {
         : model.game.getDefaultFileName();
 
     // Only save session if there's a file to restore from
-    if (!sessionFile.empty() && (model.game.moveCount() > 0 || isExternal)) {
+    if (!sessionFile.empty() && (hasContent || isExternal)) {
         auto treePath = model.game.getTreePath();
         settings.setSessionFile(sessionFile);
         settings.setSessionGameIndex(model.game.getLoadedGameIndex());
