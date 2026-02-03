@@ -418,6 +418,7 @@ void ElementGame::performDeferredInitialization() {
     // (model and view start with identical defaults, so diffs won't fire otherwise)
     view.state.komi = -1.0f;
     view.state.handicap = -1;
+    view.state.boardSize = -1;
     view.state.black.clear();
     view.state.white.clear();
 
@@ -845,9 +846,10 @@ void ElementGame::OnUpdate()
         syncDropdown(doc, "selectKomi", komiStr.str());
         view.state.komi = model.state.komi;
     }
-    if (view.board.getSize() != model.board.getSize()) {
+    if (view.state.boardSize != model.state.boardSize) {
         auto doc = context->GetDocument("game_window");
-        syncDropdown(doc, "selBoard", std::to_string(model.board.getSize()));
+        syncDropdown(doc, "selBoard", std::to_string(model.state.boardSize));
+        view.state.boardSize = model.state.boardSize;
     }
     if (view.state.black != model.state.black) {
         auto doc = context->GetDocument("game_window");

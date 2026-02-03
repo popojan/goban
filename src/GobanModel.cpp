@@ -25,6 +25,7 @@ void GobanModel::onBoardSized(int boardSize) {
     state.white = white;
     state.komi = komi;
     state.handicap = handicap;
+    state.boardSize = boardSize;
 
     state.reservoirBlack = state.reservoirWhite = (boardSize*boardSize - 1)/2 + 1;
 	calcCapturedBlack = 0;
