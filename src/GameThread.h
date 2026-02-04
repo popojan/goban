@@ -164,7 +164,7 @@ private:
     std::atomic<bool> hasThreadRunning{false};
     std::atomic<bool> enginesSyncedToPosition{true};  // False = player engines need sync before playing
     std::atomic<bool> kibitzNeedsSync{false};  // True = kibitz engine needs sync (deferred from UI thread)
-    Player* playerToMove;
+    std::atomic<Player*> playerToMove;
     Move queuedMove;
     mutable std::mutex playerMutex;
     std::condition_variable engineStarted;

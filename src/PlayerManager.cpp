@@ -29,6 +29,7 @@ size_t PlayerManager::addPlayer(Player* player) {
 }
 
 Engine* PlayerManager::currentCoach() const {
+    std::lock_guard<std::mutex> lock(mutex);
     if (coach < players.size() && players[coach]->isTypeOf(Player::ENGINE)) {
         return dynamic_cast<Engine*>(players[coach]);
     }
@@ -36,6 +37,7 @@ Engine* PlayerManager::currentCoach() const {
 }
 
 Engine* PlayerManager::currentKibitz() const {
+    std::lock_guard<std::mutex> lock(mutex);
     if (kibitz < players.size() && players[kibitz]->isTypeOf(Player::ENGINE)) {
         return dynamic_cast<Engine*>(players[kibitz]);
     }
@@ -43,6 +45,7 @@ Engine* PlayerManager::currentKibitz() const {
 }
 
 Player* PlayerManager::currentPlayer(Color colorToMove) const {
+    std::lock_guard<std::mutex> lock(mutex);
     int which = colorToMove == Color::BLACK ? 0 : 1;
     if (activePlayer[which] < players.size()) {
         return players[activePlayer[which]];
@@ -80,6 +83,7 @@ size_t PlayerManager::activatePlayer(int which, size_t newIndex) {
 }
 
 size_t PlayerManager::getActivePlayer(int which) const {
+    std::lock_guard<std::mutex> lock(mutex);
     return activePlayer[which];
 }
 
@@ -91,11 +95,13 @@ void PlayerManager::setActivePlayer(int which, size_t index) {
 }
 
 bool PlayerManager::areBothPlayersHuman() const {
+    std::lock_guard<std::mutex> lock(mutex);
     return players[activePlayer[0]]->isTypeOf(Player::HUMAN)
         && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
 }
 
 bool PlayerManager::areBothPlayersEngines() const {
+    std::lock_guard<std::mutex> lock(mutex);
     if (players.empty() || activePlayer[0] >= players.size() || activePlayer[1] >= players.size()) {
         return false;
     }
@@ -104,6 +110,7 @@ bool PlayerManager::areBothPlayersEngines() const {
 }
 
 std::string PlayerManager::getName(size_t id) const {
+    std::lock_guard<std::mutex> lock(mutex);
     if (id < players.size()) {
         return players[id]->getName();
     }
@@ -127,6 +134,10 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
 
     try {
         auto engine = new GtpEngine(command, parameters, path, name, messages);
+
+        // Lock while modifying shared player/engine vectors and coach/kibitz indices
+        // (loadSingleEngine is called from parallel threads)
+        std::lock_guard<std::mutex> lock(mutex);
         size_t id = addEngine(engine);
 
         // Handle coach/kibitz flags

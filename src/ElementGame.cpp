@@ -502,14 +502,22 @@ void ElementGame::performDeferredInitialization() {
         int blackIdx = findPlayer(blackName);
         int whiteIdx = findPlayer(whiteName);
 
-        // Fallback to Human if saved player not found (engine removed from config)
+        // Fallback if saved player not found (engine removed from config, or language changed)
+        auto findHuman = [&players]() -> int {
+            for (size_t i = 0; i < players.size(); i++) {
+                if (players[i]->isTypeOf(Player::HUMAN)) return static_cast<int>(i);
+            }
+            return -1;
+        };
         if (blackIdx < 0) {
-            spdlog::warn("Saved black player '{}' not found, falling back to Human", blackName);
-            blackIdx = findPlayer("Human");
+            blackIdx = findHuman();
+            spdlog::info("Saved black player '{}' not found, using '{}'",
+                blackName, blackIdx >= 0 ? players[blackIdx]->getName() : "none");
         }
         if (whiteIdx < 0) {
-            spdlog::warn("Saved white player '{}' not found, falling back to Human", whiteName);
-            whiteIdx = findPlayer("Human");
+            whiteIdx = findHuman();
+            spdlog::info("Saved white player '{}' not found, using '{}'",
+                whiteName, whiteIdx >= 0 ? players[whiteIdx]->getName() : "none");
         }
 
         if (blackIdx >= 0) control.switchPlayer(0, blackIdx);

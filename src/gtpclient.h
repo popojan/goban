@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <thread>
 #include <atomic>
+#include <mutex>
 #include <functional>
 
 #ifdef _WIN32
@@ -78,6 +79,7 @@ private:
     std::unique_ptr<Process> proc_;
     std::string exe;
     std::string lastLine;
+    mutable std::mutex lastLineMutex_;
     std::vector<OutputFilter> outputFilters;
     std::unique_ptr<StderrReaderThread> stderrReader_;
 

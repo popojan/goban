@@ -40,22 +40,17 @@ class LocalHumanPlayer: public Player {
 public:
     explicit LocalHumanPlayer(const std::string& name): Player(name, LOCAL | HUMAN) {}
     Move genmove(const Color& ) override {
+        std::unique_lock<std::mutex> lock(mut);
+        cond.wait(lock, [this]() { return move != Move::INVALID; });
         Move ret(move);
-        if(move == Move::INVALID) {
-            spdlog::debug("LOCK human genmove");
-            std::unique_lock<std::mutex> lock(mut);
-            cond.wait(lock, [this]() { return move != Move::INVALID; });
-            ret = move;
-        }
         move = Move();
         return ret;
     }
 
     void suggestMove(const Move& m) override {
-        this->move = m;
         {
-            spdlog::debug("LOCK suggest move = {}", m.toString());
             std::lock_guard<std::mutex> lock(mut);
+            this->move = m;
         }
         cond.notify_one();
     }

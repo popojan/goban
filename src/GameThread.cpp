@@ -13,8 +13,9 @@ GameThread::GameThread(GobanModel &m) :
 
     // Set interrupt callback for player manager
     playerManager->setInterruptCallback([this]() {
-        if (playerToMove != nullptr && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
-            playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
+        Player* p = playerToMove.load();
+        if (p != nullptr && p->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+            p->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
         }
     });
 
@@ -99,7 +100,10 @@ void GameThread::shutdown() {
     for (auto* player : playerManager->getPlayers()) {
         if (player->isTypeOf(Player::ENGINE)) {
             spdlog::debug("shutdown: terminating {}", player->getName());
+            spdlog::default_logger()->flush();
             dynamic_cast<GtpEngine*>(player)->terminateProcess();
+            spdlog::debug("shutdown: terminated {}", player->getName());
+            spdlog::default_logger()->flush();
         }
     }
     spdlog::debug("shutdown: calling interrupt");
@@ -234,16 +238,15 @@ void GameThread::run() {
 bool GameThread::isRunning() const { return hasThreadRunning;}
 
 bool GameThread::isThinking() const {
-    std::unique_lock<std::mutex> lock(playerMutex);
     // Only block for engine thinking, not for human waiting for input
-    return playerToMove != nullptr && playerToMove->isTypeOf(Player::ENGINE);
+    Player* p = playerToMove.load();
+    return p != nullptr && p->isTypeOf(Player::ENGINE);
 }
 
 bool GameThread::humanToMove() const {
-    std::unique_lock<std::mutex> lock(playerMutex);
     // Use playerToMove if set, otherwise fall back to actual current player
     // (playerToMove is nullptr before game loop sets it, but we still need to check)
-    const Player* player = playerToMove;
+    const Player* player = playerToMove.load();
     if (!player && playerManager) {
         player = playerManager->currentPlayer(model.state.colorToMove);
     }
@@ -524,18 +527,19 @@ void GameThread::gameLoop() {
 
 void GameThread::playLocalMove(const Move& move) {
     std::unique_lock<std::mutex> lock(playerMutex);
-    spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), playerToMove ? "set" : "null");
-    if (playerToMove) {
-        playerToMove->suggestMove(move);
+    Player* p = playerToMove.load();
+    spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), p ? "set" : "null");
+    if (p) {
+        p->suggestMove(move);
     } else if (model.started || move == Move::RESIGN || move == Move::INTERRUPT) {
         queuedMove = move;
     }
 }
 
 void GameThread::playKibitzMove() const {
-    std::unique_lock<std::mutex> lock(playerMutex);
     Move kibitzed(Move::KIBITZED, model.state.colorToMove);
-    if(playerToMove) playerToMove->suggestMove(kibitzed);
+    Player* p = playerToMove.load();
+    if (p) p->suggestMove(kibitzed);
 }
 
 void GameThread::navigateBack() {
@@ -589,9 +593,9 @@ void GameThread::waitForCommandOrTimeout(int ms) {
 
 void GameThread::wakeGameThread() {
     navQueueCV.notify_one();
-    std::lock_guard<std::mutex> lock(playerMutex);
-    if (playerToMove && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
-        playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
+    Player* p = playerToMove.load();
+    if (p && p->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+        p->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
     }
 }
 
@@ -823,8 +827,9 @@ bool GameThread::setGameMode(GameMode mode) {
             aiVsAiMode = false;
         }
         // Interrupt any blocking human player so game loop re-evaluates with new mode
-        if (playerToMove != nullptr && playerToMove->isTypeOf(Player::LOCAL | Player::HUMAN)) {
-            playerToMove->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
+        Player* p = playerToMove.load();
+        if (p != nullptr && p->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+            p->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
         }
         return true;
     }

@@ -210,14 +210,11 @@ bool Process::waitFor(int timeoutMs) const {
 void Process::terminate() {
     if (hProcess_ != INVALID_HANDLE_VALUE) {
         TerminateProcess(hProcess_, 1);
-        // Wait for process to die — closes child's pipe ends,
-        // unblocking any pending ReadFile on our read ends
         WaitForSingleObject(hProcess_, 2000);
     }
-    // Safe to close handles now — no pending I/O
-    closeStderr();
-    closeStdout();
-    closeStdin();
+    // Don't close pipe handles here — the StderrReaderThread may still
+    // have a pending ReadFile. Handles are closed by ~Process after the
+    // reader thread is joined.
 }
 
 bool Process::running() const {
@@ -538,6 +535,7 @@ void GtpClient::operator()(const std::string& line) {
                 vars[re.var] = output;
                 compileFilters();
             } else {
+                std::lock_guard<std::mutex> lock(lastLineMutex_);
                 lastLine = output;
             }
         }
@@ -564,6 +562,7 @@ void GtpClient::addOutputFilter(const std::string& msg, const std::string& forma
 }
 
 std::string GtpClient::lastError() {
+    std::lock_guard<std::mutex> lock(lastLineMutex_);
     return lastLine;
 }
 
