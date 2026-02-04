@@ -203,12 +203,10 @@ void UserSettings::setSoundEnabled(bool value) {
 
 void UserSettings::setLastSgfPath(const std::string& value) {
     lastSgfPath = value;
-    save();
 }
 
 void UserSettings::setStartFresh(bool value) {
     startFresh = value;
-    save();
 }
 
 void UserSettings::setShaderName(const std::string& value) {

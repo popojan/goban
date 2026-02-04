@@ -21,11 +21,16 @@ bool GobanControl::newGame(unsigned boardSize) const {
         model.createNewRecord();
         view.animateIntro();
         parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
-        // Save game settings so fresh start uses these values
+        // Save game settings so fresh start uses these values (single save)
         auto& settings = UserSettings::instance();
-        settings.setBoardSize(static_cast<int>(boardSize));
-        settings.setKomi(model.state.komi);
-        settings.setHandicap(model.state.handicap);
+        auto players = engine.getPlayers();
+        size_t blackIdx = engine.getActivePlayer(0);
+        size_t whiteIdx = engine.getActivePlayer(1);
+        std::string blackName = (blackIdx < players.size()) ? players[blackIdx]->getName() : "Human";
+        std::string whiteName = (whiteIdx < players.size()) ? players[whiteIdx]->getName() : "Human";
+        settings.setGameSettings(
+            static_cast<int>(boardSize), model.state.komi, model.state.handicap,
+            blackName, whiteName);
         // Clear session state - user explicitly started fresh
         settings.clearSessionState();
         return true;
@@ -184,17 +189,15 @@ void GobanControl::command(const std::string& cmd) {
 
     bool checked = false;
     if(cmd == "quit") {
-        // Show confirmation if game has moves
+        // saveCurrentGame() is called by main.cpp cleanup on all exit paths
         if (model.game.moveCount() > 0 && !model.isGameOver) {
             parent->showPromptYesNoTemplate("templateQuitWithoutFinishing", [this](bool confirmed) {
                 if (confirmed) {
-                    saveCurrentGame();
                     exit = true;
                     AppState::RequestExit();
                 }
             });
         } else {
-            saveCurrentGame();  // Saves game and stores path for restore on next start
             exit = true;
             AppState::RequestExit();
         }
@@ -636,9 +639,6 @@ bool GobanControl::setHandicap(int handicap) const {
     if(!model.started && !isOver) {
         model.state.handicap = handicap;
         success = newGame(model.getBoardSize());
-        if (success) {
-            UserSettings::instance().setHandicap(handicap);
-        }
     }
     view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
     return success;

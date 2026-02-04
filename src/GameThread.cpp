@@ -518,7 +518,7 @@ void GameThread::playLocalMove(const Move& move) {
     spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), playerToMove ? "set" : "null");
     if (playerToMove) {
         playerToMove->suggestMove(move);
-    } else if (model.started || move == Move::RESIGN) {
+    } else if (model.started || move == Move::RESIGN || move == Move::INTERRUPT) {
         queuedMove = move;
     }
 }

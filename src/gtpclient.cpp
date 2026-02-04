@@ -180,6 +180,13 @@ void Process::closeStdin() {
     }
 }
 
+void Process::closeStdout() {
+    if (hStdoutRead_ != INVALID_HANDLE_VALUE) {
+        CloseHandle(hStdoutRead_);
+        hStdoutRead_ = INVALID_HANDLE_VALUE;
+    }
+}
+
 void Process::closeStderr() {
     if (hStderrRead_ != INVALID_HANDLE_VALUE) {
         CloseHandle(hStderrRead_);
@@ -201,8 +208,10 @@ bool Process::waitFor(int timeoutMs) const {
 }
 
 void Process::terminate() {
-    // Close stderr first to unblock any ReadFile() call in StderrReaderThread
+    // Close pipe handles to unblock any ReadFile() calls in game thread or StderrReaderThread
     closeStderr();
+    closeStdout();
+    closeStdin();
     if (hProcess_ != INVALID_HANDLE_VALUE) TerminateProcess(hProcess_, 1);
 }
 
@@ -339,6 +348,13 @@ void Process::closeStdin() {
     }
 }
 
+void Process::closeStdout() {
+    if (stdoutFd_ >= 0) {
+        close(stdoutFd_);
+        stdoutFd_ = -1;
+    }
+}
+
 void Process::closeStderr() {
     if (stderrFd_ >= 0) {
         close(stderrFd_);
@@ -365,8 +381,10 @@ bool Process::waitFor(int timeoutMs) const {
 }
 
 void Process::terminate() {
-    // Close stderr first to unblock any read() call in StderrReaderThread
+    // Close pipe handles to unblock any read() calls, then kill the process
     closeStderr();
+    closeStdout();
+    closeStdin();
     if (pid_ > 0) kill(pid_, SIGKILL);
 }
 
