@@ -119,26 +119,24 @@ void GameThread::removeSgfPlayers() const {
 
 bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
-    /*this->boardSize = boardSize;
-    this->komi = komi;
-    this->handicap = handicap;*/
-
     // Reset to Match mode on new game
     gameMode = GameMode::MATCH;
 
-    bool success = true;
-
-    for (auto player : playerManager->getPlayers()) {
-        success &= player->boardsize(boardSize);
-        success &= player->clear();
+    // Only sync coach engine (needed for fixed_handicap computation).
+    // All other engines are synced lazily on the game thread when they
+    // first need to play, keeping the UI thread responsive.
+    Engine* coach = currentCoach();
+    if (coach) {
+        coach->boardsize(boardSize);
+        coach->clear();
+        coach->komi(komi);
     }
 
-    // All engines now start from empty board - they're synced
-    enginesSyncedToPosition = true;
-    kibitzNeedsSync = false;
+    // Non-coach engines will be synced lazily on the game thread
+    enginesSyncedToPosition = false;
+    kibitzNeedsSync = true;
 
-    // Always notify observers of board size, even if engine failed
-    // This ensures the board renders correctly regardless of engine state
+    // Notify observers of board size (renders board immediately)
     std::for_each(
         gameObservers.begin(), gameObservers.end(),
         [boardSize](GameObserver* observer){
@@ -146,13 +144,9 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
         }
     );
 
-    if (!success) {
-        spdlog::warn("Engine initialization failed, but board will still render");
-    }
-
     setKomi(komi);
     setFixedHandicap(handicap);
-    return success;
+    return true;
 
 }
 
@@ -161,9 +155,8 @@ void GameThread::setKomi(float komi) {
         gameObservers.begin(), gameObservers.end(),
         [komi](GameObserver* observer){observer->onKomiChange(komi);}
     );
-    for (auto player : playerManager->getPlayers()) {
-        player->komi(komi);
-    }
+    // Engine komi is set during lazy sync (syncEngineToPosition) or
+    // explicitly by clearGame for the coach engine.
 }
 
 size_t GameThread::getActivePlayer(int which) const {
@@ -195,7 +188,8 @@ bool GameThread::setFixedHandicap(int handicap) {
         if (!coach->fixed_handicap(handicap, stones)) {
             return setFixedHandicap(0);  // Fall back to no handicap
         }
-        applyHandicapStonesToEngines(stones, coach);
+        // Non-coach engines get handicap stones during lazy sync
+        model.state.colorToMove = Color::WHITE;
     }
 
     model.state.handicap = handicap;

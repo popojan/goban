@@ -279,32 +279,8 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
 
     spdlog::info("branchFromFinishedGame: creating fresh game copy from finished game");
 
-    // Deep-copy a single ISgfcProperty by recreating it with independent value
-    // objects. Sharing property objects between game trees in the same document
-    // corrupts the C-level SGFC save buffer (uninitialised memory reads).
     auto vF = F::CreatePropertyValueFactory();
     auto pF = F::CreatePropertyFactory();
-    auto deepCopyProperty = [&](const std::shared_ptr<ISgfcProperty>& prop)
-        -> std::shared_ptr<ISgfcProperty>
-    {
-        auto values = prop->GetPropertyValues();
-        if (values.empty()) {
-            return pF->CreateProperty(prop->GetPropertyType());
-        }
-        std::vector<std::shared_ptr<ISgfcPropertyValue>> newValues;
-        for (const auto& value : values) {
-            if (value->IsComposedValue()) {
-                auto composed = value->ToComposedValue();
-                auto sv1 = vF->CreateCustomPropertyValue(composed->GetValue1()->GetRawValue());
-                auto sv2 = vF->CreateCustomPropertyValue(composed->GetValue2()->GetRawValue());
-                newValues.push_back(vF->CreateCustomComposedPropertyValue(sv1, sv2));
-            } else {
-                newValues.push_back(vF->CreateCustomPropertyValue(
-                    value->ToSingleValue()->GetRawValue()));
-            }
-        }
-        return pF->CreateProperty(prop->GetPropertyType(), newValues);
-    };
 
     // Collect path from root to currentNode
     std::vector<std::shared_ptr<ISgfcNode>> path;
@@ -320,7 +296,7 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
     auto newGame = F::CreateGame();
     auto newRoot = newGame->GetRootNode();
 
-    // Deep-copy root properties (except RE - this is a new unfinished game)
+    // Copy root properties (except RE - this is a new unfinished game)
     std::vector<std::shared_ptr<ISgfcProperty>> rootProps;
     for (const auto& prop : rootNode->GetProperties()) {
         if (prop->GetPropertyType() == T::RE) continue;
@@ -334,7 +310,7 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
             rootProps.push_back(pF->CreateProperty(T::DT, vF->CreateSimpleTextPropertyValue(buf)));
             continue;
         }
-        rootProps.push_back(deepCopyProperty(prop));
+        rootProps.push_back(prop);
     }
     // Update game name
     {
@@ -347,13 +323,13 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
     }
     newRoot->SetProperties(rootProps);
 
-    // Deep-copy moves along the path
+    // Copy moves along the path
     auto prevNode = newRoot;
     for (const auto& pathNode : path) {
         auto newMoveNode = F::CreateNode();
         std::vector<std::shared_ptr<ISgfcProperty>> nodeProps;
         for (const auto& prop : pathNode->GetProperties()) {
-            nodeProps.push_back(deepCopyProperty(prop));
+            nodeProps.push_back(prop);
         }
         newMoveNode->SetProperties(nodeProps);
         newGame->GetTreeBuilder()->AppendChild(prevNode, newMoveNode);
@@ -700,6 +676,15 @@ void GameRecord::appendGameToDocument() {
     doc->AppendGame(game);
     ++numGames;
     gameInDocument = true;
+
+    // Game is now in daily session — clear external doc reference
+    // so session save stores the daily session path, not the external file
+    if (loadedExternalDoc != nullptr) {
+        spdlog::info("appendGameToDocument: game transferred to daily session, clearing external doc reference");
+        loadedExternalDoc = nullptr;
+        loadedFilePath.clear();
+    }
+
     spdlog::info("appendGameToDocument: appended game #{} to doc (total: {})", numGames, numGames);
 }
 

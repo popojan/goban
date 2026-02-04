@@ -203,6 +203,7 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     if(!comment.empty()) {
         game.annotate(comment);
     }
+    state.comment = game.getComment();
     state.holdsStone = false;
     changeTurn();
 }
