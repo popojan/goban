@@ -491,8 +491,13 @@ void ElementGame::performDeferredInitialization() {
             return -1;
         };
 
-        std::string blackName = settings.hasGameSettings() ? settings.getBlackPlayer() : "Human";
-        std::string whiteName = settings.hasGameSettings() ? settings.getWhitePlayer() : "Human";
+        // When no game settings saved, keep PlayerManager defaults (human vs coach)
+        std::string blackName = settings.hasGameSettings()
+            ? settings.getBlackPlayer()
+            : players[engine.getActivePlayer(0)]->getName();
+        std::string whiteName = settings.hasGameSettings()
+            ? settings.getWhitePlayer()
+            : players[engine.getActivePlayer(1)]->getName();
 
         int blackIdx = findPlayer(blackName);
         int whiteIdx = findPlayer(whiteName);

@@ -94,6 +94,7 @@ static void EnsureHoverListenersForAllDocuments() {
 // For application restart with different config
 static char* g_executable_path = nullptr;
 static std::string g_pending_restart_config;
+static std::string g_log_level;
 
 void RequestRestart(const std::string& configFile) {
     g_pending_restart_config = configFile;
@@ -116,6 +117,10 @@ void ExecuteRestart() {
     args.push_back(g_executable_path);
     args.push_back("--config");
     args.push_back(g_pending_restart_config.c_str());
+    if (!g_log_level.empty() && g_log_level != "warning") {
+        args.push_back("--verbosity");
+        args.push_back(g_log_level.c_str());
+    }
     args.push_back(nullptr);
 
     intptr_t result = _spawnv(_P_NOWAIT, g_executable_path, args.data());
@@ -131,6 +136,12 @@ void ExecuteRestart() {
     args.push_back(config_flag);
     char* config_path = strdup(g_pending_restart_config.c_str());
     args.push_back(config_path);
+    if (!g_log_level.empty() && g_log_level != "warning") {
+        char verbosity_flag[] = "--verbosity";
+        args.push_back(verbosity_flag);
+        char* log_level = strdup(g_log_level.c_str());
+        args.push_back(log_level);
+    }
     args.push_back(nullptr);
 
     execv(g_executable_path, args.data());
@@ -379,6 +390,8 @@ int main(int argc, char** argv)
     parse(argc, argv, cli);
 #endif
 
+    g_log_level = logLevel;
+
     const char* WINDOW_NAME = "Goban";
 
 #ifdef RMLUI_PLATFORM_WIN32
@@ -562,24 +575,33 @@ int main(int argc, char** argv)
 
     // Save current game and stop thread before destroying RmlUi elements
     spdlog::debug("Stopping game thread");
+    spdlog::default_logger()->flush();
     if (auto gameDoc = context->GetDocument("game_window")) {
         if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
             gameElement->getController().saveCurrentGame();
+            spdlog::debug("Saved, calling shutdown");
+            spdlog::default_logger()->flush();
             gameElement->getGameThread().shutdown();
+            spdlog::debug("Shutdown complete");
+            spdlog::default_logger()->flush();
         }
     }
 
+    spdlog::debug("EventManager::Shutdown");
+    spdlog::default_logger()->flush();
     EventManager::Shutdown();
 
     // Clear document tracking before RmlUi cleanup
     g_documentsWithHoverListener.clear();
 
     spdlog::debug("Before context destroy");
+    spdlog::default_logger()->flush();
 
     // Context is cleaned up by Rml::Shutdown()
     context = nullptr;
 
-    spdlog::debug("Before RmlUi shutdown");
+    spdlog::debug("Before RmlUi shutdown (engine destructors run here)");
+    spdlog::default_logger()->flush();
 
     Rml::ReleaseTextures();
     Rml::Shutdown();

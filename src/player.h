@@ -44,7 +44,7 @@ public:
         if(move == Move::INVALID) {
             spdlog::debug("LOCK human genmove");
             std::unique_lock<std::mutex> lock(mut);
-            cond.wait(lock);
+            cond.wait(lock, [this]() { return move != Move::INVALID; });
             ret = move;
         }
         move = Move();

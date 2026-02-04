@@ -208,11 +208,16 @@ bool Process::waitFor(int timeoutMs) const {
 }
 
 void Process::terminate() {
-    // Close pipe handles to unblock any ReadFile() calls in game thread or StderrReaderThread
+    if (hProcess_ != INVALID_HANDLE_VALUE) {
+        TerminateProcess(hProcess_, 1);
+        // Wait for process to die — closes child's pipe ends,
+        // unblocking any pending ReadFile on our read ends
+        WaitForSingleObject(hProcess_, 2000);
+    }
+    // Safe to close handles now — no pending I/O
     closeStderr();
     closeStdout();
     closeStdin();
-    if (hProcess_ != INVALID_HANDLE_VALUE) TerminateProcess(hProcess_, 1);
 }
 
 bool Process::running() const {
@@ -381,10 +386,8 @@ bool Process::waitFor(int timeoutMs) const {
 }
 
 void Process::terminate() {
-    // Close pipe handles to unblock any read() calls, then kill the process
-    closeStderr();
-    closeStdout();
-    closeStdin();
+    // SIGKILL immediately tears down the process and closes all its FDs,
+    // so any pending read() on stdout/stderr returns EOF.
     if (pid_ > 0) kill(pid_, SIGKILL);
 }
 
@@ -613,20 +616,23 @@ bool GtpClient::success(const CommandOutput& ret) {
 }
 
 GtpClient::~GtpClient() {
-    // Send quit without waiting for response — engine may be stuck on a
-    // blocking command (e.g. final_status_list dead on empty board).
+    spdlog::debug("~GtpClient: sending quit to {}", exe);
+    spdlog::default_logger()->flush();
     proc_->write("quit\n");
-
-    if (stderrReader_) {
-        stderrReader_->stop();
-    }
-
     proc_->closeStdin();
     if (!proc_->waitFor(2000)) {
-        spdlog::warn("Engine did not exit gracefully, force-terminating");
+        spdlog::warn("~GtpClient: {} did not exit gracefully, force-terminating", exe);
+        spdlog::default_logger()->flush();
         proc_->terminate();
     }
     (void) proc_->wait();
+    spdlog::debug("~GtpClient: {} process dead, stopping stderr reader", exe);
+    spdlog::default_logger()->flush();
+    // Engine is dead — stderr pipe is broken, reader thread can exit
+    if (stderrReader_) {
+        stderrReader_->stop();
+    }
+    spdlog::debug("~GtpClient: {} cleanup complete", exe);
 }
 
 void GtpClient::terminateProcess() {

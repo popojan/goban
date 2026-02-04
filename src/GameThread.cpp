@@ -74,10 +74,10 @@ Player* GameThread::currentPlayer() const {
 }
 
 void GameThread::interrupt() {
+    spdlog::debug("interrupt: thread={}", thread ? "exists" : "null");
+    spdlog::default_logger()->flush();
     if (thread) {
         interruptRequested = true;
-        // Clear stale nav commands before joining — prevents them from executing
-        // on a new game state after loadSGF/switchGame replaces model.game.
         {
             std::lock_guard<std::mutex> lock(navQueueMutex);
             std::queue<NavCommand> empty;
@@ -85,20 +85,28 @@ void GameThread::interrupt() {
         }
         navQueueCV.notify_one();
         playLocalMove(Move(Move::INTERRUPT, model.state.colorToMove));
+        spdlog::debug("interrupt: joining thread...");
+        spdlog::default_logger()->flush();
         thread->join();
+        spdlog::debug("interrupt: thread joined");
         thread.reset();
     }
 }
 
 void GameThread::shutdown() {
-    // Kill all engine processes so any blocking readLine() returns immediately,
-    // allowing the game thread to check interruptRequested and exit.
+    spdlog::debug("shutdown: terminating engine processes");
+    spdlog::default_logger()->flush();
     for (auto* player : playerManager->getPlayers()) {
         if (player->isTypeOf(Player::ENGINE)) {
+            spdlog::debug("shutdown: terminating {}", player->getName());
             dynamic_cast<GtpEngine*>(player)->terminateProcess();
         }
     }
+    spdlog::debug("shutdown: calling interrupt");
+    spdlog::default_logger()->flush();
     interrupt();
+    spdlog::debug("shutdown: complete");
+    spdlog::default_logger()->flush();
 }
 
 void GameThread::removeSgfPlayers() const {
@@ -220,7 +228,7 @@ void GameThread::run() {
     }
 
     thread = std::make_unique<std::thread>(&GameThread::gameLoop, this);
-    engineStarted.wait(lock);
+    engineStarted.wait(lock, [this]() { return hasThreadRunning.load(); });
 }
 
 bool GameThread::isRunning() const { return hasThreadRunning;}
@@ -510,6 +518,7 @@ void GameThread::gameLoop() {
         if(locked) lock.unlock();
         waitForCommandOrTimeout(50);
     }
+    spdlog::debug("gameLoop: exiting");
     hasThreadRunning = false;
 }
 

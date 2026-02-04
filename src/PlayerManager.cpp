@@ -160,10 +160,10 @@ void PlayerManager::loadHumanPlayers(const std::shared_ptr<Configuration>& confi
 
     numPlayers = human + 1;
     activePlayer[0] = human;
-    activePlayer[1] = (coach != 0) ? coach : human;
+    activePlayer[1] = !engines.empty() ? coach : human;
 
     // Default kibitz to coach if not set
-    if (kibitz == 0 && coach != 0) {
+    if (!engines.empty() && kibitz == 0) {
         kibitz = coach;
         spdlog::info("No kibitz set. Defaulting to [{}] coach engine.", players[kibitz]->getName());
     }
