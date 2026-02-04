@@ -31,7 +31,7 @@ public:
     void UnloadDialog(Rml::Context* context);
 
     // Public method to show the dialog (called from GobanControl)
-    void ShowDialog();
+    void ShowDialog(const std::string& currentFile = "", int currentGameIndex = -1);
 
     // Public method to hide the dialog (called from DialogKeyListener)
     void HideDialog() const;
@@ -54,6 +54,10 @@ private:
     Rml::ElementDocument* dialogDocument;
     FileChooserDataSource* dataSource;
     DialogKeyListener* keyListener;
+
+    // Board's current file/game (for re-selecting when navigating back to the file)
+    std::string boardFile;
+    int boardGameIndex = -1;
 
     // Localized strings
     std::string strPageInfoFmt = "Page %d of %d";

@@ -263,9 +263,21 @@ std::string FileChooserDataSource::GetSelectedFilePath() const {
 }
 
 int FileChooserDataSource::FindFileByPath(const std::string& path) const {
+    // Try exact match first
     for (size_t i = 0; i < files.size(); ++i) {
         if (files[i].fullPath.u8string() == path) {
             return static_cast<int>(i);
+        }
+    }
+    // Try normalized path comparison (handles ./games/ vs games/ etc.)
+    std::error_code ec;
+    auto targetPath = std::filesystem::weakly_canonical(path, ec);
+    if (!ec) {
+        for (size_t i = 0; i < files.size(); ++i) {
+            auto filePath = std::filesystem::weakly_canonical(files[i].fullPath, ec);
+            if (!ec && filePath == targetPath) {
+                return static_cast<int>(i);
+            }
         }
     }
     return -1;

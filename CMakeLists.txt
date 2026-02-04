@@ -69,6 +69,7 @@ function(build_libsgfcplusplus)
             STEP_TARGETS build
             UPDATE_COMMAND ""
             PATCH_COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch || true
+            COMMAND git -C sgfc -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/sgfc-save-buffer-uninitialised-byte.patch || true
             INSTALL_COMMAND ""
             )
 

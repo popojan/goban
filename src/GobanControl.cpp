@@ -64,10 +64,6 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
                     return;
                 }
                 // Stone-in-hand: first click picks up, second click places
-                bool inputAllowed = engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS
-                    || view.isTsumegoMode();
-                if (!inputAllowed) return;
-
                 if (!model.state.holdsStone) {
                     // First click: pick up stone
                     model.state.holdsStone = true;
@@ -285,20 +281,18 @@ void GobanControl::command(const std::string& cmd) {
     }
     else if (cmd == "pass") {
         if (syncingUI) return;  // Block until initialization complete
-        if(engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS) {
-            // During navigation, use navigateToVariation (follows existing or creates new)
-            if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
-                Color colorToMove = model.game.getColorToMove();
-                Move passMove(Move::PASS, colorToMove);
-                model.start();
-                if (!engine.isRunning()) engine.run();
-                engine.navigateToVariation(passMove);
-            } else {
-                model.start();
-                if (!engine.isRunning()) engine.run();
-                auto move = engine.getLocalMove(Move::PASS);
-                engine.playLocalMove(move);
-            }
+        // During navigation, pass creates a variation (game is paused — no turn restriction)
+        if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
+            Color colorToMove = model.game.getColorToMove();
+            Move passMove(Move::PASS, colorToMove);
+            model.start();
+            if (!engine.isRunning()) engine.run();
+            engine.navigateToVariation(passMove);
+        } else if (engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS) {
+            model.start();
+            if (!engine.isRunning()) engine.run();
+            auto move = engine.getLocalMove(Move::PASS);
+            engine.playLocalMove(move);
         }
     }
     else if (cmd == "clear") {
@@ -470,7 +464,12 @@ void GobanControl::command(const std::string& cmd) {
     else if(cmd == "load") {
         // Get the file chooser handler and show the dialog
         if (auto* handler = dynamic_cast<EventHandlerFileChooser*>(EventManager::GetEventHandler("open"))) {
-            handler->ShowDialog();
+            // Pre-select current file and game in dialog
+            std::string currentFile = model.game.hasLoadedExternalDoc()
+                ? model.game.getLoadedFilePath()
+                : model.game.getDefaultFileName();
+            int currentGameIdx = model.game.getLoadedGameIndex();
+            handler->ShowDialog(currentFile, currentGameIdx);
         } else {
             spdlog::warn("File chooser handler not found");
         }

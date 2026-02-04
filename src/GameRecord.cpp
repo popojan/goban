@@ -279,6 +279,33 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
 
     spdlog::info("branchFromFinishedGame: creating fresh game copy from finished game");
 
+    // Deep-copy a single ISgfcProperty by recreating it with independent value
+    // objects. Sharing property objects between game trees in the same document
+    // corrupts the C-level SGFC save buffer (uninitialised memory reads).
+    auto vF = F::CreatePropertyValueFactory();
+    auto pF = F::CreatePropertyFactory();
+    auto deepCopyProperty = [&](const std::shared_ptr<ISgfcProperty>& prop)
+        -> std::shared_ptr<ISgfcProperty>
+    {
+        auto values = prop->GetPropertyValues();
+        if (values.empty()) {
+            return pF->CreateProperty(prop->GetPropertyType());
+        }
+        std::vector<std::shared_ptr<ISgfcPropertyValue>> newValues;
+        for (const auto& value : values) {
+            if (value->IsComposedValue()) {
+                auto composed = value->ToComposedValue();
+                auto sv1 = vF->CreateCustomPropertyValue(composed->GetValue1()->GetRawValue());
+                auto sv2 = vF->CreateCustomPropertyValue(composed->GetValue2()->GetRawValue());
+                newValues.push_back(vF->CreateCustomComposedPropertyValue(sv1, sv2));
+            } else {
+                newValues.push_back(vF->CreateCustomPropertyValue(
+                    value->ToSingleValue()->GetRawValue()));
+            }
+        }
+        return pF->CreateProperty(prop->GetPropertyType(), newValues);
+    };
+
     // Collect path from root to currentNode
     std::vector<std::shared_ptr<ISgfcNode>> path;
     auto node = currentNode;
@@ -293,7 +320,7 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
     auto newGame = F::CreateGame();
     auto newRoot = newGame->GetRootNode();
 
-    // Copy root properties (except RE - this is a new unfinished game)
+    // Deep-copy root properties (except RE - this is a new unfinished game)
     std::vector<std::shared_ptr<ISgfcProperty>> rootProps;
     for (const auto& prop : rootNode->GetProperties()) {
         if (prop->GetPropertyType() == T::RE) continue;
@@ -304,17 +331,13 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
             time = *std::localtime(&t);
             char buf[64];
             std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &time);
-            auto vF = F::CreatePropertyValueFactory();
-            auto pF = F::CreatePropertyFactory();
             rootProps.push_back(pF->CreateProperty(T::DT, vF->CreateSimpleTextPropertyValue(buf)));
             continue;
         }
-        rootProps.push_back(prop);
+        rootProps.push_back(deepCopyProperty(prop));
     }
     // Update game name
     {
-        auto vF = F::CreatePropertyValueFactory();
-        auto pF = F::CreatePropertyFactory();
         // Remove old GN if present
         rootProps.erase(std::remove_if(rootProps.begin(), rootProps.end(),
             [](const auto& p) { return p->GetPropertyType() == SgfcPropertyType::GN; }),
@@ -324,16 +347,13 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
     }
     newRoot->SetProperties(rootProps);
 
-    // Copy moves along the path
-    auto vF = F::CreatePropertyValueFactory();
-    auto pF = F::CreatePropertyFactory();
+    // Deep-copy moves along the path
     auto prevNode = newRoot;
     for (const auto& pathNode : path) {
         auto newMoveNode = F::CreateNode();
-        // Copy move properties (B/W) and other properties from the path node
         std::vector<std::shared_ptr<ISgfcProperty>> nodeProps;
         for (const auto& prop : pathNode->GetProperties()) {
-            nodeProps.push_back(prop);
+            nodeProps.push_back(deepCopyProperty(prop));
         }
         newMoveNode->SetProperties(nodeProps);
         newGame->GetTreeBuilder()->AppendChild(prevNode, newMoveNode);
@@ -364,6 +384,8 @@ void GameRecord::branchFromFinishedGame(const Move& move) {
     gameHasNewMoves = true;
     unsavedChanges = true;
     gameInDocument = false;
+    loadedExternalDoc = nullptr;   // New game belongs to daily session, not external doc
+    loadedFilePath.clear();        // No longer viewing a loaded file
     appendGameToDocument();
 
     spdlog::info("branchFromFinishedGame: created new game with {} moves + new branch",
@@ -488,7 +510,6 @@ void GameRecord::initGame(int boardSizeInt, float komi, int handicap, const std:
     unsavedChanges = false;
     gameInDocument = false;
     loadedExternalDoc = nullptr;
-    loadedGameIndex = 0;
     loadedFilePath.clear();  // Clear loaded file path for fresh game
     
     using namespace LibSgfcPlusPlus;
@@ -678,7 +699,6 @@ void GameRecord::appendGameToDocument() {
 
     doc->AppendGame(game);
     ++numGames;
-    loadedGameIndex = numGames - 1;  // Track actual position for session restore
     gameInDocument = true;
     spdlog::info("appendGameToDocument: appended game #{} to doc (total: {})", numGames, numGames);
 }
@@ -838,18 +858,18 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
             defaultFileName = fileName;
             spdlog::debug("loadFromSGF: detected today's daily session '{}'", stem);
         }
-        if (isDailySession && doc == nullptr) {
+        if (isDailySession) {
+            // Always adopt the fresh document for daily session
+            // Caller (loadSGFWithEngine) auto-saves before loading, so disk is up-to-date
             doc = loadedDoc->GetDocument();
             numGames = games.size();
-            gameInDocument = true;  // Game is already in doc, prevent re-append
-            loadedExternalDoc = nullptr;  // Daily session, not external
-            loadedGameIndex = gameIndex;
-            spdlog::debug("loadFromSGF: daily session - preserving doc with {} games", numGames);
+            gameInDocument = true;
+            loadedExternalDoc = nullptr;  // Not external
+            spdlog::debug("loadFromSGF: daily session - adopting doc with {} games", numGames);
         } else {
             // Preserve full external document for game cycling (PageUp/PageDown)
             // Kept separately from doc (daily session) so both coexist
             loadedExternalDoc = loadedDoc->GetDocument();
-            loadedGameIndex = gameIndex;
             spdlog::debug("loadFromSGF: external SGF with {} games, viewing game {}",
                 games.size(), gameIndex);
         }
@@ -1543,6 +1563,19 @@ void GameRecord::extractGameInfo(const std::shared_ptr<LibSgfcPlusPlus::ISgfcNod
     }
 }
 
+int GameRecord::getLoadedGameIndex() const {
+    auto currentDoc = loadedExternalDoc ? loadedExternalDoc : doc;
+    if (currentDoc && game) {
+        auto games = currentDoc->GetGames();
+        for (size_t i = 0; i < games.size(); i++) {
+            if (games[i] == game) {
+                return static_cast<int>(i);
+            }
+        }
+    }
+    return -1;
+}
+
 size_t GameRecord::getLoadedGameCount() const {
     if (loadedExternalDoc) {
         return loadedExternalDoc->GetGames().size();
@@ -1576,7 +1609,6 @@ bool GameRecord::switchToGame(int gameIndex, SGFGameInfo& gameInfo, bool startAt
     gameHasNewMoves = false;
     unsavedChanges = false;
     gameInDocument = (browseDoc == doc);  // Only true for daily session games
-    loadedGameIndex = gameIndex;
 
     boardSize.Columns = gameInfo.boardSize;
     boardSize.Rows = gameInfo.boardSize;

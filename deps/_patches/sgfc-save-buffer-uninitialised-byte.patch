@@ -1,0 +1,18 @@
+diff --git a/sgfc/src/save.c b/sgfc/src/save.c
+index 51250b6..23f8802 100644
+--- a/sgfc/src/save.c
++++ b/sgfc/src/save.c
+@@ -141,10 +141,11 @@ static int SaveBufferIO_putc(struct SaveFileHandler *sfh, int c)
+ 		char *new_buffer = (char *)malloc(sfh->fh.memh.buffer_size*2);
+ 		if (!new_buffer)
+ 			return EOF;
+-		memcpy(new_buffer, sfh->fh.memh.buffer, sfh->fh.memh.buffer_size);
++		size_t written = sfh->fh.memh.pos - sfh->fh.memh.buffer;
++		memcpy(new_buffer, sfh->fh.memh.buffer, written);
+ 		free(sfh->fh.memh.buffer);
+ 		sfh->fh.memh.buffer = new_buffer;
+-		sfh->fh.memh.pos = new_buffer + sfh->fh.memh.buffer_size;
++		sfh->fh.memh.pos = new_buffer + written;
+ 		sfh->fh.memh.buffer_size *= 2;
+ 	}
+

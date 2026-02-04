@@ -174,15 +174,25 @@ void EventHandlerFileChooser::UnloadDialog(Rml::Context* context) {
     }
 }
 
-void EventHandlerFileChooser::ShowDialog() {
+void EventHandlerFileChooser::ShowDialog(const std::string& currentFile, int currentGameIndex) {
     if (!dialogDocument) {
         spdlog::error("Dialog document not loaded");
         return;
     }
 
+    // Remember board's current file/game for re-selection when navigating back
+    boardFile = currentFile;
+    boardGameIndex = currentGameIndex;
+
     // Save current selection before refresh
     std::string selectedFilePath = dataSource->GetSelectedFilePath();
     int selectedGameIdx = dataSource->GetSelectedGameIndex();
+
+    // Fall back to current game if no previous dialog selection
+    if (selectedFilePath.empty() && !currentFile.empty()) {
+        selectedFilePath = currentFile;
+        selectedGameIdx = currentGameIndex;
+    }
 
     // Refresh file list
     dataSource->RefreshFiles();
@@ -352,8 +362,9 @@ void EventHandlerFileChooser::populateGamesList() {
             rowElement->SetClass("game_row", true);
             rowElement->SetAttribute("data-index", std::to_string(i));
 
-            // Mark first game as selected by default
-            if (i == 0) {
+            // Mark selected game (defaults to first if no override)
+            int actualGameIndex = (dataSource->GetGamesCurrentPage() - 1) * FileChooserDataSource::GetGamesPageSize() + i;
+            if (actualGameIndex == dataSource->GetSelectedGameIndex()) {
                 rowElement->SetClass("selected", true);
             }
 
@@ -435,6 +446,15 @@ void EventHandlerFileChooser::handleFileSelection(int index) {
         updatePaginationInfo();
     } else {
         // It's an SGF file - populate games list
+        // Re-select board's game if navigating back to the same file
+        if (!boardFile.empty() && boardGameIndex >= 0) {
+            std::error_code ec1, ec2;
+            auto selectedPath = std::filesystem::weakly_canonical(dataSource->GetSelectedFilePath(), ec1);
+            auto boardPath = std::filesystem::weakly_canonical(boardFile, ec2);
+            if (!ec1 && !ec2 && selectedPath == boardPath) {
+                dataSource->SelectGame(boardGameIndex);
+            }
+        }
         populateGamesList();
         updatePaginationInfo();
         // Auto-detect tsumego based on first game's properties
