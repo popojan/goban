@@ -1,7 +1,7 @@
-diff --git a/sgfc/src/save.c b/sgfc/src/save.c
+diff --git a/src/save.c b/src/save.c
 index 51250b6..23f8802 100644
---- a/sgfc/src/save.c
-+++ b/sgfc/src/save.c
+--- a/src/save.c
++++ b/src/save.c
 @@ -141,10 +141,11 @@ static int SaveBufferIO_putc(struct SaveFileHandler *sfh, int c)
  		char *new_buffer = (char *)malloc(sfh->fh.memh.buffer_size*2);
  		if (!new_buffer)

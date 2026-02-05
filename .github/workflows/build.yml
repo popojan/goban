@@ -76,10 +76,8 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          # Note: macOS doesn't need X11/ALSA - GLFW uses Cocoa, PortAudio uses CoreAudio
-          # This may require CMakeLists.txt fixes for macOS
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON || true
-          make -j$(sysctl -n hw.ncpu) || true
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON
+          make -j$(sysctl -n hw.ncpu)
 
       - name: Build goban
         run: |
