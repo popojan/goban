@@ -132,6 +132,11 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
         coach->komi(komi);
     }
 
+    // Clear stale setup stones from previous game (e.g. tsumego with white stones)
+    // before lazy sync uses them. setFixedHandicap() will set setupBlackStones below.
+    model.setupBlackStones.clear();
+    model.setupWhiteStones.clear();
+
     // Non-coach engines will be synced lazily on the game thread
     enginesSyncedToPosition = false;
     kibitzNeedsSync = true;
@@ -313,7 +318,8 @@ std::string GameThread::collectEngineComments() const {
         if (p->isTypeOf(Player::ENGINE)) {
             std::string engineMsg(dynamic_cast<GtpEngine*>(p)->lastError());
             if (!engineMsg.empty()) {
-                engineComments << engineMsg << " (" << p->getName() << ") ";
+                if (engineComments.tellp() > 0) engineComments << "\n";
+                engineComments << engineMsg;
             }
         }
     }
@@ -1083,12 +1089,20 @@ bool GameThread::syncEngineToPosition(Engine* engine, int* syncedMoves) {
     }
     engine->komi(komi);
 
-    // Replay setup stones (AB: black, AW: white)
+    // Replay setup stones (AB: black, AW: white) — fail early on invalid stones
     for (const auto& stone : model.setupBlackStones) {
-        engine->play(Move(stone, Color::BLACK));
+        if (!engine->play(Move(stone, Color::BLACK))) {
+            spdlog::error("syncEngineToPosition: {} rejected setup black stone {} — aborting",
+                engine->getName(), stone.toSgf(boardSize));
+            return false;
+        }
     }
     for (const auto& stone : model.setupWhiteStones) {
-        engine->play(Move(stone, Color::WHITE));
+        if (!engine->play(Move(stone, Color::WHITE))) {
+            spdlog::error("syncEngineToPosition: {} rejected setup white stone {} — aborting",
+                engine->getName(), stone.toSgf(boardSize));
+            return false;
+        }
     }
 
     // Replay all moves — stop on first failure (fail early)

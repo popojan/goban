@@ -976,36 +976,6 @@ void ElementGame::OnUpdate()
         syncDropdown(doc, "selectWhite", std::to_string(engine.getActivePlayer(1)));
         view.state.white = model.state.white;
     }
-    // Collect engine errors FIRST (before message display, so we can combine them)
-    std::string engineErrors;
-    for (auto& p : engine.getPlayers()) {
-        if (p->isTypeOf(Player::ENGINE)) {
-            std::string err = dynamic_cast<GtpEngine*>(p)->lastError();
-            if (!err.empty()) {
-                if (!engineErrors.empty()) engineErrors += "\n";
-                engineErrors += err;
-            }
-        }
-    }
-
-    // Helper to show message with engine errors prepended
-    auto showWithErrors = [this, &engineErrors](const std::string& msg) {
-        if (engineErrors.empty()) {
-            showMessage(msg);
-        } else if (msg.empty()) {
-            showMessage(engineErrors);
-        } else {
-            showMessage(engineErrors + "\n" + msg);
-        }
-    };
-
-    // Track if we need to refresh due to engine error changes
-    bool errorsChanged = (engineErrors != model.state.err);
-    if (errorsChanged) {
-        model.state.err = engineErrors;
-        view.state.err = engineErrors;
-    }
-
     // Check if current message is important (game-related, should override engine messages)
     auto isImportantMessage = [](GameState::Message msg) {
         return msg == GameState::WHITE_WON || msg == GameState::BLACK_WON ||
@@ -1015,8 +985,6 @@ void ElementGame::OnUpdate()
                msg == GameState::TSUMEGO_SOLVED || msg == GameState::TSUMEGO_WRONG;
     };
 
-    // Update message when msg changes or position changes
-    // Don't let engine error changes override important messages
     bool msgChanged = view.state.msg != model.state.msg;
     bool posChanged = view.board.positionNumber.load() != model.board.positionNumber.load();
 
@@ -1026,9 +994,7 @@ void ElementGame::OnUpdate()
     if (posChanged) {
         commentSnapshot = model.state.comment;
     }
-    bool shouldUpdateForErrors = errorsChanged && !isImportantMessage(model.state.msg);
-
-    if (msgChanged || posChanged || shouldUpdateForErrors) {
+    if (msgChanged || posChanged) {
         switch (model.state.msg) {
         case GameState::CALCULATING_SCORE:
             showMessage(getTemplateText(context, "templateCalculatingScore"));
@@ -1106,31 +1072,23 @@ void ElementGame::OnUpdate()
             if (msgChanged) view.playSound("error", 0.5);
             break;
         default:
-            if (!engineErrors.empty()) {
-                showMessage(engineErrors);
-            } else {
-                clearMessage();
-            }
+            clearMessage();
         }
         view.state.msg = model.state.msg;
         // Note: Don't store positionNumber here - let GobanView::Update() handle it
         // to ensure UPDATE_STONES flag is set before positionNumber is consumed
     }
     // Show SGF comment if available, but don't overwrite important game messages
-    if (view.state.comment != commentSnapshot || errorsChanged || posChanged) {
+    if (view.state.comment != commentSnapshot || posChanged) {
         spdlog::debug("Comment changed: '{}' -> '{}'", view.state.comment.substr(0, 30), commentSnapshot.substr(0, 30));
         if (!commentSnapshot.empty() && !isImportantMessage(model.state.msg)) {
-            showWithErrors(commentSnapshot);
+            showMessage(commentSnapshot);
             // Scroll to bottom to show latest content
             if (auto msg = context->GetDocument("game_window")->GetElementById("lblMessage")) {
                 msg->SetScrollTop(msg->GetScrollHeight() - msg->GetClientHeight());
             }
         } else if (!isImportantMessage(model.state.msg)) {
-            if (!engineErrors.empty()) {
-                showMessage(engineErrors);
-            } else {
-                clearMessage();
-            }
+            clearMessage();
         }
         view.state.comment = commentSnapshot;
     }

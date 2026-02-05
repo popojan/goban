@@ -36,7 +36,6 @@ public:
     int boardSize;
     float result;
     std::string cmd;
-    std::string err;
     std::string comment;  // SGF comment for current move (C property)
     std::vector<BoardMarkup> markup;  // SGF markup annotations (LB/TR/SQ/CR/MA)
     

@@ -63,12 +63,14 @@ function(build_libsgfcplusplus)
             GIT_TAG 2.0.1
             CMAKE_ARGS  ${CL_ARGS}
             BUILD_COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus -DENABLE_TESTS=0
-            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE}
+            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE} --parallel 1
             SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
             STEP_TARGETS build
             UPDATE_COMMAND ""
-            PATCH_COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch
+            PATCH_COMMAND git checkout -- .
+            COMMAND git -C sgfc checkout -- .
+            COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch
             COMMAND git -C sgfc -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/sgfc-save-buffer-uninitialised-byte.patch
             INSTALL_COMMAND ""
             )
