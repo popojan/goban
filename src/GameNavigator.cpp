@@ -28,20 +28,23 @@ void GameNavigator::syncStateAfterNavigation() {
 }
 
 GameNavigator::GameNavigator(GobanModel& model, CoachProvider getCoach,
-                             ActivePlayersProvider getActivePlayers, ObserverList& observers)
-    : model(model), getCoach(std::move(getCoach)), getActivePlayers(std::move(getActivePlayers)), gameObservers(observers)
+                             ActivePlayersProvider getActivePlayers, ObserverList& observers,
+                             SyncEngineCallback syncEngine)
+    : model(model), getCoach(std::move(getCoach)), getActivePlayers(std::move(getActivePlayers)),
+      syncEngine(std::move(syncEngine)), gameObservers(observers)
 {
 }
 
 void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo) const {
-    // Only sync active players (black + white), not all available engines
+    // Sync ALL engines (invariant: all engines stay at same position)
     for (auto player : getActivePlayers()) {
-        if (player != reinterpret_cast<Player*>(coach)) {
-            if (isUndo) {
-                player->undo();
-            } else {
-                player->play(move);
-            }
+        if (!player->isTypeOf(Player::ENGINE)) continue;
+        if (player == reinterpret_cast<Player*>(coach)) continue;
+
+        if (isUndo) {
+            player->undo();
+        } else {
+            player->play(move);
         }
     }
 }
@@ -286,31 +289,14 @@ bool GameNavigator::navigateToStart() {
         model.game.undo();
     }
 
-    // Use "clear and replay" approach to sync engines (avoids undo limitations)
-    int boardSize = model.game.getBoardSize();
-    coach->boardsize(boardSize);
-    coach->clear();
-    coach->komi(model.state.komi);
-
-    // Replay setup stones
-    for (const auto& stone : model.setupBlackStones) {
-        coach->play(Move(stone, Color::BLACK));
+    // Sync all engines to root position via callback
+    if (!syncEngine(coach)) {
+        spdlog::warn("navigateToStart: coach sync failed");
+        return false;
     }
-    for (const auto& stone : model.setupWhiteStones) {
-        coach->play(Move(stone, Color::WHITE));
-    }
-
-    // Sync other active players
     for (auto player : getActivePlayers()) {
-        if (player != reinterpret_cast<Player*>(coach)) {
-            player->boardsize(boardSize);
-            player->clear();
-            for (const auto& stone : model.setupBlackStones) {
-                player->play(Move(stone, Color::BLACK));
-            }
-            for (const auto& stone : model.setupWhiteStones) {
-                player->play(Move(stone, Color::WHITE));
-            }
+        if (player != reinterpret_cast<Player*>(coach) && player->isTypeOf(Player::ENGINE)) {
+            syncEngine(static_cast<Engine*>(player));
         }
     }
 
@@ -423,50 +409,13 @@ bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& b
         return false;
     }
 
-    // Sync coach engine to new position: clear and replay all moves
-    int boardSize = model.game.getBoardSize();
-    coach->boardsize(boardSize);
-    coach->clear();
-    coach->komi(model.state.komi);
-
-    // Replay setup stones
-    for (const auto& stone : model.setupBlackStones) {
-        coach->play(Move(stone, Color::BLACK));
-    }
-    for (const auto& stone : model.setupWhiteStones) {
-        coach->play(Move(stone, Color::WHITE));
-    }
-
-    // Replay all moves from root to current position
-    model.game.replay([&coach](const Move& move) {
-        coach->play(move);
-    });
-
-    // Sync other active players
-    for (auto player : getActivePlayers()) {
-        if (player != reinterpret_cast<Player*>(coach)) {
-            player->boardsize(boardSize);
-            player->clear();
-            for (const auto& stone : model.setupBlackStones) {
-                player->play(Move(stone, Color::BLACK));
-            }
-            for (const auto& stone : model.setupWhiteStones) {
-                player->play(Move(stone, Color::WHITE));
-            }
-            model.game.replay([player](const Move& move) {
-                player->play(move);
-            });
-        }
-    }
-
-    // Sync state and notify
+    // Update display immediately (before engine sync, which may be slow)
     model.state.msg = GameState::NONE;
     syncStateAfterNavigation();
 
     // Restore game-over state if at end of a finished game
     if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
-        // Set result message (resignation or win)
         auto resultMsg = model.game.getResultMessage();
         if (resultMsg != GameState::NONE) {
             model.state.msg = resultMsg;
@@ -484,6 +433,14 @@ bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& b
 
     spdlog::info("navigateToTreePath: navigated {} steps ({} branch choices), now at move {}",
         pathLength, branchChoices.size(), model.game.getViewPosition());
+
+    // Sync only the coach engine (needed for scoring). Other engines (kibitz, etc.)
+    // are synced on-demand when they need to generate a move — avoids blocking on
+    // slow engines like KataGo during startup.
+    if (!syncEngine(coach)) {
+        spdlog::warn("navigateToTreePath: coach sync failed");
+        return false;
+    }
 
     return true;
 }

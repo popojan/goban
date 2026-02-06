@@ -3,7 +3,6 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <cmath>
-#include <set>
 
 GameThread::GameThread(GobanModel &m) :
         model(m), thread(nullptr), playerToMove(nullptr)
@@ -24,21 +23,11 @@ GameThread::GameThread(GobanModel &m) :
         model,
         [this]() { return currentCoach(); },
         [this]() -> std::vector<Player*> {
-            // Return only engines that are actively used: active players + kibitz
-            // (coach is handled separately in syncEngines)
-            auto& allPlayers = playerManager->getPlayers();
-            std::set<Player*> used;
-            size_t blackIdx = playerManager->getActivePlayer(0);
-            size_t whiteIdx = playerManager->getActivePlayer(1);
-            if (blackIdx < allPlayers.size()) used.insert(allPlayers[blackIdx]);
-            if (whiteIdx < allPlayers.size()) used.insert(allPlayers[whiteIdx]);
-            // Include kibitz engine if set
-            if (auto* kibitz = currentKibitz()) {
-                used.insert(reinterpret_cast<Player*>(kibitz));
-            }
-            return std::vector<Player*>(used.begin(), used.end());
+            // Return ALL engines (coach is handled separately in syncEngines)
+            return playerManager->getPlayers();
         },
-        gameObservers
+        gameObservers,
+        [this](Engine* eng) -> bool { return syncEngineToPosition(eng); }
     );
 }
 
@@ -137,9 +126,8 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
     model.setupBlackStones.clear();
     model.setupWhiteStones.clear();
 
-    // Non-coach engines will be synced lazily on the game thread
-    enginesSyncedToPosition = false;
-    kibitzNeedsSync = true;
+    // Non-coach engines will be synced on the game thread before genmove
+    enginesSynced = false;
 
     // Notify observers of board size (renders board immediately)
     std::for_each(
@@ -168,7 +156,8 @@ size_t GameThread::getActivePlayer(int which) const {
     return playerManager->getActivePlayer(which);
 }
 
-size_t GameThread::activatePlayer(int which, size_t newIndex) const {
+size_t GameThread::activatePlayer(int which, size_t newIndex) {
+    // All engines stay in sync after initial sync, so no special handling needed
     return playerManager->activatePlayer(which, newIndex);
 }
 
@@ -253,13 +242,19 @@ bool GameThread::humanToMove() const {
 }
 void GameThread::syncOtherEngines(const Move& move, const Player* player, const Engine* coach,
                                    const Engine* kibitzEngine, bool kibitzed) const {
-    for (auto p : playerManager->getPlayers()) {
-        if (p != reinterpret_cast<const Player*>(coach) && p != player && (!kibitzed || p != kibitzEngine)) {
-            spdlog::debug("syncOtherEngines: syncing player {}", p->getName());
-            if (!p->play(move)) {
-                spdlog::error("syncOtherEngines: {} rejected move {} — engines may be out of sync!",
-                    p->getName(), move.toString());
-            }
+    // Sync ALL engines to keep them in sync (invariant: all engines at same position)
+    for (auto* p : playerManager->getPlayers()) {
+        if (!p->isTypeOf(Player::ENGINE)) continue;
+
+        // Skip: coach (already has the move), move maker, kibitz if it made the move
+        if (p == reinterpret_cast<const Player*>(coach)) continue;
+        if (p == player) continue;
+        if (kibitzed && p == kibitzEngine) continue;
+
+        spdlog::debug("syncOtherEngines: syncing engine {}", p->getName());
+        if (!p->play(move)) {
+            spdlog::error("syncOtherEngines: {} rejected move {} — engine out of sync!",
+                p->getName(), move.toString());
         }
     }
 }
@@ -363,17 +358,28 @@ void GameThread::gameLoop() {
         Engine* kibitzEngine = currentKibitz();
         Player* player = currentPlayer();
 
-        // Lazy sync: ensure all engines have correct board size and position
-        if (!enginesSyncedToPosition) {
-            auto allPlayers = playerManager->getPlayers();
-            for (auto* p : allPlayers) {
-                if (p->isTypeOf(Player::ENGINE)) {
-                    auto* eng = static_cast<Engine*>(p);
-                    spdlog::info("Lazy syncing engine {} to position", eng->getName());
-                    syncEngineToPosition(eng);
+        // Initial sync: sync all engines to current position after load/new game.
+        // Coach first (enables scoring), then remaining engines.
+        if (!enginesSynced) {
+            // 1. Sync coach first (fast, enables scoring)
+            if (coach) {
+                spdlog::info("Initial sync: syncing coach {} to position", coach->getName());
+                syncEngineToPosition(coach);
+            }
+
+            // 2. Score if game is finished (coach now ready)
+            if (model.isGameOver) {
+                processScoring();
+            }
+
+            // 3. Sync remaining engines
+            for (auto* p : playerManager->getPlayers()) {
+                if (p->isTypeOf(Player::ENGINE) && p != coach) {
+                    spdlog::info("Initial sync: syncing engine {} to position", p->getName());
+                    syncEngineToPosition(static_cast<Engine*>(p));
                 }
             }
-            enginesSyncedToPosition = true;
+            enginesSynced = true;
         }
 
         std::unique_lock<std::mutex> lock(playerMutex, std::defer_lock);
@@ -578,11 +584,14 @@ void GameThread::navigateToEnd() {
     wakeGameThread();
 }
 
-bool GameThread::navigateToTreePath(int pathLength, const std::vector<int>& branchChoices) {
-    // Direct call (not queued) - safe during initialization when game loop is blocked on !model.
-    // Must not be called while game loop is running (use queued navigation instead).
-    if (!navigator) return false;
-    return navigator->navigateToTreePath(pathLength, branchChoices);
+void GameThread::navigateToTreePath(int pathLength, const std::vector<int>& branchChoices) {
+    std::lock_guard<std::mutex> lock(navQueueMutex);
+    NavCommand cmd;
+    cmd.type = NavCommand::TO_TREE_PATH;
+    cmd.pathLength = pathLength;
+    cmd.branchChoices = branchChoices;
+    navQueue.push(std::move(cmd));
+    wakeGameThread();
 }
 
 void GameThread::waitForCommandOrTimeout(int ms) {
@@ -608,42 +617,8 @@ void GameThread::processScoring() {
 
     model.state.msg = GameState::CALCULATING_SCORE;
 
-    // Ensure coach has the correct position before asking for territory.
-    // Skip sync if engines are already at the correct position (live game) —
-    // re-syncing can fail (e.g. superko) and destroy a good board state.
-    // Sync is needed for loaded finished games where engines start empty.
-    if (!enginesSyncedToPosition) {
-        int syncedMoves = 0;
-        if (!syncEngineToPosition(coach, &syncedMoves)) {
-            spdlog::error("processScoring: engine sync failed at move {}, navigating to error position",
-                syncedMoves + 1);
-
-            // Navigate SGF tree back to the last valid position
-            size_t currentPos = model.game.getViewPosition();
-            while (model.game.getViewPosition() > static_cast<size_t>(syncedMoves)
-                   && model.game.hasPreviousMove()) {
-                model.game.undo();
-            }
-            spdlog::info("processScoring: navigated from move {} to move {}",
-                currentPos, model.game.getViewPosition());
-
-            // Clear game-over state — we're no longer at the end
-            model.isGameOver = false;
-            model.board.showTerritory = false;
-            model.board.showTerritoryAuto = false;
-
-            // Rebuild board at the error position and notify observers
-            Board result(model.game.getBoardSize());
-            navigator->buildBoardFromSGF(result);
-            navigator->notifyBoardChange(result);
-
-            model.state.colorToMove = model.game.getColorToMove();
-            model.state.comment = model.game.getComment();
-            model.state.markup = model.game.getMarkup();
-            model.state.msg = GameState::SCORING_FAILED;
-            return;
-        }
-    }
+    // Invariant: All engines stay in sync after initial sync.
+    // Coach is always ready for scoring at this point.
 
     Board result(model.game.getBoardSize());
     Position koPosition;
@@ -652,7 +627,7 @@ void GameThread::processScoring() {
 
     if (interruptRequested) return;
 
-    // Fallback: if coach scoring failed, try other engines
+    // Fallback: if coach scoring failed, try other engines (already synced)
     if (result.territoryReady && std::abs(result.score) < 0.1f) {
         for (auto* player : playerManager->getPlayers()) {
             if (player != coach && player->isTypeOf(Player::ENGINE)) {
@@ -660,7 +635,6 @@ void GameThread::processScoring() {
                 if (gtpEngine) {
                     spdlog::info("Coach scoring failed, trying {} for final_score",
                         gtpEngine->getName());
-                    if (!syncEngineToPosition(gtpEngine)) continue;
                     float altScore = gtpEngine->final_score();
                     if (std::abs(altScore) > 0.1f) {
                         spdlog::info("Using {} score: {:.1f}", gtpEngine->getName(), altScore);
@@ -681,16 +655,6 @@ void GameThread::processScoring() {
 }
 
 void GameThread::processNavigationQueue() {
-    // Lazy-sync kibitz engine on the game thread (deferred from UI thread)
-    if (kibitzNeedsSync.exchange(false)) {
-        Engine* kibitz = currentKibitz();
-        Engine* coach = currentCoach();
-        if (kibitz && kibitz != coach && kibitz->isTypeOf(Player::ENGINE)) {
-            spdlog::info("Lazy-syncing kibitz engine on game thread");
-            syncEngineToPosition(kibitz);
-        }
-    }
-
     while (true) {
         NavCommand cmd;
         {
@@ -768,10 +732,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
                 if (kibitz && coach && !model.isGameOver) {
-                    // Navigation only syncs active players; a separate kibitz may be stale
-                    if (kibitz != coach) {
-                        syncEngineToPosition(kibitz);
-                    }
+                    // All engines are synced after initial sync
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis nav: triggering kibitz response for {}", responseColor.toString());
                     Move response = kibitz->genmove(responseColor);
@@ -789,12 +750,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             Engine* coach = currentCoach();
             if (!kibitz || !coach) break;
 
-            // Sync kibitz engine if it differs from coach (coach is kept in sync
-            // during navigation, but a separate kibitz engine may be stale)
-            if (kibitz != coach) {
-                syncEngineToPosition(kibitz);
-            }
-
+            // All engines are synced after initial sync
             Color responseColor = model.state.colorToMove;
             spdlog::debug("KIBITZ_NAV: requesting move for {}", responseColor.toString());
             Move response = kibitz->genmove(responseColor);
@@ -802,6 +758,13 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
 
             if (kibitz == coach || coach->play(response)) {
                 processSuccessfulMove(response, kibitz, coach, kibitz, false);
+            }
+            break;
+        }
+        case NavCommand::TO_TREE_PATH: {
+            if (!navigator->navigateToTreePath(cmd.pathLength, cmd.branchChoices)) {
+                spdlog::warn("navigateToTreePath failed on game thread - clearing session state");
+                UserSettings::instance().clearSessionState();
             }
             break;
         }
@@ -936,6 +899,18 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
     if (!sgfPath.empty() && firstReadyEngine) {
         spdlog::info("Loading SGF with first engine: {} (gameIndex={}, startAtRoot={})", sgfPath, gameIndex, startAtRoot);
         loadSGFWithEngine(sgfPath, firstReadyEngine, gameIndex, startAtRoot);
+
+        // Wait for coach engine (usually GNU Go — loads fast, often already ready).
+        // Needed for tree path navigation and scoring on the game thread.
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [this]() { return currentCoach() != nullptr; });
+        }
+
+        // Start game thread early — processes any queued navigation (tree path,
+        // etc.) and scoring with the coach, without waiting for slow engines.
+        // finalizeGameLoad() will skip run() since the thread is already running.
+        run();
     } else {
         // No SGF - wait for coach engine specifically (it handles handicap/scoring)
         Engine* coach = nullptr;
@@ -992,7 +967,7 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
     // Sync remaining engines to game state
     spdlog::info("Syncing {} engines to game state", totalEngines);
     bool sgfWasLoaded = !sgfPath.empty();
-    syncRemainingEngines(firstReadyEngine, sgfWasLoaded);
+    finalizeGameLoad(firstReadyEngine, sgfWasLoaded);
 
     spdlog::info("All engines loaded and synced");
 }
@@ -1015,7 +990,7 @@ bool GameThread::loadSGF(const std::string& fileName, int gameIndex, bool startA
 
     // Sync remaining engines and finalize (player matching, game mode, run thread)
     // Pass coach as already-synced engine
-    syncRemainingEngines(coach);
+    finalizeGameLoad(coach);
 
     return true;
 }
@@ -1036,7 +1011,7 @@ bool GameThread::switchGame(int gameIndex, bool startAtRoot) {
     }
 
     // Sync remaining engines (kibitz, etc.) but don't re-match players
-    syncRemainingEngines(currentCoach(), false);
+    finalizeGameLoad(currentCoach(), false);
 
     spdlog::info("Switched to game {} (board: {}, moves: {})",
         gameIndex + 1, gameInfo.boardSize, model.game.moveCount());
@@ -1123,7 +1098,7 @@ bool GameThread::syncEngineToPosition(Engine* engine, int* syncedMoves) {
     return !replayFailed;
 }
 
-void GameThread::finalizeLoadedGame(Engine* engine, const GameRecord::SGFGameInfo& gameInfo) {
+void GameThread::finalizeLoadedGame(Engine* /* engine */, const GameRecord::SGFGameInfo& gameInfo) {
     // Check if game ended (double pass or resignation)
     bool endedWithPasses = false;
     if (model.game.moveCount() >= 2) {
@@ -1196,6 +1171,7 @@ void GameThread::matchSgfPlayers() {
 bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine* engine) {
     // Common logic for setting up model state after loading/switching a game.
     // Called by both loadSGFWithEngine() and switchGame().
+    // Engine sync happens on game thread (via enginesSynced = false in finalizeGameLoad).
 
     model.state.komi = gameInfo.komi;
     model.state.handicap = gameInfo.handicap;
@@ -1222,13 +1198,7 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
             observer->onBoardSized(gameInfo.boardSize);
         });
 
-    // Sync engine
-    if (!engine) {
-        engine = currentCoach();
-    }
-    if (engine) {
-        syncEngineToPosition(engine);
-    }
+    // Engine sync deferred to game thread - just display board immediately
 
     // Set game state before onBoardChange — the render loop reads comment/colorToMove
     // when it detects positionNumber change, so these must be ready first.
@@ -1269,7 +1239,7 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
 
 bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, int gameIndex, bool startAtRoot) {
     // Load SGF and sync specified engine (or coach if none specified)
-    // Call syncRemainingEngines() later when other engines are ready
+    // Call finalizeGameLoad() later when other engines are ready
 
     // Interrupt game loop first - it may be blocked waiting on a player's genmove().
     // Must happen before removeSgfPlayers() to avoid destroying a player mid-wait.
@@ -1296,26 +1266,15 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     return applyLoadedGame(gameInfo, engine);
 }
 
-void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) {
-    // For SGF viewing, only sync kibitz engine (coach is already synced)
-    // Player engines are synced lazily when they actually need to play
-    // This significantly speeds up SGF loading for large games
+void GameThread::finalizeGameLoad(Engine* alreadySynced, bool matchPlayers) {
+    // Finalize game load: mark for initial sync, match players, start game thread.
+    // All engines will be synced on game thread (coach first for scoring).
 
-    Engine* coach = alreadySynced ? alreadySynced : currentCoach();
-    Engine* kibitz = currentKibitz();
-
-    spdlog::info("Setting up SGF viewing (board: {}, moves: {})",
+    spdlog::info("Finalizing game load (board: {}, moves: {})",
                  model.getBoardSize(), model.game.moveCount());
 
-    // Defer kibitz sync to the game thread to avoid blocking the UI thread.
-    // The game thread will sync kibitz before processing the first navigation command.
-    if (kibitz && kibitz != coach && kibitz->isTypeOf(Player::ENGINE)) {
-        kibitzNeedsSync = true;
-    }
-
-    // Mark player engines as needing sync (will be done when they play)
-    // This avoids syncing engines that may never be used for this game
-    enginesSyncedToPosition = false;
+    // Mark for initial sync on game thread
+    enginesSynced = false;
 
     // Match SGF player names to engines (only when SGF was loaded)
     if (matchPlayers) {
@@ -1329,7 +1288,7 @@ void GameThread::syncRemainingEngines(Engine* alreadySynced, bool matchPlayers) 
     // Start game thread for navigation (loop waits at !model until started)
     run();
 
-    spdlog::info("SGF viewing ready (kibitz will sync on game thread)");
+    spdlog::info("SGF viewing ready (engines will sync on game thread)");
 }
 
 void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const {

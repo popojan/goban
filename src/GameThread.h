@@ -22,10 +22,12 @@ extern std::shared_ptr<Configuration> config;
 
 /** \brief Navigation command queued for execution on the game thread */
 struct NavCommand {
-    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION, KIBITZ_NAV };
+    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION, KIBITZ_NAV, TO_TREE_PATH };
     Type type;
     Move move;  // For TO_VARIATION
     bool promote = true;  // For TO_VARIATION: promote to main line
+    int pathLength = 0;                 // For TO_TREE_PATH
+    std::vector<int> branchChoices;     // For TO_TREE_PATH
 };
 
 /** \brief Game mode determining player interaction behavior
@@ -105,7 +107,7 @@ public:
                              int gameIndex = -1,
                              bool startAtRoot = false);
 
-	size_t activatePlayer(int which, size_t newIndex) const;
+	size_t activatePlayer(int which, size_t newIndex);
 
 	size_t getActivePlayer(int which) const;
 
@@ -123,7 +125,7 @@ public:
     void navigateToVariation(const Move& move, bool promote = true);
     void navigateToStart();
     void navigateToEnd();
-    bool navigateToTreePath(int pathLength, const std::vector<int>& branchChoices);  // Navigate to specific tree position (for session restore)
+    void navigateToTreePath(int pathLength, const std::vector<int>& branchChoices);  // Navigate to specific tree position (for session restore)
     void requestKibitzNav();  // Request engine move via navigation (for tsumego dead branches)
 
     std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
@@ -134,7 +136,7 @@ public:
     bool autoPlayTsumegoSetup();  // Auto-play first move if it contradicts PL (non-standard tsumego convention)
     bool syncEngineToPosition(Engine* engine, int* syncedMoves = nullptr);  // Sync one engine to current game state (returns false on failure)
     bool syncCoachToCurrentPosition();  // Sync coach engine to current game tree position (for session restoration)
-    void syncRemainingEngines(Engine* alreadySynced = nullptr, bool matchPlayers = true);  // Sync all engines except alreadySynced
+    void finalizeGameLoad(Engine* alreadySynced = nullptr, bool matchPlayers = true);  // Mark engines for lazy sync, match players, start game thread
 
 private:
     void syncOtherEngines(const Move& move, const Player* player, const Engine* coach, const Engine* kibitzEngine, bool kibitzed) const;
@@ -162,8 +164,7 @@ private:
     std::mutex mutex2;
     std::atomic<bool> interruptRequested{false};
     std::atomic<bool> hasThreadRunning{false};
-    std::atomic<bool> enginesSyncedToPosition{true};  // False = player engines need sync before playing
-    std::atomic<bool> kibitzNeedsSync{false};  // True = kibitz engine needs sync (deferred from UI thread)
+    std::atomic<bool> enginesSynced{true};  // All engines synced to current position
     std::atomic<Player*> playerToMove;
     Move queuedMove;
     mutable std::mutex playerMutex;

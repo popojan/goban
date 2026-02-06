@@ -25,6 +25,7 @@ class GameNavigator {
 public:
     using CoachProvider = std::function<Engine*()>;
     using ActivePlayersProvider = std::function<std::vector<Player*>()>;
+    using SyncEngineCallback = std::function<bool(Engine*)>;
     using ObserverList = std::vector<GameObserver*>;
 
     /** \brief Result of navigateToVariation for caller to handle Analysis mode */
@@ -34,7 +35,8 @@ public:
     };
 
     GameNavigator(GobanModel& model, CoachProvider getCoach,
-                  ActivePlayersProvider getActivePlayers, ObserverList& observers);
+                  ActivePlayersProvider getActivePlayers, ObserverList& observers,
+                  SyncEngineCallback syncEngine);
 
     // Navigation methods for SGF replay
     bool navigateBack();
@@ -77,6 +79,7 @@ private:
     GobanModel& model;
     CoachProvider getCoach;
     ActivePlayersProvider getActivePlayers;
+    SyncEngineCallback syncEngine;
     ObserverList& gameObservers;
     std::atomic<bool> navigationInProgress{false};
 };

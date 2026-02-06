@@ -158,6 +158,8 @@ These invariants must be maintained to prevent race conditions and ensure consis
 - **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
 - **Block navigation while engine thinking**: `isThinking()` returns true only for ENGINE types (not human players). Navigation keys are blocked when engine is processing.
 - **Navigation in bot-bot matches**: Requires switching to Analysis mode first (pauses genmove loop).
+- **Engine sync invariant**: All enabled engines stay in sync at the same position. After load/new game, `enginesSynced = false` triggers initial sync on game thread: coach syncs first (enables scoring), then remaining engines. After initial sync, every move is sent to ALL engines via `syncOtherEngines`. No special cases for coach/player/kibitz roles.
+- **All GTP from game thread**: Engine commands during active game must go through the game thread (navigation queue, initial sync). Direct GTP from UI thread is only safe when game thread is stopped (after `interrupt()`).
 
 ### SGF Game Record Consistency
 - **PB/PW updated on first move**: Player names in SGF header are updated when the first move is made, capturing actual players after setup.
