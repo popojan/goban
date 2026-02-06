@@ -359,6 +359,16 @@ void ElementGame::startAsyncEngineLoading() {
     // Start at root if: tsumego mode OR we have a session tree path to navigate to
     int gameIdx = sgfGameIndex;  // Capture for lambda
     bool loadAtRoot = sessionRestoreNeeded && (sessionTsumegoMode || sessionTreePathLength > 0);
+
+    // Queue tree path navigation before starting engines. The command sits in the
+    // queue until the game thread starts (inside loadEnginesParallel, as soon as
+    // the coach engine is ready). Single unified path — always on the game thread.
+    if (sessionRestoreNeeded && sessionTreePathLength > 0 && !sessionTsumegoMode) {
+        engine.navigateToTreePath(sessionTreePathLength, sessionTreePath);
+        spdlog::info("Session restore: queued tree path navigation ({} steps, {} branch choices)",
+            sessionTreePathLength, sessionTreePath.size());
+    }
+
     engineLoadFuture = std::async(std::launch::async, [this, gameIdx, loadAtRoot]() {
         engine.loadEnginesParallel(config, sgfToLoad, [this]() {
             // Called when first engine is ready and SGF is loaded
@@ -426,21 +436,8 @@ void ElementGame::performDeferredInitialization() {
             sessionRestoreNeeded = false;
         }
 
-        if (sessionRestoreNeeded && sessionTreePathLength > 0) {
-            // For tsumego, ignore tree path - always start at root
-            if (sessionTsumegoMode) {
-                spdlog::info("Session restore: tsumego mode - staying at root");
-            } else {
-                if (engine.navigateToTreePath(sessionTreePathLength, sessionTreePath)) {
-                    spdlog::info("Session restore: navigated {} steps ({} branch choices)",
-                        sessionTreePathLength, sessionTreePath.size());
-                } else {
-                    spdlog::warn("Session restore: failed to navigate to tree path (SGF structure changed?)");
-                    // Clear session state to prevent repeated failures
-                    UserSettings::instance().clearSessionState();
-                }
-            }
-        }
+        // Tree path navigation was queued in startAsyncEngineLoading() and already
+        // processed by the game thread (started early, as soon as coach was ready).
 
         // Restore tsumego mode
         if (sessionRestoreNeeded && sessionTsumegoMode) {
