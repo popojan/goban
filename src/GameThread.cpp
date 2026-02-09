@@ -347,19 +347,23 @@ void GameThread::gameLoop() {
         processNavigationQueue();
         if (interruptRequested) break;
 
-        // When model is inactive or game is over, just wait for nav commands
+        // When model is inactive or game is over, skip genmove logic.
+        // If engines are synced (live game end), score and wait for nav commands.
+        // If not synced (loaded game), fall through to initial sync which
+        // syncs the coach first, then scores.
         if (!model || model.isGameOver) {
-            processScoring();
-            waitForCommandOrTimeout(100);
-            continue;
+            if (enginesSynced) {
+                processScoring();
+                waitForCommandOrTimeout(100);
+                continue;
+            }
         }
 
         Engine* coach = currentCoach();
-        Engine* kibitzEngine = currentKibitz();
-        Player* player = currentPlayer();
 
         // Initial sync: sync all engines to current position after load/new game.
-        // Coach first (enables scoring), then remaining engines.
+        // Runs AFTER nav queue so queued tree path navigation executes first
+        // (navigateToTreePath syncs the coach internally).
         if (!enginesSynced) {
             // 1. Sync coach first (fast, enables scoring)
             if (coach) {
@@ -382,31 +386,26 @@ void GameThread::gameLoop() {
             enginesSynced = true;
         }
 
+        Engine* kibitzEngine = currentKibitz();
+        Player* player = currentPlayer();
+
         std::unique_lock<std::mutex> lock(playerMutex, std::defer_lock);
         bool locked = false;
 
-        // Skip genmove if:
-        // 1. Navigation operation is in progress (atomic flag)
-        // 2. Navigating through history (not at the end position)
-        // This prevents AI from playing on an old board state during SGF review
+        // Skip genmove if navigation operation is in progress (atomic flag)
         if (navigator->isNavigating()) {
+            spdlog::debug("Game loop: waiting for navigation to complete");
             waitForCommandOrTimeout(50);
             continue;
         }
-        bool navigatingHistory = model.game.isNavigating() && !model.game.isAtEndOfNavigation();
-        if (navigatingHistory && gameMode == GameMode::MATCH
-            && player && !player->isTypeOf(Player::HUMAN)) {
-            // Match mode only: block engine genmove at historical positions.
-            // In Analysis mode, human always controls — handled by the Analysis branch.
-            spdlog::debug("Game loop: skipping engine genmove during navigation (view pos {}/{})",
-                model.game.getViewPosition(), model.game.getLoadedMovesCount());
-            waitForCommandOrTimeout(100);
-            continue;
-        }
+        // Navigation back/home calls model.pause(), blocking genmove via !model check above.
+        // No separate navigatingHistory check needed.
 
         if (gameMode == GameMode::ANALYSIS && coach && !interruptRequested) {
             // Analysis mode: human plays either color, engine responds to human moves
             Player* humanPlayer = playerManager->getPlayers()[playerManager->getHumanIndex()];
+            spdlog::debug("Game loop: Analysis mode, waiting for human move (color={})",
+                model.state.colorToMove.toString());
 
             // Atomically read and clear queuedMove under lock
             Move suggestedMove;
@@ -470,6 +469,8 @@ void GameThread::gameLoop() {
 
         } else if(coach && player && !interruptRequested) {
             // Match mode: strict player roles
+            spdlog::debug("Game loop: Match mode, calling genmove for {} (player={})",
+                model.state.colorToMove.toString(), player->getName());
 
             // Atomically read and clear queuedMove under lock
             Move suggestedMove;
@@ -525,6 +526,17 @@ void GameThread::gameLoop() {
         // Clear playerToMove while still holding lock - signals processing complete
         playerToMove = nullptr;
         if(locked) lock.unlock();
+
+        // Debug: log if we fell through without entering any mode
+        if (gameMode != GameMode::ANALYSIS && !(coach && player)) {
+            static int fallCount = 0;
+            if (++fallCount % 100 == 1) {
+                spdlog::debug("Game loop: fell through (gameMode={}, coach={}, player={})",
+                    gameMode == GameMode::MATCH ? "Match" : "Analysis",
+                    coach ? coach->getName() : "null",
+                    player ? player->getName() : "null");
+            }
+        }
         waitForCommandOrTimeout(50);
     }
     spdlog::debug("gameLoop: exiting");
@@ -648,6 +660,12 @@ void GameThread::processScoring() {
 
     if (result.territoryReady) {
         model.state.scoreDelta = result.score;
+        // Update message to show winner (replaces CALCULATING_SCORE)
+        model.state.msg = (result.score > 0) ? GameState::BLACK_WON : GameState::WHITE_WON;
+    } else {
+        // Scoring failed - clear the calculating message
+        model.state.msg = GameState::SCORING_FAILED;
+        model.state.scoringError = "Territory calculation failed";
     }
 
     std::for_each(gameObservers.begin(), gameObservers.end(),
@@ -910,6 +928,10 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
         // Start game thread early — processes any queued navigation (tree path,
         // etc.) and scoring with the coach, without waiting for slow engines.
         // finalizeGameLoad() will skip run() since the thread is already running.
+        // Must reset enginesSynced BEFORE run() — otherwise the game thread sees
+        // stale true from previous game, skips initial sync, and processScoring
+        // runs with an unsynced coach (wrong position → final_status_list fails).
+        enginesSynced = false;
         run();
     } else {
         // No SGF - wait for coach engine specifically (it handles handicap/scoring)

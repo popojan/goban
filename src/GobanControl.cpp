@@ -314,12 +314,17 @@ void GobanControl::command(const std::string& cmd) {
         });
     }
     else if (cmd == "start") {
+        spdlog::debug("start command: syncingUI={}, isGameOver={}, started={}, isRunning={}",
+            syncingUI, model.isGameOver.load(), model.started, engine.isRunning());
         if (syncingUI) return;  // Block until initialization complete
         if (!model.isGameOver) {
             model.start();
             if (!engine.isRunning()) {
                 engine.run();
             }
+            spdlog::info("Game started from menu");
+        } else {
+            spdlog::debug("start command blocked: isGameOver=true");
         }
     }
     else if (cmd == "reset camera") {

@@ -496,8 +496,11 @@ void GobanView::zoomToStones() {
     vec3 center = puMid * cu + pvMid * cv + t * cw;
     vec2 targetPan(center.x, center.z);
 
-    // Iterate: compute distance + perspective-correct centering until converged
-    float targetDist = 0.5f;
+    // Initial distance from world-space bbox size (so first iteration is reasonable)
+    float puHalf = (puMax - puMin) * 0.5f + r;
+    float pvHalf = (pvMax - pvMin) * 0.5f + r;
+    float worldHalf = std::max(puHalf / ratio, pvHalf);
+    float targetDist = std::max(0.5f, FOCAL_LENGTH * worldHalf);
     for (int iter = 0; iter < 8; ++iter) {
         // Screen-space bbox from two levels per stone:
         // - board plane (y=0): stone base, no radius
@@ -510,14 +513,14 @@ void GobanView::zoomToStones() {
         for (const auto& s : stones) {
             vec3 o0 = s - panOff;
             // Board level (no radius)
-            float d0 = dot(o0, cw) + targetDist;
+            float d0 = std::max(0.01f, dot(o0, cw) + targetDist);
             float qu0 = FOCAL_LENGTH * dot(o0, cu) / d0;
             float qv0 = FOCAL_LENGTH * dot(o0, cv) / d0;
             quMin = std::min(quMin, qu0); quMax = std::max(quMax, qu0);
             qvMin = std::min(qvMin, qv0); qvMax = std::max(qvMax, qv0);
             // Equator level (full radius)
             vec3 oH = o0 + yOff;
-            float dH = dot(oH, cw) + targetDist;
+            float dH = std::max(0.01f, dot(oH, cw) + targetDist);
             float rScr = FOCAL_LENGTH * r / dH;
             float quH = FOCAL_LENGTH * dot(oH, cu) / dH;
             float qvH = FOCAL_LENGTH * dot(oH, cv) / dH;
@@ -550,11 +553,15 @@ void GobanView::zoomToStones() {
         if (std::abs(quMid) < 0.0001f && std::abs(qvMid) < 0.0001f
             && std::abs(scale - 1.0f) < 0.0001f)
             break;
+
+        // Apply pan correction with damping to prevent oscillation
         vec3 worldShift = shiftU * cu + shiftV * cv;
         float ty = -worldShift.y / cw.y;
         worldShift += ty * cw;
-        targetPan.x += worldShift.x;
-        targetPan.y += worldShift.z;
+        float shiftLen = length(vec2(worldShift.x, worldShift.z));
+        float damping = (shiftLen > 1.0f) ? 0.5f : 1.0f;
+        targetPan.x += damping * worldShift.x;
+        targetPan.y += damping * worldShift.z;
     }
 
     targetDist = std::clamp(targetDist, 0.01f, 10.0f);

@@ -97,11 +97,10 @@ bool GameNavigator::navigateBack() {
     model.board.showTerritory = false;
     model.board.showTerritoryAuto = false;
 
-    // Clear game-over state when navigating away from the end of a finished game.
-    // This allows resuming play (pass, new moves) in Analysis mode.
-    if (model.isGameOver) {
-        model.start();
-    }
+    // Pause active play - user is reviewing. Explicit "Start" needed to resume.
+    // Also clears isGameOver when navigating away from finished game end.
+    model.pause();
+    model.isGameOver = false;
 
     // Show pass message if the move at the current position is a pass
     Move currentMove = model.game.lastMove();
@@ -177,8 +176,9 @@ bool GameNavigator::navigateForward() {
 
     syncStateAfterNavigation();
 
-    // Restore game-over state if we've reached the end of a finished game
-    if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+    // Restore game-over state if we've reached the end of a finished game.
+    // But only if user hasn't explicitly started the game.
+    if (!model.started && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
     }
 
@@ -303,10 +303,9 @@ bool GameNavigator::navigateToStart() {
     model.board.showTerritory = false;
     model.board.showTerritoryAuto = false;
 
-    // Clear game-over state when navigating away from end
-    if (model.isGameOver) {
-        model.start();
-    }
+    // Pause active play - user is reviewing. Explicit "Start" needed to resume.
+    model.pause();
+    model.isGameOver = false;
 
     model.state.msg = GameState::NONE;
     syncStateAfterNavigation();
@@ -360,14 +359,10 @@ bool GameNavigator::navigateToEnd() {
     model.state.msg = GameState::NONE;
     syncStateAfterNavigation();
 
-    // Restore game-over state if at end of a finished game
-    if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+    // Restore game-over state if at end of a finished game.
+    // But only if user hasn't explicitly started the game.
+    if (!model.started && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
-        // Set result message (resignation or win)
-        auto resultMsg = model.game.getResultMessage();
-        if (resultMsg != GameState::NONE) {
-            model.state.msg = resultMsg;
-        }
     }
 
     Board boardResult(model.game.getBoardSize());
@@ -377,6 +372,13 @@ bool GameNavigator::navigateToEnd() {
     // Set territory flag after notifyBoardChange — updateStones would overwrite it
     if (model.game.shouldShowTerritory()) {
         model.board.toggleTerritoryAuto(true);
+        // processScoring() will set CALCULATING_SCORE then result message
+    } else if (model.isGameOver) {
+        // No territory calculation needed - set result message directly
+        auto resultMsg = model.game.getResultMessage();
+        if (resultMsg != GameState::NONE) {
+            model.state.msg = resultMsg;
+        }
     }
 
     return true;  // Always return true - we're at the end now
@@ -413,13 +415,11 @@ bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& b
     model.state.msg = GameState::NONE;
     syncStateAfterNavigation();
 
-    // Restore game-over state if at end of a finished game
-    if (model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+    // Restore game-over state if at end of a finished game.
+    // But only if user hasn't explicitly started the game (model.started) -
+    // don't override user's intent to continue playing.
+    if (!model.started && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
         model.isGameOver = true;
-        auto resultMsg = model.game.getResultMessage();
-        if (resultMsg != GameState::NONE) {
-            model.state.msg = resultMsg;
-        }
     }
 
     Board boardResult(model.game.getBoardSize());
@@ -429,6 +429,13 @@ bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& b
     // Show territory if at end of finished game (after notifyBoardChange)
     if (model.game.shouldShowTerritory()) {
         model.board.toggleTerritoryAuto(true);
+        // processScoring() will set CALCULATING_SCORE then result message
+    } else if (model.isGameOver) {
+        // No territory calculation needed - set result message directly
+        auto resultMsg = model.game.getResultMessage();
+        if (resultMsg != GameState::NONE) {
+            model.state.msg = resultMsg;
+        }
     }
 
     spdlog::info("navigateToTreePath: navigated {} steps ({} branch choices), now at move {}",
