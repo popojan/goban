@@ -579,12 +579,14 @@ GtpClient::CommandOutput GtpClient::version() {
 }
 
 GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
-    spdlog::info("{1} << {0}", command, exe);
     CommandOutput ret;
+    if (terminated_) return {"= "};
+
+    spdlog::info("{1} << {0}", command, exe);
 
     if (!proc_->write(command + "\n")) {
-        spdlog::error("Failed to write command");
-        return ret;
+        if (!terminated_) spdlog::error("Failed to write command");
+        return terminated_ ? CommandOutput{"= "} : ret;
     }
 
     spdlog::info("getting response...");
@@ -607,6 +609,7 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
         if (line.empty()) break;
         ret.push_back(line);
     }
+    if (terminated_) return {"= "};
     return ret;
 }
 
@@ -635,6 +638,7 @@ GtpClient::~GtpClient() {
 }
 
 void GtpClient::terminateProcess() {
+    terminated_ = true;
     if (proc_) proc_->terminate();
 }
 

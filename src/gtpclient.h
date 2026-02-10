@@ -82,6 +82,7 @@ private:
     mutable std::mutex lastLineMutex_;
     std::vector<OutputFilter> outputFilters;
     std::unique_ptr<StderrReaderThread> stderrReader_;
+    std::atomic<bool> terminated_{false};
 
     nlohmann::json vars;
 

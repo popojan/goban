@@ -84,6 +84,15 @@ void GameThread::interrupt() {
 }
 
 void GameThread::shutdown() {
+    // Signal the game thread to stop (non-blocking), then kill engine processes
+    // to unblock any stuck GTP commands, then join the thread.
+    spdlog::debug("shutdown: signaling interrupt");
+    spdlog::default_logger()->flush();
+    if (thread) {
+        interruptRequested = true;
+        navQueueCV.notify_one();
+    }
+    // Kill engine processes — unblocks game thread if stuck in GTP I/O.
     spdlog::debug("shutdown: terminating engine processes");
     spdlog::default_logger()->flush();
     for (auto* player : playerManager->getPlayers()) {
@@ -95,7 +104,8 @@ void GameThread::shutdown() {
             spdlog::default_logger()->flush();
         }
     }
-    spdlog::debug("shutdown: calling interrupt");
+    // Now join — game thread exits fast since pipes are dead and interrupt is set.
+    spdlog::debug("shutdown: joining game thread");
     spdlog::default_logger()->flush();
     interrupt();
     spdlog::debug("shutdown: complete");
@@ -378,6 +388,7 @@ void GameThread::gameLoop() {
 
             // 3. Sync remaining engines
             for (auto* p : playerManager->getPlayers()) {
+                if (interruptRequested) break;
                 if (p->isTypeOf(Player::ENGINE) && p != coach) {
                     spdlog::info("Initial sync: syncing engine {} to position", p->getName());
                     syncEngineToPosition(static_cast<Engine*>(p));
@@ -1067,7 +1078,7 @@ bool GameThread::syncCoachToCurrentPosition() {
 
 bool GameThread::syncEngineToPosition(Engine* engine, int* syncedMoves) {
     // Core method: sync one engine to current game position
-    if (!engine) return false;
+    if (!engine || interruptRequested) return false;
 
     int boardSize = model.getBoardSize();
     float komi = model.state.komi;
