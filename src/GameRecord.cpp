@@ -649,17 +649,23 @@ void GameRecord::appendGameToDocument() {
                 } else {
                     spdlog::warn("appendGameToDocument: existing session file invalid, creating new doc");
                     doc = F::CreateDocument(game);
-                    numGames = 0;
+                    numGames = 1;
+                    gameInDocument = true;
+                    return;
                 }
             } catch (const std::exception& e) {
                 spdlog::error("appendGameToDocument: failed to load existing session: {}", e.what());
                 doc = F::CreateDocument(game);
-                numGames = 0;
+                numGames = 1;
+                gameInDocument = true;
+                return;
             }
         } else {
             doc = F::CreateDocument(game);
-            numGames = 0;
+            numGames = 1;
+            gameInDocument = true;
             spdlog::info("appendGameToDocument: no existing session file, created new doc");
+            return;
         }
     }
 
@@ -667,7 +673,7 @@ void GameRecord::appendGameToDocument() {
     auto existingGames = doc->GetGames();
     for (const auto& g : existingGames) {
         if (g == game) {
-            spdlog::warn("appendGameToDocument: game already in doc, skipping");
+            spdlog::debug("appendGameToDocument: game already in doc, skipping");
             gameInDocument = true;
             return;
         }
