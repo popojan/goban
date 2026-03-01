@@ -201,7 +201,10 @@ double Board::placeFuzzy(const Position& p, bool noFix){
     (*this)[p].x = x;
     (*this)[p].y = y;
 
-    //random rotation for the first time
+    //random rotation: use pre-set value for cursor stones, fresh random for batch placement
+    if(p.x == 0 && p.y == 0) {
+        setRandomStoneRotation();
+    }
     glStones[idx + 1] = static_cast<float>(randomStoneRotation);
     if(noFix == false) {
         if (i + 1 < boardSize)
