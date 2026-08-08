@@ -121,6 +121,20 @@ void GameThread::processDeferredTask() {
         return;
     }
 
+    // Drop queued navigation: it refers to the game about to be replaced, and
+    // replaying it against the new one lands at an arbitrary position. The UI
+    // path used to get this for free from interrupt(), which clears the queue —
+    // but interrupt() is a no-op on this thread, so it must be done explicitly.
+    {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        if (!navQueue.empty()) {
+            spdlog::info("Discarding {} queued navigation command(s): the game is "
+                         "being replaced", navQueue.size());
+            std::queue<NavCommand> empty;
+            navQueue.swap(empty);
+        }
+    }
+
     spdlog::info("Running deferred action on the game thread");
     task();
     // Cleared only once the work is done, so that hasDeferredTask() — and

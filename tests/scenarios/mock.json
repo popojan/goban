@@ -19,5 +19,8 @@
   ],
   "humans": [
     "Human"
-  ]
+  ],
+  "sgf_dialog": {
+    "games_path": "./tests/scenarios/.games"
+  }
 }

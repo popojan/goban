@@ -41,7 +41,12 @@ fi
 
 # Scratch settings and games directories, so a run cannot touch real data.
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# The scenario config redirects the games folder here. Wiping it per suite run
+# matters for more than tidiness: the daily session file is appended to on every
+# load, and a large one slows the auto-save enough to blow the scenario waits.
+SCENARIO_GAMES="$ROOT/tests/scenarios/.games"
+rm -rf "$SCENARIO_GAMES"
+trap 'rm -rf "$WORK" "$SCENARIO_GAMES"' EXIT
 
 pass=0
 fail=0

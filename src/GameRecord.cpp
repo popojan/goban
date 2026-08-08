@@ -194,18 +194,34 @@ void GameRecord::move(const Move& move, bool insertAsFirst)  {
 
     std::lock_guard<std::mutex> lock(mutex);
 
-    // SGF tree is the source of truth - no separate history vector needed
-    if (!game) {
-        spdlog::warn("GameRecord::move() called with no game - creating new game");
-        // Create a minimal game if none exists
-        game = F::CreateGame();
-        currentNode = game->GetRootNode();
-    }
-
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyValueFactory> vF(F::CreatePropertyValueFactory());
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
 
     using namespace LibSgfcPlusPlus;
+
+    // SGF tree is the source of truth - no separate history vector needed
+    if (!game) {
+        // The fallback used to create a bare game and leave the board size at
+        // libsgfc++'s 1x1 default. Position::toSgf(1) then yields an off-board
+        // point, and the library threw straight out of GobanModel::onGameMove()
+        // on the game thread. Reachable when a restored session's SGF has moved
+        // or been corrupted, since the board stays playable in that case.
+        const int size = (boardSize.Columns >= Board::MIN_BOARD
+                          && boardSize.Columns <= Board::MAX_BOARD)
+                         ? boardSize.Columns : Board::DEFAULT_SIZE;
+        spdlog::warn("GameRecord::move() called with no game - creating a {}x{} game",
+                     size, size);
+        boardSize.Columns = size;
+        boardSize.Rows = size;
+
+        game = F::CreateGame();
+        currentNode = game->GetRootNode();
+
+        // SZ must be written explicitly: without it a reader falls back to the
+        // SGF default of 19, which would misread moves recorded for `size`.
+        auto sz(pF->CreateBoardSizeProperty(vF->CreateNumberPropertyValue(size)));
+        game->GetRootNode()->SetProperties({sz});
+    }
 
     auto newNode(F::CreateNode());
 
@@ -618,6 +634,25 @@ void GameRecord::finalizeGame(float scoreDelta) {
     game->GetRootNode()->SetProperties(properties);
 }
 
+void GameRecord::markGameInSessionDocument() {
+    // Caller must hold the mutex.
+    //
+    // Setting gameInDocument and clearing the external reference are one fact,
+    // not two: once the game lives in the daily session document it no longer
+    // belongs to the file it was loaded from. Keeping them apart meant the three
+    // early-return paths in appendGameToDocument() set the flag but skipped the
+    // cleanup, so after modifying an external SGF the record still reported
+    // hasLoadedExternalDoc(). GobanControl::saveCurrentGame() branches on that:
+    // it wrote the continuation to the daily session but persisted the external
+    // path, so the next launch restored the unmodified original.
+    gameInDocument = true;
+    if (loadedExternalDoc != nullptr) {
+        spdlog::info("Game now lives in the daily session; clearing external doc reference");
+        loadedExternalDoc = nullptr;
+        loadedFilePath.clear();
+    }
+}
+
 void GameRecord::appendGameToDocument() {
 
     if (game == nullptr) {
@@ -650,20 +685,20 @@ void GameRecord::appendGameToDocument() {
                     spdlog::warn("appendGameToDocument: existing session file invalid, creating new doc");
                     doc = F::CreateDocument(game);
                     numGames = 1;
-                    gameInDocument = true;
+                    markGameInSessionDocument();
                     return;
                 }
             } catch (const std::exception& e) {
                 spdlog::error("appendGameToDocument: failed to load existing session: {}", e.what());
                 doc = F::CreateDocument(game);
                 numGames = 1;
-                gameInDocument = true;
+                markGameInSessionDocument();
                 return;
             }
         } else {
             doc = F::CreateDocument(game);
             numGames = 1;
-            gameInDocument = true;
+            markGameInSessionDocument();
             spdlog::info("appendGameToDocument: no existing session file, created new doc");
             return;
         }
@@ -674,22 +709,14 @@ void GameRecord::appendGameToDocument() {
     for (const auto& g : existingGames) {
         if (g == game) {
             spdlog::debug("appendGameToDocument: game already in doc, skipping");
-            gameInDocument = true;
+            markGameInSessionDocument();
             return;
         }
     }
 
     doc->AppendGame(game);
     ++numGames;
-    gameInDocument = true;
-
-    // Game is now in daily session — clear external doc reference
-    // so session save stores the daily session path, not the external file
-    if (loadedExternalDoc != nullptr) {
-        spdlog::info("appendGameToDocument: game transferred to daily session, clearing external doc reference");
-        loadedExternalDoc = nullptr;
-        loadedFilePath.clear();
-    }
+    markGameInSessionDocument();
 
     spdlog::info("appendGameToDocument: appended game #{} to doc (total: {})", numGames, numGames);
 }
@@ -1238,8 +1265,16 @@ bool GameRecord::navigateToChild(const Move& targetMove, bool promoteToMainLine)
     for (size_t idx = 0; idx < children.size(); ++idx) {
         const auto& child = children[idx];
         if (auto childMove = extractMoveFromNode(child, boardSize.Columns)) {
-            // Check if this child matches the target move
-            if (childMove->pos == targetMove.pos && childMove->col == targetMove.col) {
+            // Check if this child matches the target move.
+            //
+            // The move *kind* has to be compared too, not just position and
+            // colour: Move(Move::PASS, col) leaves pos default-constructed at
+            // (0,0), which is the A1 corner. At a node holding both a pass and
+            // an A1 stone, whichever came first used to win — so clicking A1
+            // while reviewing could silently follow the pass branch instead.
+            const bool sameKind = (*childMove == Move::PASS) == (targetMove == Move::PASS);
+            if (sameKind && childMove->pos == targetMove.pos
+                && childMove->col == targetMove.col) {
                 // Promote to first child if requested, user has new moves, and not already first
                 if (promoteToMainLine && gameHasNewMoves && idx > 0 && game) {
                     game->GetTreeBuilder()->InsertChild(currentNode, child, children[0]);

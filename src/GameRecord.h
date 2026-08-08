@@ -94,6 +94,10 @@ private:
 
     void appendGameToDocument();
 
+    /// Records that the game now lives in the daily session document, clearing
+    /// any external-file reference. Caller must hold the mutex.
+    void markGameInSessionDocument();
+
     // Internal save without mutex lock (for use within already-locked methods)
     void saveAsInternal(const std::string& fileName);
 

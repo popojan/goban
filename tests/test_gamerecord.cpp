@@ -153,34 +153,20 @@ TEST_CASE("a default-constructed GameRecord has no game and a 1x1 board size") {
     CHECK(rec.getBoardSize() == 1);
 }
 
-// SUSPECTED PRODUCTION BUG — see report.
+// Regression: the null-game fallback in move() used to create a game without a
+// board size, leaving libsgfc++'s 1x1 default. Position::toSgf(1) then produced
+// an off-board point and the library threw straight out of move(), which has no
+// try/catch, and therefore out of GobanModel::onGameMove() on the game thread.
 //
-// GameRecord::move() (GameRecord.cpp:198-203) handles a null game by logging
-// "called with no game - creating new game" and calling F::CreateGame(). It does
-// not set `boardSize`, which is still the SgfcBoardSize default of 1x1, so
-// Position::toSgf(1) produces an off-board SGF point for any real coordinate and
-// CreateGoMovePropertyValue() throws. The exception escapes move() (there is no
-// try/catch) and therefore escapes GobanModel::onGameMove() on the game thread.
-//
-// Reachable at startup: GameThread::startEngines() only calls
-// model.createNewRecord() in its no-SGF branch (GameThread.cpp:978). If a
-// session SGF path is restored but the file has since been moved or corrupted,
-// loadSGFWithEngine() returns false at GameThread.cpp:1295-1297 and no game
-// record is ever created, while the board stays playable.
-TEST_CASE("move() before initGame creates a usable game" * doctest::skip()) {
+// Reachable at startup: a record is only created in the no-SGF branch, so if a
+// restored session's SGF has moved or been corrupted the load fails while the
+// board stays playable, and the first move lands here.
+TEST_CASE("move() before initGame creates a usable game") {
     quietLogging();
     GameRecord rec;
-    CHECK_NOTHROW(rec.move(blackAt(3, 15)));   // actual: throws from libsgfc++
-    CHECK(rec.getBoardSize() == 19);           // actual: 1
+    CHECK_NOTHROW(rec.move(blackAt(3, 15)));
+    CHECK(rec.getBoardSize() == 19);
     CHECK(rec.moveCount() == 1);
-}
-
-TEST_CASE("move() before initGame throws instead of recovering (current behaviour)") {
-    quietLogging();
-    GameRecord rec;
-    // Pinned so the fix above is noticed: today any real coordinate throws
-    // because the fallback game is created with a 1x1 board.
-    CHECK_THROWS(rec.move(blackAt(3, 15)));
 }
 
 TEST_CASE("initGame with a handicap makes white move first") {
@@ -1025,7 +1011,7 @@ TEST_CASE("a pass and the A1 corner are distinct variations") {
 // Fix shape: compare the move kind too, e.g. add
 //     (*childMove == Move::PASS) == (targetMove == Move::PASS)
 // to the predicate (getVariations() already returns correctly typed Moves).
-TEST_CASE("navigateToChild distinguishes a pass from an A1 stone" * doctest::skip()) {
+TEST_CASE("navigateToChild distinguishes a pass from an A1 stone") {
     quietLogging();
     GameRecord rec;
     GameRecord::SGFGameInfo info;
@@ -1607,7 +1593,7 @@ TEST_CASE("modifying an external SGF clears the external reference "
 // setSessionIsExternal(true). On the next launch the unmodified external file is
 // restored instead of the continuation the user just played.
 TEST_CASE("modifying an external SGF clears the external reference "
-          "when there is no session file yet" * doctest::skip()) {
+          "when there is no session file yet") {
     Session s;
     GameRecord::SGFGameInfo info;
     REQUIRE(s.rec.loadFromSGF(fixture("simple.sgf"), info));
