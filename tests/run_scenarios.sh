@@ -57,6 +57,11 @@ for scn in "${scenarios[@]}"; do
     printf '%-44s ' "$name"
     log="$WORK/${name}.log"
 
+    # Seed the throwaway settings with sound off. Stone sounds are pointless in
+    # an automated run, and a CI box has no audio device — Pa_Initialize()'s
+    # return value is not checked, so it is better not to open a stream at all.
+    printf '{"sound_enabled": false}\n' > "$WORK/${name}.user.json"
+
     # --script implies a throwaway user.json, but pass one explicitly so
     # concurrent runs cannot collide.
     timeout 120 "$GOBAN" \
