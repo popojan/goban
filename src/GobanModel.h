@@ -3,6 +3,7 @@
 
 #include "Metrics.h"
 #include "Board.h"
+#include "GamePhase.h"
 #include "GameState.h"
 #include <spdlog/spdlog.h>
 #include <atomic>
@@ -69,6 +70,29 @@ public:
 
     explicit operator bool() const { return !isGameOver && started; }
 
+    /// Lifecycle phase, derived from the `started` / `isGameOver` pair.
+    ///
+    /// ADR-0002 step 1: read-only, so it cannot change behaviour. The order of
+    /// the tests below *is* the current semantics and must not be reshuffled:
+    ///
+    ///  * `isGameOver` wins over `started`. Ending a game mid-play sets
+    ///    `isGameOver` without clearing `started`, so the pair (true, true) is
+    ///    reachable and means Finished.
+    ///  * `operator bool()` is exactly `phase() == GamePhase::Playing`.
+    ///  * With both flags clear the flags alone cannot tell Setup from Paused;
+    ///    the record does. An empty record — at the root with no continuation —
+    ///    is a board being configured; anything else is a game being reviewed.
+    ///
+    /// Known wart, deliberately preserved: a freshly constructed model reports
+    /// Finished, because `isGameOver` defaults to true as a stand-in for "not
+    /// ready yet" until `onBoardSized()` runs. Step 2 should make the initial
+    /// phase Setup; `!model` already covers the game loop for that case.
+    [[nodiscard]] GamePhase phase() const {
+        if (isGameOver) return GamePhase::Finished;
+        if (started)    return GamePhase::Playing;
+        return hasEmptyRecord() ? GamePhase::Setup : GamePhase::Paused;
+    }
+
     void setCursor(const Position& p) { cursor = p;}
 
 public:
@@ -96,6 +120,14 @@ public:
     Position cursor;
     std::vector<Position> setupBlackStones;
     std::vector<Position> setupWhiteStones;
+
+private:
+    /// True when there is no game to resume: the cursor is at the root and the
+    /// root has no continuation. Note that `moveCount()` is the *view* position,
+    /// so it is 0 at the root of a loaded game too — hence the second half.
+    [[nodiscard]] bool hasEmptyRecord() const {
+        return game.moveCount() == 0 && !game.hasNextMove();
+    }
 };
 
 

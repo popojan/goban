@@ -191,7 +191,7 @@ there, since recording a replay is noise.
 Currently: `move_count`, `view_position`, `main_line_moves`, `navigating`,
 `at_end`, `variations`, `has_result`, `board_size`, `color_to_move`, `komi`,
 `handicap`, `black_stones`, `white_stones`, `captured_black`, `captured_white`,
-`mode`, `ai_vs_ai`, `started`, `game_over`, `running`, `thinking`, `syncing_ui`,
+`mode`, `ai_vs_ai`, `started`, `game_over`, `phase`, `running`, `thinking`, `syncing_ui`,
 `tsumego`, `holds_stone`, `show_territory`, `msg`, `black_player`,
 `white_player`, `board_hash`.
 

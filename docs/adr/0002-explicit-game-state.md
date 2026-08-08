@@ -1,6 +1,6 @@
 # ADR-0002: Replace the lifecycle flags with explicit state machines
 
-**Status:** Accepted 2026-08-09 — implementation not started
+**Status:** Accepted 2026-08-09 — step 1 implemented, steps 2–5 outstanding
 **Date:** 2026-08-09
 
 ## Context
@@ -128,3 +128,49 @@ If step 1 shows the derived phase needs more than about five states, or that
 call sites disagree about what "started" means in ways that cannot be reconciled,
 then the flags are encoding something genuinely richer and this ADR should be
 superseded rather than forced through.
+
+## Implementation log
+
+### Step 1 — derive. Done 2026-08-09.
+
+`GamePhase` (`src/GamePhase.h`) and `GobanModel::phase()` derive the phase from
+`started`/`isGameOver`; nothing writes it, so behaviour is unchanged.
+`GobanControl::dumpState()` reports `phase` *next to* the two raw flags rather
+than instead of them, so a scenario can catch the derived value and its inputs
+disagreeing. The transition table is now written down as tests:
+`tests/test_gamephase.cpp` (19 cases: the flags→phase truth table, then one case
+per operation that writes those flags) and
+`tests/scenarios/game_phase_transitions.scn`, which walks the same lifecycle
+through the real application.
+
+Four states were enough, so the abandon criterion did not trigger. Three
+findings, all preserved as-is for step 2 to decide deliberately:
+
+1. **`started` is not a function of the phase.** `Finished` is reached two ways
+   and they are not equivalent: ending a live game sets `isGameOver` and leaves
+   `started` true, while loading a finished SGF leaves it false. Code
+   distinguishes them today — `GobanControl::setKomi()` and
+   `GameThread::setFixedHandicap()` gate on `!started` alone, so they behave
+   differently on a game that just ended than on the same game reloaded.
+
+   This is the one thing that complicates the migration plan: step 2 keeps
+   `started` as a deprecated accessor, which is only possible if it is
+   derivable. Either clear `started` when the game finishes (a small deliberate
+   behaviour change — the audit says the only visible effect is that komi
+   becomes editable on a freshly finished game, which the UI disables anyway),
+   or accept that `started` outlives the phase and keep it as a separate bit
+   until step 3 deletes its call sites. Prefer the former; decide it in step 2,
+   not silently.
+
+2. **A freshly constructed model reports `Finished`**, because `isGameOver`
+   defaults to true as a stand-in for "not ready yet" until `onBoardSized()`
+   runs. Nothing depends on it — the game loop's other guard, `!model`, covers
+   that window — but the initial phase should be `Setup`.
+
+3. **The flags cannot separate `Setup` from `Paused`; the record has to.** With
+   both clear, an empty record (at the root, no continuation) is `Setup` and
+   anything else is `Paused`. Note that `moveCount()` is the *view* position and
+   so reads 0 at the root of a loaded game too — the discriminator needs
+   `hasNextMove()` as well. A corollary: "new game" is two steps, and
+   `onBoardSized()` on its own lands in `Paused` because it clears the flags but
+   leaves the record; only `createNewRecord()` completes the transition.

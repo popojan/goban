@@ -1120,6 +1120,9 @@ nlohmann::json GobanControl::dumpState() const {
     s["ai_vs_ai"]       = engine.isAiVsAi();
     s["started"]        = model.started.load();
     s["game_over"]      = model.isGameOver.load();
+    // Derived from the pair above (ADR-0002 step 1). Reported alongside them,
+    // not instead of them, so a scenario can catch the two disagreeing.
+    s["phase"]          = phaseName(model.phase());
     s["running"]        = engine.isRunning();
     s["thinking"]       = engine.isThinking();
     s["syncing_ui"]     = syncingUI;

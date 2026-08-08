@@ -183,12 +183,20 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **Re-evaluate the loop after initial sync**: the `!model || isGameOver` early-out runs before `enginesSynced` flips, so the sync branch must `continue` rather than fall through. Otherwise a paused loaded game calls `genmove` on a `LocalHumanPlayer`, which blocks forever and silently wedges the loop — with `isThinking()` reporting false, because the stuck player is not an engine.
 - **Quiescence means all three**: `GobanControl::isIdle()` must account for engine thinking, queued navigation, and a deferred action still running.
 
-> **In flux:** ADR-0002 (approved, not yet implemented) replaces the lifecycle
-> flags below — `started`, `isGameOver`, `enginesSynced`, `hasThreadRunning` —
-> with explicit `GamePhase` / `EngineSync` / `LoopState` machines. Several
-> invariants in this section will become a transition table plus tests. Prefer
-> not to add new writers to those flags in the meantime; see
-> `docs/adr/0002-explicit-game-state.md`.
+> **In flux:** ADR-0002 replaces the lifecycle flags below — `started`,
+> `isGameOver`, `enginesSynced`, `hasThreadRunning` — with explicit `GamePhase`
+> / `EngineSync` / `LoopState` machines. Several invariants in this section will
+> become a transition table plus tests.
+>
+> **Step 1 has landed.** `GobanModel::phase()` returns a `GamePhase`
+> (`Setup`/`Playing`/`Paused`/`Finished`) *derived* from `started` and
+> `isGameOver`; the flags are still authoritative and nothing writes a phase
+> yet. Read the phase where you only need to know what the game is doing —
+> `phase()` is also what `dumpState()` reports, so scenarios can assert on it.
+> Do **not** add new writers to `started`/`isGameOver`: every write is currently
+> accounted for by the transition table in `tests/test_gamephase.cpp`, and step 2
+> (making the phase authoritative) depends on that staying true. See
+> `docs/adr/0002-explicit-game-state.md`, including its Implementation log.
 
 ### Navigation & Engine Synchronization
 - **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
