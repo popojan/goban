@@ -59,7 +59,23 @@ public:
 
     std::string getName(size_t id) const { return playerManager->getName(id); }
 
-    void interrupt();
+    /// Stops the game loop and joins it.
+    ///
+    /// The loop can be blocked inside a player's genmove(), which for an engine
+    /// is a blocking GTP read: nothing short of the engine replying will return
+    /// from it. A plain join() therefore freezes the caller for as long as the
+    /// engine thinks — which froze the whole UI when an SGF was opened during a
+    /// slow engine's move.
+    ///
+    /// timeoutMs < 0 waits indefinitely (the historical behaviour, used on the
+    /// paths that must succeed). A non-negative timeout gives up and returns
+    /// false instead of blocking; the loop still exits once genmove returns,
+    /// and run() joins the finished thread before starting a new one.
+    bool interrupt(int timeoutMs = -1);
+
+    /// Longest the UI is willing to stall waiting for the game loop to stop
+    /// before refusing an action outright.
+    static constexpr int INTERRUPT_TIMEOUT_MS = 1500;
 
     /// Forceful shutdown: kill all engine processes (unblocks game thread), then interrupt.
     void shutdown();
@@ -67,11 +83,47 @@ public:
     // Check if genmove is in progress (engine is thinking)
     bool isThinking() const;
 
+    /// Runs an action that *discards or replaces the current game* (new game,
+    /// clear, load, switch game) as soon as no engine is mid-genmove.
+    ///
+    /// A GTP command in flight owns the engine's pipes until it replies, and
+    /// standard GTP cannot abort one, so only the game thread may wait for it.
+    /// If an engine is thinking, the task is handed to the game thread, which
+    /// discards the now-irrelevant move and then runs it. The caller never
+    /// blocks.
+    ///
+    /// Actions that *preserve* the current game (navigation, stone placement)
+    /// must NOT use this — their pending genmove is still valid, so they are
+    /// refused while thinking instead.
+    ///
+    /// Returns true if the task already ran, false if it was deferred, in which
+    /// case `busyEngine` is set to the name of the engine being waited for.
+    /// Only one task can be pending: a newer one replaces an older, since these
+    /// actions all discard the game anyway.
+    bool runWhenEngineFree(std::function<void()> task, std::string* busyEngine = nullptr);
+
+    /// Consumed by the UI thread once per completed deferred task, so it can
+    /// refresh widgets it alone may touch.
+    bool takeDeferredTaskDone();
+
+    /// True while a deferred task is waiting for an engine to finish.
+    [[nodiscard]] bool hasDeferredTask() const { return deferredPending.load(); }
+
+    /// Name of the engine currently thinking, or empty.
+    [[nodiscard]] std::string thinkingPlayerName() const;
+
+    /// True when called from the game loop's own thread, where stopping the
+    /// loop is both unnecessary and impossible (it would join itself).
+    [[nodiscard]] static bool isOnGameThread();
+
     /// True while any navigation command is queued or executing. Navigation is
     /// fire-and-forget from the UI thread, so isThinking() alone does not tell
     /// you whether the board has caught up; scripted runs and any other caller
     /// that needs quiescence must consult this too.
     bool hasPendingNavigation() const;
+
+    /// Queue-only half of hasPendingNavigation(), for diagnostics.
+    [[nodiscard]] bool hasQueuedNavigation() const;
 
     bool clearGame(int boardSize, float komi, int handicap);
 
@@ -137,6 +189,7 @@ public:
     std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
 
     bool loadSGF(const std::string& fileName, int gameIndex = 0, bool startAtRoot = false);
+
     bool loadSGFWithEngine(const std::string& fileName, Engine* engine = nullptr, int gameIndex = 0, bool startAtRoot = false);
     bool switchGame(int gameIndex, bool startAtRoot = false);  // Switch game within loaded SGF doc
     bool autoPlayTsumegoSetup();  // Auto-play first move if it contradicts PL (non-standard tsumego convention)
@@ -190,6 +243,14 @@ private:
     std::queue<NavCommand> navQueue;
     mutable std::mutex navQueueMutex;
     std::condition_variable navQueueCV;
+
+    // Deferred game-discarding action (see runWhenEngineFree).
+    std::function<void()> deferredTask;
+    mutable std::mutex deferredMutex;
+    std::atomic<bool> deferredPending{false};
+    std::atomic<bool> deferredDone{false};
+
+    void processDeferredTask();
 
     void processNavigationQueue();
     void executeNavCommand(const NavCommand& cmd);

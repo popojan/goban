@@ -33,6 +33,12 @@ public:
         return exit;
     }
     bool newGame(unsigned boardSize) const;
+
+    /// UI half of a game-replacing action (new game, load, switch game).
+    /// Must run on the UI thread; ElementGame calls it when a deferred action
+    /// finishes on the game thread.
+    void finishGameReplacement() const;
+
     void switchPlayer(int which, int idx) const;
     void switchShader(int idx) const;
     bool setHandicap(int) const;
@@ -68,6 +74,11 @@ private:
         int maxArgs;
         const char* help;  // "<args> — description", or plain description if argument-less
     };
+
+    /// The actual reset. Runs on whichever thread owns the engines at the time:
+    /// the UI thread when nothing is thinking, otherwise the game thread via
+    /// GameThread::runWhenEngineFree.
+    bool newGameNow(unsigned boardSize) const;
 
     void buildRegistry();
     void listCommands() const;

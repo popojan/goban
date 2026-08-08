@@ -8,6 +8,13 @@
       "parameters": "",
       "enabled": 1,
       "kibitz": 1
+    },
+    {
+      "name": "slowmock",
+      "path": "./cmake-build-release",
+      "command": "mock_gtp_engine",
+      "parameters": "--think-ms 2500",
+      "enabled": 1
     }
   ],
   "humans": [

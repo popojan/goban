@@ -72,14 +72,25 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
                     if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
                         bool tsumego = isTsumegoToggled();
                         gameElement->setTsumegoMode(tsumego);
-                        gameElement->getGameThread().loadSGF(filePath, gameIndex, tsumego);
-                        gameElement->refreshPlayerDropdowns();  // Update dropdowns with SGF player names
-                        if (tsumego) {
-                            gameElement->getGameThread().autoPlayTsumegoSetup();
-                        }
 
-                        gameElement->updateNavigationOverlay();  // Update markup and variation overlays
-                        gameElement->requestRepaint();  // Ensure UI updates
+                        // Loading replaces the current game, so a move an engine
+                        // is still computing is worthless. GTP cannot abort a
+                        // command in flight, so rather than freeze the UI the
+                        // work is handed to the game thread. See docs/adr/0001.
+                        auto& gameThread = gameElement->getGameThread();
+                        std::string busyEngine;
+                        const bool ran = gameThread.runWhenEngineFree(
+                            [&gameThread, filePath, gameIndex, tsumego]() {
+                                if (gameThread.loadSGF(filePath, gameIndex, tsumego) && tsumego) {
+                                    gameThread.autoPlayTsumegoSetup();
+                                }
+                            }, &busyEngine);
+
+                        if (ran) {
+                            gameElement->getController().finishGameReplacement();
+                        } else {
+                            gameElement->showMessage("Waiting for " + busyEngine + "...");
+                        }
                     }
                 }
             }

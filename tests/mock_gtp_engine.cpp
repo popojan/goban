@@ -21,6 +21,11 @@
 //                       configured parameter string on whitespace, so a
 //                       multi-word value cannot survive as one argv entry.
 //   --delay-ms <n>      sleep before every response (latency simulation)
+//   --think-ms <n>      sleep before genmove replies only. This is what a slow
+//                       engine actually looks like: fast to configure, slow to
+//                       choose a move. Use this rather than --delay-ms when
+//                       simulating "engine is thinking", or setup and sync will
+//                       crawl too and mask what you are testing.
 //   --hang-on <cmd>     never respond to <cmd> — sleeps forever. Used to test
 //                       that GtpClient applies a read timeout instead of
 //                       deadlocking the game thread.
@@ -72,6 +77,7 @@ struct Options {
     std::string unknownCmd;
     std::string logFile;
     std::string stderrFile;
+    int thinkMs = 0;
 };
 
 class Position {
@@ -488,6 +494,9 @@ private:
             const char color = colorFrom(args[0]);
             if (color == 0) return respond(id, false, "syntax error");
             emitStderr();
+            if (opts_.thinkMs > 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(opts_.thinkMs));
+            }
             return respond(id, true, generateMove(color, cmd == "reg_genmove"));
         }
 
@@ -676,6 +685,7 @@ int main(int argc, char** argv) {
             }
         }
         else if (flag == "--delay-ms") opts.delayMs = std::atoi(next().c_str());
+        else if (flag == "--think-ms") opts.thinkMs = std::atoi(next().c_str());
         else if (flag == "--hang-on") opts.hangOn = next();
         else if (flag == "--fail-on") opts.failOn = next();
         else if (flag == "--unknown") opts.unknownCmd = next();

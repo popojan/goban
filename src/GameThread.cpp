@@ -63,27 +63,140 @@ Player* GameThread::currentPlayer() const {
     return playerManager->currentPlayer(model.state.colorToMove);
 }
 
-void GameThread::interrupt() {
+// Set for the lifetime of gameLoop(). There is exactly one game loop, so a
+// thread_local flag is enough and avoids atomics on a hot path.
+static thread_local bool t_isGameThread = false;
+
+bool GameThread::isOnGameThread() {
+    return t_isGameThread;
+}
+
+std::string GameThread::thinkingPlayerName() const {
+    Player* p = playerToMove.load();
+    if (p != nullptr && p->isTypeOf(Player::ENGINE)) {
+        return p->getName();
+    }
+    return {};
+}
+
+bool GameThread::runWhenEngineFree(std::function<void()> task, std::string* busyEngine) {
+    if (busyEngine) busyEngine->clear();
+
+    // Nothing to wait for: no engine is mid-genmove, so the caller's thread may
+    // safely stop the loop and do the work itself, as it always has.
+    const std::string busy = thinkingPlayerName();
+    if (busy.empty() || isOnGameThread()) {
+        task();
+        return true;
+    }
+
+    if (busyEngine) *busyEngine = busy;
+    {
+        std::lock_guard<std::mutex> lock(deferredMutex);
+        // Coalesce: these actions all discard the current game, so only the
+        // most recent request matters.
+        if (deferredTask) {
+            spdlog::info("Replacing a pending deferred action with a newer one");
+        }
+        deferredTask = std::move(task);
+    }
+    deferredPending = true;
+    // Makes the game loop drop the move it is about to receive — it belongs to
+    // a position the deferred action is about to replace.
+    navQueueCV.notify_one();
+    spdlog::info("Deferred action until {} finishes thinking", busy);
+    return false;
+}
+
+void GameThread::processDeferredTask() {
+    if (!deferredPending.load()) return;
+
+    std::function<void()> task;
+    {
+        std::lock_guard<std::mutex> lock(deferredMutex);
+        task.swap(deferredTask);
+    }
+    if (!task) {
+        deferredPending = false;
+        return;
+    }
+
+    spdlog::info("Running deferred action on the game thread");
+    task();
+    // Cleared only once the work is done, so that hasDeferredTask() — and
+    // therefore any caller waiting for quiescence — stays true for the whole
+    // duration, not just while the task sits in the queue.
+    deferredPending = false;
+    deferredDone = true;
+}
+
+bool GameThread::takeDeferredTaskDone() {
+    return deferredDone.exchange(false);
+}
+
+bool GameThread::interrupt(int timeoutMs) {
+    // Called from the game loop itself (a deferred action): the loop is between
+    // iterations, so no move is in flight and nothing needs stopping. Joining
+    // here would deadlock on self-join, and setting interruptRequested would
+    // terminate the loop the caller still needs.
+    if (isOnGameThread()) {
+        spdlog::debug("interrupt: already on the game thread, nothing to stop");
+        return true;
+    }
+
     spdlog::debug("interrupt: thread={}", thread ? "exists" : "null");
     spdlog::default_logger()->flush();
-    if (thread) {
-        interruptRequested = true;
-        {
-            std::lock_guard<std::mutex> lock(navQueueMutex);
-            std::queue<NavCommand> empty;
-            navQueue.swap(empty);
-        }
-        navQueueCV.notify_one();
-        playLocalMove(Move(Move::INTERRUPT, model.state.colorToMove));
-        spdlog::debug("interrupt: joining thread...");
-        spdlog::default_logger()->flush();
-        thread->join();
-        spdlog::debug("interrupt: thread joined");
-        thread.reset();
+    if (!thread) {
+        return true;
     }
+
+    interruptRequested = true;
+    {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        std::queue<NavCommand> empty;
+        navQueue.swap(empty);
+    }
+    navQueueCV.notify_one();
+    // Unblocks a human player waiting on its condition variable. An engine
+    // blocked in a GTP read is NOT unblocked by this — hence the timeout.
+    playLocalMove(Move(Move::INTERRUPT, model.state.colorToMove));
+
+    if (timeoutMs >= 0) {
+        // Poll rather than wait on a condition variable: the game loop holds
+        // playerMutex around parts of its turn handling, and blocking on that
+        // here would risk a deadlock for the sake of a 10 ms poll.
+        const auto deadline = std::chrono::steady_clock::now() +
+                              std::chrono::milliseconds(timeoutMs);
+        while (hasThreadRunning && std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        if (hasThreadRunning) {
+            spdlog::warn("interrupt: game loop still running after {} ms "
+                         "(engine is probably mid-genmove); not joining",
+                         timeoutMs);
+            // interruptRequested stays set, so the loop exits when genmove
+            // returns; run() joins the finished thread before starting again.
+            return false;
+        }
+    }
+
+    spdlog::debug("interrupt: joining thread...");
+    spdlog::default_logger()->flush();
+    thread->join();
+    spdlog::debug("interrupt: thread joined");
+    thread.reset();
+    return true;
 }
 
 void GameThread::shutdown() {
+    // Drop any deferred game-discarding action: the engines it would drive are
+    // about to be killed, and the user is quitting rather than starting a game.
+    {
+        std::lock_guard<std::mutex> lock(deferredMutex);
+        deferredTask = nullptr;
+    }
+    deferredPending = false;
+
     // Signal the game thread to stop (non-blocking), then kill engine processes
     // to unblock any stuck GTP commands, then join the thread.
     spdlog::debug("shutdown: signaling interrupt");
@@ -249,6 +362,11 @@ bool GameThread::hasPendingNavigation() const {
     return navigator && navigator->isNavigating();
 }
 
+bool GameThread::hasQueuedNavigation() const {
+    std::lock_guard<std::mutex> lock(navQueueMutex);
+    return !navQueue.empty();
+}
+
 bool GameThread::humanToMove() const {
     // Use playerToMove if set, otherwise fall back to actual current player
     // (playerToMove is nullptr before game loop sets it, but we still need to check)
@@ -355,12 +473,18 @@ void GameThread::processSuccessfulMove(const Move& move, const Player* movePlaye
 }
 
 void GameThread::gameLoop() {
+    t_isGameThread = true;
     interruptRequested = false;
     while (!interruptRequested) {
         if(!hasThreadRunning) {
             hasThreadRunning = true;
             engineStarted.notify_all();
         }
+
+        // Game-discarding actions (new game, load, switch game) requested while
+        // an engine was thinking run here: the loop is between moves and owns
+        // the engine pipes, so it is the only safe place for them.
+        processDeferredTask();
 
         processNavigationQueue();
         if (interruptRequested) break;
@@ -403,6 +527,16 @@ void GameThread::gameLoop() {
                 }
             }
             enginesSynced = true;
+
+            // Re-evaluate from the top. The "!model || isGameOver" test above
+            // ran while enginesSynced was still false, so it deliberately did
+            // not take its early-out — falling through now would call genmove
+            // on a game that is paused or already finished. For a loaded SGF
+            // the active player is a LocalHumanPlayer, whose genmove() blocks
+            // on a condition variable forever, which silently wedged the loop:
+            // queued navigation was never drained, and isThinking() reported
+            // false because the stuck player is not an engine.
+            continue;
         }
 
         Engine* kibitzEngine = currentKibitz();
@@ -512,6 +646,20 @@ void GameThread::gameLoop() {
 
             if (move == Move::INTERRUPT) {
                 spdlog::debug("INTERRUPT received, re-evaluating game state");
+                playerToMove = nullptr;
+                continue;
+            }
+
+            // An engine cannot be interrupted mid-genmove (GTP has no portable
+            // abort), so a move can still arrive after the loop was asked to
+            // stop — typically because the user is loading another game. That
+            // move belongs to a position nobody is looking at any more, so drop
+            // it rather than playing it into a record that is about to be
+            // replaced. Only the human path gets the INTERRUPT sentinel above.
+            if (interruptRequested || deferredPending.load()) {
+                spdlog::info("Discarding {} from {}: the current game is being "
+                             "replaced or the loop is stopping",
+                             move.toString(), player->getName());
                 playerToMove = nullptr;
                 continue;
             }
@@ -1284,6 +1432,7 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
 
     // Interrupt game loop first - it may be blocked waiting on a player's genmove().
     // Must happen before removeSgfPlayers() to avoid destroying a player mid-wait.
+    //
     interrupt();
     model.pause();
 

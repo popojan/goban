@@ -50,31 +50,67 @@ std::string toLower(std::string text) {
 } // namespace
 
 bool GobanControl::newGame(unsigned boardSize) const {
+    // Starting a new game discards the current one, so a move the engine is
+    // still computing is worthless. Rather than block the UI waiting for it
+    // (GTP cannot abort a command in flight), hand the work to the game thread,
+    // which drops the move and then runs this. See docs/adr/0001.
+    std::string busyEngine;
+    const bool ran = engine.runWhenEngineFree(
+        [this, boardSize]() { newGameNow(boardSize); }, &busyEngine);
+    if (ran) {
+        finishGameReplacement();
+    } else {
+        parent->showMessage("Waiting for " + busyEngine + "...");
+    }
+    // Accepted either way; a deferred failure is only logged, since the caller
+    // (e.g. the board-size dropdown) has already moved on.
+    return true;
+}
+
+bool GobanControl::newGameNow(unsigned boardSize) const {
+    // Engine and model work only. This may run on the game thread (when it was
+    // deferred past a genmove), and RmlUi is not thread safe — every widget and
+    // view update happens later in finishGameReplacement(), on the UI thread.
     engine.interrupt();
     engine.reset();
     engine.removeSgfPlayers();  // Remove temporary SGF players from previous load
-    view.setTsumegoMode(false);
     model.tsumegoMode = false;
     model.game.setSuppressSessionCopy(false);
-    if(engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
-        model.createNewRecord();
-        view.animateIntro();
-        parent->refreshPlayerDropdowns();  // Update dropdowns after removing SGF players
-        // Save game settings so fresh start uses these values (single save)
-        auto& settings = UserSettings::instance();
-        auto players = engine.getPlayers();
-        size_t blackIdx = engine.getActivePlayer(0);
-        size_t whiteIdx = engine.getActivePlayer(1);
-        std::string blackName = (blackIdx < players.size()) ? players[blackIdx]->getName() : "Human";
-        std::string whiteName = (whiteIdx < players.size()) ? players[whiteIdx]->getName() : "Human";
-        settings.setGameSettings(
-            static_cast<int>(boardSize), model.state.komi, model.state.handicap,
-            blackName, whiteName);
-        // Clear session state - user explicitly started fresh
-        settings.clearSessionState();
-        return true;
+    if(!engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
+        return false;
     }
-    return false;
+    model.createNewRecord();
+
+    // Save game settings so fresh start uses these values (single save)
+    auto& settings = UserSettings::instance();
+    auto players = engine.getPlayers();
+    size_t blackIdx = engine.getActivePlayer(0);
+    size_t whiteIdx = engine.getActivePlayer(1);
+    std::string blackName = (blackIdx < players.size()) ? players[blackIdx]->getName() : "Human";
+    std::string whiteName = (whiteIdx < players.size()) ? players[whiteIdx]->getName() : "Human";
+    settings.setGameSettings(
+        static_cast<int>(boardSize), model.state.komi, model.state.handicap,
+        blackName, whiteName);
+    // Clear session state - user explicitly started fresh
+    settings.clearSessionState();
+    return true;
+}
+
+void GobanControl::finishGameReplacement() const {
+    // UI half of a game-replacing action, always on the UI thread: either called
+    // straight after the engine work, or from ElementGame's poll once a deferred
+    // action completed on the game thread.
+    view.setTsumegoMode(model.tsumegoMode);
+    if (!model.tsumegoMode) {
+        view.animateIntro();
+    }
+
+    // refreshPlayerDropdowns() brackets itself with setSyncingUI already.
+    parent->refreshPlayerDropdowns();
+
+    view.updateLastMoveOverlay();
+    view.updateNavigationOverlay();
+    view.requestRepaint();
 }
 
 void GobanControl::mouseClick(int button, int state, int x, int y) {
@@ -256,7 +292,6 @@ void GobanControl::buildRegistry() {
 
     // Shared body of prev_game/next_game.
     auto stepLoadedGame = [this](CommandContext& ctx, int delta) {
-        if (engine.isThinking()) { ctx.notifyMenu = false; return; }
         size_t gameCount = model.game.getLoadedGameCount();
         if (gameCount <= 1) { ctx.notifyMenu = false; return; }
 
@@ -264,22 +299,24 @@ void GobanControl::buildRegistry() {
         int newIdx = currentIdx + delta;
         if (newIdx < 0 || newIdx >= static_cast<int>(gameCount)) { ctx.notifyMenu = false; return; }
 
-        bool tsumego = view.isTsumegoMode();
-        setSyncingUI(true);
-        engine.switchGame(newIdx, tsumego);  // Start at root in tsumego mode
-        parent->refreshPlayerDropdowns();
-        setSyncingUI(false);
+        // Switching game replaces the one on screen, so a move still being
+        // computed is worthless — defer past it rather than refusing.
+        const bool tsumego = view.isTsumegoMode();
+        std::string busyEngine;
+        const bool ran = engine.runWhenEngineFree([this, newIdx, tsumego]() {
+            engine.switchGame(newIdx, tsumego);  // Start at root in tsumego mode
+            if (tsumego) {
+                model.tsumegoMode = true;
+                model.game.setSuppressSessionCopy(true);
+                engine.autoPlayTsumegoSetup();
+            }
+        }, &busyEngine);
 
-        if (tsumego) {
-            view.setTsumegoMode(true);  // Re-apply overlay settings
-            model.tsumegoMode = true;
-            model.game.setSuppressSessionCopy(true);
-            engine.autoPlayTsumegoSetup();
+        if (ran) {
+            finishGameReplacement();
+        } else {
+            parent->showMessage("Waiting for " + busyEngine + "...");
         }
-
-        view.updateLastMoveOverlay();
-        view.updateNavigationOverlay();
-        view.requestRepaint();
     };
 
     add("help", 0, 0, "list every registered command", [this](CommandContext&) {
@@ -633,17 +670,19 @@ void GobanControl::buildRegistry() {
             spdlog::warn("load_sgf: '{}' is not a game index", ctx.args[1]);
             return;
         }
-        setSyncingUI(true);
-        const bool ok = engine.loadSGF(ctx.args[0], gameIndex, false);
-        parent->refreshPlayerDropdowns();
-        setSyncingUI(false);
-        if (!ok) {
-            spdlog::warn("load_sgf: failed to load '{}'", ctx.args[0]);
-            return;
+        const std::string path = ctx.args[0];
+        std::string busyEngine;
+        const bool ran = engine.runWhenEngineFree([this, path, gameIndex]() {
+            if (!engine.loadSGF(path, gameIndex, false)) {
+                spdlog::warn("load_sgf: failed to load '{}'", path);
+            }
+        }, &busyEngine);
+
+        if (ran) {
+            finishGameReplacement();
+        } else {
+            parent->showMessage("Waiting for " + busyEngine + "...");
         }
-        view.updateLastMoveOverlay();
-        view.updateNavigationOverlay();
-        view.requestRepaint();
     });
 
     add("load", 0, 0, "open the SGF file chooser", [this](CommandContext&) {
@@ -1046,6 +1085,9 @@ bool GobanControl::isIdle() const {
     // while no engine is thinking. Without this a script would read the board
     // before navigation had applied.
     if (engine.hasPendingNavigation()) return false;
+    // Likewise for a game-replacing action waiting on, or running past, a
+    // genmove: the board is not final until it has finished.
+    if (engine.hasDeferredTask()) return false;
     return true;
 }
 
@@ -1081,6 +1123,9 @@ nlohmann::json GobanControl::dumpState() const {
     s["running"]        = engine.isRunning();
     s["thinking"]       = engine.isThinking();
     s["syncing_ui"]     = syncingUI;
+    s["pending_nav"]    = engine.hasPendingNavigation();
+    s["queued_nav"]     = engine.hasQueuedNavigation();
+    s["deferred_task"]  = engine.hasDeferredTask();
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;

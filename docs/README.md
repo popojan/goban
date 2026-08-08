@@ -18,6 +18,7 @@ Ray-traced 3D Go/Baduk/Weiqi board application with GLSL shaders, GTP engine sup
 - [SGF Game Records](sgf-records.md) - Game saving, loading, and the games folder
 - [Building from Source](building.md) - Compilation instructions for developers
 - [Testing](testing.md) - Unit test suite, the mock GTP engine, adding a test
+- [Architecture Decision Records](adr/README.md) - Why the code is the way it is
 
 ## Quick Start
 

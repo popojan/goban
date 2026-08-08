@@ -221,6 +221,14 @@ void ElementGame::gameLoop() {
     // Check if async engine loading has completed
     checkEngineLoadingComplete();
 
+    // A game-replacing action (new game, load, switch game) that had to wait for
+    // an engine finishes on the game thread; the widget half must happen here,
+    // on the UI thread, because RmlUi is not thread safe.
+    if (engine.takeDeferredTaskDone()) {
+        control.finishGameReplacement();
+        clearMessage();
+    }
+
     auto context = GetContext();
 
     float currentTime = static_cast<float>(glfwGetTime());
@@ -270,6 +278,12 @@ double ElementGame::getIdleTimeout() const {
     // During async engine loading, poll periodically to check completion
     if (!enginesLoaded && engineLoadingStarted) {
         return 0.1;  // 100ms polling interval during loading
+    }
+
+    // A deferred action produces no input events, so without a timeout the main
+    // loop would block in glfwWaitEvents() and never notice it completed.
+    if (engine.hasDeferredTask()) {
+        return 0.05;
     }
 
     // If we displayed non-zero FPS, we need one more wake-up to show "0 fps"
