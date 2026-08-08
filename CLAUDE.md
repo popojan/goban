@@ -16,9 +16,9 @@ Red Carpet Goban is a ray-traced 3D Go/Baduk/Weiqi board application with GUI re
 # Manual build
 mkdir -p cmake-build-release
 cd cmake-build-release
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PREREQUISITIES=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON
 make
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PREREQUISITIES=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
 make
 ```
 
@@ -26,11 +26,21 @@ make
 ```bash
 mkdir -p cmake-build-debug
 cd cmake-build-debug
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_PREREQUISITIES=ON
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBuildPrerequisites=ON
 make
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_PREREQUISITIES=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBuildPrerequisites=OFF
 make
 ```
+
+### Tests
+```bash
+cd cmake-build-release
+make -j4 goban_tests mock_gtp_engine
+./goban_tests            # or: ctest --output-on-failure
+cd .. && ./tests/run_scenarios.sh
+```
+Fast single-file loop while writing tests: `./tests/compile_one.sh tests/test_x.cpp`.
+See `docs/testing.md`.
 
 ### Running the Application
 ```bash
@@ -44,6 +54,11 @@ make
 ## Architecture Overview
 
 ### Core Components
+
+#### Target layout
+- **goban_core** (static lib): rules, SGF, navigation, engine sync, GTP client, settings — no OpenGL/RmlUi rendering, so tests link it without a graphics context
+- **goban**: the application (rendering, UI, audio, platform glue)
+- **goban_tests**, **mock_gtp_engine**: see `docs/testing.md`
 
 #### Game Engine Layer
 - **GobanModel**: Core game state and board representation
@@ -111,6 +126,8 @@ The codebase supports multiple platforms with platform-specific implementations 
 - **games/**: SGF game record storage
 - **engine/**: External Go engines (GNU Go, KataGo, etc.)
 - **cmake/**: CMake find modules for dependencies
+- **tests/**: unit tests, SGF fixtures, the mock GTP engine, and `tests/scenarios/`
+- **docs/adr/**: Architecture Decision Records — why the code is the way it is
 
 ### Configuration System
 
@@ -166,6 +183,13 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **Re-evaluate the loop after initial sync**: the `!model || isGameOver` early-out runs before `enginesSynced` flips, so the sync branch must `continue` rather than fall through. Otherwise a paused loaded game calls `genmove` on a `LocalHumanPlayer`, which blocks forever and silently wedges the loop — with `isThinking()` reporting false, because the stuck player is not an engine.
 - **Quiescence means all three**: `GobanControl::isIdle()` must account for engine thinking, queued navigation, and a deferred action still running.
 
+> **In flux:** ADR-0002 (approved, not yet implemented) replaces the lifecycle
+> flags below — `started`, `isGameOver`, `enginesSynced`, `hasThreadRunning` —
+> with explicit `GamePhase` / `EngineSync` / `LoopState` machines. Several
+> invariants in this section will become a transition table plus tests. Prefer
+> not to add new writers to those flags in the meantime; see
+> `docs/adr/0002-explicit-game-state.md`.
+
 ### Navigation & Engine Synchronization
 - **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
 - **Block navigation while engine thinking**: `isThinking()` returns true only for ENGINE types (not human players). Navigation keys are blocked when engine is processing.
@@ -201,11 +225,16 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **Search before creating**: Before introducing a new flag, helper, or mechanism, search the codebase for existing patterns that solve the same problem. Use `grep` for related keywords (e.g. "suppress", "syncing", "guard", "flag"). Reusing an existing mechanism is always preferable to adding a new one.
 - **Fix at the source**: When a race condition or unwanted side effect is discovered, fix the root cause rather than adding compensating workarounds downstream. A guard at the event source is better than a deferred correction after the fact.
 - **Fail early**: Always check return values from operations that can fail (GTP commands, file I/O, engine communication). When a prerequisite fails, bail out immediately rather than continuing with corrupt state. Silent failures cascade — a failed `boardsize` followed by blind move replay produces wrong results that are hard to diagnose.
+- **Record decisions, not just invariants**: a non-obvious design choice — especially one where you rejected a plausible alternative — belongs in `docs/adr/` as an Architecture Decision Record, with the alternatives and the downsides you accepted. Read the existing ADRs before proposing something that revisits an old decision. Invariants (rules that must always hold) stay in the section above and should be enforced by a test; decisions are append-only and superseded rather than edited.
 - **Document new invariants**: When introducing a new invariant, flag, or cross-cutting concern, add it to the Design Invariants section above. Not all invariants can be documented upfront, but capturing them as they're discovered prevents future regressions.
 
 ## Test Scenarios
 
-Known error-prone sequences that should be regression tested:
+Known error-prone sequences that should be regression tested. Several of these
+are now **executable** under `tests/scenarios/*.scn` — run them with
+`./tests/run_scenarios.sh`, and see `docs/testing.md` for the directive syntax.
+The remaining ones below are still prose; converting one is a good way to pin a
+bug you have just fixed.
 
 ### Navigation During Engine Play
 ```

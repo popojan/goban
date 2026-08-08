@@ -64,4 +64,4 @@ A compact alternative for small decisions is the *Y-statement*:
 ## Index
 
 - [ADR-0001: Engine-exclusive UI actions](0001-engine-exclusive-ui-actions.md)
-- [ADR-0002: Replace the lifecycle flags with explicit state machines](0002-explicit-game-state.md) — *Proposed*
+- [ADR-0002: Replace the lifecycle flags with explicit state machines](0002-explicit-game-state.md) — *Accepted; implementation not started*

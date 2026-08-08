@@ -1,6 +1,6 @@
 # ADR-0002: Replace the lifecycle flags with explicit state machines
 
-**Status:** Proposed — scoping only, no code written yet
+**Status:** Accepted 2026-08-09 — implementation not started
 **Date:** 2026-08-09
 
 ## Context
