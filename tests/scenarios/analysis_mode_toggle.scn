@@ -1,0 +1,54 @@
+# Analysis mode: entering it must pause the genmove loop so that navigation
+# works immediately, and leaving it must restore match play.
+#
+# This is the sequence from CLAUDE.md's "Analysis Mode Workflow", made
+# executable. Run with:
+#   ./tests/run_scenarios.sh tests/scenarios/analysis_mode_toggle.scn
+
+new_game 9
+wait_idle
+expect board_size 9
+expect mode match
+expect move_count 0
+expect started false
+
+# Both sides are engines, so starting runs the genmove loop unattended.
+switch_player black mock
+switch_player white mock
+wait_idle
+expect black_player mock
+expect white_player mock
+
+start
+expect started true
+
+# Let the bots play a few moves. Use >= : the genmove loop is fast and would
+# race past an exact count.
+wait_until move_count >= 4
+expect running true
+
+# Entering analysis mode must pause genmove. If it did not, move_count would
+# keep climbing and the navigation below would be refused.
+toggle_analysis_mode
+wait_idle
+expect mode analysis
+expect thinking false
+
+# Navigation must work right away in analysis mode.
+navigate_start
+wait_idle
+expect view_position 0
+expect navigating true
+expect game_over false
+
+navigate_end
+wait_idle
+# Compare against another state key rather than a hard-coded length, since how
+# many moves the bots managed before the pause is not deterministic.
+expect view_position $main_line_moves
+expect at_end true
+
+# Back to match play.
+toggle_analysis_mode
+wait_idle
+expect mode match

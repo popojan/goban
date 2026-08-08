@@ -135,6 +135,15 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
     try {
         auto engine = new GtpEngine(command, parameters, path, name, messages);
 
+        // Optional per-engine response timeout. Engines differ enormously here:
+        // a CPU KataGo can spend a minute loading weights, while a scripted test
+        // engine should fail in seconds.
+        if (botConfig.contains("timeout_ms")) {
+            const int timeout = botConfig.value("timeout_ms", GtpClient::DEFAULT_COMMAND_TIMEOUT_MS);
+            engine->setCommandTimeout(timeout);
+            spdlog::info("Engine [{}] command timeout set to {} ms", name, timeout);
+        }
+
         // Lock while modifying shared player/engine vectors and coach/kibitz indices
         // (loadSingleEngine is called from parallel threads)
         std::lock_guard<std::mutex> lock(mutex);

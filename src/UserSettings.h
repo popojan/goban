@@ -102,12 +102,18 @@ public:
     bool hasSettings() const { return settingsLoaded; }
     bool hasShaderSettings() const { return shaderLoaded; }
 
+    /// Redirect persistence to another file. Must be called before load().
+    /// Scenario runs use this so that driving the app from a script cannot
+    /// overwrite the developer's real session, camera and game settings.
+    void setSettingsFile(const std::string& path) { settingsFile = path; }
+    const std::string& getSettingsFile() const { return settingsFile; }
+
 private:
     UserSettings() = default;
     UserSettings(const UserSettings&) = delete;
     UserSettings& operator=(const UserSettings&) = delete;
 
-    static constexpr const char* SETTINGS_FILE = "user.json";
+    std::string settingsFile = "user.json";
 
     bool settingsLoaded = false;
     bool savedCameraLoaded = false;

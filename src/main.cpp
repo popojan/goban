@@ -44,6 +44,8 @@
 #include <set>
 
 #include "UserSettings.h"
+#include "ScenarioRunner.h"
+#include "ScenarioRecorder.h"
 
 Rml::Context* context = nullptr;
 
@@ -133,11 +135,11 @@ void ExecuteRestart() {
     std::vector<char*> args;
     args.push_back(g_executable_path);
     char config_flag[] = "--config";
+    char verbosity_flag[] = "--verbosity";
     args.push_back(config_flag);
     char* config_path = strdup(g_pending_restart_config.c_str());
     args.push_back(config_path);
     if (!g_log_level.empty() && g_log_level != "warning") {
-        char verbosity_flag[] = "--verbosity";
         args.push_back(verbosity_flag);
         char* log_level = strdup(g_log_level.c_str());
         args.push_back(log_level);
@@ -370,15 +372,48 @@ int main(int argc, char** argv)
 
     using namespace clipp;
     std::string logLevel("warning");
+    std::string scenarioFile;
+    std::string userSettingsFile;
+    bool forceRecord = false;
+
+    // Parse the CLI before touching UserSettings: a scenario run redirects
+    // persistence so it cannot overwrite the developer's real session.
+    std::string configurationFileArg;
+    auto preCli = (
+        option("-v", "--verbosity") & word("level", logLevel),
+        option("-c", "--config") & value("file", configurationFileArg),
+        option("-s", "--script") & value("file", scenarioFile),
+        option("--user-settings") & value("file", userSettingsFile),
+        option("--record").set(forceRecord)
+    );
+#ifdef RMLUI_PLATFORM_WIN32
+    parse(__argc, __argv, preCli);
+#else
+    parse(argc, argv, preCli);
+#endif
+
+    // A scripted run defaults to a throwaway settings file, so that driving the
+    // app from a scenario never mutates user.json.
+    if (userSettingsFile.empty() && !scenarioFile.empty()) {
+        userSettingsFile = "scenario-user.json";
+    }
+    if (!userSettingsFile.empty()) {
+        UserSettings::instance().setSettingsFile(userSettingsFile);
+    }
 
     // Load user preferences
     UserSettings::instance().load();
-    std::string configurationFile = UserSettings::instance().getLastConfig();
-    bool startFullscreen = UserSettings::instance().getFullscreen();
+    std::string configurationFile = configurationFileArg.empty()
+        ? UserSettings::instance().getLastConfig()
+        : configurationFileArg;
+    // Never take over the screen during a scripted run.
+    bool startFullscreen = scenarioFile.empty() && UserSettings::instance().getFullscreen();
 
     auto cli = (
         option("-v", "--verbosity") & word("level", logLevel),
-        option("-c", "--config") & value("file", configurationFile)
+        option("-c", "--config") & value("file", configurationFile),
+        option("-s", "--script") & value("file", scenarioFile),
+        option("--user-settings") & value("file", userSettingsFile)
     );
 #ifdef RMLUI_PLATFORM_WIN32
     (void)instance_handle;
@@ -420,6 +455,13 @@ int main(int argc, char** argv)
     // Request OpenGL 2.1 compatibility profile for GL2 renderer
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+
+    // A scripted run still needs a real GL context (shaders compile, the board
+    // renders), but it must not pop a window in front of whatever the developer
+    // is doing. Under Xvfb in CI this makes no difference.
+    if (!scenarioFile.empty()) {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    }
 
     // Create GLFW window
     GLFWwindow* window = glfwCreateWindow(window_width, window_height, WINDOW_NAME, nullptr, nullptr);
@@ -525,6 +567,19 @@ int main(int argc, char** argv)
     EventManager::RegisterEventHandler("open", fileChooserHandler);
     fileChooserHandler->LoadDialog(context);
 
+    ScenarioRunner scenario;
+    bool scenarioActive = false;
+    if (!scenarioFile.empty()) {
+        // Recording a replay of a recording is noise, unless we are explicitly
+        // testing the recorder itself.
+        ScenarioRecorder::instance().setEnabled(forceRecord);
+        if (!scenario.load(scenarioFile)) {
+            CleanupResources(window);
+            return 2;
+        }
+        scenarioActive = true;
+    }
+
     if (EventManager::LoadWindow("goban", context)) {
         // Main loop
         while (!glfwWindowShouldClose(window) && !AppState::ExitRequested()) {
@@ -546,12 +601,28 @@ int main(int argc, char** argv)
                 gameElement->gameLoop();
             }
 
+            // Advance the scenario after the game loop, so state observed by
+            // `expect` reflects everything this frame already processed.
+            if (scenarioActive && gameElement) {
+                scenario.pump(gameElement->getController(), gameElement->areEnginesLoaded());
+                if (scenario.finished()) {
+                    scenarioActive = false;
+                    AppState::RequestExit();
+                }
+            }
+
             // Render if needed (check AFTER event processing)
             if (!gameElement || gameElement->needsRender()) {
                 render_interface.BeginFrame();
                 context->Render();
                 render_interface.EndFrame();
                 glfwSwapBuffers(window);
+            } else if (scenarioActive) {
+                // A scenario generates no input events, so blocking in
+                // glfwWaitEvents() would stall it forever. Poll on a short tick
+                // instead — long enough not to spin, short enough to keep the
+                // run brisk.
+                glfwWaitEventsTimeout(0.005);
             } else {
                 // Nothing to render - wait for next event instead of busy-polling
                 // Use timeout if FPS display needs one more update to show "0"
@@ -625,6 +696,10 @@ int main(int argc, char** argv)
     // If restart was requested, execute it now (after cleanup)
     if (HasPendingRestart()) {
         ExecuteRestart();
+    }
+
+    if (!scenarioFile.empty()) {
+        return scenario.report(scenarioFile);
     }
 
     return 0;

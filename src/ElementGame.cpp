@@ -39,7 +39,7 @@ static std::string getTemplateText(Rml::Context* context, const std::string& tem
 
 ElementGame::ElementGame(const Rml::String& tag)
         : Rml::Element(tag),
-          model(this, determineInitialBoardSize()),
+          model(determineInitialBoardSize()),
           view(model), engine(model),
           control(this, model, view, engine)
 {

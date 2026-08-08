@@ -65,8 +65,6 @@ class Engine: public Player
 public:
     explicit Engine(const std::string& name) : Player(name, LOCAL | ENGINE), board(19)  {}
     Move genmove(const Color& colorToMove) override = 0;
-    virtual const Board& showboard() = 0;
-    virtual const Board& showterritory(bool final, Color colorToMove) = 0;
     virtual float final_score() = 0;
     // Apply territory calculation to an existing board (uses engine for dead stones + score)
     virtual void applyTerritory(Board& targetBoard) = 0;
@@ -127,25 +125,18 @@ public:
     ~GtpEngine() override = default;
 
     Move genmove(const Color& colorToMove) override;
-    const Board& showboard();
     bool fixed_handicap(int handicap, std::vector<Position>& stones) override;
     bool komi(float komi) override;
     bool play(const Move& m) override;
     bool boardsize(unsigned boardSize) override;
     bool clear() override;
     bool undo() override;
-    virtual bool estimateTerritory(bool final, const Color& colorToMove);
-    const Board& showterritory(bool final, Color colorToMove) override;
     float final_score() override;
     void applyTerritory(Board& targetBoard) override;
 
     // KataGo-specific scoring via kata-analyze (returns 0.0 if not supported)
     float kataAnalyzeScore(const Color& colorToMove);
     bool supportsKataAnalyze();
-
-protected:
-
-    static bool setTerritory(const GtpClient::CommandOutput& ret, Board& b, const Color& color);
 };
 
 #endif // PLAYER_H

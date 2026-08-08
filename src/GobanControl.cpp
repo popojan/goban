@@ -6,9 +6,48 @@
 #include "EventHandlerFileChooser.h"
 #include "EventManager.h"
 #include "UserSettings.h"
+#include "ScenarioRecorder.h"
+#include <algorithm>
+#include <cctype>
 #include <ctime>
 #include <sstream>
 #include <iomanip>
+
+namespace {
+
+// Splits a command line on whitespace.
+std::vector<std::string> splitCommand(const std::string& cmd) {
+    std::vector<std::string> tokens;
+    std::istringstream ss(cmd);
+    std::string token;
+    while (ss >> token) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
+// Strict integer parse — the whole token must be consumed.
+bool parseInt(const std::string& text, int& out) {
+    try {
+        size_t consumed = 0;
+        int value = std::stoi(text, &consumed);
+        if (consumed != text.size()) {
+            return false;
+        }
+        out = value;
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+std::string toLower(std::string text) {
+    std::transform(text.begin(), text.end(), text.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+}
+
+} // namespace
 
 bool GobanControl::newGame(unsigned boardSize) const {
     engine.interrupt();
@@ -56,103 +95,16 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
         // Block stone placement until initialization is complete (players set)
         if (syncingUI) return;
         if (button == 0 && state == 1) {
-            // During navigation (not at end), handle clicks specially
-            if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
-                // Block navigation while engine is thinking - would corrupt state
-                if (engine.isThinking()) {
-                    spdlog::debug("Navigation click blocked - engine is thinking");
-                    return;
-                }
-                // Stone-in-hand: first click picks up, second click places
-                if (!model.state.holdsStone) {
-                    // First click: pick up stone
-                    model.state.holdsStone = true;
-                    model.updateReservoirs();
-                    view.requestRepaint(GobanView::UPDATE_STONES);
-                    return;
-                }
-
-                // Second click: place stone
-                model.state.holdsStone = false;
-                model.updateReservoirs();
-
-                // Check if click matches an existing variation
-                auto variations = model.game.getVariations();
-                for (const auto& move : variations) {
-                    if (move == Move::NORMAL && move.pos == coord) {
-                        spdlog::debug("Clicked on existing variation at ({},{})", coord.col(), coord.row());
-                        engine.navigateToVariation(move);
-                        return;
-                    }
-                }
-
-                // No matching variation — new move
-                if (view.isTsumegoMode()) {
-                    // Game thread infers BM marking from context
-                    Color colorToMove = model.game.getColorToMove();
-                    Move newMove(coord, colorToMove);
-                    engine.navigateToVariation(newMove, false);
-                    return;
-                }
-
-                // Normal mode: create new variation
-                Color colorToMove = model.game.getColorToMove();
-                spdlog::debug("New variation during navigation (color={})",
-                    colorToMove == Color::BLACK ? "B" : "W");
-                model.start();
-                if (!engine.isRunning()) {
-                    engine.run();
-                }
-                Move newMove(coord, colorToMove);
-                engine.navigateToVariation(newMove);
-                return;
+            // Record here rather than in boardClick(), which is shared with the
+            // `click` command — that path is already recorded by command().
+            ScenarioRecorder::instance().recordAction(
+                "click", {std::to_string(coord.col()), std::to_string(coord.row())},
+                dumpState());
+            {
+                ScenarioRecorder::SuppressNested noNestedRecords;
+                boardClick(coord);
             }
-
-            // In tsumego mode at end of variation
-            if (view.isTsumegoMode() && model.game.isAtEndOfNavigation()) {
-                if (!model.game.isOnBadMovePath()) {
-                    return;  // Solved — stay blocked
-                }
-                // Dead branch: allow exploration
-                if (!model.state.holdsStone) {
-                    model.state.holdsStone = true;
-                    model.updateReservoirs();
-                    view.requestRepaint(GobanView::UPDATE_STONES);
-                    return;
-                }
-                model.state.holdsStone = false;
-                model.updateReservoirs();
-                Color colorToMove = model.game.getColorToMove();
-                Move newMove(coord, colorToMove);
-                engine.navigateToVariation(newMove, false);
-                return;
-            }
-
-            bool playNow = true;
-            if (model.isGameOver) {
-                // Clicking on finished game - reuse "clear" which handles save + settings restore
-                command("clear");
-                playNow = false;
-            }
-            else if(!model.isGameOver) {
-               model.start();
-               if (!engine.isRunning()) {
-                   engine.run();
-               }
-            }
-            spdlog::debug("engine.isRunning() = {}", engine.isRunning());
-            if(playNow) {
-                if(!engine.humanToMove() || model.state.holdsStone) {
-                    const auto move = engine.getLocalMove(coord);
-                    engine.playLocalMove(move);
-                    view.requestRepaint();
-                }
-                else {
-                    model.state.holdsStone = true;
-                    model.updateReservoirs();  // Stone in hand reduces reservoir
-                    view.requestRepaint(GobanView::UPDATE_STONES);
-                }
-            }
+            ScenarioRecorder::instance().recordState(dumpState());
         }
     }
     if (button == 1 && state == 1) {
@@ -181,10 +133,164 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     }
 }
 
-void GobanControl::command(const std::string& cmd) {
+// Left click on an on-board intersection. Callers must have validated that the
+// point is on the board and that initialization is complete.
+void GobanControl::boardClick(const Position& coord) {
+    // During navigation (not at end), handle clicks specially
+    if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
+        // Block navigation while engine is thinking - would corrupt state
+        if (engine.isThinking()) {
+            spdlog::debug("Navigation click blocked - engine is thinking");
+            return;
+        }
+        // Stone-in-hand: first click picks up, second click places
+        if (!model.state.holdsStone) {
+            // First click: pick up stone
+            model.state.holdsStone = true;
+            model.updateReservoirs();
+            view.requestRepaint(GobanView::UPDATE_STONES);
+            return;
+        }
 
-    bool checked = false;
-    if(cmd == "quit") {
+        // Second click: place stone
+        model.state.holdsStone = false;
+        model.updateReservoirs();
+
+        // Check if click matches an existing variation
+        auto variations = model.game.getVariations();
+        for (const auto& move : variations) {
+            if (move == Move::NORMAL && move.pos == coord) {
+                spdlog::debug("Clicked on existing variation at ({},{})", coord.col(), coord.row());
+                engine.navigateToVariation(move);
+                return;
+            }
+        }
+
+        // No matching variation — new move
+        if (view.isTsumegoMode()) {
+            // Game thread infers BM marking from context
+            Color colorToMove = model.game.getColorToMove();
+            Move newMove(coord, colorToMove);
+            engine.navigateToVariation(newMove, false);
+            return;
+        }
+
+        // Normal mode: create new variation
+        Color colorToMove = model.game.getColorToMove();
+        spdlog::debug("New variation during navigation (color={})",
+            colorToMove == Color::BLACK ? "B" : "W");
+        model.start();
+        if (!engine.isRunning()) {
+            engine.run();
+        }
+        Move newMove(coord, colorToMove);
+        engine.navigateToVariation(newMove);
+        return;
+    }
+
+    // In tsumego mode at end of variation
+    if (view.isTsumegoMode() && model.game.isAtEndOfNavigation()) {
+        if (!model.game.isOnBadMovePath()) {
+            return;  // Solved — stay blocked
+        }
+        // Dead branch: allow exploration
+        if (!model.state.holdsStone) {
+            model.state.holdsStone = true;
+            model.updateReservoirs();
+            view.requestRepaint(GobanView::UPDATE_STONES);
+            return;
+        }
+        model.state.holdsStone = false;
+        model.updateReservoirs();
+        Color colorToMove = model.game.getColorToMove();
+        Move newMove(coord, colorToMove);
+        engine.navigateToVariation(newMove, false);
+        return;
+    }
+
+    bool playNow = true;
+    if (model.isGameOver) {
+        // Clicking on finished game - reuse "clear" which handles save + settings restore
+        command("clear");
+        playNow = false;
+    }
+    else if(!model.isGameOver) {
+       model.start();
+       if (!engine.isRunning()) {
+           engine.run();
+       }
+    }
+    spdlog::debug("engine.isRunning() = {}", engine.isRunning());
+    if(playNow) {
+        if(!engine.humanToMove() || model.state.holdsStone) {
+            const auto move = engine.getLocalMove(coord);
+            engine.playLocalMove(move);
+            view.requestRepaint();
+        }
+        else {
+            model.state.holdsStone = true;
+            model.updateReservoirs();  // Stone in hand reduces reservoir
+            view.requestRepaint(GobanView::UPDATE_STONES);
+        }
+    }
+}
+
+void GobanControl::buildRegistry() {
+    auto add = [this](const char* name, int minArgs, int maxArgs, const char* help,
+                      std::function<void(CommandContext&)> handler) {
+        registry[name] = CommandEntry{std::move(handler), minArgs, maxArgs, help};
+    };
+
+    // Shared guard for the four navigation commands: GTP traffic while the engine
+    // is thinking would corrupt its board state. Blocking here does *not* skip the
+    // post-dispatch menu update, matching the original combined branch.
+    auto navigate = [this](const char* name, const std::function<void()>& action) {
+        spdlog::debug("Navigation command '{}': isThinking={}, isRunning={}, isGameOver={}",
+            name, engine.isThinking(), engine.isRunning(), model.isGameOver.load());
+        if (engine.isThinking()) {
+            spdlog::debug("Navigation command '{}' blocked - engine is thinking", name);
+            return;
+        }
+        action();
+    };
+
+    // Shared body of prev_game/next_game.
+    auto stepLoadedGame = [this](CommandContext& ctx, int delta) {
+        if (engine.isThinking()) { ctx.notifyMenu = false; return; }
+        size_t gameCount = model.game.getLoadedGameCount();
+        if (gameCount <= 1) { ctx.notifyMenu = false; return; }
+
+        int currentIdx = model.game.getLoadedGameIndex();
+        int newIdx = currentIdx + delta;
+        if (newIdx < 0 || newIdx >= static_cast<int>(gameCount)) { ctx.notifyMenu = false; return; }
+
+        bool tsumego = view.isTsumegoMode();
+        setSyncingUI(true);
+        engine.switchGame(newIdx, tsumego);  // Start at root in tsumego mode
+        parent->refreshPlayerDropdowns();
+        setSyncingUI(false);
+
+        if (tsumego) {
+            view.setTsumegoMode(true);  // Re-apply overlay settings
+            model.tsumegoMode = true;
+            model.game.setSuppressSessionCopy(true);
+            engine.autoPlayTsumegoSetup();
+        }
+
+        view.updateLastMoveOverlay();
+        view.updateNavigationOverlay();
+        view.requestRepaint();
+    };
+
+    add("help", 0, 0, "list every registered command", [this](CommandContext&) {
+        listCommands();
+    });
+
+    add("nop", 0, 0, "does nothing; used by UI elements that only swallow the event",
+        [](CommandContext&) {
+    });
+
+    add("quit", 0, 0, "save and exit (prompts when a game is in progress)", [this](CommandContext&) {
         // saveCurrentGame() is called by main.cpp cleanup on all exit paths
         if (model.game.moveCount() > 0 && !model.isGameOver) {
             parent->showPromptYesNoTemplate("templateQuitWithoutFinishing", [this](bool confirmed) {
@@ -197,47 +303,57 @@ void GobanControl::command(const std::string& cmd) {
             exit = true;
             AppState::RequestExit();
         }
-    }
-    else if (cmd == "toggle_fullscreen") {
+    });
+
+    add("toggle_fullscreen", 0, 0, "toggle fullscreen", [this](CommandContext& ctx) {
         fullscreen = AppState::ToggleFullscreen();
-        checked = fullscreen;
+        ctx.checked = fullscreen;
         UserSettings::instance().setFullscreen(fullscreen);
         view.requestRepaint();
-    }
-    else if (cmd == "toggle_sound") {
+    });
+
+    add("toggle_sound", 0, 0, "toggle sound effects", [this](CommandContext& ctx) {
         bool soundEnabled = view.player.isMuted();  // Was muted, now enable
         view.player.setMuted(!soundEnabled);
-        checked = soundEnabled;
+        ctx.checked = soundEnabled;
         UserSettings::instance().setSoundEnabled(soundEnabled);
-    }
-    else if (cmd == "toggle_fps") {
-        checked = view.toggleFpsLimit();
-    }
-    else if (cmd == "animate") {
+    });
+
+    add("toggle_fps", 0, 0, "toggle the frame rate limiter", [this](CommandContext& ctx) {
+        ctx.checked = view.toggleFpsLimit();
+    });
+
+    add("animate", 0, 0, "run the camera intro animation", [this](CommandContext&) {
         view.lastTime = 0.0;
         view.startTime = AppState::GetElapsedTime();
         view.animationRunning = true;
         view.requestRepaint();
-    }
-    else if (cmd == "toggle_territory") {
-        // Only allow territory toggle at end of a scored game (not resignation)
+    });
+
+    add("toggle_territory", 0, 0, "toggle territory display", [this](CommandContext& ctx) {
+        // Only allow territory toggle at end of a scored game (not resignation).
+        // On refusal the menu is still updated (with checked == false), unselecting it.
         if (model.game.shouldShowTerritory()) {
-            checked = model.board.toggleTerritory();
+            ctx.checked = model.board.toggleTerritory();
             view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
         }
-    }
-    else if (cmd == "toggle_last_move_overlay") {
-        checked = view.toggleLastMoveOverlay();
+    });
+
+    add("toggle_last_move_overlay", 0, 0, "toggle the last move marker", [this](CommandContext& ctx) {
+        ctx.checked = view.toggleLastMoveOverlay();
         view.requestRepaint();
-    }
-    else if (cmd == "toggle_next_move_overlay") {
-        checked = view.toggleNextMoveOverlay();
+    });
+
+    add("toggle_next_move_overlay", 0, 0, "toggle the next move marker", [this](CommandContext& ctx) {
+        ctx.checked = view.toggleNextMoveOverlay();
         view.requestRepaint();
-    }
-    else if (cmd == "play once") {
-        if (syncingUI) return;  // Block until initialization complete
+    });
+
+    add("play once", 0, 0, "ask the kibitz engine for one move", [this](CommandContext& ctx) {
+        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         // Don't trigger at end of finished game
         if (model.game.isAtFinishedGame()) {
+            ctx.notifyMenu = false;
             return;
         }
         // Activate genmove if needed (for kibitz to work)
@@ -249,38 +365,48 @@ void GobanControl::command(const std::string& cmd) {
         }
         engine.playKibitzMove();
         view.requestRepaint();
-    }
-    else if (cmd == "toggle_analysis_mode") {
+    });
+
+    add("toggle_analysis_mode", 0, 0, "switch between match and analysis mode", [this](CommandContext& ctx) {
         if (view.isTsumegoMode()) {
-            return;  // Tsumego mode exits only via new game or loading ordinary SGF
+            // Tsumego mode exits only via new game or loading ordinary SGF.
+            // Leave the menu toggle alone — OnUpdate keeps it lit for tsumego.
+            ctx.notifyMenu = false;
+            return;
         }
         if (engine.getGameMode() == GameMode::MATCH) {
             if (engine.setGameMode(GameMode::ANALYSIS)) {
-                checked = true;
+                ctx.checked = true;
             }
         } else {
             if (engine.setGameMode(GameMode::MATCH)) {
-                checked = false;
+                ctx.checked = false;
             }
         }
         view.requestRepaint();
-    }
-    else if (cmd == "genmove") {
-        // Reserved for future "resume match from here" feature
-    }
-    else if (cmd == "toggle ai vs ai") {
+    });
+
+    add("genmove", 0, 0, "reserved for a future \"resume match from here\" feature (no-op)",
+        [](CommandContext&) {
+    });
+
+    // Registered but currently unbound: no keybinding in config/base.json and no
+    // menu entry in any config/gui/*/goban.rml (see backlog/issue-48-better-genmove.md).
+    add("toggle ai vs ai", 0, 0, "toggle engine-versus-engine play", [this](CommandContext&) {
         engine.setAiVsAi(!engine.isAiVsAi());
         view.requestRepaint();
-    }
-    else if(cmd == "resign") {
-        if (syncingUI) return;  // Block until initialization complete
+    });
+
+    add("resign", 0, 0, "resign the game", [this](CommandContext& ctx) {
+        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         if(engine.humanToMove()) {
             auto move = engine.getLocalMove(Move::RESIGN);
             engine.playLocalMove(move);
         }
-    }
-    else if (cmd == "pass") {
-        if (syncingUI) return;  // Block until initialization complete
+    });
+
+    add("pass", 0, 0, "pass", [this](CommandContext& ctx) {
+        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         // During navigation, pass creates a variation (game is paused — no turn restriction)
         if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
             Color colorToMove = model.game.getColorToMove();
@@ -294,9 +420,10 @@ void GobanControl::command(const std::string& cmd) {
             auto move = engine.getLocalMove(Move::PASS);
             engine.playLocalMove(move);
         }
-    }
-    else if (cmd == "clear") {
-        if (syncingUI) return;  // Block until initialization complete
+    });
+
+    add("clear", 0, 0, "clear the board and start over (prompts first)", [this](CommandContext& ctx) {
+        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         // Use different prompt for game in progress vs finished game
         const char* templateId = engine.isRunning() && !model.isGameOver && !model.tsumegoMode
             ? "templateQuitWithoutFinishing"
@@ -312,11 +439,12 @@ void GobanControl::command(const std::string& cmd) {
                 (void) newGame(savedSize > 0 ? savedSize : model.getBoardSize());
             }
         });
-    }
-    else if (cmd == "start") {
+    });
+
+    add("start", 0, 0, "start/resume engine play", [this](CommandContext& ctx) {
         spdlog::debug("start command: syncingUI={}, isGameOver={}, started={}, isRunning={}",
             syncingUI, model.isGameOver.load(), model.started, engine.isRunning());
-        if (syncingUI) return;  // Block until initialization complete
+        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         if (!model.isGameOver) {
             model.start();
             if (!engine.isRunning()) {
@@ -326,108 +454,135 @@ void GobanControl::command(const std::string& cmd) {
         } else {
             spdlog::debug("start command blocked: isGameOver=true");
         }
-    }
-    else if (cmd == "reset camera") {
+    });
+
+    add("reset camera", 0, 0, "restore the default camera", [this](CommandContext&) {
         view.resetView();
         view.requestRepaint();
-    }
-    else if (cmd == "save camera") {
+    });
+
+    add("save camera", 0, 0, "store the current camera as the preset", [this](CommandContext&) {
         view.saveView();
-    }
-    else if (cmd == "delete camera") {
+    });
+
+    add("delete camera", 0, 0, "forget the stored camera preset", [this](CommandContext&) {
         view.clearView();
-    }
-    else if (cmd == "zoom stones") {
+    });
+
+    add("zoom stones", 0, 0, "frame the stones on the board", [this](CommandContext&) {
         view.zoomToStones();
-    }
-    else if (cmd == "undo move") {
+    });
+
+    add("undo move", 0, 0, "take back the last move", [this](CommandContext&) {
         if (!engine.isThinking()) {
             engine.navigateBack();
         }
-    }
-    else if (cmd == "navigate_start" || cmd == "navigate_end" ||
-             cmd == "navigate_back" || cmd == "navigate_forward") {
-        // Block navigation while engine is thinking - would corrupt state
-        spdlog::debug("Navigation command '{}': isThinking={}, isRunning={}, isGameOver={}",
-            cmd, engine.isThinking(), engine.isRunning(), model.isGameOver.load());
-        if (engine.isThinking()) {
-            spdlog::debug("Navigation command '{}' blocked - engine is thinking", cmd);
-        }
-        else if (cmd == "navigate_start") {
-            engine.navigateToStart();
-        }
-        else if (cmd == "navigate_end") {
-            engine.navigateToEnd();
-        }
-        else if (cmd == "navigate_back") {
-            engine.navigateBack();
-        }
-        else if (cmd == "navigate_forward") {
-            engine.navigateForward();
-        }
-    }
-    else if (cmd == "pan camera") {
+    });
+
+    add("navigate_start", 0, 0, "jump to the start of the game", [this, navigate](CommandContext&) {
+        navigate("navigate_start", [this] { engine.navigateToStart(); });
+    });
+
+    add("navigate_end", 0, 0, "jump to the end of the current branch", [this, navigate](CommandContext&) {
+        navigate("navigate_end", [this] { engine.navigateToEnd(); });
+    });
+
+    add("navigate_back", 0, 0, "step one move back", [this, navigate](CommandContext&) {
+        navigate("navigate_back", [this] { engine.navigateBack(); });
+    });
+
+    add("navigate_forward", 0, 0, "step one move forward", [this, navigate](CommandContext&) {
+        navigate("navigate_forward", [this] { engine.navigateForward(); });
+    });
+
+    add("pan camera", 0, 0, "end an interactive camera pan", [this](CommandContext&) {
         view.endPan();
-    }
-    else if (cmd == "rotate camera") {
+    });
+
+    add("rotate camera", 0, 0, "end an interactive camera rotation", [this](CommandContext&) {
         view.endRotation();
-    }
-    else if (cmd == "zoom camera") {
+    });
+
+    add("zoom camera", 0, 0, "end an interactive camera zoom", [this](CommandContext&) {
         view.endZoom();
-    }
-    else if (cmd == "cycle shaders") {
+    });
+
+    add("cycle shaders", 0, 0, "select the next shader", [this](CommandContext&) {
         if(auto doc = parent->GetContext()->GetDocument("game_window")) {
             if(auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectShader"))) {
                 int currentProgram = select->GetSelection();
                 select->SetSelection((currentProgram + 1) % select->GetNumOptions());
             }
         }
-    }
-    else if (cmd == "increase gamma") {
+    });
+
+    add("increase gamma", 0, 0, "raise gamma", [this](CommandContext&) {
         spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() + 0.025f);
-    }
-    else if (cmd == "decrease gamma") {
+    });
+
+    add("decrease gamma", 0, 0, "lower gamma", [this](CommandContext&) {
         spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() - 0.025f);
-    }
-    else if (cmd == "increase eof") {
+    });
+
+    add("increase eof", 0, 0, "raise the stereo eye offset factor", [this](CommandContext&) {
         view.setEof(view.getEof() + 0.0025f);
         spdlog::debug("new eof = {0}", view.getEof());
-    }
-    else if (cmd == "decrease eof") {
+    });
+
+    add("decrease eof", 0, 0, "lower the stereo eye offset factor", [this](CommandContext&) {
         view.setEof(view.getEof() - 0.0025f);
         spdlog::debug("new eof = {0}", view.getEof());
-    }
-    else if (cmd == "increase dof") {
+    });
+
+    add("increase dof", 0, 0, "raise the depth of field", [this](CommandContext&) {
         view.setDof(view.getDof() + 0.0025f);
         spdlog::debug("new dof = {0}", view.getDof());
-    }
-    else if (cmd == "decrease dof") {
+    });
+
+    add("decrease dof", 0, 0, "lower the depth of field", [this](CommandContext&) {
         view.setDof(view.getDof() - 0.0025f);
         spdlog::debug("new dof = {0}", view.getDof());
-    }
+    });
 
-    else if (cmd == "increase contrast") {
+    add("increase contrast", 0, 0, "raise contrast", [this](CommandContext&) {
         spdlog::debug("new contrast = {0}", view.getContrast() + 0.025f);
         view.setContrast(view.getContrast() + 0.025f);
-    }
-    else if (cmd == "decrease contrast") {
+    });
+
+    add("decrease contrast", 0, 0, "lower contrast", [this](CommandContext&) {
         spdlog::debug("new contrast = {0}", view.getContrast() - 0.025f);
         view.setContrast(view.getContrast() - 0.025f);
-    }
-    else if (cmd == "reset contrast and gamma") {
+    });
+
+    add("reset contrast and gamma", 0, 0, "restore default contrast and gamma", [this](CommandContext&) {
         view.resetAdjustments();
-    }
-    else if(cmd == "free camera toggle") {
+    });
+
+    add("free camera toggle", 0, 0, "toggle the horizontal camera lock", [this](CommandContext&) {
         view.cam.setHorizontalLock(!view.cam.lock);
-    }
-    else if(cmd == "save") {
+    });
+
+    add("report_bug", 0, 0, "write the recent interactions to a replayable bug report",
+        [this](CommandContext&) {
+        // The recorder is always on, so this works retroactively: notice
+        // something odd, then save what led up to it.
+        const std::string path = ScenarioRecorder::instance().save("reports");
+        if (path.empty()) {
+            parent->showMessage("Nothing recorded yet");
+        } else {
+            parent->showMessage(path);
+        }
+    });
+
+    add("save", 0, 0, "save the game record now", [this](CommandContext&) {
         model.game.saveAs("");
         // Show feedback with filename
         parent->showMessage(model.game.getDefaultFileName());
-    }
-    else if(cmd == "archive") {
+    });
+
+    add("archive", 0, 0, "move the daily record to a timestamped file", [this](CommandContext& ctx) {
         // Save any pending changes to the daily file
         std::string dailyFile = model.game.getDefaultFileName();
         model.game.saveAs("");
@@ -435,6 +590,7 @@ void GobanControl::command(const std::string& cmd) {
         // Check if there's actually a file to archive
         if (!std::filesystem::exists(dailyFile)) {
             parent->showMessage("Nothing to archive");
+            ctx.notifyMenu = false;
             return;
         }
 
@@ -454,6 +610,7 @@ void GobanControl::command(const std::string& cmd) {
         } catch (const std::exception& e) {
             spdlog::error("Failed to rename session file: {}", e.what());
             parent->showMessage("Archive failed");
+            ctx.notifyMenu = false;
             return;
         }
 
@@ -465,8 +622,31 @@ void GobanControl::command(const std::string& cmd) {
         // Show feedback with archived filename
         parent->showMessage(archivedFile);
         spdlog::info("Archived to {}, daily session continues as {}", archivedFile, dailyFile);
-    }
-    else if(cmd == "load") {
+    });
+
+    add("load_sgf", 1, 2, "<path> [gameIndex] — load an SGF without the file chooser",
+        [this](CommandContext& ctx) {
+        // Same entry point the file chooser uses, exposed for scripted runs and
+        // for the prologue of recorded bug reports.
+        int gameIndex = 0;
+        if (ctx.args.size() > 1 && !parseInt(ctx.args[1], gameIndex)) {
+            spdlog::warn("load_sgf: '{}' is not a game index", ctx.args[1]);
+            return;
+        }
+        setSyncingUI(true);
+        const bool ok = engine.loadSGF(ctx.args[0], gameIndex, false);
+        parent->refreshPlayerDropdowns();
+        setSyncingUI(false);
+        if (!ok) {
+            spdlog::warn("load_sgf: failed to load '{}'", ctx.args[0]);
+            return;
+        }
+        view.updateLastMoveOverlay();
+        view.updateNavigationOverlay();
+        view.requestRepaint();
+    });
+
+    add("load", 0, 0, "open the SGF file chooser", [this](CommandContext&) {
         // Get the file chooser handler and show the dialog
         if (auto* handler = dynamic_cast<EventHandlerFileChooser*>(EventManager::GetEventHandler("open"))) {
             // Pre-select current file and game in dialog
@@ -478,46 +658,191 @@ void GobanControl::command(const std::string& cmd) {
         } else {
             spdlog::warn("File chooser handler not found");
         }
-    }
-    else if (cmd == "prev_game" || cmd == "next_game") {
-        if (engine.isThinking()) return;
-        size_t gameCount = model.game.getLoadedGameCount();
-        if (gameCount <= 1) return;
+    });
 
-        int currentIdx = model.game.getLoadedGameIndex();
-        int newIdx = (cmd == "prev_game") ? currentIdx - 1 : currentIdx + 1;
-        if (newIdx < 0 || newIdx >= static_cast<int>(gameCount)) return;
+    add("prev_game", 0, 0, "previous game in the loaded SGF collection",
+        [stepLoadedGame](CommandContext& ctx) {
+            stepLoadedGame(ctx, -1);
+    });
 
-        bool tsumego = view.isTsumegoMode();
-        setSyncingUI(true);
-        engine.switchGame(newIdx, tsumego);  // Start at root in tsumego mode
-        parent->refreshPlayerDropdowns();
-        setSyncingUI(false);
+    add("next_game", 0, 0, "next game in the loaded SGF collection",
+        [stepLoadedGame](CommandContext& ctx) {
+            stepLoadedGame(ctx, +1);
+    });
 
-        if (tsumego) {
-            view.setTsumegoMode(true);  // Re-apply overlay settings
-            model.tsumegoMode = true;
-            model.game.setSuppressSessionCopy(true);
-            engine.autoPlayTsumegoSetup();
-        }
-
-        view.updateLastMoveOverlay();
-        view.updateNavigationOverlay();
-        view.requestRepaint();
-    }
-    else if(cmd == "msg") {
+    add("msg", 0, 0, "dismiss the status message", [this](CommandContext&) {
         // Only clear if no active prompt (prompts require button click)
         if (!parent->hasActivePrompt()) {
             parent->clearMessage();
         }
-    }
-    else if(cmd == "prompt_yes" || cmd == "prompt_ok") {
+    });
+
+    add("prompt_yes", 0, 0, "confirm the active prompt", [this](CommandContext&) {
         parent->handlePromptResponse(true);
-    }
-    else if(cmd == "prompt_no" || cmd == "prompt_cancel") {
+    });
+
+    add("prompt_ok", 0, 0, "confirm the active prompt", [this](CommandContext&) {
+        parent->handlePromptResponse(true);
+    });
+
+    add("prompt_no", 0, 0, "dismiss the active prompt", [this](CommandContext&) {
         parent->handlePromptResponse(false);
+    });
+
+    add("prompt_cancel", 0, 0, "dismiss the active prompt", [this](CommandContext&) {
+        parent->handlePromptResponse(false);
+    });
+
+    // --- Parameterised commands (scripting channel) --------------------------
+
+    add("new_game", 1, 1, "<size> — start a new game on a size x size board",
+        [this](CommandContext& ctx) {
+            int boardSize = 0;
+            if (!parseInt(ctx.args[0], boardSize) || boardSize < 2 || boardSize > 25) {
+                spdlog::warn("new_game: '{}' is not a valid board size (2..25)", ctx.args[0]);
+                return;
+            }
+            if (!newGame(static_cast<unsigned>(boardSize))) {
+                spdlog::warn("new_game: failed to start a {}x{} game", boardSize, boardSize);
+            }
+    });
+
+    add("switch_player", 2, 2, "<black|white> <name-or-index> — assign a player to one colour",
+        [this](CommandContext& ctx) {
+            const std::string colour = toLower(ctx.args[0]);
+            int which = -1;
+            if (colour == "black" || colour == "b" || colour == "0") {
+                which = 0;
+            } else if (colour == "white" || colour == "w" || colour == "1") {
+                which = 1;
+            } else {
+                spdlog::warn("switch_player: '{}' is not a colour (expected black or white)",
+                    ctx.args[0]);
+                return;
+            }
+
+            const auto players = engine.getPlayers();
+            int index = -1;
+            if (parseInt(ctx.args[1], index)) {
+                if (index < 0 || index >= static_cast<int>(players.size())) {
+                    spdlog::warn("switch_player: player index {} out of range (0..{})",
+                        index, players.empty() ? 0 : players.size() - 1);
+                    return;
+                }
+            } else {
+                // Resolve by name: exact match wins, otherwise a unique substring match
+                const std::string wanted = toLower(ctx.args[1]);
+                int partial = -1;
+                int partialCount = 0;
+                for (size_t i = 0; i < players.size(); ++i) {
+                    const std::string name = toLower(players[i]->getName());
+                    if (name == wanted) {
+                        index = static_cast<int>(i);
+                        break;
+                    }
+                    if (name.find(wanted) != std::string::npos) {
+                        partial = static_cast<int>(i);
+                        ++partialCount;
+                    }
+                }
+                if (index < 0 && partialCount == 1) {
+                    index = partial;
+                }
+                if (index < 0) {
+                    std::ostringstream known;
+                    for (size_t i = 0; i < players.size(); ++i) {
+                        known << (i ? ", " : "") << i << ':' << players[i]->getName();
+                    }
+                    spdlog::warn("switch_player: no unique player matching '{}' (known: {})",
+                        ctx.args[1], known.str());
+                    return;
+                }
+            }
+
+            switchPlayer(which, index);
+            parent->refreshPlayerDropdowns();  // Keep the dropdowns in step with the switch
+            view.requestRepaint();
+    });
+
+    add("click", 2, 2, "<col> <row> — place a stone as if the board was clicked there",
+        [this](CommandContext& ctx) {
+            int col = 0;
+            int row = 0;
+            if (!parseInt(ctx.args[0], col) || !parseInt(ctx.args[1], row)) {
+                spdlog::warn("click: '{} {}' is not a board coordinate pair",
+                    ctx.args[0], ctx.args[1]);
+                return;
+            }
+            const Position coord(col, row);
+            if (!model.isPointOnBoard(coord)) {
+                spdlog::warn("click: ({},{}) is off a {}x{} board",
+                    col, row, model.getBoardSize(), model.getBoardSize());
+                return;
+            }
+            // Same guard as mouseClick: no stone placement until players are set
+            if (syncingUI) {
+                spdlog::warn("click: ignored, initialization is not complete");
+                return;
+            }
+            boardClick(coord);
+    });
+}
+
+void GobanControl::listCommands() const {
+    spdlog::info("{} commands registered:", registry.size());
+    for (const auto& entry : registry) {
+        spdlog::info("  {:<26} {}", entry.first, entry.second.help);
     }
-    parent->OnMenuToggle(cmd, checked);
+}
+
+void GobanControl::command(const std::string& cmd) {
+    if (registry.empty()) {
+        buildRegistry();
+    }
+    // Legacy command names contain spaces ("play once", "reset camera"), so an
+    // exact match on the whole line wins before falling back to tokenisation.
+    if (registry.find(cmd) != registry.end()) {
+        command(cmd, std::vector<std::string>());
+        return;
+    }
+    const auto tokens = splitCommand(cmd);
+    if (tokens.empty()) {
+        return;  // blank line — nothing to dispatch
+    }
+    command(tokens.front(), std::vector<std::string>(tokens.begin() + 1, tokens.end()));
+}
+
+void GobanControl::command(const std::string& name, const std::vector<std::string>& args) {
+    if (registry.empty()) {
+        buildRegistry();
+    }
+    const auto entry = registry.find(name);
+    if (entry == registry.end()) {
+        spdlog::warn("Unknown command '{}' — run 'help' to list the known commands", name);
+        return;
+    }
+    const int argc = static_cast<int>(args.size());
+    if (argc < entry->second.minArgs || argc > entry->second.maxArgs) {
+        spdlog::warn("Command '{}' takes {}..{} argument(s), got {} — usage: {} {}",
+            name, entry->second.minArgs, entry->second.maxArgs, argc, name, entry->second.help);
+        return;
+    }
+    // Record before executing, then sample the resulting state, so a saved
+    // report shows what each action produced.
+    ScenarioRecorder::instance().recordAction(name, args, dumpState());
+
+    CommandContext ctx{args, false, true};
+    {
+        ScenarioRecorder::SuppressNested noNestedRecords;
+        entry->second.handler(ctx);
+    }
+
+    ScenarioRecorder::instance().recordState(dumpState());
+    // Feed the toggle state back into the menu, unless the handler bailed out
+    // (the old if/else chain reached this line only when no `return` was taken).
+    if (ctx.notifyMenu) {
+        parent->OnMenuToggle(name, ctx.checked);
+    }
 }
 
 void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
@@ -649,6 +974,15 @@ bool GobanControl::setHandicap(int handicap) const {
 }
 
 void GobanControl::switchPlayer(int which, int newPlayerIndex) const {
+    // Dropdown-driven switches never reach command(), so record here too.
+    auto allPlayers = engine.getPlayers();
+    const std::string chosen =
+        (newPlayerIndex >= 0 && static_cast<size_t>(newPlayerIndex) < allPlayers.size())
+            ? allPlayers[static_cast<size_t>(newPlayerIndex)]->getName()
+            : std::to_string(newPlayerIndex);
+    ScenarioRecorder::instance().recordAction(
+        "switch_player", {which == 0 ? "black" : "white", chosen}, dumpState());
+
     engine.activatePlayer(which, static_cast<size_t>(newPlayerIndex));
     model.state.holdsStone = false;
     // Persist player choice — only switchPlayer saves to UserSettings,
@@ -679,6 +1013,107 @@ void GobanControl::switchShader(int newShaderIndex) const {
 void GobanControl::destroy() const {
     spdlog::debug("GAME DESTRUCT");
     engine.interrupt();
+}
+
+namespace {
+
+const char* messageName(GameState::Message m) {
+    switch (m) {
+        case GameState::NONE:              return "none";
+        case GameState::WHITE_PASS:        return "white_pass";
+        case GameState::BLACK_PASS:        return "black_pass";
+        case GameState::WHITE_RESIGNS:     return "white_resigns";
+        case GameState::BLACK_RESIGNS:     return "black_resigns";
+        case GameState::BLACK_RESIGNED:    return "black_resigned";
+        case GameState::WHITE_RESIGNED:    return "white_resigned";
+        case GameState::WHITE_WON:         return "white_won";
+        case GameState::BLACK_WON:         return "black_won";
+        case GameState::PAUSED:            return "paused";
+        case GameState::CALCULATING_SCORE: return "calculating_score";
+        case GameState::SCORING_FAILED:    return "scoring_failed";
+        case GameState::TSUMEGO_SOLVED:    return "tsumego_solved";
+        case GameState::TSUMEGO_WRONG:     return "tsumego_wrong";
+    }
+    return "unknown";
+}
+
+}  // namespace
+
+bool GobanControl::isIdle() const {
+    if (syncingUI) return false;
+    if (engine.isThinking()) return false;
+    // Navigation is queued to the game thread, so it can still be outstanding
+    // while no engine is thinking. Without this a script would read the board
+    // before navigation had applied.
+    if (engine.hasPendingNavigation()) return false;
+    return true;
+}
+
+nlohmann::json GobanControl::dumpState() const {
+    nlohmann::json s;
+
+    // Game record / navigation
+    s["move_count"]     = model.game.moveCount();
+    s["view_position"]  = model.game.getViewPosition();
+    s["main_line_moves"] = model.game.getLoadedMovesCount();
+    s["navigating"]     = model.game.isNavigating();
+    s["at_end"]         = model.game.isAtEndOfNavigation();
+    s["variations"]     = model.game.getVariations().size();
+    s["has_result"]     = model.game.hasGameResult();
+    s["board_size"]     = model.game.getBoardSize();
+
+    // Turn and rules state
+    s["color_to_move"]  = (model.state.colorToMove == Color::BLACK) ? "B" : "W";
+    s["komi"]           = model.state.komi;
+    s["handicap"]       = model.state.handicap;
+
+    // Stones actually on the board, and prisoners
+    s["black_stones"]   = model.board.stonesOnBoard(Color::BLACK);
+    s["white_stones"]   = model.board.stonesOnBoard(Color::WHITE);
+    s["captured_black"] = model.board.capturedCount(Color::BLACK);
+    s["captured_white"] = model.board.capturedCount(Color::WHITE);
+
+    // Lifecycle flags — the ones the Design Invariants are written about
+    s["mode"]           = (engine.getGameMode() == GameMode::ANALYSIS) ? "analysis" : "match";
+    s["ai_vs_ai"]       = engine.isAiVsAi();
+    s["started"]        = model.started.load();
+    s["game_over"]      = model.isGameOver.load();
+    s["running"]        = engine.isRunning();
+    s["thinking"]       = engine.isThinking();
+    s["syncing_ui"]     = syncingUI;
+    s["tsumego"]        = model.tsumegoMode.load();
+    s["holds_stone"]    = model.state.holdsStone;
+    s["show_territory"] = model.board.showTerritory;
+    s["msg"]            = messageName(model.state.msg);
+
+    // Where the position came from — needed to reconstruct a starting point
+    // when replaying a recorded session.
+    s["sgf_file"] = model.game.hasLoadedExternalDoc()
+        ? model.game.getLoadedFilePath()
+        : std::string();
+    s["game_index"] = model.game.getLoadedGameIndex();
+
+    // Players
+    auto players = engine.getPlayers();
+    const size_t blackIdx = engine.getActivePlayer(0);
+    const size_t whiteIdx = engine.getActivePlayer(1);
+    s["black_player"] = (blackIdx < players.size()) ? players[blackIdx]->getName() : "";
+    s["white_player"] = (whiteIdx < players.size()) ? players[whiteIdx]->getName() : "";
+
+    // A cheap, order-independent fingerprint of the position, so a scenario can
+    // assert "the board is the same as before" without spelling out 361 points.
+    unsigned long hash = 1469598103934665603UL;
+    for (int row = 0; row < model.game.getBoardSize(); ++row) {
+        for (int col = 0; col < model.game.getBoardSize(); ++col) {
+            const Color& stone = model.board[Position(col, row)].stone;
+            const unsigned long v = (stone == Color::BLACK) ? 2u
+                                  : (stone == Color::WHITE) ? 1u : 0u;
+            hash = (hash ^ v) * 1099511628211UL;
+        }
+    }
+    s["board_hash"] = hash;
+
+    return s;
 }
 
 void GobanControl::saveCurrentGame() const {

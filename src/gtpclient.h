@@ -28,11 +28,18 @@ void replaceAll(std::string& out, const std::string& what, const std::string& by
 // Cross-platform process with stdin/stdout/stderr pipes
 class Process {
 public:
+    enum class ReadStatus { Ok, Eof, Timeout };
+
     Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir);
     ~Process();
 
     bool write(const std::string& data) const;
-    bool readLine(std::string& line);
+
+    /// Reads one line, waiting at most timeoutMs. A negative timeout blocks
+    /// indefinitely, which is the historical behaviour.
+    ReadStatus readLine(std::string& line, int timeoutMs);
+
+    bool readLine(std::string& line) { return readLine(line, -1) == ReadStatus::Ok; }
     bool readLineStderr(std::string& line);
     void closeStdin();
     void closeStdout();
@@ -82,7 +89,13 @@ private:
     mutable std::mutex lastLineMutex_;
     std::vector<OutputFilter> outputFilters;
     std::unique_ptr<StderrReaderThread> stderrReader_;
+    // Killed deliberately during shutdown: further commands answer "= " so
+    // teardown stays silent.
     std::atomic<bool> terminated_{false};
+    // Killed because it stopped responding. Distinct from terminated_ because
+    // this one must keep reporting failure — pretending a dead engine answered
+    // OK would let move replay and scoring proceed against nothing.
+    std::atomic<bool> failed_{false};
 
     nlohmann::json vars;
 
@@ -106,8 +119,6 @@ public:
 
     std::string lastError();
 
-    CommandOutput showboard();
-
     CommandOutput name();
 
     CommandOutput version();
@@ -118,6 +129,23 @@ public:
 
     /// Kill the engine process immediately (unblocks any blocking readLine).
     void terminateProcess();
+
+    /// Maximum time to wait for a response to a single GTP command.
+    /// A negative value waits forever.
+    ///
+    /// This exists because a wedged engine used to hang the game thread with no
+    /// way out (issue #45's failure mode, and a hazard for automated runs).
+    /// The default is deliberately generous: a strong engine thinking at long
+    /// time settings, or KataGo loading network weights, can legitimately take
+    /// tens of seconds. Per-engine overrides come from "timeout_ms" in the bot
+    /// configuration.
+    void setCommandTimeout(int ms) { commandTimeoutMs_ = ms; }
+    [[nodiscard]] int getCommandTimeout() const { return commandTimeoutMs_; }
+
+    static constexpr int DEFAULT_COMMAND_TIMEOUT_MS = 300000;  // 5 minutes
+
+private:
+    int commandTimeoutMs_ = DEFAULT_COMMAND_TIMEOUT_MS;
 };
 
 #endif // GTPCLIENT_H

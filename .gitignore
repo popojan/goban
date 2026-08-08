@@ -49,3 +49,15 @@ wiki/
 
 # Current user configuration
 user.json
+
+# Test fixtures must survive the blanket *.sgf rule above
+!tests/data/*.sgf
+
+# Scenario runs and recorded bug reports
+reports/
+scenario-user.json
+
+# Local scratch logs
+last_run.log.*
+valgrind.log*
+user.json.*

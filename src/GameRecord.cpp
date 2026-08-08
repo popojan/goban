@@ -699,6 +699,26 @@ void GameRecord::clearSession() {
     doc = nullptr;
     numGames = 0;
     gameInDocument = false;  // Allow current game to be added to new session
+
+    // Re-attach the in-progress game to the fresh session immediately, but only
+    // if the player has actually diverged from the loaded record. A game that is
+    // merely being replayed (gameHasNewMoves == false) must NOT be copied into
+    // the new session — that is the whole point of the flag.
+    //
+    // Doing it here rather than waiting for the next move matters: the only
+    // caller of appendGameToDocument() is move(), behind
+    // `if (!gameHasNewMoves)`, which is already true for a game under way. So
+    // nothing would ever have rebuilt the document, `doc` would stay null, and
+    // saveAsInternal() bails out on a null doc — silently dropping every move
+    // played after archiving mid-game.
+    //
+    // appendGameToDocument() takes no lock of its own and expects the caller to
+    // hold the mutex, which we do. It still honours suppressSessionCopy, so
+    // tsumego mode remains excluded.
+    if (gameHasNewMoves) {
+        appendGameToDocument();
+    }
+
     spdlog::info("Cleared session document - new session will start fresh");
 }
 
@@ -1454,8 +1474,17 @@ void GameRecord::buildBoardFromMoves(Board& outBoard, Position& koPosition) cons
 
     // Replay moves from root to current position
     auto path = getPathFromRoot();
-    outBoard.replayMoves(path);
+    const int applied = outBoard.replayMoves(path);
     koPosition = outBoard.getKoPosition();
+
+    // replayMoves stops at the first move it considers illegal. Ignoring that
+    // meant a rejected move silently produced a board reconstructed only up to
+    // that point, with no indication anything was wrong.
+    if (applied != static_cast<int>(path.size())) {
+        spdlog::error("buildBoardFromMoves: replayed only {} of {} moves — the displayed "
+                      "position is incomplete (see the preceding replayMoves warning)",
+                      applied, path.size());
+    }
 
     spdlog::debug("buildBoardFromMoves: replayed {} moves, {} black stones, {} white stones on board",
         path.size(), outBoard.stonesOnBoard(Color::BLACK), outBoard.stonesOnBoard(Color::WHITE));

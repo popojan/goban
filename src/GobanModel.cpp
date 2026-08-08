@@ -1,4 +1,3 @@
-#include "ElementGame.h"
 #include "GobanModel.h"
 #include "UserSettings.h"
 #include <glm/glm.hpp>

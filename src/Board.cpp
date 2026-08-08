@@ -1,6 +1,7 @@
 #include "Board.h"
 #include <sstream>
 #include <algorithm>
+#include <cctype>
 
 const float Board::mBlackArea = 2.0f;
 const float Board::mWhiteArea = 3.0f;
@@ -33,7 +34,10 @@ std::ostream& operator<< (std::ostream& stream, const Color& color) {
 }
 
 std::ostream& operator<< (std::ostream& stream, const Board& board) {
-    for (int i = board.boardSize; i != 0; --i) {
+    // Rows run top to bottom. The loop previously started at boardSize and
+    // stopped at 1, which skipped the bottom row and read one row past the end
+    // of the board.
+    for (int i = board.boardSize - 1; i >= 0; --i) {
         for(int j = 0; j < board.boardSize; ++j)
             stream << board[Position(j, i)].stone << " ";
         stream << std::endl;
@@ -48,7 +52,15 @@ std::istream& operator>> (std::istream& stream, Position& pos) {
     int j;
     if(d < 0)
         return stream;
-    if (c >= 'I') j = 7 + c - 'I'; else j = c - 'A';
+    // GTP vertices are case-insensitive, and the column letter 'I' is skipped.
+    // Without the fold to upper case a lower-case reply such as "d4" produced
+    // column 34 (7 + 'd' - 'I'), which nothing downstream bounds-checks.
+    c = static_cast<unsigned char>(std::toupper(c));
+    if (c == 'I' || c < 'A' || c > 'T') {
+        pos = Position(-1, -1);
+        return stream;
+    }
+    if (c > 'I') j = 7 + c - 'I'; else j = c - 'A';
     int i = d - 1;
     pos = Position(j, i);
     return stream;
@@ -479,99 +491,6 @@ void Board::copyStateFrom(const Board& b) {
     score = b.score;
 }
 
-bool Board::parseGtp(const std::vector<std::string>& lines) {
-    bool success = false;
-    try {
-        if(lines.front().at(0) == '=') {
-            std::istringstream ssin(lines.at(2));
-
-            int size = 0;
-            ssin >> size;
-            spdlog::debug("Size: {}", size);
-            if(size >= MIN_BOARD && size <= MAX_BOARD) {
-                int bcaptured = 0, wcaptured = 0;
-                spdlog::debug(lines.at(1));
-			    bool white = true;
-                for(int i = 2; i < 2 + size; ++i) {
-                    spdlog::debug(lines[i]);
-                    for(int j = 3; j < 3 + (size << 1); j += 2) {
-                        char c = lines[i][j];
-                        Position p((j - 3) >> 1, size - i + 1);
-                        Color color;
-                        if(c == 'X') {
-                            color = Color::BLACK;
-                        }
-                        else if(c == 'O') {
-                            color = Color::WHITE;
-                        }
-                        (*this)[p].stone = color;
-                    }
-                    if(lines[i].back() == 's') {
-                        std::string s;
-                        std::istringstream ssline(lines[i]);
-                        while((ssline >> s) && s != "captured") {
-                          ssline >> s;
-                        }
-                        int count = 0;
-                        ssline >> count;
-						if (white) {
-							bcaptured = count;
-							white = false;
-						}
-						else {
-							wcaptured = count;
-						}
-                    }
-                }
-                boardSize = size;
-                success = true;
-                capturedBlack = bcaptured;
-                capturedWhite = wcaptured;
-                spdlog::debug("Captured: {}, {}", capturedBlack, capturedWhite);
-                spdlog::debug(lines[2 + size]);
-                moveNumber += 1;
-            }
-        }
-    }
-    catch (const std::out_of_range& oor) {
-        spdlog::error("Gtp parse error: {}", oor.what());
-    }
-    return success;
-
-}
-
-bool Board::parseGtpInfluence(const std::vector<std::string>& lines) {
-    bool success = false;
-    try {
-        for (int i = 0; i < boardSize; ++i) {
-            spdlog::debug("row = {}/{}", i, boardSize);
-            std::istringstream ssin(lines.at(i));
-            if (i == 0) {
-                char c;
-                ssin >> c;
-                success = (c == '=');
-                if (!success) return false;
-            }
-            for (int j = 0; j < boardSize; ++j) {
-                float val = 0.0;
-                ssin >> val;
-                Color c;
-                if (val > 2)
-                    c = Color::WHITE;
-                else if (val < -2)
-                    c = Color::BLACK;
-                (*this)[Position(j, boardSize - i - 1)].influence = c;
-            }
-        }
-        success = true;
-    }
-    catch (const std::out_of_range& oor) {
-        spdlog::error("Gtp parse error: {}", oor.what());
-    }
-    return success;
-
-}
-
 void Board::invalidate() {
     //++positionNumber;
     std::unique_lock<std::mutex> mutex;
@@ -843,8 +762,20 @@ int Board::applyMoveWithCaptures(const Move& move) {
         }
     }
 
-    // Set ko position if exactly 1 stone captured, otherwise clear it
-    koPosition = (totalCaptured == 1) ? lastCapturePos : Position(-1, -1);
+    // Simple ko arises only when a lone stone captures a lone stone and is
+    // itself left in atari — then retaking would repeat the position. Testing
+    // only "exactly one stone captured" also flags snapback, where the
+    // capturing group is larger than one stone and the recapture is legal in
+    // every ruleset. That false positive made replayMoves() abort, silently
+    // truncating board reconstruction for any game record containing a
+    // snapback.
+    koPosition = Position(-1, -1);
+    if (totalCaptured == 1) {
+        auto capturingGroup = findGroup(pos);
+        if (capturingGroup.size() == 1 && countLiberties(capturingGroup) == 1) {
+            koPosition = lastCapturePos;
+        }
+    }
 
     // Update capture counts
     if (totalCaptured > 0) {

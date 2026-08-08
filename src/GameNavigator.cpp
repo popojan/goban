@@ -329,8 +329,6 @@ bool GameNavigator::navigateToEnd() {
 
     NavigationGuard guard(navigationInProgress);
 
-    bool playedMoves = false;
-
     // Play all moves on main line (first child at each branch)
     while (true) {
         auto variations = model.game.getVariations();
@@ -352,7 +350,6 @@ bool GameNavigator::navigateToEnd() {
             spdlog::warn("navigateToEnd: navigateToChild failed, this shouldn't happen");
             break;  // Don't create new moves, something is wrong
         }
-        playedMoves = true;
     }
 
     // Always show result at end (whether we played moves or were already there)

@@ -241,6 +241,14 @@ bool GameThread::isThinking() const {
     return p != nullptr && p->isTypeOf(Player::ENGINE);
 }
 
+bool GameThread::hasPendingNavigation() const {
+    {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        if (!navQueue.empty()) return true;
+    }
+    return navigator && navigator->isNavigating();
+}
+
 bool GameThread::humanToMove() const {
     // Use playerToMove if set, otherwise fall back to actual current player
     // (playerToMove is nullptr before game loop sets it, but we still need to check)

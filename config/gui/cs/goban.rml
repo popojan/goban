@@ -200,7 +200,8 @@
                         </div>
                         <div class="grp">
                             <div class="hr">Verze</div>
-                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
+                            <div class="cmd" id="lblVersion" onmouseup="nop">Goban %s</div>
+                            <div class="cmd" onmouseup="report_bug">Nahlásit chybu</div>
                         </div>
                     </div>
                 </div>
@@ -210,12 +211,12 @@
         <div id="grpPlayers">
             <div id="grpBlack" class="hoverable bottom left">
                 <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="black">Black: 0</div>
+                  <div class="cmd" id="cntBlack" onmouseup="nop">Black: 0</div>
                 </div>
             </div>
             <div id="grpWhite" class="hoverable top right">
                 <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="white">White: 0</div>
+                  <div class="cmd" id="cntWhite" onmouseup="nop">White: 0</div>
                 </div>
             </div>
         </div>

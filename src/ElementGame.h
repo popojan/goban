@@ -58,6 +58,9 @@ public:
     // Game settings dropdowns (board/komi/handicap) are synced automatically in OnUpdate
     GobanControl& getController() { return control; }
     GameThread& getGameThread() { return engine; }
+    /// Async engine loading has finished. Scenario scripts must not issue game
+    /// commands before this, since players are not yet assigned.
+    [[nodiscard]] bool areEnginesLoaded() const { return enginesLoaded; }
     const GobanModel& getModel() const { return model; }
     void OnMenuToggle(const std::string& cmd, bool checked) const;
     void setElementDisabled(const std::string& elementId, bool disabled) const;

@@ -8,6 +8,11 @@
 #include <thread>
 #include <spdlog/spdlog.h>
 
+#ifndef _WIN32
+#include <cerrno>
+#include <poll.h>
+#endif
+
 #ifdef _WIN32
 // Windows implementation
 Process::Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir) {
@@ -120,8 +125,11 @@ bool Process::write(const std::string& data) const {
     return WriteFile(hStdinWrite_, data.c_str(), static_cast<DWORD>(data.size()), &written, NULL) && written == data.size();
 }
 
-bool Process::readLine(std::string& line) {
+Process::ReadStatus Process::readLine(std::string& line, int timeoutMs) {
     line.clear();
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(timeoutMs < 0 ? 0 : timeoutMs);
+
     while (true) {
         // Check buffer first
         size_t pos = stdoutBuffer_.find('\n');
@@ -130,7 +138,24 @@ bool Process::readLine(std::string& line) {
             stdoutBuffer_.erase(0, pos + 1);
             // Remove \r if present
             if (!line.empty() && line.back() == '\r') line.pop_back();
-            return true;
+            return ReadStatus::Ok;
+        }
+
+        // ReadFile on an anonymous pipe blocks, so poll with PeekNamedPipe to
+        // keep the timeout honest.
+        if (timeoutMs >= 0) {
+            DWORD available = 0;
+            while (true) {
+                if (!PeekNamedPipe(hStdoutRead_, NULL, 0, NULL, &available, NULL)) {
+                    available = 0;
+                    break;  // pipe closed; fall through to ReadFile for EOF handling
+                }
+                if (available > 0) break;
+                if (std::chrono::steady_clock::now() >= deadline) {
+                    return ReadStatus::Timeout;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
         }
 
         // Read more data
@@ -140,9 +165,9 @@ bool Process::readLine(std::string& line) {
             if (!stdoutBuffer_.empty()) {
                 line = std::move(stdoutBuffer_);
                 stdoutBuffer_.clear();
-                return true;
+                return ReadStatus::Ok;
             }
-            return false;
+            return ReadStatus::Eof;
         }
         stdoutBuffer_.append(buf, bytesRead);
     }
@@ -293,15 +318,37 @@ bool Process::write(const std::string& data) const {
     return written == static_cast<ssize_t>(data.size());
 }
 
-bool Process::readLine(std::string& line) {
+Process::ReadStatus Process::readLine(std::string& line, int timeoutMs) {
     line.clear();
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(timeoutMs < 0 ? 0 : timeoutMs);
+
     while (true) {
         size_t pos = stdoutBuffer_.find('\n');
         if (pos != std::string::npos) {
             line = stdoutBuffer_.substr(0, pos);
             stdoutBuffer_.erase(0, pos + 1);
             if (!line.empty() && line.back() == '\r') line.pop_back();
-            return true;
+            return ReadStatus::Ok;
+        }
+
+        if (timeoutMs >= 0) {
+            if (stdoutFd_ < 0) return ReadStatus::Eof;
+            for (;;) {
+                const auto now = std::chrono::steady_clock::now();
+                if (now >= deadline) return ReadStatus::Timeout;
+                const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    deadline - now).count();
+
+                struct pollfd pfd{};
+                pfd.fd = stdoutFd_;
+                pfd.events = POLLIN;
+                const int ready = poll(&pfd, 1, static_cast<int>(remaining));
+                if (ready > 0) break;                 // data (or hangup) available
+                if (ready == 0) return ReadStatus::Timeout;
+                if (errno == EINTR) continue;         // signal, not a real failure
+                return ReadStatus::Eof;
+            }
         }
 
         char buf[256];
@@ -310,9 +357,9 @@ bool Process::readLine(std::string& line) {
             if (!stdoutBuffer_.empty()) {
                 line = std::move(stdoutBuffer_);
                 stdoutBuffer_.clear();
-                return true;
+                return ReadStatus::Ok;
             }
-            return false;
+            return ReadStatus::Eof;
         }
         stdoutBuffer_.append(buf, bytesRead);
     }
@@ -566,10 +613,6 @@ std::string GtpClient::lastError() {
     return lastLine;
 }
 
-GtpClient::CommandOutput GtpClient::showboard() {
-    return issueCommand("showboard");
-}
-
 GtpClient::CommandOutput GtpClient::name() {
     return issueCommand("name");
 }
@@ -580,6 +623,9 @@ GtpClient::CommandOutput GtpClient::version() {
 
 GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
     CommandOutput ret;
+    // Order matters: a timed-out engine must keep failing, whereas one shut
+    // down on purpose reports success so teardown produces no error spam.
+    if (failed_) return {};
     if (terminated_) return {"= "};
 
     spdlog::info("{1} << {0}", command, exe);
@@ -593,7 +639,26 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
     bool error = true;
 
     std::string line;
-    while (proc_->readLine(line)) {
+    while (true) {
+        const Process::ReadStatus status = proc_->readLine(line, commandTimeoutMs_);
+
+        if (status == Process::ReadStatus::Timeout) {
+            if (terminated_) return {"= "};
+            spdlog::error("{} >> TIMEOUT after {} ms (command: {})",
+                          exe, commandTimeoutMs_, command);
+            // The engine may still answer later, and that stray reply would be
+            // read as the response to the *next* command — silently wrong
+            // results are worse than a dead engine. Kill it so every subsequent
+            // command fails fast and visibly instead.
+            spdlog::error("{}: terminating unresponsive engine to avoid a "
+                          "desynchronised GTP stream", exe);
+            failed_ = true;
+            terminateProcess();
+            return {};   // success() == false
+        }
+
+        if (status == Process::ReadStatus::Eof) break;
+
         line.erase(line.find_last_not_of(" \n\r\t") + 1);
         if(ret.empty()) {
             error = !line.empty() && line[0] != '=';

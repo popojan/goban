@@ -1,0 +1,16 @@
+{
+  "$include": "../../config/en.json",
+  "bots": [
+    {
+      "name": "mock",
+      "path": "./cmake-build-release",
+      "command": "mock_gtp_engine",
+      "parameters": "",
+      "enabled": 1,
+      "kibitz": 1
+    }
+  ],
+  "humans": [
+    "Human"
+  ]
+}

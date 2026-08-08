@@ -85,6 +85,15 @@ public:
         }
         int col = sgfPoint[0] - 'a';
         int row = boardSize - (sgfPoint[1] - 'a') - 1;
+        // Reject out-of-range points rather than returning a Position that
+        // satisfies operator bool. Callers index straight into the points array
+        // (GameRecord::buildBoardFromMoves, getMoveAt), so an unchecked column
+        // from a malformed record would write past the end of the board.
+        // Pass moves never reach here — libsgfcplusplus reports those via
+        // IsPassMove() before the point is parsed.
+        if (col < 0 || col >= boardSize || row < 0 || row >= boardSize) {
+            return Position(-1, -1);
+        }
         return Position(col, row);
     }
 
@@ -245,10 +254,6 @@ private:
     int removeGroup(const std::vector<Position>& group);
 
 public:
-
-    bool parseGtp(const std::vector<std::string>& lines);
-
-    bool parseGtpInfluence(const std::vector<std::string>& lines);
 
     void invalidate();
 

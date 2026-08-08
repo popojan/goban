@@ -188,7 +188,8 @@
                         </div>
                         <div class="grp">
                             <div class="hr">バージョン</div>
-                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
+                            <div class="cmd" id="lblVersion" onmouseup="nop">Goban %s</div>
+                            <div class="cmd" onmouseup="report_bug">バグを報告</div>
                         </div>
                     </div>
                 </div>
@@ -198,12 +199,12 @@
         <div id="grpPlayers">
             <div id="grpBlack" class="hoverable bottom left">
                 <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="black">黒: 0</div>
+                  <div class="cmd" id="cntBlack" onmouseup="nop">黒: 0</div>
                 </div>
             </div>
             <div id="grpWhite" class="hoverable top right">
                 <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="white">白: 0</div>
+                  <div class="cmd" id="cntWhite" onmouseup="nop">白: 0</div>
                 </div>
             </div>
         </div>

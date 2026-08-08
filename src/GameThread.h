@@ -67,6 +67,12 @@ public:
     // Check if genmove is in progress (engine is thinking)
     bool isThinking() const;
 
+    /// True while any navigation command is queued or executing. Navigation is
+    /// fire-and-forget from the UI thread, so isThinking() alone does not tell
+    /// you whether the board has caught up; scripted runs and any other caller
+    /// that needs quiescence must consult this too.
+    bool hasPendingNavigation() const;
+
     bool clearGame(int boardSize, float komi, int handicap);
 
     void removeSgfPlayers() const;  // Remove temporary players created from SGF loading
@@ -182,7 +188,7 @@ private:
 
     // Navigation command queue (UI thread -> game thread)
     std::queue<NavCommand> navQueue;
-    std::mutex navQueueMutex;
+    mutable std::mutex navQueueMutex;
     std::condition_variable navQueueCV;
 
     void processNavigationQueue();

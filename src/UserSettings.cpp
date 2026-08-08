@@ -8,7 +8,7 @@ UserSettings& UserSettings::instance() {
 }
 
 void UserSettings::load() {
-    std::ifstream fin(SETTINGS_FILE);
+    std::ifstream fin(settingsFile);
     if (!fin) {
         spdlog::debug("No user settings file found");
         return;
@@ -176,7 +176,7 @@ void UserSettings::save() {
         };
     }
 
-    std::ofstream fout(SETTINGS_FILE);
+    std::ofstream fout(settingsFile);
     if (fout) {
         fout << user.dump(2);
         fout.close();

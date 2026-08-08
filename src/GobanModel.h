@@ -9,16 +9,18 @@
 #include "GameObserver.h"
 #include "GameRecord.h"
 
-class ElementGame;
-
 class GobanModel: public GameObserver {
 public:
-    GobanModel(ElementGame *p, int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
-        : parent(p), invalidated(true),
+    explicit GobanModel(int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
+        : invalidated(true),
           calcCapturedBlack(0), calcCapturedWhite(0), ddc{}, metrics(), cursor({0, 0}), board(boardSize) {
         // Initialize metrics so board can render before engine initialization
         metrics.calc(boardSize);
         state.metricsReady = true;  // Metrics are valid after calc()
+        // These were previously accepted and then silently dropped, so any
+        // caller passing them got the GameState defaults instead.
+        state.handicap = handicap;
+        state.komi = komi;
     }
 
     ~GobanModel() override;
@@ -70,8 +72,6 @@ public:
     void setCursor(const Position& p) { cursor = p;}
 
 public:
-    ElementGame* parent;
-
     Board board;
 
     std::atomic<bool> isGameOver{true};

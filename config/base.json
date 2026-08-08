@@ -83,7 +83,7 @@
     {"key": 1, "command": "play once"},
     {"key": 81, "command": "quit"},
     {"key": 17, "command": "toggle_fullscreen"},
-    {"key": 35, "command": "fps"},
+    {"key": 35, "command": "toggle_fps"},
     {"key": 26, "command": "animate"},
     {"key": 31, "command": "toggle_territory"},
     {"key": 25, "command": "toggle_last_move_overlay"},

@@ -9,8 +9,23 @@ include(GNUInstallDirs)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-set_property(GLOBAL PROPERTY CMAKE_CXX_FLAGS_RELEASE "-O3 -s")
-set_property(GLOBAL PROPERTY CMAKE_CXX_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
+# Hard pin the language standard. target_compile_features(cxx_std_17) is a *minimum*,
+# so a compiler defaulting to C++20 or later (GCC 16 does) satisfies it without emitting
+# any -std flag — which breaks std::filesystem::path::u8string() call sites that expect
+# the C++17 std::string return type.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# These were previously set via set_property(GLOBAL PROPERTY ...), which sets an unrelated
+# global property rather than the variable — so they never reached the compiler.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+    # Applied per-target below so that FetchContent dependencies stay quiet.
+    set(GOBAN_WARNING_FLAGS -Wall -Wextra)
+else()
+    set(GOBAN_WARNING_FLAGS "")
+endif()
 
 INCLUDE(ExternalProject)
 INCLUDE(FetchContent)
@@ -173,6 +188,20 @@ function(fetch_rmlui)
     set(RMLUI_BACKENDS_DIR "${rmlui_SOURCE_DIR}/Backends" PARENT_SCOPE)
 endfunction()
 
+function(fetch_doctest)
+    set(DOCTEST_WITH_TESTS OFF CACHE BOOL "" FORCE)
+    set(DOCTEST_NO_INSTALL ON CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(doctest
+            GIT_REPOSITORY https://github.com/doctest/doctest.git
+            GIT_TAG v2.4.12)
+
+    FetchContent_MakeAvailable(doctest)
+
+    # Needed by the caller to include doctest's CTest integration script.
+    set(doctest_SOURCE_DIR "${doctest_SOURCE_DIR}" PARENT_SCOPE)
+endfunction()
+
 function(download_fonts)
     set(FONT_DIR "${PROJECT_SOURCE_DIR}/config/fonts")
     set(FONT_FILE "${FONT_DIR}/NotoSansCJKsc-Regular.otf")
@@ -244,6 +273,7 @@ else()
 endif()
 
 option(BuildPrerequisites "BuildPrerequisites" OFF)
+option(GOBAN_BUILD_TESTS "Build goban_core unit tests" ON)
 
 find_package(LibGlyphy)
 if(BuildPrerequisites OR NOT LibGlyphy_FOUND)
@@ -263,9 +293,6 @@ else()
 
     cmake_language(CALL find_libsgfcplusplus)
 
-    add_executable(${PROJECT_NAME}
-            src/FileChooserDataSource.cpp)
-
     if(WIN32)
         # WIN32_LEAN_AND_MEAN prevents windows.h from including winsock.h
         add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN)
@@ -280,7 +307,6 @@ else()
     if(WIN32)
         # Windows: vcpkg dependencies
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
-        set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     elseif(APPLE)
         # iconv is needed by libsgfcplusplus for SGF encoding conversion
         find_library(ICONV_LIBRARY iconv REQUIRED)
@@ -312,87 +338,133 @@ else()
         src/glyphy/GlyphyShader.cc
     )
 
-    set(GOBAN_HDR_FILES
+    # ------------------------------------------------------------------
+    # goban_core — game logic with no OpenGL, GLFW or RmlUi rendering
+    # dependency. Linkable into unit tests without a graphics context.
+    # The only RmlUi contact is Rml::Input::KeyIdentifier, used as the
+    # keybinding key type in Configuration.h (a header-only enum).
+    # ------------------------------------------------------------------
+    set(GOBAN_CORE_HDR_FILES
         src/Board.h
         src/Camera.h
+        src/Configuration.h
+        src/GameNavigator.h
+        src/GameObserver.h
+        src/GameRecord.h
+        src/GameState.h
+        src/GameThread.h
+        src/GobanModel.h
+        src/Metrics.h
+        src/PlayerManager.h
+        src/player.h
+        src/Quaternion.h
+        src/ScenarioRecorder.h
+        src/SGF.h
+        src/UserSettings.h
+        src/Vector.h
+        src/gtpclient.h
+    )
+
+    set(GOBAN_CORE_SRC_FILES
+        src/Board.cpp
+        src/Camera.cpp
+        src/Configuration.cpp
+        src/GameNavigator.cpp
+        src/GameRecord.cpp
+        src/GameThread.cpp
+        src/GobanModel.cpp
+        src/Metrics.cpp
+        src/PlayerManager.cpp
+        src/player.cpp
+        src/Quaternion.cpp
+        src/ScenarioRecorder.cpp
+        src/UserSettings.cpp
+        src/Vector.cpp
+        src/gtpclient.cpp
+    )
+
+    add_library(goban_core STATIC
+        ${GOBAN_CORE_SRC_FILES}
+        ${GOBAN_CORE_HDR_FILES}
+    )
+
+    target_include_directories(goban_core PUBLIC
+            src
+            ${glm_SOURCE_DIR}
+            ${libsgfcplusplus_inc_dir}
+            ${PROJECT_BINARY_DIR}/generated
+    )
+
+    add_dependencies(goban_core project_libsgfcplusplus)
+
+    target_link_libraries(goban_core PUBLIC
+        libsgfcplusplus
+        spdlog
+        rmlui
+        nlohmann_json::nlohmann_json
+        ${CMAKE_THREAD_LIBS_INIT}
+    )
+
+    target_compile_options(goban_core PRIVATE ${GOBAN_WARNING_FLAGS})
+
+    # ------------------------------------------------------------------
+    # goban — the application: rendering, UI, audio, platform glue
+    # ------------------------------------------------------------------
+    set(GOBAN_APP_HDR_FILES
+        src/AppState.h
         src/ElementGame.h
         src/Event.h
         src/EventHandler.h
-        src/EventHandlerNewGame.h
         src/EventHandlerFileChooser.h
+        src/EventHandlerNewGame.h
         src/EventInstancer.h
         src/EventManager.h
-        src/GameThread.h
-        src/GameObserver.h
-        src/GameNavigator.h
-        src/PlayerManager.h
-        src/gtpclient.h
-        src/player.h
-        src/Quaternion.h
-        src/Vector.h
-        src/GobanView.h
-        src/GobanModel.h
-        src/GobanControl.h
-        src/Shadinclude.hpp
-        src/GobanShader.h
-        src/Metrics.h
-        src/GobanOverlay.h
-        src/GameState.h
-        src/Configuration.h
-        src/GameRecord.h
         src/FileChooserDataSource.h
-        src/AppState.h
+        src/GobanControl.h
+        src/GobanOverlay.h
+        src/GobanShader.h
+        src/GobanView.h
+        src/OpenGL.h
+        src/ScenarioRunner.h
+        src/Shadinclude.hpp
     )
 
-    set(GOBAN_SRC_FILES
-        src/Board.cpp
-        src/Camera.cpp
+    set(GOBAN_APP_SRC_FILES
+        src/AppState.cpp
         src/ElementGame.cpp
         src/Event.cpp
         src/EventHandler.cpp
-        src/EventHandlerNewGame.cpp
         src/EventHandlerFileChooser.cpp
+        src/EventHandlerNewGame.cpp
         src/EventInstancer.cpp
         src/EventManager.cpp
-        src/GameNavigator.cpp
-        src/GameThread.cpp
-        src/PlayerManager.cpp
-        src/gtpclient.cpp
-        src/main.cpp
-        src/player.cpp
-        src/Quaternion.cpp
-        src/Vector.cpp
-        src/GobanView.cpp
-        src/GobanModel.cpp
         src/FileChooserDataSource.cpp
         src/GobanControl.cpp
-        src/GobanShader.cpp
-        src/Metrics.cpp
         src/GobanOverlay.cpp
+        src/GobanShader.cpp
+        src/GobanView.cpp
+        src/ScenarioRunner.cpp
+        src/main.cpp
         src/sound/AudioFile.cpp
         src/sound/AudioPlayer.cpp
         src/sound/FileHandler.cpp
         src/sound/StreamHandler.cpp
-            src/Configuration.cpp
         src/glad/src/glad.c
-        src/GameRecord.cpp
-        src/AppState.cpp
-        src/UserSettings.cpp
     )
-    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
-    target_sources(${PROJECT_NAME} PRIVATE
-        ${GOBAN_SRC_FILES}
-        ${GOBAN_HDR_FILES}
+    add_executable(${PROJECT_NAME}
+        ${GOBAN_APP_SRC_FILES}
+        ${GOBAN_APP_HDR_FILES}
         ${GLYPHY_SRC_FILES}
         ${RMLUI_BACKEND_SRC_FILES}
     )
+
     if(WIN32)
         target_sources(${PROJECT_NAME} PRIVATE src/goban.rc)
+        set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     endif()
+
     target_include_directories(${PROJECT_NAME} PRIVATE
-            ${glm_SOURCE_DIR}
-            src
             src/glyphy
             src/sound/
             src/glad/include
@@ -402,7 +474,6 @@ else()
             ${FREETYPE_INCLUDE_DIRS}
             ${LIBSNDFILE_INCLUDE_DIR}
             ${PORTAUDIO_INCLUDE_DIRS}
-            ${libsgfcplusplus_inc_dir}
     )
 
     add_dependencies(${PROJECT_NAME}
@@ -412,7 +483,10 @@ else()
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE HAVE_CONFIG_H=1)
 
+    target_compile_options(${PROJECT_NAME} PRIVATE ${GOBAN_WARNING_FLAGS})
+
     target_link_libraries(${PROJECT_NAME}
+        goban_core
         ${CMAKE_DL_LIBS}
         ${OPENGL_LIBRARIES}
         libglyphy
@@ -427,5 +501,49 @@ else()
         nlohmann_json::nlohmann_json
         ${EXTRA_LIBS}
     )
+
+    # ------------------------------------------------------------------
+    # goban_tests — unit tests over goban_core (no graphics context)
+    # ------------------------------------------------------------------
+    if(GOBAN_BUILD_TESTS)
+        cmake_language(CALL fetch_doctest)
+        enable_testing()
+
+        # Deterministic GTP engine used as a test double. Intentionally does not
+        # link goban_core: a mock that shared Board's rules implementation could
+        # not catch a bug in it.
+        add_executable(mock_gtp_engine tests/mock_gtp_engine.cpp)
+        target_compile_options(mock_gtp_engine PRIVATE ${GOBAN_WARNING_FLAGS})
+
+        # CONFIGURE_DEPENDS so newly added test files are picked up without
+        # having to edit this file for every new suite.
+        file(GLOB GOBAN_TEST_SRC_FILES CONFIGURE_DEPENDS
+            ${PROJECT_SOURCE_DIR}/tests/*.cpp
+        )
+        # The mock engine is a separate executable with its own main().
+        list(REMOVE_ITEM GOBAN_TEST_SRC_FILES
+            ${PROJECT_SOURCE_DIR}/tests/mock_gtp_engine.cpp
+        )
+
+        if(GOBAN_TEST_SRC_FILES)
+            add_executable(goban_tests ${GOBAN_TEST_SRC_FILES})
+            target_link_libraries(goban_tests PRIVATE goban_core doctest::doctest)
+            target_include_directories(goban_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+            target_compile_options(goban_tests PRIVATE ${GOBAN_WARNING_FLAGS})
+
+            add_dependencies(goban_tests mock_gtp_engine)
+
+            target_compile_definitions(goban_tests PRIVATE
+                GOBAN_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data"
+                GOBAN_TEST_BIN_DIR="${PROJECT_BINARY_DIR}"
+                GOBAN_MOCK_ENGINE="$<TARGET_FILE:mock_gtp_engine>"
+            )
+
+            include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
+            doctest_discover_tests(goban_tests)
+        else()
+            message(STATUS "GOBAN_BUILD_TESTS is ON but tests/*.cpp is empty")
+        endif()
+    endif()
 
 endif()
