@@ -64,4 +64,5 @@ A compact alternative for small decisions is the *Y-statement*:
 ## Index
 
 - [ADR-0001: Engine-exclusive UI actions](0001-engine-exclusive-ui-actions.md)
-- [ADR-0002: Replace the lifecycle flags with explicit state machines](0002-explicit-game-state.md) — *Accepted; implementation not started*
+- [ADR-0002: Replace the lifecycle flags with explicit state machines](0002-explicit-game-state.md) — *Accepted; complete. Its implementation log records where the plan was wrong.*
+- [ADR-0003: Goban's GTP server role is a transparent proxy](0003-gtp-server-as-proxy.md) — *Proposed; open questions unresolved*
