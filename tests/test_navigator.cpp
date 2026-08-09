@@ -316,8 +316,7 @@ TEST_CASE("navigateBack undoes one move on the record and on every engine") {
     REQUIRE(f.model.game.moveCount() == 4);
     f.model.board.showTerritory = true;
     f.model.board.showTerritoryAuto = true;
-    f.model.started = true;
-    f.model.isGameOver = true;
+    f.model.endGame(GameState::DOUBLE_PASS);
 
     CHECK(f.nav.navigateBack());
 
@@ -330,8 +329,8 @@ TEST_CASE("navigateBack undoes one move on the record and on every engine") {
     CHECK_FALSE(f.nav.isNavigating());        // and released afterwards
 
     // Reviewing pauses play and clears the stale finished-game state.
-    CHECK_FALSE(f.model.started.load());
-    CHECK_FALSE(f.model.isGameOver.load());
+    CHECK_FALSE(f.model.isStarted());
+    CHECK_FALSE(f.model.isGameOver());
     CHECK_FALSE(f.model.board.showTerritory);
     CHECK_FALSE(f.model.board.showTerritoryAuto);
 
@@ -409,7 +408,7 @@ TEST_CASE("navigateForward replays the main line and labels passes") {
     CHECK(f.model.state.passVariationLabel == "4");
     CHECK(f.model.game.isGameFinished());
     // End of a game that carries a result and the user has not pressed Start.
-    CHECK(f.model.isGameOver.load());
+    CHECK(f.model.isGameOver());
 
     CHECK_FALSE(f.nav.navigateForward());          // nothing left
     CHECK(coach.plays.size() == 4);
@@ -436,13 +435,13 @@ TEST_CASE("navigateForward keeps isGameOver clear once the user has started") {
     f.useCoach(coach);
     REQUIRE(f.load("double_pass.sgf", /*startAtRoot=*/true));
     f.model.start();
-    REQUIRE(f.model.started.load());
+    REQUIRE(f.model.isStarted());
 
     for (int i = 0; i < 4; ++i) CHECK(f.nav.navigateForward());
     CHECK(f.model.game.isAtEndOfNavigation());
     CHECK(f.model.game.hasGameResult());
     // model.started guards the restore, so the user's intent to play wins.
-    CHECK_FALSE(f.model.isGameOver.load());
+    CHECK_FALSE(f.model.isGameOver());
 }
 
 TEST_CASE("navigateToStart rewinds the record and syncs every engine") {
@@ -455,8 +454,7 @@ TEST_CASE("navigateToStart rewinds the record and syncs every engine") {
     LocalHumanPlayer human("Human");
     f.players = {static_cast<Player*>(&coach), static_cast<Player*>(&other), &human};
     REQUIRE(f.load("simple.sgf"));
-    f.model.started = true;
-    f.model.isGameOver = true;
+    f.model.endGame(GameState::DOUBLE_PASS);
     f.model.board.showTerritory = true;
 
     CHECK(f.nav.navigateToStart());
@@ -465,8 +463,8 @@ TEST_CASE("navigateToStart rewinds the record and syncs every engine") {
     CHECK(f.model.game.getLoadedMovesCount() == 4);   // tree untouched
     CHECK(f.model.state.msg == GameState::NONE);
     CHECK(f.model.state.colorToMove == Color::BLACK);
-    CHECK_FALSE(f.model.started.load());
-    CHECK_FALSE(f.model.isGameOver.load());
+    CHECK_FALSE(f.model.isStarted());
+    CHECK_FALSE(f.model.isGameOver());
     CHECK_FALSE(f.model.board.showTerritory);
     CHECK(f.observer.boardChanges == 1);
     CHECK(f.observer.lastBlackStones == 0);
@@ -529,7 +527,7 @@ TEST_CASE("navigateToEnd of a scored game turns on the territory overlay") {
     CHECK(f.model.game.shouldShowTerritory());
     CHECK(f.model.board.showTerritory);
     CHECK(f.model.board.showTerritoryAuto);
-    CHECK(f.model.isGameOver.load());
+    CHECK(f.model.isGameOver());
 }
 
 TEST_CASE("navigateToEnd of a resigned game shows the result without territory") {
@@ -542,7 +540,7 @@ TEST_CASE("navigateToEnd of a resigned game shows the result without territory")
     CHECK(f.model.game.moveCount() == 3);
     CHECK_FALSE(f.model.game.shouldShowTerritory());
     CHECK_FALSE(f.model.board.showTerritory);
-    CHECK(f.model.isGameOver.load());
+    CHECK(f.model.isGameOver());
     CHECK(f.model.state.msg == GameState::BLACK_RESIGNED);   // RE[W+R]
 }
 
@@ -606,7 +604,7 @@ TEST_CASE("navigateToVariation creates a promoted branch in an unfinished game")
     CHECK(variations[0].pos == Position(9, 9));
     CHECK(variations[1].pos == Position(3, 3));   // the original dp
     // A promoted branch resumes play.
-    CHECK(f.model.started.load());
+    CHECK(f.model.isStarted());
 }
 
 TEST_CASE("navigateToVariation without promotion appends and stays paused") {
@@ -627,7 +625,7 @@ TEST_CASE("navigateToVariation without promotion appends and stays paused") {
     CHECK(variations[0].pos == Position(3, 3));   // original dp keeps the lead
     CHECK(variations[1].pos == Position(9, 9));
     CHECK(f.model.game.getLoadedMovesCount() == 4);
-    CHECK_FALSE(f.model.started.load());          // stays in navigation mode
+    CHECK_FALSE(f.model.isStarted());          // stays in navigation mode
 }
 
 TEST_CASE("navigateToVariation on a finished game forks a fresh game record") {
@@ -646,7 +644,7 @@ TEST_CASE("navigateToVariation on a finished game forks a fresh game record") {
     // branchFromFinishedGame() copies the path into a new game without RE.
     CHECK_FALSE(f.model.game.hasGameResult());
     CHECK_FALSE(f.model.game.hasLoadedExternalDoc());
-    CHECK(f.model.started.load());
+    CHECK(f.model.isStarted());
     CHECK(f.model.game.getBoardSize() == 9);
 }
 
@@ -706,7 +704,7 @@ TEST_CASE("navigateToTreePath restores the territory overlay at a finished end")
 
     CHECK(f.nav.navigateToTreePath(4, {}));
     CHECK(f.model.game.isGameFinished());
-    CHECK(f.model.isGameOver.load());
+    CHECK(f.model.isGameOver());
     CHECK(f.model.board.showTerritory);
     CHECK(f.model.board.showTerritoryAuto);
 }
@@ -1018,19 +1016,25 @@ TEST_CASE("createNewRecord with handicap stones records them and flips the first
     CHECK(board[Position(6, 6)].stone == Color::BLACK);
 }
 
-TEST_CASE("model.pause and model.start toggle the isGameOver / started pair") {
+TEST_CASE("model.start resumes a finished game and model.pause stops it") {
     Fixture f(9);
     REQUIRE(f.load("resign.sgf"));
 
-    f.model.isGameOver = true;
+    f.model.endGame(GameState::RESIGNATION);
     f.model.start();
-    CHECK(f.model.started.load());
-    CHECK_FALSE(f.model.isGameOver.load());
+    CHECK(f.model.isStarted());
+    CHECK_FALSE(f.model.isGameOver());
     CHECK(f.model.state.reason == GameState::NO_REASON);
 
     f.model.pause();
-    CHECK_FALSE(f.model.started.load());
-    // pause() deliberately leaves isGameOver alone; navigateBack() is what
-    // clears it, and it needs a coach to get that far.
-    CHECK_FALSE(f.model.isGameOver.load());
+    CHECK_FALSE(f.model.isStarted());
+    CHECK_FALSE(f.model.isGameOver());
+
+    // pause() deliberately cannot un-finish a game — enterReview() is what
+    // navigateBack() uses for that, once it has moved the position off the end.
+    f.model.endGame(GameState::RESIGNATION);
+    f.model.pause();
+    CHECK(f.model.isGameOver());
+    f.model.enterReview();
+    CHECK_FALSE(f.model.isGameOver());
 }

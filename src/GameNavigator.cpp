@@ -65,7 +65,7 @@ void GameNavigator::notifyBoardChangeWithMove(const Board& result, const Move& m
 bool GameNavigator::navigateBack() {
     spdlog::debug("navigateBack: isNavigating={}, hasPrev={}, isGameOver={}, moveCount={}",
         model.game.isNavigating(), model.game.hasPreviousMove(),
-        model.isGameOver.load(), model.game.moveCount());
+        model.isGameOver(), model.game.moveCount());
 
     if (!model.game.isNavigating() || !model.game.hasPreviousMove()) {
         spdlog::debug("navigateBack: cannot navigate (isNavigating={}, hasPrev={})",
@@ -98,9 +98,9 @@ bool GameNavigator::navigateBack() {
     model.board.showTerritoryAuto = false;
 
     // Pause active play - user is reviewing. Explicit "Start" needed to resume.
-    // Also clears isGameOver when navigating away from finished game end.
-    model.pause();
-    model.isGameOver = false;
+    // enterReview() rather than pause(): the position shown is no longer the end
+    // of the game, so a finished game must stop being finished.
+    model.enterReview();
 
     // Show pass message if the move at the current position is a pass
     Move currentMove = model.game.lastMove();
@@ -178,8 +178,9 @@ bool GameNavigator::navigateForward() {
 
     // Restore game-over state if we've reached the end of a finished game.
     // But only if user hasn't explicitly started the game.
-    if (!model.started && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
-        model.isGameOver = true;
+    if (!model.isStarted() && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+        model.endGame(model.game.isResignationResult()
+            ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
     }
 
     Board boardResult(model.game.getBoardSize());
@@ -264,7 +265,7 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
 bool GameNavigator::navigateToStart() {
     spdlog::debug("navigateToStart: isNavigating={}, hasPrev={}, isGameOver={}, moveCount={}",
         model.game.isNavigating(), model.game.hasPreviousMove(),
-        model.isGameOver.load(), model.game.moveCount());
+        model.isGameOver(), model.game.moveCount());
 
     if (!model.game.isNavigating()) {
         spdlog::debug("navigateToStart: not in navigation mode");
@@ -304,8 +305,7 @@ bool GameNavigator::navigateToStart() {
     model.board.showTerritoryAuto = false;
 
     // Pause active play - user is reviewing. Explicit "Start" needed to resume.
-    model.pause();
-    model.isGameOver = false;
+    model.enterReview();
 
     model.state.msg = GameState::NONE;
     syncStateAfterNavigation();
@@ -358,8 +358,9 @@ bool GameNavigator::navigateToEnd() {
 
     // Restore game-over state if at end of a finished game.
     // But only if user hasn't explicitly started the game.
-    if (!model.started && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
-        model.isGameOver = true;
+    if (!model.isStarted() && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+        model.endGame(model.game.isResignationResult()
+            ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
     }
 
     Board boardResult(model.game.getBoardSize());
@@ -370,7 +371,7 @@ bool GameNavigator::navigateToEnd() {
     if (model.game.shouldShowTerritory()) {
         model.board.toggleTerritoryAuto(true);
         // processScoring() will set CALCULATING_SCORE then result message
-    } else if (model.isGameOver) {
+    } else if (model.isGameOver()) {
         // No territory calculation needed - set result message directly
         auto resultMsg = model.game.getResultMessage();
         if (resultMsg != GameState::NONE) {
@@ -415,8 +416,9 @@ bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& b
     // Restore game-over state if at end of a finished game.
     // But only if user hasn't explicitly started the game (model.started) -
     // don't override user's intent to continue playing.
-    if (!model.started && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
-        model.isGameOver = true;
+    if (!model.isStarted() && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
+        model.endGame(model.game.isResignationResult()
+            ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
     }
 
     Board boardResult(model.game.getBoardSize());
@@ -427,7 +429,7 @@ bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& b
     if (model.game.shouldShowTerritory()) {
         model.board.toggleTerritoryAuto(true);
         // processScoring() will set CALCULATING_SCORE then result message
-    } else if (model.isGameOver) {
+    } else if (model.isGameOver()) {
         // No territory calculation needed - set result message directly
         auto resultMsg = model.game.getResultMessage();
         if (resultMsg != GameState::NONE) {

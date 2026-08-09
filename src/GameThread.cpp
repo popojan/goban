@@ -299,7 +299,7 @@ size_t GameThread::activatePlayer(int which, size_t newIndex) {
 }
 
 bool GameThread::setFixedHandicap(int handicap) {
-    if (model.started) {
+    if (model.isStarted()) {
         return false;
     }
 
@@ -371,7 +371,8 @@ bool GameThread::isThinking() const {
 bool GameThread::hasPendingNavigation() const {
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);
-        if (!navQueue.empty()) return true;
+        // Queued, or popped and still running — see processNavigationQueue().
+        if (!navQueue.empty() || navInFlight.load() > 0) return true;
     }
     return navigator && navigator->isNavigating();
 }
@@ -507,7 +508,7 @@ void GameThread::gameLoop() {
         // If engines are synced (live game end), score and wait for nav commands.
         // If not synced (loaded game), fall through to initial sync which
         // syncs the coach first, then scores.
-        if (!model || model.isGameOver) {
+        if (!model || model.isGameOver()) {
             if (enginesSynced) {
                 processScoring();
                 waitForCommandOrTimeout(100);
@@ -528,7 +529,7 @@ void GameThread::gameLoop() {
             }
 
             // 2. Score if game is finished (coach now ready)
-            if (model.isGameOver) {
+            if (model.isGameOver()) {
                 processScoring();
             }
 
@@ -615,7 +616,7 @@ void GameThread::gameLoop() {
                 processSuccessfulMove(move, humanPlayer, coach, kibitzEngine, wasKibitz);
 
                 // Human-originated move: engine (kibitz) auto-responds
-                if (!wasKibitz && !model.isGameOver && kibitzEngine) {
+                if (!wasKibitz && !model.isGameOver() && kibitzEngine) {
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis: triggering kibitz response for {}", responseColor.toString());
                     Move response = kibitzEngine->genmove(responseColor);
@@ -627,7 +628,7 @@ void GameThread::gameLoop() {
                 }
             }
 
-            if (model.isGameOver) {
+            if (model.isGameOver()) {
                 continue;
             }
 
@@ -697,7 +698,7 @@ void GameThread::gameLoop() {
                 processSuccessfulMove(move, player, coach, kibitzEngine, kibitzed);
             }
 
-            if(model.isGameOver) {
+            if(model.isGameOver()) {
                 continue;
             }
 
@@ -730,7 +731,7 @@ void GameThread::playLocalMove(const Move& move) {
     spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), p ? "set" : "null");
     if (p) {
         p->suggestMove(move);
-    } else if (model.started || move == Move::RESIGN || move == Move::INTERRUPT) {
+    } else if (model.isStarted() || move == Move::RESIGN || move == Move::INTERRUPT) {
         queuedMove = move;
     }
 }
@@ -854,6 +855,13 @@ void GameThread::processScoring() {
 }
 
 void GameThread::processNavigationQueue() {
+    /// Keeps a popped command visible to hasPendingNavigation() until it has
+    /// actually finished, exception paths included.
+    struct InFlightGuard {
+        std::atomic<int>& count;
+        ~InFlightGuard() { --count; }
+    };
+
     while (true) {
         NavCommand cmd;
         {
@@ -861,7 +869,15 @@ void GameThread::processNavigationQueue() {
             if (navQueue.empty()) return;
             cmd = std::move(navQueue.front());
             navQueue.pop();
+            // Claim the command before the lock drops. GameNavigator raises its
+            // own NavigationGuard, but only once it is past its guard clauses —
+            // so between the pop and that point the command was invisible to
+            // hasPendingNavigation(), and a caller polling for quiescence in
+            // that window read the board before navigation had applied. That is
+            // exactly the "queued navigation" half of the isIdle() invariant.
+            ++navInFlight;
         }
+        InFlightGuard guard{navInFlight};
         executeNavCommand(cmd);
     }
 }
@@ -930,7 +946,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             if (varResult.success && gameMode == GameMode::ANALYSIS) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
-                if (kibitz && coach && !model.isGameOver) {
+                if (kibitz && coach && !model.isGameOver()) {
                     // All engines are synced after initial sync
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis nav: triggering kibitz response for {}", responseColor.toString());
@@ -1320,14 +1336,11 @@ void GameThread::finalizeLoadedGame(Engine* /* engine */, const GameRecord::SGFG
         return;  // Game not finished
     }
 
-    // Set the game state for finished game
-    model.state.reason = endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
-
-    // Set flags — actual scoring happens in the game loop idle section
+    // Actual scoring happens in the game loop idle section
     if (endedWithPasses) {
         model.board.toggleTerritoryAuto(true);
     }
-    model.isGameOver = true;
+    model.endGame(endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
 
     if (endedByResignation) {
         bool blackWon = (gameInfo.gameResult.GameResultType == LibSgfcPlusPlus::SgfcGameResultType::BlackWin);

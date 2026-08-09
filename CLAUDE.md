@@ -180,23 +180,27 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
   - *Terminating* (quit) — engine processes are killed outright (`shutdown()`).
 - **Deferred actions split in two**: the engine/model half may run on the game thread; every widget update must go in `GobanControl::finishGameReplacement()`, which the UI thread calls via `takeDeferredTaskDone()`. RmlUi is not thread safe.
 - **`interrupt()` is a no-op on the game thread**: joining there would deadlock on self-join, and setting `interruptRequested` would kill the loop the caller still needs.
-- **Re-evaluate the loop after initial sync**: the `!model || isGameOver` early-out runs before `enginesSynced` flips, so the sync branch must `continue` rather than fall through. Otherwise a paused loaded game calls `genmove` on a `LocalHumanPlayer`, which blocks forever and silently wedges the loop — with `isThinking()` reporting false, because the stuck player is not an engine.
+- **Re-evaluate the loop after initial sync**: the `!model || isGameOver()` early-out runs before `enginesSynced` flips, so the sync branch must `continue` rather than fall through. Otherwise a paused loaded game calls `genmove` on a `LocalHumanPlayer`, which blocks forever and silently wedges the loop — with `isThinking()` reporting false, because the stuck player is not an engine.
 - **Quiescence means all three**: `GobanControl::isIdle()` must account for engine thinking, queued navigation, and a deferred action still running.
 
-> **In flux:** ADR-0002 replaces the lifecycle flags below — `started`,
-> `isGameOver`, `enginesSynced`, `hasThreadRunning` — with explicit `GamePhase`
-> / `EngineSync` / `LoopState` machines. Several invariants in this section will
-> become a transition table plus tests.
+> **In flux:** ADR-0002 replaces the lifecycle flags below with explicit
+> `GamePhase` / `EngineSync` / `LoopState` machines.
 >
-> **Step 1 has landed.** `GobanModel::phase()` returns a `GamePhase`
-> (`Setup`/`Playing`/`Paused`/`Finished`) *derived* from `started` and
-> `isGameOver`; the flags are still authoritative and nothing writes a phase
-> yet. Read the phase where you only need to know what the game is doing —
-> `phase()` is also what `dumpState()` reports, so scenarios can assert on it.
-> Do **not** add new writers to `started`/`isGameOver`: every write is currently
-> accounted for by the transition table in `tests/test_gamephase.cpp`, and step 2
-> (making the phase authoritative) depends on that staying true. See
-> `docs/adr/0002-explicit-game-state.md`, including its Implementation log.
+> **Steps 1–2 have landed for `GamePhase`.** `GobanModel::gamePhase` is now the
+> authoritative lifecycle state — `Setup` / `Playing` / `Paused` / `Finished` —
+> and the `started` and `isGameOver` booleans are gone. Read it with `phase()`;
+> it is also what `dumpState()` reports, so scenarios can assert on it.
+>
+> Change it only through the named transitions on `GobanModel`: `start()`,
+> `pause()`, `enterReview()`, `endGame(reason)`, `createNewRecord()`. They all
+> funnel into a single private `transitionTo()`, which is the one place the
+> lifecycle is logged — do not add a second writer.
+>
+> `isStarted()` and `isGameOver()` survive as compatibility accessors and are
+> pure functions of the phase. **Step 3 deletes them**, so prefer `phase()` in
+> new code. `enginesSynced` and `hasThreadRunning` are untouched so far (steps 4
+> and 5). See `docs/adr/0002-explicit-game-state.md` and its Implementation log,
+> which records what step 2 changed on purpose.
 
 ### Navigation & Engine Synchronization
 - **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
@@ -208,7 +212,7 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 ### SGF Game Record Consistency
 - **PB/PW updated on first move**: Player names in SGF header are updated when the first move is made, capturing actual players after setup.
 - **Annotations only after first move**: Player switch annotations (`switched_player:`) only recorded after `moveCount() > 0`. Setup changes are silent.
-- **No annotations during SGF loading**: `started` flag must be false during SGF load to prevent spurious annotations.
+- **No annotations during SGF loading**: the phase must not be `Playing` during SGF load, or player-switch annotations leak into the loaded record.
 - **Result removed if main line unfinished**: When saving a modified SGF, if the main line (first children) doesn't end in resign/double-pass, remove the RE property.
 - **Session copy only for diverged games**: A game is copied into the daily session document only once the player has actually played a move (`gameHasNewMoves`). A record that is merely being replayed, without diverging from its SGF tree, must never be copied into the session — otherwise reviewing a game would silently duplicate it. `suppressSessionCopy` excludes tsumego mode entirely.
 - **`gameInDocument` is the double-append guard**, not `gameHasNewMoves`. The `gameHasNewMoves` check at the `move()` call sites is a once-only latch; `appendGameToDocument()` itself keys on `gameInDocument`. Don't clear `gameHasNewMoves` to force a re-append — that destroys the replay-vs-diverge distinction above.
@@ -222,8 +226,9 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 ### Game State
 - **isGameFinished()**: True only for resign or double-pass (two consecutive passes).
 - **Territory display**: Only shown at finished game positions, not at end of unfinished variations.
-- **Loaded games stay paused**: After loading an SGF, `model.started` remains false. Human moves work through the navigation path (`navigateToVariation`). Engine play requires explicit "Start" button press (`model.start()`).
-- **`isGameOver` lifecycle during navigation**: Cleared by `model.start()` when navigating back/home from a finished game. Restored by `navigateForward`/`navigateToEnd` when reaching end of a game with `hasGameResult()`.
+- **Loaded games stay paused**: loading leaves the phase at `Paused` (or `Finished`), never `Playing` — `onBoardSized()` calls `enterReview()`, which resolves against the record. Human moves work through the navigation path (`navigateToVariation`). Engine play requires an explicit "Start" (`model.start()`).
+- **Finished is left and re-entered by navigation**: `navigateBack`/`navigateToStart` call `enterReview()`, which drops `Finished` because the position shown is no longer the end of the game. `navigateForward`/`navigateToEnd`/`navigateToTreePath` call `endGame()` again on reaching the end of a game with `hasGameResult()` — but only when the phase is not `Playing`, so a user who pressed Start keeps playing.
+- **`pause()` cannot un-finish a game**: it means "stop playing", and is a no-op in `Finished`. Use `enterReview()`, and only once the position has actually moved off the end.
 
 ### UI Event Suppression
 - **`syncingUI` flag**: `GobanControl::syncingUI` suppresses game actions triggered by UI change events during programmatic dropdown updates. Any method that repopulates dropdowns (player, board size, komi, handicap) must wrap the repopulation with `setSyncingUI(true/false)`. Event handlers in `EventHandlerNewGame` check `isSyncingUI()` and skip side effects when true. This prevents transient intermediate states (e.g. briefly activating an engine player during dropdown clear/repopulate) from triggering game actions.

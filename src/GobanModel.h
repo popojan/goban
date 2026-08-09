@@ -39,19 +39,47 @@ public:
 
 	bool isPointOnBoard(const Position& coord) const;
 
+    // --- Lifecycle transitions (ADR-0002 step 2) -----------------------------
+    // These are the only ways the phase moves. Each names an intent rather than
+    // a flag write, so "who ended the game?" is answerable by grepping for
+    // endGame() instead of reading three files.
+
+    /// Begin or resume active play. Clears any stale end-of-game reason, so it
+    /// doubles as "this game is no longer over".
     void start() {
-        started = true;
-        isGameOver = false;
         state.reason = GameState::NO_REASON;
+        transitionTo(GamePhase::Playing, "start");
     }
-    
+
+    /// Stop active play without abandoning the game. A no-op on a finished
+    /// game: something has to un-finish it first, which is enterReview().
+    void pause() {
+        if (phase() == GamePhase::Finished) return;
+        transitionTo(restingPhase(), "pause");
+    }
+
+    /// Leave a game — finished or in progress — for review. This is what
+    /// navigating backwards does: unlike pause() it clears the finished state,
+    /// because the position being shown is no longer the end of the game.
+    void enterReview() {
+        transitionTo(restingPhase(), "enterReview");
+    }
+
+    /// The game ended. `reason` is DOUBLE_PASS or RESIGNATION; NO_REASON is
+    /// rejected, since a finished game always has a result to show.
+    void endGame(GameState::Reason reason) {
+        if (reason == GameState::NO_REASON) {
+            spdlog::error("endGame(NO_REASON) refused — a game cannot end for no reason");
+            return;
+        }
+        state.reason = reason;
+        transitionTo(GamePhase::Finished, "endGame");
+    }
+
     void createNewRecord() {
         game.initGame(board.getSize(), state.komi, setupBlackStones.size(), state.black, state.white);
         game.setHandicapStones(setupBlackStones);
-    }
-
-    void pause() {
-        started = false;
+        transitionTo(GamePhase::Setup, "createNewRecord");
     }
 
     Color changeTurn() {
@@ -68,41 +96,27 @@ public:
     void calcCaptured(Metrics& m, int capturedBlack, int capturedWhite);
     void updateReservoirs();
 
-    explicit operator bool() const { return !isGameOver && started; }
+    /// True exactly while the game loop may call genmove.
+    explicit operator bool() const { return phase() == GamePhase::Playing; }
 
-    /// Lifecycle phase, derived from the `started` / `isGameOver` pair.
-    ///
-    /// ADR-0002 step 1: read-only, so it cannot change behaviour. The order of
-    /// the tests below *is* the current semantics and must not be reshuffled:
-    ///
-    ///  * `isGameOver` wins over `started`. Ending a game mid-play sets
-    ///    `isGameOver` without clearing `started`, so the pair (true, true) is
-    ///    reachable and means Finished.
-    ///  * `operator bool()` is exactly `phase() == GamePhase::Playing`.
-    ///  * With both flags clear the flags alone cannot tell Setup from Paused;
-    ///    the record does. An empty record — at the root with no continuation —
-    ///    is a board being configured; anything else is a game being reviewed.
-    ///
-    /// Known wart, deliberately preserved: a freshly constructed model reports
-    /// Finished, because `isGameOver` defaults to true as a stand-in for "not
-    /// ready yet" until `onBoardSized()` runs. Step 2 should make the initial
-    /// phase Setup; `!model` already covers the game loop for that case.
-    [[nodiscard]] GamePhase phase() const {
-        if (isGameOver) return GamePhase::Finished;
-        if (started)    return GamePhase::Playing;
-        return hasEmptyRecord() ? GamePhase::Setup : GamePhase::Paused;
-    }
+    /// The authoritative lifecycle state (ADR-0002 step 2).
+    [[nodiscard]] GamePhase phase() const { return gamePhase.load(); }
+
+    /// Compatibility accessors for the two booleans the phase replaced. Both
+    /// are pure functions of the phase now — that is the whole point — and
+    /// exist only so the ~40 read sites can be converted a file at a time.
+    /// ADR-0002 step 3 deletes them; prefer phase() in new code.
+    [[nodiscard]] bool isStarted() const { return phase() == GamePhase::Playing; }
+    [[nodiscard]] bool isGameOver() const { return phase() == GamePhase::Finished; }
 
     void setCursor(const Position& p) { cursor = p;}
 
 public:
     Board board;
 
-    std::atomic<bool> isGameOver{true};
     std::atomic<bool> tsumegoMode{false};
     std::string tsumegoHintBlack;  // Localized "Black to move", set on UI thread
     std::string tsumegoHintWhite;  // Localized "White to move", set on UI thread
-    std::atomic<bool> started{false};
     GameState state;
 
     GameRecord game;
@@ -128,6 +142,32 @@ private:
     [[nodiscard]] bool hasEmptyRecord() const {
         return game.moveCount() == 0 && !game.hasNextMove();
     }
+
+    /// Where "not playing, not finished" lands: an empty record is a board being
+    /// configured, anything else is a game being reviewed.
+    [[nodiscard]] GamePhase restingPhase() const {
+        return hasEmptyRecord() ? GamePhase::Setup : GamePhase::Paused;
+    }
+
+    /// The single writer. Every phase change in the program goes through here,
+    /// which is what makes "who ended the game?" a one-line grep and gives the
+    /// lifecycle one log stream instead of three files' worth of flag writes.
+    ///
+    /// There is deliberately no rejection table: every ordered pair of phases
+    /// turns out to be reachable through some supported user action (see the
+    /// ADR-0002 implementation log). What the type buys is that the states are
+    /// now mutually exclusive — the old `started && isGameOver` combination is
+    /// unrepresentable — not that some pairs are forbidden.
+    void transitionTo(GamePhase next, const char* via) {
+        const GamePhase prev = gamePhase.exchange(next);
+        if (prev != next) {
+            spdlog::debug("phase: {} -> {} ({})", phaseName(prev), phaseName(next), via);
+        }
+    }
+
+    /// Authoritative lifecycle state. Atomic because the game thread ends games
+    /// while the UI thread reads the phase every frame.
+    std::atomic<GamePhase> gamePhase{GamePhase::Setup};
 };
 
 

@@ -11,8 +11,10 @@ void GobanModel::onBoardSized(int boardSize) {
 	board.toggleTerritoryAuto(false);
     board.positionNumber += 1;
 
-	isGameOver    = false;
-	started = false;
+	// Resizing the board abandons whatever was on it. The record is replaced
+	// separately, by createNewRecord() — until it is, restingPhase() still sees
+	// the old one, so this can land in Paused rather than Setup.
+	enterReview();
 
     auto black = state.black;
     auto white = state.white;
@@ -165,7 +167,6 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     }
     
     if (isDoublePass || move == Move::RESIGN) {
-        state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
         if (move == Move::RESIGN) {
             // Set winner immediately - opposite of who resigned
             state.winner = (move.col == Color::BLACK) ? Color::WHITE : Color::BLACK;
@@ -176,7 +177,7 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
         if (isDoublePass) {
             board.toggleTerritoryAuto(true);
         }
-        isGameOver = true;
+        endGame(move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
         spdlog::debug("Main Over! Reason {}", static_cast<int>(state.reason));
     }
     else if (move == Move::PASS) {
@@ -231,12 +232,12 @@ void GobanModel::onBoardChange(const Board& result) {
     updateReservoirs();
 
     spdlog::debug("over {} ready {} score {} showTerritory={}",
-        isGameOver, result.territoryReady, result.score, board.showTerritory);
+        isGameOver(), result.territoryReady, result.score, board.showTerritory);
 
     bool shouldShow = game.shouldShowTerritory();
     spdlog::debug("onBoardChange: territoryReady={}, shouldShowTerritory={}", result.territoryReady, shouldShow);
 
-    if (isGameOver && result.territoryReady && shouldShow) {
+    if (isGameOver() && result.territoryReady && shouldShow) {
         // At end of scored game - compute result message
         spdlog::debug("onBoardChange: ENTERING result block, score={}", result.score);
         board.score = result.score;  // Copy score from result board
@@ -246,11 +247,11 @@ void GobanModel::onBoardChange(const Board& result) {
         // Trigger repaint to show territory
         board.positionNumber += 1;
         // Finalize and save only once (live game ending, result not yet written)
-        if (isGameOver && !game.hasGameResult()) {
+        if (isGameOver() && !game.hasGameResult()) {
             game.finalizeGame(state.scoreDelta);
             game.saveAs("");
         }
-    } else if (isGameOver && game.isAtEndOfNavigation() && game.isResignationResult()) {
+    } else if (isGameOver() && game.isAtEndOfNavigation() && game.isResignationResult()) {
         // At end of resigned game - show resignation message
         state.msg = game.getResultMessage();
         // Auto-save resigned game (RE property already set by GameRecord::move)
@@ -265,7 +266,10 @@ void GobanModel::onBoardChange(const Board& result) {
 }
 
 void GobanModel::onKomiChange(float newKomi) {
-    if (!started) {
+    // Setup or Paused only. The old guard was `!started`, which also let komi
+    // through on a *loaded* finished game — RE was scored with the old value,
+    // so that was a hole rather than a feature. See the ADR-0002 step 2 log.
+    if (phase() == GamePhase::Setup || phase() == GamePhase::Paused) {
         spdlog::debug("setting komi {}", newKomi);
         state.komi = newKomi;
     }
@@ -279,7 +283,7 @@ void GobanModel::onPlayerChange(int which, const std::string& name) {
     }
 
     // Only annotate player switches after first move, and not on finished games
-    if (started && game.moveCount() > 0 && !game.hasGameResult()) {
+    if (isStarted() && game.moveCount() > 0 && !game.hasGameResult()) {
         std::ostringstream val;
         val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
         if (which == 0) {

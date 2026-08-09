@@ -1,20 +1,22 @@
-// Tests for GamePhase — step 1 of docs/adr/0002-explicit-game-state.md.
+// Tests for GamePhase — docs/adr/0002-explicit-game-state.md.
 //
-// GobanModel::phase() is *derived* from the `started` / `isGameOver` pair, so
-// none of this can change behaviour. Its whole purpose is to write the implicit
-// state machine down: the first half of this file pins the truth table (which
-// flag combinations map to which phase, and that `operator bool()` is exactly
-// "Playing"), the second half pins the transition table (what each operation
-// that writes those flags does to the phase).
+// Step 1 added the phase as a value derived from the `started` / `isGameOver`
+// pair. Step 2 inverted that: `GobanModel::gamePhase` is now the authoritative
+// state, the two booleans are gone, and `isStarted()` / `isGameOver()` survive
+// only as compatibility accessors that are pure functions of the phase.
 //
-// When step 2 inverts the relationship and makes the phase authoritative, these
-// are the tests that say whether the inversion preserved behaviour. Anything
-// here that looks wrong is a bug in today's code, not in the test — the two
-// cases we already know about are called out inline:
+// So this file has two halves. The first pins that the accessors really are
+// functions of the phase — which is what makes step 3 (deleting them) a
+// mechanical substitution rather than a behaviour change — and that the old
+// `started && isGameOver` combination is now unrepresentable. The second pins
+// the transition table: what each named transition, and each operation that
+// triggers one, does to the phase.
 //
-//   * a freshly constructed model reports Finished, not Setup;
-//   * pause() cannot leave Finished, so a finished game that is paused stays
-//     finished until something clears isGameOver explicitly.
+// Two step-1 findings were resolved here rather than preserved:
+//
+//   * a freshly constructed model is now Setup, not Finished;
+//   * `started` no longer outlives the game — ending a live game leaves
+//     isStarted() false, matching a loaded finished game.
 #include <doctest/doctest.h>
 
 #include <filesystem>
@@ -111,80 +113,138 @@ struct Fixture {
         std::filesystem::remove_all(dir, ec);
     }
 
+    /// Load a record and enter review, which is what the application does:
+    /// GameThread::applyLoadedGame() notifies onBoardSized(), and that calls
+    /// enterReview(). Loading without it would leave the phase and the record
+    /// disagreeing in a way no code path can actually produce.
     bool load(const std::string& name, bool startAtRoot = false) {
         GameRecord::SGFGameInfo info;
-        return model.game.loadFromSGF(fixture(name), info, 0, startAtRoot);
+        const bool ok = model.game.loadFromSGF(fixture(name), info, 0, startAtRoot);
+        if (ok) model.enterReview();
+        return ok;
     }
 
     /// What GobanControl::newGameNow() does to the model: size the board (which
-    /// clears the flags) and then replace the record.
+    /// enters review) and then replace the record.
     void newGame(int boardSize) {
         model.onBoardSized(boardSize);
         model.createNewRecord();
     }
 
-    void setFlags(bool started, bool gameOver) {
-        model.started = started;
-        model.isGameOver = gameOver;
+    /// Drive the model into a phase the way the application would.
+    void enter(GamePhase phase) {
+        switch (phase) {
+            case GamePhase::Setup:
+            case GamePhase::Paused:   model.enterReview(); break;
+            case GamePhase::Playing:  model.start(); break;
+            case GamePhase::Finished: model.endGame(GameState::DOUBLE_PASS); break;
+        }
+        REQUIRE(model.phase() == phase);
     }
 };
 
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// The truth table: flags -> phase
+// The phase is authoritative; the old flags are functions of it
 // ---------------------------------------------------------------------------
 
-TEST_CASE("the flag pair maps onto exactly four phases") {
+TEST_CASE("the compatibility accessors are pure functions of the phase") {
     Fixture f(9);
     f.newGame(9);
 
-    f.setFlags(false, false);
-    CHECK(f.model.phase() == GamePhase::Setup);      // empty record
+    for (GamePhase phase : {GamePhase::Setup, GamePhase::Playing,
+                            GamePhase::Finished}) {
+        f.enter(phase);
+        CHECK(f.model.isStarted()   == (phase == GamePhase::Playing));
+        CHECK(f.model.isGameOver()  == (phase == GamePhase::Finished));
+        CHECK(static_cast<bool>(f.model) == (phase == GamePhase::Playing));
+    }
 
-    f.setFlags(true, false);
-    CHECK(f.model.phase() == GamePhase::Playing);
-
-    f.setFlags(false, true);
-    CHECK(f.model.phase() == GamePhase::Finished);
-
-    // Reachable: a move that ends the game sets isGameOver and leaves started
-    // alone. isGameOver has to win, or the loop would keep calling genmove.
-    f.setFlags(true, true);
-    CHECK(f.model.phase() == GamePhase::Finished);
+    // Paused needs a non-empty record to be reachable at all.
+    REQUIRE(f.load("simple.sgf"));
+    REQUIRE(f.model.phase() == GamePhase::Paused);
+    CHECK_FALSE(f.model.isStarted());
+    CHECK_FALSE(f.model.isGameOver());
+    CHECK_FALSE(static_cast<bool>(f.model));
 }
 
-TEST_CASE("with both flags clear the record decides between Setup and Paused") {
+TEST_CASE("started and game-over can no longer both be true") {
+    // The old model let a live game end without clearing `started`, so the pair
+    // (true, true) was reachable and every reader had to know isGameOver won.
+    // Now Finished is one state and isStarted() is false in it.
     Fixture f(9);
     f.newGame(9);
-    f.setFlags(false, false);
-    CHECK(f.model.phase() == GamePhase::Setup);
+    f.model.state.black = "Black";
+    f.model.state.white = "White";
+    f.model.start();
+    REQUIRE(f.model.isStarted());
+
+    f.model.onGameMove(Move(Move::PASS, Color::BLACK), "");
+    f.model.onGameMove(Move(Move::PASS, Color::WHITE), "");
+
+    CHECK(f.model.phase() == GamePhase::Finished);
+    CHECK(f.model.isGameOver());
+    CHECK_FALSE(f.model.isStarted());
+}
+
+TEST_CASE("komi is editable in Setup and Paused, and nowhere else") {
+    // The old guard was `!started`, which let komi through on a finished game
+    // that had been *loaded* but not on one that had just ended — the same
+    // position, two answers. Both are refused now: RE was scored with the komi
+    // that was in force, so changing it after the fact corrupts the record.
+    Fixture f(9);
+    f.newGame(9);
+    f.model.state.komi = 6.5f;
+
+    f.model.onKomiChange(0.5f);                      // Setup
+    CHECK(f.model.state.komi == doctest::Approx(0.5f));
+
+    REQUIRE(f.load("simple.sgf"));
+    REQUIRE(f.model.phase() == GamePhase::Paused);
+    f.model.onKomiChange(7.5f);
+    CHECK(f.model.state.komi == doctest::Approx(7.5f));
+
+    f.model.start();
+    f.model.onKomiChange(1.5f);
+    CHECK(f.model.state.komi == doctest::Approx(7.5f));   // refused while playing
+
+    f.model.endGame(GameState::DOUBLE_PASS);
+    f.model.onKomiChange(2.5f);
+    CHECK(f.model.state.komi == doctest::Approx(7.5f));   // and once finished
+}
+
+TEST_CASE("the resting phase follows the record, not the caller") {
+    Fixture f(9);
+    f.newGame(9);
+    f.model.enterReview();
+    CHECK(f.model.phase() == GamePhase::Setup);      // empty record
 
     // A loaded game viewed from its root: moveCount() is 0 here too, so the
     // view position alone cannot tell these apart — the root's children can.
     REQUIRE(f.load("simple.sgf", /*startAtRoot=*/true));
     REQUIRE(f.model.game.moveCount() == 0);
-    f.setFlags(false, false);
     CHECK(f.model.phase() == GamePhase::Paused);
 
     // And at the end of that same unfinished game.
     REQUIRE(f.load("simple.sgf"));
     REQUIRE(f.model.game.moveCount() == 4);
     REQUIRE(f.model.game.isAtEndOfNavigation());
-    f.setFlags(false, false);
     CHECK(f.model.phase() == GamePhase::Paused);
 }
 
-TEST_CASE("operator bool is exactly the Playing phase") {
+TEST_CASE("endGame refuses to finish a game for no reason") {
     Fixture f(9);
     f.newGame(9);
-    for (bool started : {false, true}) {
-        for (bool gameOver : {false, true}) {
-            f.setFlags(started, gameOver);
-            CHECK(static_cast<bool>(f.model)
-                  == (f.model.phase() == GamePhase::Playing));
-        }
-    }
+    f.model.start();
+
+    f.model.endGame(GameState::NO_REASON);
+    CHECK(f.model.phase() == GamePhase::Playing);    // refused, not applied
+    CHECK(f.model.state.reason == GameState::NO_REASON);
+
+    f.model.endGame(GameState::RESIGNATION);
+    CHECK(f.model.phase() == GamePhase::Finished);
+    CHECK(f.model.state.reason == GameState::RESIGNATION);
 }
 
 TEST_CASE("phase names are stable") {
@@ -194,13 +254,12 @@ TEST_CASE("phase names are stable") {
     CHECK(std::string(phaseName(GamePhase::Finished)) == "finished");
 }
 
-TEST_CASE("a freshly constructed model reports Finished") {
-    // Wart, pinned deliberately: isGameOver defaults to true as a stand-in for
-    // "not ready yet", so the very first phase is Finished rather than Setup.
-    // Nothing depends on it — the game loop's other guard, !model, already
-    // covers this window — but step 2 has to decide it on purpose.
+TEST_CASE("a freshly constructed model starts in Setup") {
+    // Step 1 found this reported Finished, because isGameOver defaulted to true
+    // as a stand-in for "not ready yet". The game loop's other guard, !model,
+    // is what actually holds it off, and that still holds here.
     GobanModel fresh(9);
-    CHECK(fresh.phase() == GamePhase::Finished);
+    CHECK(fresh.phase() == GamePhase::Setup);
     CHECK_FALSE(static_cast<bool>(fresh));
 }
 
@@ -219,17 +278,16 @@ TEST_CASE("a new game returns to Setup from any phase") {
     f.newGame(9);
     CHECK(f.model.phase() == GamePhase::Setup);
 
-    f.setFlags(true, true);
-    REQUIRE(f.model.phase() == GamePhase::Finished);
+    f.enter(GamePhase::Finished);
     f.newGame(9);
     CHECK(f.model.phase() == GamePhase::Setup);
 }
 
 TEST_CASE("sizing the board alone does not reach Setup while a record survives") {
-    // onBoardSized() clears both flags but leaves game alone, so on its own it
-    // lands in Paused. Only newGameNow()'s second half — createNewRecord() —
-    // completes the transition. Worth pinning: it is the one place where the
-    // phase depends on something outside the two flags.
+    // onBoardSized() calls enterReview(), which resolves against the record —
+    // and the old record is still attached at that point, so on its own it lands
+    // in Paused. Only newGameNow()'s second half, createNewRecord(), completes
+    // the transition to Setup.
     Fixture f(9);
     REQUIRE(f.load("simple.sgf"));
     f.model.onBoardSized(9);
@@ -247,13 +305,11 @@ TEST_CASE("start enters Playing from Setup, Paused and Finished alike") {
     CHECK(f.model.phase() == GamePhase::Playing);
 
     REQUIRE(f.load("simple.sgf"));
-    f.setFlags(false, false);
     REQUIRE(f.model.phase() == GamePhase::Paused);
     f.model.start();
     CHECK(f.model.phase() == GamePhase::Playing);
 
-    f.setFlags(false, true);
-    REQUIRE(f.model.phase() == GamePhase::Finished);
+    f.enter(GamePhase::Finished);
     f.model.start();
     CHECK(f.model.phase() == GamePhase::Playing);
     CHECK(f.model.state.reason == GameState::NO_REASON);
@@ -268,11 +324,13 @@ TEST_CASE("pause leaves Playing but cannot leave Finished") {
     f.model.pause();
     CHECK(f.model.phase() == GamePhase::Paused);
 
-    // pause() only clears `started`. Navigating back is what also clears
-    // isGameOver; a bare pause() on a finished game is a no-op phase-wise.
-    f.setFlags(true, true);
+    // pause() means "stop playing", not "un-finish". Leaving Finished is
+    // enterReview()'s job, and navigateBack() is its only caller that matters.
+    f.enter(GamePhase::Finished);
     f.model.pause();
     CHECK(f.model.phase() == GamePhase::Finished);
+    f.model.enterReview();
+    CHECK(f.model.phase() == GamePhase::Paused);
 }
 
 TEST_CASE("pausing a game with nothing recorded falls back to Setup") {
@@ -317,8 +375,7 @@ TEST_CASE("a resignation finishes the game") {
 TEST_CASE("navigateBack leaves a finished game for Paused") {
     Fixture f(9);
     REQUIRE(f.load("double_pass.sgf"));
-    f.setFlags(true, true);
-    REQUIRE(f.model.phase() == GamePhase::Finished);
+    f.enter(GamePhase::Finished);
 
     REQUIRE(f.nav.navigateBack());
     CHECK(f.model.phase() == GamePhase::Paused);
@@ -327,7 +384,7 @@ TEST_CASE("navigateBack leaves a finished game for Paused") {
 TEST_CASE("navigateToStart pauses, and stays Paused at the root of a real game") {
     Fixture f(9);
     REQUIRE(f.load("double_pass.sgf"));
-    f.setFlags(true, true);
+    f.enter(GamePhase::Finished);
 
     REQUIRE(f.nav.navigateToStart());
     REQUIRE(f.model.game.moveCount() == 0);
@@ -338,7 +395,6 @@ TEST_CASE("navigateToStart pauses, and stays Paused at the root of a real game")
 TEST_CASE("navigateForward restores Finished only at the end of a finished game") {
     Fixture f(9);
     REQUIRE(f.load("double_pass.sgf", /*startAtRoot=*/true));
-    f.setFlags(false, false);
     REQUIRE(f.model.phase() == GamePhase::Paused);
 
     for (int i = 0; i < 3; ++i) {
@@ -358,7 +414,7 @@ TEST_CASE("navigateForward keeps Playing once the user has started") {
 
     for (int i = 0; i < 4; ++i) REQUIRE(f.nav.navigateForward());
     REQUIRE(f.model.game.isAtEndOfNavigation());
-    // The `!model.started` guard on the restore means the user's intent to keep
+    // The `!isStarted()` guard on the restore means the user's intent to keep
     // playing wins over the record's result.
     CHECK(f.model.phase() == GamePhase::Playing);
 }
@@ -366,7 +422,6 @@ TEST_CASE("navigateForward keeps Playing once the user has started") {
 TEST_CASE("navigateToEnd restores Finished at the end of a finished game") {
     Fixture f(9);
     REQUIRE(f.load("double_pass.sgf", /*startAtRoot=*/true));
-    f.setFlags(false, false);
 
     REQUIRE(f.nav.navigateToEnd());
     CHECK(f.model.phase() == GamePhase::Finished);
@@ -375,7 +430,6 @@ TEST_CASE("navigateToEnd restores Finished at the end of a finished game") {
 TEST_CASE("navigateToTreePath restores Finished at the end of a finished game") {
     Fixture f(9);
     REQUIRE(f.load("double_pass.sgf", /*startAtRoot=*/true));
-    f.setFlags(false, false);
 
     const size_t mainLine = f.model.game.getLoadedMovesCount();
     REQUIRE(f.nav.navigateToTreePath(static_cast<int>(mainLine), {}));
@@ -385,7 +439,6 @@ TEST_CASE("navigateToTreePath restores Finished at the end of a finished game") 
 TEST_CASE("navigateToVariation enters Playing only when it promotes the branch") {
     Fixture f(9);
     REQUIRE(f.load("simple.sgf", /*startAtRoot=*/true));
-    f.setFlags(false, false);
     REQUIRE(f.model.phase() == GamePhase::Paused);
 
     // Non-promoted branch (tsumego exploration): stays in navigation mode.

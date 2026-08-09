@@ -243,6 +243,10 @@ private:
     std::queue<NavCommand> navQueue;
     mutable std::mutex navQueueMutex;
     std::condition_variable navQueueCV;
+    /// Commands popped from navQueue but not yet finished. Without it a command
+    /// is invisible to hasPendingNavigation() between the pop and the
+    /// navigator raising its own flag. Incremented under navQueueMutex.
+    std::atomic<int> navInFlight{0};
 
     // Deferred game-discarding action (see runWhenEngineFree).
     std::function<void()> deferredTask;

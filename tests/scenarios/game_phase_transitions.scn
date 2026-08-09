@@ -32,10 +32,18 @@ expect game_over false
 # Finished: two passes in a row end it.
 pass
 wait_until game_over true
+# RE is written by the territory pass that follows the double pass, not by the
+# move, so it lags game_over — and wait_idle does not cover scoring, because a
+# failed scoring attempt never sets territoryReady and would hang the wait.
+# Everything below depends on RE: the navigation restore reads hasGameResult().
+wait_until has_result true
 wait_idle
 expect phase finished
 expect move_count 2
-expect has_result true
+# ADR-0002 step 2 normalised this: a game that ends under play used to leave
+# `started` true, so the same Finished position answered differently depending
+# on whether it had been played or loaded. Now both say false.
+expect started false
 
 # Start is refused on a finished game — the phase must not move.
 start

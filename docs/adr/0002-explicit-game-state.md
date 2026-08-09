@@ -1,6 +1,6 @@
 # ADR-0002: Replace the lifecycle flags with explicit state machines
 
-**Status:** Accepted 2026-08-09 — step 1 implemented, steps 2–5 outstanding
+**Status:** Accepted 2026-08-09 — `GamePhase` steps 1–2 implemented, steps 3–5 outstanding
 **Date:** 2026-08-09
 
 ## Context
@@ -174,3 +174,78 @@ findings, all preserved as-is for step 2 to decide deliberately:
    `hasNextMove()` as well. A corollary: "new game" is two steps, and
    `onBoardSized()` on its own lands in `Paused` because it clears the flags but
    leaves the record; only `createNewRecord()` completes the transition.
+
+### Step 2 — invert. Done 2026-08-09.
+
+`GobanModel::gamePhase` is now the authoritative state and the `started` /
+`isGameOver` booleans are deleted. Every change goes through one private
+`transitionTo()`, reached only via named transitions that say what happened
+rather than which flag moved: `start()`, `pause()`, `enterReview()`,
+`endGame(reason)`, `createNewRecord()`. `isStarted()` and `isGameOver()` remain
+as compatibility accessors — now pure functions of the phase — so step 3 is a
+mechanical substitution at ~40 read sites rather than a behaviour change.
+
+**There is no rejection table, and that is the finding.** Step 2 was specified
+as "a legal-transition table which rejects and logs illegal transitions", but
+every ordered pair of phases turns out to be reachable through some supported
+action: new game from anywhere, Start on a paused *or* finished game (promoting
+a variation from a finished position does exactly this), navigating off the end
+of a finished game, navigating back onto it. A matrix that permits everything is
+worse than none — it reads like a guarantee and provides none. So the type does
+the work instead: the states are mutually exclusive, which is what the old
+`started && isGameOver` pair was not, and the single writer gives the lifecycle
+one log stream. The only precondition worth enforcing turned out to be
+`endGame(NO_REASON)`, which is refused: a finished game always has a result.
+
+Three deliberate behaviour changes, each pinned by a test:
+
+1. **`started` no longer outlives the game.** This is finding 1 from step 1,
+   resolved by normalising rather than by carrying an extra bit. Ending a game
+   under play now leaves `isStarted()` false, matching a loaded finished game.
+   Knock-on effects, all audited: `playLocalMove()` stops queuing a move for a
+   finished game (the ADR-0001 stale-move class); `onPlayerChange()` stops
+   annotating in the window between a double pass and RE being written;
+   `setFixedHandicap()`'s `started` guard becomes unreachable, its callers
+   already running after the phase has left `Playing`. `setHandicap()`,
+   `operator bool()` and `cmdStart` are unaffected — each is separately guarded
+   by `state.reason` or `hasGameResult()`.
+
+2. **Komi is editable in `Setup` and `Paused` only.** The old `!started` guard
+   refused a game that had just ended but allowed the same game reloaded from
+   SGF, because loading leaves `started` false. Rather than propagate the
+   laxer of the two, both are refused: RE was scored with the komi in force, so
+   editing it afterwards corrupts the record. `GobanControl::setKomi()` and
+   `GobanModel::onKomiChange()` carry the same guard and must stay in step.
+
+3. **A fresh model starts in `Setup`, not `Finished`** — finding 2 from step 1.
+   The game loop is held off by its other guard, `!model`, which still holds.
+
+One consequence worth knowing: the navigation restore path now calls
+`endGame()`, which sets `state.reason` from `isResignationResult()`. Previously
+it set only the flag, so a position could be "over" with `reason ==
+NO_REASON` after a start/navigate-back/navigate-forward sequence. The phase and
+the reason can no longer disagree.
+
+**Next: step 3** — delete `isStarted()` / `isGameOver()`, one file at a time,
+replacing each read with the phase predicate it actually means. Several are not
+straight substitutions: `!isGameOver()` at a *call* site usually means "the game
+is playable", which is `Setup || Paused || Playing`, and spelling that out is
+the point of the exercise.
+
+**Two harness bugs surfaced**, both found by the step-2 scenario asserting state
+immediately after every transition — which no earlier scenario did, because
+earlier ones assert against a bot match where engine latency hid the windows.
+Neither is caused by this ADR; both would have corrupted any future scenario.
+
+- `hasPendingNavigation()` reported false between `processNavigationQueue()`
+  popping a command and `GameNavigator` raising its own `navigationInProgress`
+  flag, so `wait_idle` could return *during* a navigation and read the board
+  before it had applied. Fixed with an in-flight counter incremented under the
+  queue mutex — the same shape `processDeferredTask()` already used. Reproduced
+  roughly one run in eight; zero in twenty-five after the fix.
+- `wait_idle` does not cover territory scoring, so the SGF `RE` property lags
+  `game_over`: it is written by the scoring pass, not by the closing move. This
+  one is *not* fixed. The obvious predicate — "territory requested but not
+  ready" — is permanently true when scoring fails, which would hang every
+  `wait_idle` instead. Scenarios must `wait_until has_result true` before
+  asserting anything that depends on the record being final.
