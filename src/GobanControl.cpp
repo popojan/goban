@@ -1272,6 +1272,9 @@ nlohmann::json GobanControl::dumpState() const {
     // Lets a scenario tell "a prompt appeared" from "the command silently did
     // nothing" — the distinction the dead handicap prompt turned on.
     s["prompt_active"]  = parent->hasActivePrompt();
+    // A screenshot taken while this is true is not reproducible: the camera is
+    // between positions and the shader is fed a live clock while animating.
+    s["camera_animating"] = view.animationRunning || view.cameraAnim.active;
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;

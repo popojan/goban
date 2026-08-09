@@ -187,9 +187,12 @@ bool ScenarioRunner::execute(const Step& step, GobanControl& control) {
         return true;
     }
 
-    // Anything else is a normal application command.
+    // Anything else is a normal application command. Hand over the whole
+    // line: legacy command names contain spaces ("reset camera", "cycle
+    // shaders"), and the single-string overload resolves those before
+    // falling back to tokenisation.
     spdlog::info("scenario: line {}: {}", step.line, step.directive);
-    control.command(name, step.args);
+    control.command(step.directive);
     return true;
 }
 
