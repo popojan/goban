@@ -307,6 +307,49 @@ TEST_CASE("resign records RE on the root without adding a node") {
     CHECK_FALSE(s.rec.isGameFinished());
 }
 
+TEST_CASE("resigning mid-tree is refused, so a reviewed game keeps its result") {
+    // A resignation writes RE on the root and adds no node, so it cannot
+    // describe a branch the way a stone or a pass can. Applied while reviewing,
+    // it used to relabel the whole game: rewind a game White resigned, press
+    // Resign as Black, and RE flipped to W+R while the recorded line still
+    // ended in White resigning. The saved SGF then contradicted itself.
+    Session s;
+    s.rec.initGame(9, 0.5f, 0, "B", "W");
+    s.rec.move(blackAt(4, 4));
+    s.rec.move(whiteAt(2, 2));
+    s.rec.move(blackAt(6, 6));
+    s.rec.move(Move(Move::RESIGN, Color::WHITE));      // white resigns => RE[B+R]
+    REQUIRE(s.rec.getResultMessage() == GameState::WHITE_RESIGNED);
+
+    // Rewind into the game: the cursor now has a continuation ahead of it.
+    s.rec.undo();
+    s.rec.undo();
+    REQUIRE(s.rec.moveCount() == 1);
+    REQUIRE_FALSE(s.rec.isAtEndOfNavigation());
+
+    s.rec.move(Move(Move::RESIGN, Color::BLACK));      // would have written W+R
+
+    CHECK(s.rec.getResultMessage() == GameState::WHITE_RESIGNED);   // untouched
+    CHECK(s.rec.moveCount() == 1);                                  // no node added
+    CHECK(s.rec.getLoadedMovesCount() == 3);                        // tree intact
+}
+
+TEST_CASE("resigning at the end of a branch is still allowed") {
+    // The guard is about having a continuation ahead, not about the game
+    // already having a result. Rewind, play a new line, resign in it.
+    Session s;
+    s.rec.initGame(9, 0.5f, 0, "B", "W");
+    s.rec.move(blackAt(4, 4));
+    s.rec.move(whiteAt(2, 2));
+    s.rec.undo();
+    s.rec.move(whiteAt(7, 7));                 // a branch; now at its end
+    REQUIRE(s.rec.isAtEndOfNavigation());
+
+    s.rec.move(Move(Move::RESIGN, Color::BLACK));
+    CHECK(s.rec.getResultMessage() == GameState::BLACK_RESIGNED);
+    CHECK(s.rec.isResignationResult());
+}
+
 TEST_CASE("finalizeGame writes a score result and never overwrites a resignation") {
     Session s;
     s.rec.initGame(9, 0.5f, 0, "B", "W");

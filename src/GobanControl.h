@@ -60,6 +60,13 @@ public:
     /// flight.
     [[nodiscard]] bool isIdle() const;
 
+    /// Whether resigning is meaningful right now. One predicate, two callers:
+    /// the `resign` command guards on it, and ElementGame greys `cmdResign` by
+    /// it. Keeping the button and the command on the same question is the point
+    /// — they used to disagree, so a resign refused by the toolbar still went
+    /// through from the keybinding.
+    [[nodiscard]] bool canResign() const;
+
 private:
     // Per-invocation state handed to a command handler.
     struct CommandContext {

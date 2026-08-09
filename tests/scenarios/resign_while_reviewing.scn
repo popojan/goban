@@ -1,0 +1,55 @@
+# Resigning writes the SGF result on the root and adds no move node, so it can
+# only ever describe the end of the line being played. Applied while reviewing,
+# it used to relabel the whole record: rewind a game White resigned, press
+# Resign as Black, and the result flipped to "black resigned" while the recorded
+# moves still ended the other way. The saved SGF contradicted itself.
+#
+# The toolbar greyed the Resign button in that state, but the keybinding did
+# not, so the corruption was reachable anyway. GobanControl::canResign() is now
+# the single predicate behind both.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+# Black passes, then White resigns: RE[B+R], reported as white_resigned.
+pass
+wait_until move_count >= 1
+wait_idle
+resign
+# The phase flips in endGame(), which runs before the record is written, so wait
+# on the thing being asserted rather than on the phase.
+wait_until result white_resigned
+wait_idle
+expect phase finished
+expect move_count 1
+
+# Rewind into the game. The phase leaves Finished; the record keeps its result.
+navigate_back
+wait_idle
+expect phase paused
+expect view_position 0
+expect result white_resigned
+
+# Resigning here must be refused — there is a continuation ahead of the cursor.
+# Before the fix this rewrote the root to "black resigned".
+resign
+# Phase first: the guard refuses before the command's model.start(), so a
+# regression shows up here immediately. `result` lags — the move would be
+# handed to the game thread — so it is the corroborating check, not the canary.
+expect phase paused
+wait_idle
+expect phase paused
+expect result white_resigned
+expect move_count 0
+
+# And it is still refused after returning to the end, because the game there is
+# already decided; resigning twice would overwrite the recorded outcome.
+navigate_end
+wait_idle
+expect phase finished
+resign
+wait_idle
+expect result white_resigned

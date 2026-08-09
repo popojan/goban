@@ -734,8 +734,11 @@ void GameThread::playLocalMove(const Move& move) {
     spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), p ? "set" : "null");
     if (p) {
         p->suggestMove(move);
-    } else if (model.phase() == GamePhase::Playing
-               || move == Move::RESIGN || move == Move::INTERRUPT) {
+    } else if (model.phase() == GamePhase::Playing || move == Move::INTERRUPT) {
+        // RESIGN used to be queued from any phase, which is how a resignation
+        // issued while reviewing survived to fire on the next start, against a
+        // position nobody was looking at. GobanControl::canResign() now refuses
+        // it outright, so the exemption only kept the hazard alive.
         queuedMove = move;
     }
 }

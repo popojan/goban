@@ -436,10 +436,22 @@ void GobanControl::buildRegistry() {
 
     add("resign", 0, 0, "resign the game", [this](CommandContext& ctx) {
         if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
-        if(engine.humanToMove()) {
-            auto move = engine.getLocalMove(Move::RESIGN);
-            engine.playLocalMove(move);
+        if (!canResign()) {
+            ctx.notifyMenu = false;
+            // The button is greyed in this case, but the keybinding is not, so
+            // say why rather than swallowing the key.
+            if (!model.game.isAtEndOfNavigation()) {
+                parent->showMessage("Navigate to the end of the game to resign");
+            }
+            return;
         }
+        // Resigning is an act of play, so it implies starting — the same thing
+        // `pass` does from a paused position. Without this the move was merely
+        // queued and fired later, on whatever start happened next.
+        model.start();
+        if (!engine.isRunning()) engine.run();
+        auto move = engine.getLocalMove(Move::RESIGN);
+        engine.playLocalMove(move);
     });
 
     add("pass", 0, 0, "pass", [this](CommandContext& ctx) {
@@ -1083,6 +1095,20 @@ const char* messageName(GameState::Message m) {
 
 }  // namespace
 
+bool GobanControl::canResign() const {
+    if (syncingUI) return false;
+    // A resignation carries no move: GameRecord::move() writes the RE property
+    // on the root and adds no node. So unlike a stone or a pass it cannot
+    // describe a branch — applied anywhere but the end of the line being
+    // played, it relabels a game whose recorded ending then contradicts it.
+    if (!model.game.isAtEndOfNavigation()) return false;
+    // Already decided. Resigning again would overwrite the recorded result.
+    if (model.phase() == GamePhase::Finished) return false;
+    // Tsumego problems are puzzles, not games to concede.
+    if (model.tsumegoMode) return false;
+    return engine.humanToMove();
+}
+
 bool GobanControl::isIdle() const {
     if (syncingUI) return false;
     if (engine.isThinking()) return false;
@@ -1107,6 +1133,10 @@ nlohmann::json GobanControl::dumpState() const {
     s["at_end"]         = model.game.isAtEndOfNavigation();
     s["variations"]     = model.game.getVariations().size();
     s["has_result"]     = model.game.hasGameResult();
+    // The recorded result itself, read back from the SGF RE property — not
+    // model.state.msg, which is transient. Lets a scenario prove that an action
+    // did *not* rewrite the outcome.
+    s["result"]         = messageName(model.game.getResultMessage());
     s["board_size"]     = model.game.getBoardSize();
 
     // Turn and rules state

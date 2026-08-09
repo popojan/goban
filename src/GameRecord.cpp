@@ -261,6 +261,16 @@ void GameRecord::move(const Move& move, bool insertAsFirst)  {
         }
     }
     else if (move == Move::RESIGN) {
+        // A resignation adds no node — it only writes RE on the root. That is
+        // only truthful at the end of the line: with a continuation still ahead
+        // of the cursor, the result would contradict the moves recorded after
+        // it. Callers gate on this too (GobanControl::canResign); refusing here
+        // as well keeps the record safe from any path that forgets to.
+        if (currentNode && currentNode->GetFirstChild()) {
+            spdlog::error("GameRecord::move: refusing to resign mid-tree — the "
+                          "recorded game continues past this position");
+            return;
+        }
         // Resignation: set RE property in root node (W+R or B+R)
         // Black resigning means White wins, and vice versa
         std::string result = (move.col == Color::BLACK) ? "W+R" : "B+R";

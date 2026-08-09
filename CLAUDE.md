@@ -224,11 +224,16 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 
 ### Game State
 - **isGameFinished()**: True only for resign or double-pass (two consecutive passes).
+- **Resignation only at the end of the line**: a resignation writes `RE` on the SGF root and adds no node, so unlike a stone or a pass it cannot describe a branch. Applied with a continuation still ahead of the cursor it relabels a game whose recorded moves then contradict the result. `GobanControl::canResign()` is the single predicate — at end of navigation, not already `Finished`, not tsumego, human to move — and `GameRecord::move()` refuses mid-tree as a backstop. Resigning implies starting, as passing does.
 - **Territory display**: Only shown at finished game positions, not at end of unfinished variations.
 - **Loaded games stay paused**: loading leaves the phase at `Paused` (or `Finished`), never `Playing` — `onBoardSized()` calls `enterReview()`, which resolves against the record. Human moves work through the navigation path (`navigateToVariation`). Engine play requires an explicit "Start" (`model.start()`).
 - **Finished is left and re-entered by navigation**: `navigateBack`/`navigateToStart` call `enterReview()`, which drops `Finished` because the position shown is no longer the end of the game. `navigateForward`/`navigateToEnd`/`navigateToTreePath` call `endGame()` again on reaching the end of a game with `hasGameResult()` — but only when the phase is not `Playing`, so a user who pressed Start keeps playing.
 - **`pause()` cannot un-finish a game**: it means "stop playing", and is a no-op in `Finished`. Use `enterReview()`, and only once the position has actually moved off the end.
 - **`state.reason` is not part of the phase and outlives it**: `enterReview()` leaves it set, and the UI's own "is over" test (`ElementGame::OnUpdate`, `GobanControl::setHandicap`) reads `state.reason != NO_REASON`, not the phase. Only `start()` and `onBoardSized()` clear it. Known inconsistency, pinned by `tests/test_gamephase.cpp`; don't add readers of `state.reason` as a lifecycle test.
+
+### UI Widget State
+- **A button's enabled state must ask the same question its command asks.** `cmdResign` and the `resign` command both call `GobanControl::canResign()`. Where they diverged, the toolbar greyed an action out while its keybinding still performed it — the disabled button looked like a guard and was not one. When adding a guard to a command, give the widget the same predicate rather than a second, hand-rolled condition.
+- **Widget state reads the phase, not `state.reason`.** They diverge after navigating back from a finished game: the phase returns to `Paused` while the reason stays set. See the `state.reason` invariant above.
 
 ### UI Event Suppression
 - **`syncingUI` flag**: `GobanControl::syncingUI` suppresses game actions triggered by UI change events during programmatic dropdown updates. Any method that repopulates dropdowns (player, board size, komi, handicap) must wrap the repopulation with `setSyncingUI(true/false)`. Event handlers in `EventHandlerNewGame` check `isSyncingUI()` and skip side effects when true. This prevents transient intermediate states (e.g. briefly activating an engine player during dropdown clear/repopulate) from triggering game actions.

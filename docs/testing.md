@@ -189,7 +189,7 @@ there, since recording a replay is noise.
 
 `GobanControl::dumpState()` is the single source; a failure prints all of it.
 Currently: `move_count`, `view_position`, `main_line_moves`, `navigating`,
-`at_end`, `variations`, `has_result`, `board_size`, `color_to_move`, `komi`,
+`at_end`, `variations`, `has_result`, `result`, `board_size`, `color_to_move`, `komi`,
 `handicap`, `black_stones`, `white_stones`, `captured_black`, `captured_white`,
 `mode`, `ai_vs_ai`, `phase`, `running`, `thinking`, `syncing_ui`,
 `tsumego`, `holds_stone`, `show_territory`, `msg`, `black_player`,

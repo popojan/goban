@@ -797,7 +797,12 @@ void ElementGame::OnUpdate()
     //view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSizeX);
     view.board.updateMetrics(model.metrics);
 
-    bool isOver = model.state.reason != GameState::NO_REASON;
+    // The lifecycle phase, not state.reason. The two diverge after navigating
+    // back from a finished game: the phase returns to Paused but the reason
+    // stays set, which used to grey out Start, Pass, Undo and Kibitz on a
+    // position that is no longer the end of the game — while the keybindings
+    // for those same actions kept working.
+    bool isOver = model.phase() == GamePhase::Finished;
     bool isRunning = engine.isRunning();
 
     Rml::Context* context = GetContext();
@@ -876,8 +881,13 @@ void ElementGame::OnUpdate()
 
         // Pass/Resign/Undo: disabled when not human's turn, game over, or locked in AI vs AI
         setElementDisabled("cmdPass", !humanTurn || isOver || aiVsAiLocked);
-        setElementDisabled("cmdResign", !humanTurn || isOver || aiVsAiLocked);
-        setElementDisabled("cmdUndo", !humanTurn || isOver || aiVsAiLocked);
+        // Resign asks GobanControl the same question the `resign` command asks,
+        // so the button and the keybinding can no longer disagree.
+        setElementDisabled("cmdResign", !control.canResign() || aiVsAiLocked);
+        // Undo is navigateBack under another name; gate it like the navigation
+        // buttons below, not on whose turn it is. Reviewing a finished game is
+        // exactly when you need it.
+        setElementDisabled("cmdUndo", thinking || aiVsAiLocked);
         setElementDisabled("cmdKibitz", thinking || isOver || aiVsAiLocked);
 
         // Navigation: disabled when engine thinking or locked in AI vs AI
