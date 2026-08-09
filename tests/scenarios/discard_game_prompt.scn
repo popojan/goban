@@ -1,0 +1,72 @@
+# Board size and handicap replace the game on screen, so they confirm first —
+# the same gate `clear` has always had. This scenario exists because the first
+# attempt at that gate shipped broken and was found by hand: the prompt appeared,
+# Yes did nothing, and the dropdown snapped back. GobanModel::hasGameWorthKeeping()
+# had decided the question was worth asking while GobanControl::setHandicap()
+# still refused mid-game, so confirming ran straight into a refusal.
+#
+# The dropdowns themselves are not scriptable, but the `board_size` and
+# `handicap` commands take the identical route, prompt included.
+#
+# Both players are human and every move is a pass, so nothing advances on its own.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect phase setup
+expect handicap 0
+
+# --- 1. Confirming a handicap change mid-game must actually apply it ---------
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+
+handicap 2
+# Asserted before answering: "a prompt appeared" is what separates this bug from
+# a command that silently did nothing, and the two look identical otherwise.
+expect prompt_active true
+expect handicap 0          # nothing applied until the answer comes back
+
+prompt_yes
+wait_idle
+expect prompt_active false
+# The regression: all three of these were unchanged before the fix.
+expect handicap 2
+expect move_count 0
+expect main_line_moves 0
+expect phase setup
+
+# --- 2. Declining must leave the game alone ---------------------------------
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+
+handicap 4
+expect prompt_active true
+prompt_no
+wait_idle
+expect prompt_active false
+expect handicap 2          # unchanged
+expect move_count 1        # and the game survived
+expect phase playing
+
+# --- 3. Board size takes the same route -------------------------------------
+board_size 19
+expect prompt_active true
+prompt_yes
+wait_idle
+expect board_size 19
+expect move_count 0
+expect phase setup
+
+# --- 4. Nothing worth keeping means no question -----------------------------
+# An empty board has nothing to discard, so the change applies straight away.
+handicap 0
+expect prompt_active false
+wait_idle
+expect handicap 0
+expect board_size 19

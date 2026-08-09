@@ -142,6 +142,12 @@ camera. In CI, wrap it: `xvfb-run -s "-screen 0 1024x768x24" tests/run_scenarios
 A value of `$otherKey` compares two pieces of state, e.g.
 `expect view_position $main_line_moves`.
 
+Confirmation prompts are scriptable: `board_size <n>` and `handicap <n>` take
+the same route as the dropdowns, so they ask before replacing a game worth
+keeping. Answer with `prompt_yes` / `prompt_no`, and assert `prompt_active` to
+show the prompt really appeared — otherwise a command that silently does nothing
+looks identical to one that was refused. `new_game <size>` stays unprompted.
+
 Two rules learned the hard way:
 
 - **Never assert an exact value on something that moves on its own.** The
@@ -192,7 +198,7 @@ Currently: `move_count`, `view_position`, `main_line_moves`, `navigating`,
 `at_end`, `variations`, `has_result`, `result`, `board_size`, `color_to_move`, `komi`,
 `handicap`, `black_stones`, `white_stones`, `captured_black`, `captured_white`,
 `mode`, `ai_vs_ai`, `phase`, `loop_state`, `engine_sync`, `running`, `thinking`, `syncing_ui`,
-`tsumego`, `holds_stone`, `show_territory`, `msg`, `black_player`,
+`tsumego`, `holds_stone`, `show_territory`, `prompt_active`, `msg`, `black_player`,
 `white_player`, `board_hash`.
 
 Add a key there and every scenario can assert on it.

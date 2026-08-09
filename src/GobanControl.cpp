@@ -474,9 +474,12 @@ void GobanControl::buildRegistry() {
     add("clear", 0, 0, "clear the board and start over (prompts first)", [this](CommandContext& ctx) {
         if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         // Use different prompt for game in progress vs finished game
+        // Same prompt as the board-size and handicap dropdowns: all three
+        // replace the game, and all three save it first, so neither "quit" nor
+        // "discard" describes what happens. Only `quit` still ends the app.
         const char* templateId = engine.isRunning() && model.phase() != GamePhase::Finished
                                  && !model.tsumegoMode
-            ? "templateQuitWithoutFinishing"
+            ? "templateStartNewGame"
             : "templateClearBoard";
         parent->showPromptYesNoTemplate(templateId, [this](bool confirmed) {
             if (confirmed) {
@@ -816,6 +819,29 @@ void GobanControl::buildRegistry() {
             view.requestRepaint();
     });
 
+    add("board_size", 1, 1, "<size> — as the board-size dropdown, confirmation included",
+        [this](CommandContext& ctx) {
+            int boardSize = 0;
+            if (!parseInt(ctx.args[0], boardSize)) {
+                spdlog::warn("board_size: '{}' is not a number", ctx.args[0]);
+                return;
+            }
+            // Unlike new_game, this is the dropdown's path: it asks before
+            // replacing a game worth keeping. new_game stays unprompted because
+            // every scenario opens with it.
+            requestNewGame(static_cast<unsigned>(boardSize), {});
+    });
+
+    add("handicap", 1, 1, "<stones> — as the handicap dropdown, confirmation included",
+        [this](CommandContext& ctx) {
+            int handicap = 0;
+            if (!parseInt(ctx.args[0], handicap)) {
+                spdlog::warn("handicap: '{}' is not a number", ctx.args[0]);
+                return;
+            }
+            requestHandicap(handicap, {});
+    });
+
     add("click", 2, 2, "<col> <row> — place a stone as if the board was clicked there",
         [this](CommandContext& ctx) {
             int col = 0;
@@ -1018,16 +1044,15 @@ bool GobanControl::setKomi(float komi) const {
 
 bool GobanControl::setHandicap(int handicap) const {
     spdlog::debug("setHandicap: handicap={} phase={}", handicap, phaseName(model.phase()));
-    bool success = false;
-    // The old second guard was `state.reason != NO_REASON`, a stand-in for the
-    // confirmation this path never had: it refused on a finished game and let
-    // an unfinished one be replaced silently. requestHandicap() asks properly
-    // now, so the phase is the only condition left — and state.reason loses its
-    // last use as a lifecycle test.
-    if(model.phase() != GamePhase::Playing) {
-        model.state.handicap = handicap;
-        success = newGame(model.getBoardSize());
-    }
+    // No guard here on purpose. This is the "do it" half, holding no policy —
+    // the same split as newGame() and requestNewGame(). Its only caller is
+    // requestHandicap(), which has already asked the user whether the current
+    // game may be replaced; a second condition here could only contradict that
+    // answer, which is exactly what it did: the phase test refused precisely
+    // when hasGameWorthKeeping() had decided the question was worth asking, so
+    // confirming the prompt did nothing at all.
+    model.state.handicap = handicap;
+    const bool success = newGame(model.getBoardSize());
     view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
     return success;
 }
@@ -1122,7 +1147,7 @@ void GobanControl::confirmGameReplacement(std::function<void()> replace,
         replace();
         return;
     }
-    parent->showPromptYesNoTemplate("templateDiscardGame",
+    parent->showPromptYesNoTemplate("templateStartNewGame",
         [replace = std::move(replace), onCancelled = std::move(onCancelled)](bool confirmed) {
             if (confirmed) {
                 replace();
@@ -1225,6 +1250,9 @@ nlohmann::json GobanControl::dumpState() const {
     s["deferred_task"]  = engine.hasDeferredTask();
     s["engine_sync"]    = engineSyncName(engine.engineSyncState());
     s["loop_state"]     = loopStateName(engine.loopState());
+    // Lets a scenario tell "a prompt appeared" from "the command silently did
+    // nothing" — the distinction the dead handicap prompt turned on.
+    s["prompt_active"]  = parent->hasActivePrompt();
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;
