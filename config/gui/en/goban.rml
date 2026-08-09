@@ -141,6 +141,7 @@
                             <div class="template" id="templateCalculatingScore">Calculating score...</div>
                             <div class="template" id="templateClearBoard">Clear board?</div>
                             <div class="template" id="templateQuitWithoutFinishing">Quit without finishing?</div>
+                            <div class="template" id="templateDiscardGame">Discard the game in progress?</div>
                             </div>
                             <div id="grpMoves">
                             <div class="hr">Play</div>

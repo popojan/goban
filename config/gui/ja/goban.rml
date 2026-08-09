@@ -129,6 +129,7 @@
                             <div class="template" id="templateCalculatingScore">計算中...</div>
                             <div class="template" id="templateClearBoard">盤面をクリア？</div>
                             <div class="template" id="templateQuitWithoutFinishing">対局を終了しますか？</div>
+                            <div class="template" id="templateDiscardGame">対局を破棄しますか？</div>
                             </div>
                             <div id="grpMoves">
                             <div class="hr">着手</div>

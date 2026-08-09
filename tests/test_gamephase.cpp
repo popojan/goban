@@ -264,6 +264,39 @@ TEST_CASE("a freshly constructed model starts in Setup") {
     CHECK_FALSE(static_cast<bool>(fresh));
 }
 
+TEST_CASE("hasGameWorthKeeping decides when replacing the game needs confirming") {
+    // The gate on the board-size and handicap dropdowns, which replace the game
+    // on screen. It used to be missing there entirely: only `clear` asked.
+    Fixture f(9);
+    f.newGame(9);
+    CHECK_FALSE(f.model.hasGameWorthKeeping());        // empty board, nothing to lose
+
+    f.model.state.black = "Black";
+    f.model.state.white = "White";
+    f.model.start();
+    f.model.onGameMove(Move(Position(3, 3), Color::BLACK), "");
+    CHECK(f.model.hasGameWorthKeeping());              // a game in progress
+
+    // Reviewing from the root: moveCount() is 0 here, so the view position
+    // alone would wrongly report an empty board. This is the case that would
+    // have silently discarded a game.
+    f.model.enterReview();
+    while (f.model.game.hasPreviousMove()) f.model.game.undo();
+    REQUIRE(f.model.game.moveCount() == 0);
+    CHECK(f.model.hasGameWorthKeeping());
+
+    // A decided game has nothing left to lose.
+    f.model.endGame(GameState::RESIGNATION);
+    CHECK_FALSE(f.model.hasGameWorthKeeping());
+
+    // Neither has a puzzle.
+    Fixture t(9);
+    REQUIRE(t.load("tsumego.sgf"));
+    REQUIRE(t.model.hasGameWorthKeeping());            // ...until it is one
+    t.model.tsumegoMode = true;
+    CHECK_FALSE(t.model.hasGameWorthKeeping());
+}
+
 TEST_CASE("state.reason outlives the Finished phase — known inconsistency") {
     // Pinned, not endorsed. enterReview() drops Finished but leaves
     // state.reason set, and the UI's own notion of "over" is

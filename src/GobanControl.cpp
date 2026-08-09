@@ -1017,11 +1017,14 @@ bool GobanControl::setKomi(float komi) const {
 }
 
 bool GobanControl::setHandicap(int handicap) const {
-    bool isOver = model.state.reason != GameState::NO_REASON;
-    spdlog::debug("setHandicap: handicap={} phase={} isOver={}",
-        handicap, phaseName(model.phase()), isOver);
+    spdlog::debug("setHandicap: handicap={} phase={}", handicap, phaseName(model.phase()));
     bool success = false;
-    if(model.phase() != GamePhase::Playing && !isOver) {
+    // The old second guard was `state.reason != NO_REASON`, a stand-in for the
+    // confirmation this path never had: it refused on a finished game and let
+    // an unfinished one be replaced silently. requestHandicap() asks properly
+    // now, so the phase is the only condition left — and state.reason loses its
+    // last use as a lifecycle test.
+    if(model.phase() != GamePhase::Playing) {
         model.state.handicap = handicap;
         success = newGame(model.getBoardSize());
     }
@@ -1094,6 +1097,44 @@ const char* messageName(GameState::Message m) {
 }
 
 }  // namespace
+
+void GobanControl::confirmGameReplacement(std::function<void()> replace,
+                                          std::function<void()> onCancelled) const {
+    if (!model.hasGameWorthKeeping()) {
+        replace();
+        return;
+    }
+    parent->showPromptYesNoTemplate("templateDiscardGame",
+        [replace = std::move(replace), onCancelled = std::move(onCancelled)](bool confirmed) {
+            if (confirmed) {
+                replace();
+            } else if (onCancelled) {
+                onCancelled();
+            }
+        });
+}
+
+void GobanControl::requestNewGame(unsigned boardSize, std::function<void(bool)> onSettled) const {
+    confirmGameReplacement(
+        [this, boardSize, onSettled]() {
+            // Board size is about to change, so the game on screen is going
+            // regardless — save it first, as `clear` does.
+            saveCurrentGame();
+            const bool ok = newGame(boardSize);
+            if (onSettled) onSettled(ok);
+        },
+        [onSettled]() { if (onSettled) onSettled(false); });
+}
+
+void GobanControl::requestHandicap(int handicap, std::function<void(bool)> onSettled) const {
+    confirmGameReplacement(
+        [this, handicap, onSettled]() {
+            saveCurrentGame();
+            const bool ok = setHandicap(handicap);
+            if (onSettled) onSettled(ok);
+        },
+        [onSettled]() { if (onSettled) onSettled(false); });
+}
 
 bool GobanControl::canResign() const {
     if (syncingUI) return false;

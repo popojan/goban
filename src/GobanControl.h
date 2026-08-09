@@ -43,6 +43,17 @@ public:
     void switchShader(int idx) const;
     bool setHandicap(int) const;
     bool setKomi(float) const;
+
+    /// Board-size and handicap changes replace the game on screen, so they ask
+    /// first when there is a game worth keeping — the same gate `clear` has
+    /// always had, and the one the dropdowns were missing.
+    ///
+    /// The answer arrives asynchronously, so the caller cannot revert its
+    /// widget at the call site: `onSettled(changed)` runs once the outcome is
+    /// known, with `changed == false` when the user declined or the change
+    /// failed.
+    void requestNewGame(unsigned boardSize, std::function<void(bool)> onSettled) const;
+    void requestHandicap(int handicap, std::function<void(bool)> onSettled) const;
     // Parses "name arg arg..." and dispatches through the command registry.
     void command(const std::string& cmd);
     // Dispatches an already split command (scripting channel entry point).
@@ -68,6 +79,12 @@ public:
     [[nodiscard]] bool canResign() const;
 
 private:
+    /// Runs `replace` once the user has agreed to discard the current game, or
+    /// straight away when GobanModel::hasGameWorthKeeping() says there is
+    /// nothing to lose.
+    void confirmGameReplacement(std::function<void()> replace,
+                                std::function<void()> onCancelled) const;
+
     // Per-invocation state handed to a command handler.
     struct CommandContext {
         const std::vector<std::string>& args;

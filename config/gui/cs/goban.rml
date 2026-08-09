@@ -141,6 +141,7 @@
                             <div class="template" id="templateCalculatingScore">Počítám skóre...</div>
                             <div class="template" id="templateClearBoard">Sklidit desku?</div>
                             <div class="template" id="templateQuitWithoutFinishing">Ukončit rozehranou hru?</div>
+                            <div class="template" id="templateDiscardGame">Zahodit rozehranou hru?</div>
                             </div>
                             <div id="grpMoves">
                             <div class="hr">Hrát</div>

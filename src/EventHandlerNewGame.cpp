@@ -36,11 +36,18 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
             if (select) lastBoardSelection = select->GetSelection();
         } else if (static_cast<int>(model.getBoardSize()) == boardSize) {
             if (select) lastBoardSelection = select->GetSelection();
-        } else if(!controller.newGame(boardSize)) {
-            spdlog::error("setting boardsize failed");
-            select->SetSelection(lastBoardSelection);
         } else {
-            lastBoardSelection = select->GetSelection();
+            // Changing the board size replaces the game, so it asks first —
+            // the answer arrives later, hence the callback rather than a
+            // return value.
+            controller.requestNewGame(boardSize, [this, select](bool changed) {
+                if (!select) return;
+                if (changed) {
+                    lastBoardSelection = select->GetSelection();
+                } else {
+                    select->SetSelection(lastBoardSelection);
+                }
+            });
         }
     }
     else if(value == "mdown" || value == "mup") {
@@ -66,11 +73,16 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
             if (select) lastHandicapSelection = select->GetSelection();
         } else if (model.state.handicap == handicap) {
             if (select) lastHandicapSelection = select->GetSelection();
-        } else if(!controller.setHandicap(handicap)) {
-            spdlog::error("setting handicap failed");
-            select->SetSelection(lastHandicapSelection);
         } else {
-            lastHandicapSelection = select->GetSelection();
+            // Handicap restarts the game too, so it takes the same route.
+            controller.requestHandicap(handicap, [this, select](bool changed) {
+                if (!select) return;
+                if (changed) {
+                    lastHandicapSelection = select->GetSelection();
+                } else {
+                    select->SetSelection(lastHandicapSelection);
+                }
+            });
         }
     }
     else if(value == "engine") {

@@ -102,6 +102,19 @@ public:
     /// The authoritative lifecycle state (ADR-0002 step 2).
     [[nodiscard]] GamePhase phase() const { return gamePhase.load(); }
 
+    /// True when replacing the game on screen would discard something the user
+    /// would miss, and so should be confirmed first. A finished game has
+    /// nothing left to lose, an empty board has nothing to discard, and a
+    /// tsumego is a puzzle rather than a game in progress.
+    ///
+    /// Note the second half of the record test: moveCount() is the *view*
+    /// position, so it reads 0 while reviewing from the root of a real game.
+    [[nodiscard]] bool hasGameWorthKeeping() const {
+        if (tsumegoMode) return false;
+        if (phase() == GamePhase::Finished) return false;
+        return game.moveCount() > 0 || game.getLoadedMovesCount() > 0;
+    }
+
     void setCursor(const Position& p) { cursor = p;}
 
 public:
