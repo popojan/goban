@@ -459,7 +459,9 @@ int main(int argc, char** argv)
     // A scripted run still needs a real GL context (shaders compile, the board
     // renders), but it must not pop a window in front of whatever the developer
     // is doing. Under Xvfb in CI this makes no difference.
-    if (!scenarioFile.empty()) {
+    // GOBAN_SCENARIO_VISIBLE overrides this for benchmark runs: a hidden
+    // window's swap never presents, so frame timings measured there are fiction.
+    if (!scenarioFile.empty() && getenv("GOBAN_SCENARIO_VISIBLE") == nullptr) {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     }
 
@@ -472,7 +474,9 @@ int main(int argc, char** argv)
     }
 
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
+    // Vsync paces interactive use; a scripted run wants frames as fast as the
+    // GPU can produce them, both for benchmarks and to keep CI runs brisk.
+    glfwSwapInterval(scenarioFile.empty() ? 1 : 0);
 
     // Set window icon from executable resource (Windows only)
 #ifdef _WIN32
