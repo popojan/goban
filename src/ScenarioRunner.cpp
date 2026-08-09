@@ -167,6 +167,21 @@ bool ScenarioRunner::execute(const Step& step, GobanControl& control) {
         return true;
     }
 
+    if (name == "screenshot") {
+        if (step.args.empty()) {
+            recordFailure(step, "screenshot needs a file path", control.dumpState());
+            return true;
+        }
+        if (!screenshotRequested) {
+            control.requestScreenshot(step.args[0]);
+            screenshotRequested = true;
+            return false;
+        }
+        if (control.screenshotPending()) return false;
+        screenshotRequested = false;
+        return true;
+    }
+
     if (name == "quit_when_done") {
         done = true;
         return true;

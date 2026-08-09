@@ -1348,3 +1348,11 @@ void GobanControl::saveCurrentGame() const {
 
     settings.save();
 }
+
+void GobanControl::requestScreenshot(const std::string& path) {
+    view.requestScreenshot(path);
+}
+
+bool GobanControl::screenshotPending() const {
+    return view.screenshotPending();
+}

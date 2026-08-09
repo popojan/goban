@@ -30,6 +30,9 @@ class GobanControl;
 ///   wait_until <k> <v>    wait until a state key reaches a value (10 s cap)
 ///   dump_state [label]    log the whole state, for authoring new scenarios
 ///   fail_fast on|off      stop at the first failed expectation (default on)
+///   screenshot <path>     render one frame and write it as binary PPM (P6);
+///                         blocks until the capture happened, so later steps
+///                         cannot mutate the frame being shot
 ///   quit_when_done        end the run (implied at end of file)
 ///
 /// A failed expectation prints the full state, because the useful question is
@@ -96,6 +99,10 @@ private:
     // Wait bookkeeping. Deadlines are absolute times from glfwGetTime().
     bool waiting = false;
     double waitDeadline = 0.0;
+
+    // Screenshot bookkeeping: the request was handed to the view and the step
+    // stays current until the main loop reports the capture done.
+    bool screenshotRequested = false;
 };
 
 #endif  // GOBAN_SCENARIORUNNER_H

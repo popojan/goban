@@ -47,6 +47,10 @@ public:
         return view.needsRender();
     }
 
+    /// Non-empty when a scenario asked for a screenshot; the main loop calls
+    /// this right before the buffer swap and captures the finished frame.
+    std::string takeScreenshotRequest() { return view.takeScreenshotRequest(); }
+
     // Returns timeout for idle sleep: >0 = seconds to wait, -1 = wait forever
     double getIdleTimeout() const;
 

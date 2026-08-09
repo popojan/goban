@@ -41,6 +41,7 @@
 #include <nlohmann/json.hpp>
 
 #include <memory>
+#include <fstream>
 #include <set>
 
 #include "UserSettings.h"
@@ -215,6 +216,34 @@ static void CleanupResources(GLFWwindow* window) {
         glfwDestroyWindow(window);
     }
     glfwTerminate();  // Safe to call even if not initialized
+}
+
+// Reads the finished back buffer and writes it as binary PPM (P6). Called
+// between rendering and the swap: the front buffer of a hidden window never
+// receives the frame, so this is the only reliable capture point.
+static void WriteScreenshotPPM(GLFWwindow* window, const std::string& path) {
+    int w = 0, h = 0;
+    glfwGetFramebufferSize(window, &w, &h);
+    if (w <= 0 || h <= 0) {
+        spdlog::error("screenshot: framebuffer has no size");
+        return;
+    }
+    std::vector<unsigned char> pixels(static_cast<size_t>(w) * h * 3);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_BACK);
+    glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        spdlog::error("screenshot: cannot write '{}'", path);
+        return;
+    }
+    out << "P6\n" << w << " " << h << "\n255\n";
+    for (int row = h - 1; row >= 0; --row) {  // GL rows are bottom-up
+        out.write(reinterpret_cast<const char*>(pixels.data() + static_cast<size_t>(row) * w * 3),
+                  static_cast<std::streamsize>(w) * 3);
+    }
+    spdlog::info("screenshot: wrote {}x{} to {}", w, h, path);
 }
 
 // GLFW callbacks
@@ -620,6 +649,12 @@ int main(int argc, char** argv)
                 render_interface.BeginFrame();
                 context->Render();
                 render_interface.EndFrame();
+                if (gameElement) {
+                    const std::string shot = gameElement->takeScreenshotRequest();
+                    if (!shot.empty()) {
+                        WriteScreenshotPPM(window, shot);
+                    }
+                }
                 glfwSwapBuffers(window);
             } else if (scenarioActive) {
                 // A scenario generates no input events, so blocking in

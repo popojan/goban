@@ -131,6 +131,11 @@ public:
     /// Engines are up; the UI may start accepting commands.
     void finishInitialization() { uiReady = true; }
 
+    /// Scenario support, forwarded to the view: the `screenshot` directive
+    /// blocks until the main loop has captured the frame.
+    void requestScreenshot(const std::string& path);
+    [[nodiscard]] bool screenshotPending() const;
+
     /// Whether a widget change event should be read as the user's intent. False
     /// during startup, and while a dropdown is being repopulated — removing and
     /// re-adding options fires the same events a real selection does.

@@ -120,6 +120,20 @@ public:
 
     void requestRepaint(int what = UPDATE_SOME);
     bool needsRender() const { return updateFlag != UPDATE_NONE || animationRunning || cameraAnim.active; }
+
+    // Scenario screenshots. The runner sets the path; the main loop captures
+    // the back buffer right before the swap — the only moment a finished frame
+    // exists — and clears the request. All on the UI thread.
+    void requestScreenshot(const std::string& path) {
+        pendingScreenshot = path;
+        requestRepaint(UPDATE_ALL);
+    }
+    [[nodiscard]] bool screenshotPending() const { return !pendingScreenshot.empty(); }
+    std::string takeScreenshotRequest() {
+        std::string path = pendingScreenshot;
+        pendingScreenshot.clear();
+        return path;
+    }
     void stopAudioIfInactive() { player.stopIfInactive(); }
     void playSound(const std::string& id, double volume = 1.0) { player.play(id, volume); }
     bool toggleLastMoveOverlay();
@@ -180,6 +194,7 @@ public:
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
     AudioPlayer player;
+    std::string pendingScreenshot;  // see requestScreenshot()
 
     void clearView();
 };
