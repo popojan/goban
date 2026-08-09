@@ -37,6 +37,38 @@ enum class GameMode {
     ANALYSIS    ///< Sabaki-like - human plays either color, AI responds based on move source
 };
 
+/** \brief Whether the engines match the game record — ADR-0002 step 4.
+ *
+ * Replaces the `enginesSynced` bool. The distinction the bool could not make is
+ * between work *pending* and work *happening*: after a new game the record has
+ * moved and nothing is synced, but the game loop is stopped and will stay
+ * stopped until the user plays. Treating that as "busy" would hang any caller
+ * waiting for quiescence, whereas an in-progress replay genuinely is busy.
+ */
+/** \brief The game loop's own lifecycle — ADR-0002 step 4.
+ *
+ * Replaces the `hasThreadRunning` / `interruptRequested` pair. `Stopping` is
+ * the state the two encoded jointly and neither named: the thread is still
+ * alive, because an engine mid-genmove cannot be aborted, but it will exit as
+ * soon as that call returns.
+ *
+ * `deferredPending` is deliberately *not* folded in. A deferred task can be
+ * queued while the loop runs perfectly happily, and it never means "stopping" —
+ * it is work waiting, not lifecycle. The two only meet in one derived question,
+ * shouldDiscardMove().
+ */
+enum class LoopState {
+    Stopped,   ///< No game loop. The thread may exist but has returned.
+    Running,   ///< The loop is turning.
+    Stopping   ///< Asked to stop; still alive until the current call returns.
+};
+
+enum class EngineSync {
+    Unsynced,  ///< Engines are behind the record. Nobody may be working on it.
+    Syncing,   ///< The game thread is replaying the record into engines now.
+    Synced     ///< Every engine sits at the record's current position.
+};
+
 
 /** \brief Background thread responsible for rules enforcing
  *
@@ -108,6 +140,31 @@ public:
 
     /// True while a deferred task is waiting for an engine to finish.
     [[nodiscard]] bool hasDeferredTask() const { return deferredPending.load(); }
+
+    /// True once the loop has been asked to stop and has not yet exited. The
+    /// old spelling was `interruptRequested`.
+    [[nodiscard]] bool stopRequested() const { return loop.load() == LoopState::Stopping; }
+
+    /// A move that arrived from an engine is worthless if the loop is stopping
+    /// or the game is about to be replaced. The one place the loop's lifecycle
+    /// and the deferred-task queue are asked a single question.
+    [[nodiscard]] bool shouldDiscardMove() const {
+        return stopRequested() || deferredPending.load();
+    }
+
+    /// For diagnostics and scenario assertions.
+    [[nodiscard]] LoopState loopState() const { return loop.load(); }
+
+    /// True only while the game thread is actually replaying the record into
+    /// the engines. Deliberately not true for EngineSync::Unsynced: that state
+    /// persists with the loop stopped after a new game, so treating it as busy
+    /// would stall every caller waiting for quiescence.
+    [[nodiscard]] bool isSyncingEngines() const {
+        return engineSync.load() == EngineSync::Syncing;
+    }
+
+    /// For diagnostics and scenario assertions.
+    [[nodiscard]] EngineSync engineSyncState() const { return engineSync.load(); }
 
     /// Name of the engine currently thinking, or empty.
     [[nodiscard]] std::string thinkingPlayerName() const;
@@ -221,9 +278,8 @@ private:
     GobanModel& model;
     std::unique_ptr<std::thread> thread;
     std::mutex mutex2;
-    std::atomic<bool> interruptRequested{false};
-    std::atomic<bool> hasThreadRunning{false};
-    std::atomic<bool> enginesSynced{true};  // All engines synced to current position
+    std::atomic<LoopState> loop{LoopState::Stopped};
+    std::atomic<EngineSync> engineSync{EngineSync::Synced};
     std::atomic<Player*> playerToMove;
     Move queuedMove;
     mutable std::mutex playerMutex;

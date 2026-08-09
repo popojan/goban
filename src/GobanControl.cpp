@@ -1096,6 +1096,24 @@ const char* messageName(GameState::Message m) {
     return "unknown";
 }
 
+const char* loopStateName(LoopState s) {
+    switch (s) {
+        case LoopState::Stopped:  return "stopped";
+        case LoopState::Running:  return "running";
+        case LoopState::Stopping: return "stopping";
+    }
+    return "unknown";
+}
+
+const char* engineSyncName(EngineSync s) {
+    switch (s) {
+        case EngineSync::Unsynced: return "unsynced";
+        case EngineSync::Syncing:  return "syncing";
+        case EngineSync::Synced:   return "synced";
+    }
+    return "unknown";
+}
+
 }  // namespace
 
 void GobanControl::confirmGameReplacement(std::function<void()> replace,
@@ -1160,6 +1178,10 @@ bool GobanControl::isIdle() const {
     // Likewise for a game-replacing action waiting on, or running past, a
     // genmove: the board is not final until it has finished.
     if (engine.hasDeferredTask()) return false;
+    // And while the game thread is replaying the record into the engines. Only
+    // EngineSync::Syncing counts: Unsynced persists with the loop stopped after
+    // a new game, so waiting on that would never return.
+    if (engine.isSyncingEngines()) return false;
     return true;
 }
 
@@ -1201,6 +1223,8 @@ nlohmann::json GobanControl::dumpState() const {
     s["pending_nav"]    = engine.hasPendingNavigation();
     s["queued_nav"]     = engine.hasQueuedNavigation();
     s["deferred_task"]  = engine.hasDeferredTask();
+    s["engine_sync"]    = engineSyncName(engine.engineSyncState());
+    s["loop_state"]     = loopStateName(engine.loopState());
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;

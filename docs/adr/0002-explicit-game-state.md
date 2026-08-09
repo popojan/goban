@@ -289,3 +289,61 @@ commit rather than a refactor's.
 **`GamePhase` is now complete.** Remaining: step 4 (`EngineSync` and
 `LoopState`, both local to `GameThread`) and step 5 (decompose
 `ElementGame::OnUpdate()`, retiring `syncingUI`).
+
+### Step 4 — EngineSync and LoopState. Done 2026-08-09.
+
+Both are private to `GameThread`, so this step touches no other file except
+`GobanControl::isIdle()` and `dumpState()`.
+
+**`EngineSync`** replaces `enginesSynced`. The third state is not decoration:
+the bool could not distinguish work *pending* from work *happening*, and the
+difference decides whether a caller waiting for quiescence should wait.
+`newGameNow()` interrupts the loop and *then* marks the engines out of date, so
+after a new game the state is `Unsynced` with nothing running — indefinitely,
+until the user's first move starts the loop. Treating that as busy would stall
+`wait_idle` forever. `Syncing`, by contrast, is held only while the game thread
+is replaying the record, and is left unconditionally at the end of the replay,
+failure included, so it cannot strand anyone. `isIdle()` now waits on `Syncing`
+alone — a real gap closed, of the same family as the navigation one in step 2.
+
+**`LoopState`** replaces `hasThreadRunning` and `interruptRequested`.
+`Stopping` is the state those two encoded jointly and neither named: the thread
+is alive, because an engine mid-genmove cannot be aborted, but it will exit as
+soon as that call returns.
+
+**`deferredPending` is not folded in**, contrary to the plan above. A deferred
+task can be queued while the loop runs perfectly happily, and it never means
+"stopping" — it is work waiting, not lifecycle. Folding it in would recreate
+exactly the conflation this ADR exists to remove, which is the same reasoning
+the decision used to exclude `tsumegoMode` and friends. The two meet in one
+derived question, now named `shouldDiscardMove()`.
+
+Collapsing two independent bits into one enum introduces a hazard the bits did
+not have: an unconditional write to `Running` can swallow a `Stopping` that
+arrived in between. So the loop announces itself with a compare-exchange from
+`Stopped` only, once, before the first iteration rather than inside it. That
+also closes a latent deadlock — an interrupt landing between `gameLoop()`
+clearing the old flag and its first loop test used to leave `run()` waiting on
+`engineStarted` forever, because `hasThreadRunning` was never set.
+
+`interrupt()` now leaves `Stopped` after a successful join, where the old code
+left `interruptRequested` set until something else happened to clear it. On the
+timeout path it stays `Stopping`, which is exactly what that path means. It also
+enters `Stopping` by compare-exchange from `Running` only: the mirror of the
+same hazard, and one this refactor briefly introduced. Writing it
+unconditionally would claim an already-exited loop was still alive, and the
+timeout poll would spin out its full deadline and report failure for a thread
+that was ready to join — reachable after a timed-out interrupt whose loop later
+exited on its own. Latent today, since no caller passes a timeout, but the
+timeout path is documented API.
+
+The wider lesson for step 5: collapsing independent bits into one enum removes
+illegal combinations and adds lost-update hazards in their place. Every write
+to such an enum wants to be conditional on the state it expects.
+
+`dumpState()` reports `engine_sync` and `loop_state`.
+
+**Remaining: step 5** — decompose `ElementGame::OnUpdate()` and retire
+`syncingUI`. That is a rendering-layer change with no test harness behind it,
+so it is a different kind of risk from steps 1–4 and should be planned on its
+own.

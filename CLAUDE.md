@@ -181,7 +181,7 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **Deferred actions split in two**: the engine/model half may run on the game thread; every widget update must go in `GobanControl::finishGameReplacement()`, which the UI thread calls via `takeDeferredTaskDone()`. RmlUi is not thread safe.
 - **`interrupt()` is a no-op on the game thread**: joining there would deadlock on self-join, and setting `interruptRequested` would kill the loop the caller still needs.
 - **Re-evaluate the loop after initial sync**: the `phase() != Playing` early-out runs before `enginesSynced` flips, so the sync branch must `continue` rather than fall through. Otherwise a paused loaded game calls `genmove` on a `LocalHumanPlayer`, which blocks forever and silently wedges the loop — with `isThinking()` reporting false, because the stuck player is not an engine.
-- **Quiescence means all three**: `GobanControl::isIdle()` must account for engine thinking, queued navigation, and a deferred action still running.
+- **Quiescence means all four**: `GobanControl::isIdle()` must account for engine thinking, queued *or in-flight* navigation, a deferred action still running, and `EngineSync::Syncing`. It deliberately does **not** cover territory scoring — the obvious predicate is permanently true when scoring fails, so it would hang instead of tighten; scenarios use `wait_until has_result true`. Every gap here has produced a flaky scenario at least once.
 
 > **In flux:** ADR-0002 replaces the lifecycle flags below with explicit
 > `GamePhase` / `EngineSync` / `LoopState` machines.
@@ -197,15 +197,23 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 > funnel into a single private `transitionTo()`, which is the one place the
 > lifecycle is logged — do not add a second writer.
 >
-> `enginesSynced` and `hasThreadRunning` are still raw flags (step 4), and
-> `syncingUI` waits on `ElementGame::OnUpdate()` being decomposed (step 5). See
-> `docs/adr/0002-explicit-game-state.md` and its Implementation log.
+> **`EngineSync` and `LoopState` are done too** (step 4), both private to
+> `GameThread`. `enginesSynced` is now `Unsynced` / `Syncing` / `Synced`, and
+> `hasThreadRunning` + `interruptRequested` are `Stopped` / `Running` /
+> `Stopping`. Ask via `stopRequested()`, `isSyncingEngines()`,
+> `shouldDiscardMove()`, `isRunning()`. `deferredPending` deliberately stays a
+> flag — it is queued work, not lifecycle.
+>
+> Only `syncingUI` is left, waiting on `ElementGame::OnUpdate()` being
+> decomposed (step 5). See `docs/adr/0002-explicit-game-state.md` and its
+> Implementation log.
 
 ### Navigation & Engine Synchronization
 - **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
 - **Block navigation while engine thinking**: `isThinking()` returns true only for ENGINE types (not human players). Navigation keys are blocked when engine is processing.
 - **Navigation in bot-bot matches**: Requires switching to Analysis mode first (pauses genmove loop).
-- **Engine sync invariant**: All enabled engines stay in sync at the same position. After load/new game, `enginesSynced = false` triggers initial sync on game thread: coach syncs first (enables scoring), then remaining engines. After initial sync, every move is sent to ALL engines via `syncOtherEngines`. No special cases for coach/player/kibitz roles.
+- **Engine sync invariant**: All enabled engines stay in sync at the same position. After load/new game, `EngineSync::Unsynced` triggers initial sync on the game thread: coach syncs first (enables scoring), then remaining engines. After initial sync, every move is sent to ALL engines via `syncOtherEngines`. No special cases for coach/player/kibitz roles.
+- **`Unsynced` is not "busy", `Syncing` is**: after a new game the engines are `Unsynced` while the game loop is *stopped*, and stay that way until the user's first move restarts it. Only `Syncing` — held while the game thread is actually replaying — may make `isIdle()` false; waiting on `Unsynced` would never return. The replay always leaves `Syncing`, failure included.
 - **All GTP from game thread**: Engine commands during active game must go through the game thread (navigation queue, initial sync). Direct GTP from UI thread is only safe when game thread is stopped (after `interrupt()`).
 
 ### SGF Game Record Consistency

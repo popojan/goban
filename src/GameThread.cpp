@@ -32,8 +32,7 @@ GameThread::GameThread(GobanModel &m) :
 }
 
 void GameThread::reset() {
-    interruptRequested = false;
-    hasThreadRunning = false;
+    loop = LoopState::Stopped;
     playerToMove = nullptr;
 }
 
@@ -164,7 +163,16 @@ bool GameThread::interrupt(int timeoutMs) {
         return true;
     }
 
-    interruptRequested = true;
+    // Only a *running* loop can be asked to stop. Writing Stopping
+    // unconditionally would be the mirror of the hazard gameLoop() guards
+    // against: on a loop that has already exited it would claim the thread is
+    // still alive, and the timeout poll below would then spin out its full
+    // deadline and report failure for a thread that was ready to join.
+    // Reachable after a timed-out interrupt whose loop later exited on its own.
+    {
+        LoopState expected = LoopState::Running;
+        loop.compare_exchange_strong(expected, LoopState::Stopping);
+    }
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);
         std::queue<NavCommand> empty;
@@ -181,14 +189,15 @@ bool GameThread::interrupt(int timeoutMs) {
         // here would risk a deadlock for the sake of a 10 ms poll.
         const auto deadline = std::chrono::steady_clock::now() +
                               std::chrono::milliseconds(timeoutMs);
-        while (hasThreadRunning && std::chrono::steady_clock::now() < deadline) {
+        while (loop.load() != LoopState::Stopped
+               && std::chrono::steady_clock::now() < deadline) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
-        if (hasThreadRunning) {
+        if (loop.load() != LoopState::Stopped) {
             spdlog::warn("interrupt: game loop still running after {} ms "
                          "(engine is probably mid-genmove); not joining",
                          timeoutMs);
-            // interruptRequested stays set, so the loop exits when genmove
+            // The state stays Stopping, so the loop exits when genmove
             // returns; run() joins the finished thread before starting again.
             return false;
         }
@@ -199,6 +208,9 @@ bool GameThread::interrupt(int timeoutMs) {
     thread->join();
     spdlog::debug("interrupt: thread joined");
     thread.reset();
+    // Joined, so the loop is definitively down. The old code left
+    // interruptRequested set here until something else happened to clear it.
+    loop = LoopState::Stopped;
     return true;
 }
 
@@ -216,7 +228,8 @@ void GameThread::shutdown() {
     spdlog::debug("shutdown: signaling interrupt");
     spdlog::default_logger()->flush();
     if (thread) {
-        interruptRequested = true;
+        LoopState expected = LoopState::Running;
+        loop.compare_exchange_strong(expected, LoopState::Stopping);
         navQueueCV.notify_one();
     }
     // Kill engine processes — unblocks game thread if stuck in GTP I/O.
@@ -263,8 +276,11 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
     model.setupBlackStones.clear();
     model.setupWhiteStones.clear();
 
-    // Non-coach engines will be synced on the game thread before genmove
-    enginesSynced = false;
+    // Non-coach engines will be synced on the game thread before genmove.
+    // Note the loop is stopped at this point (newGameNow interrupts it), so
+    // this can sit Unsynced indefinitely — until the user's first move starts
+    // it. That is why Unsynced is not a "busy" state.
+    engineSync = EngineSync::Unsynced;
 
     // Notify observers of board size (renders board immediately)
     std::for_each(
@@ -343,7 +359,7 @@ void GameThread::run() {
     std::unique_lock<std::mutex> lock(playerMutex);
 
     // If thread exists and finished, join it first before starting new one
-    if (thread && thread->joinable() && !hasThreadRunning) {
+    if (thread && thread->joinable() && loop.load() == LoopState::Stopped) {
         spdlog::debug("run: joining finished thread before starting new one");
         lock.unlock();
         thread->join();
@@ -351,16 +367,16 @@ void GameThread::run() {
     }
 
     // Don't start if already running
-    if (hasThreadRunning) {
+    if (loop.load() != LoopState::Stopped) {
         spdlog::debug("run: thread already running, skipping");
         return;
     }
 
     thread = std::make_unique<std::thread>(&GameThread::gameLoop, this);
-    engineStarted.wait(lock, [this]() { return hasThreadRunning.load(); });
+    engineStarted.wait(lock, [this]() { return loop.load() != LoopState::Stopped; });
 }
 
-bool GameThread::isRunning() const { return hasThreadRunning;}
+bool GameThread::isRunning() const { return loop.load() != LoopState::Stopped; }
 
 bool GameThread::isThinking() const {
     // Only block for engine thinking, not for human waiting for input
@@ -489,12 +505,20 @@ void GameThread::processSuccessfulMove(const Move& move, const Player* movePlaye
 
 void GameThread::gameLoop() {
     t_isGameThread = true;
-    interruptRequested = false;
-    while (!interruptRequested) {
-        if(!hasThreadRunning) {
-            hasThreadRunning = true;
-            engineStarted.notify_all();
-        }
+    // Announce the loop is up before the first iteration, and only from
+    // Stopped. Doing it inside the loop (as `hasThreadRunning = true` did) would
+    // now be a hazard rather than a redundancy: one enum carries both bits, so
+    // an unconditional write to Running would silently swallow a Stopping that
+    // arrived between the loop test and the write. It also closes a latent
+    // deadlock — an interrupt landing before the first iteration used to leave
+    // run() waiting on engineStarted forever.
+    {
+        LoopState expected = LoopState::Stopped;
+        loop.compare_exchange_strong(expected, LoopState::Running);
+    }
+    engineStarted.notify_all();
+
+    while (loop.load() == LoopState::Running) {
 
         // Game-discarding actions (new game, load, switch game) requested while
         // an engine was thinking run here: the loop is between moves and owns
@@ -502,7 +526,7 @@ void GameThread::gameLoop() {
         processDeferredTask();
 
         processNavigationQueue();
-        if (interruptRequested) break;
+        if (stopRequested()) break;
 
         // Anything but Playing means no genmove: Setup and Paused are waiting
         // on the user, Finished is done. (This used to read `!model ||
@@ -512,7 +536,7 @@ void GameThread::gameLoop() {
         // If not synced (loaded game), fall through to initial sync which
         // syncs the coach first, then scores.
         if (model.phase() != GamePhase::Playing) {
-            if (enginesSynced) {
+            if (engineSync.load() == EngineSync::Synced) {
                 processScoring();
                 waitForCommandOrTimeout(100);
                 continue;
@@ -524,7 +548,12 @@ void GameThread::gameLoop() {
         // Initial sync: sync all engines to current position after load/new game.
         // Runs AFTER nav queue so queued tree path navigation executes first
         // (navigateToTreePath syncs the coach internally).
-        if (!enginesSynced) {
+        if (engineSync.load() != EngineSync::Synced) {
+            // Visible to other threads for as long as the replay takes, so a
+            // caller waiting for quiescence waits for it. Always left below,
+            // failure included, so it cannot strand anyone.
+            engineSync = EngineSync::Syncing;
+
             // 1. Sync coach first (fast, enables scoring)
             if (coach) {
                 spdlog::info("Initial sync: syncing coach {} to position", coach->getName());
@@ -538,16 +567,16 @@ void GameThread::gameLoop() {
 
             // 3. Sync remaining engines
             for (auto* p : playerManager->getPlayers()) {
-                if (interruptRequested) break;
+                if (stopRequested()) break;
                 if (p->isTypeOf(Player::ENGINE) && p != coach) {
                     spdlog::info("Initial sync: syncing engine {} to position", p->getName());
                     syncEngineToPosition(static_cast<Engine*>(p));
                 }
             }
-            enginesSynced = true;
+            engineSync = EngineSync::Synced;
 
             // Re-evaluate from the top. The "!model || isGameOver" test above
-            // ran while enginesSynced was still false, so it deliberately did
+            // ran while the engines were still unsynced, so it deliberately did
             // not take its early-out — falling through now would call genmove
             // on a game that is paused or already finished. For a loaded SGF
             // the active player is a LocalHumanPlayer, whose genmove() blocks
@@ -572,7 +601,7 @@ void GameThread::gameLoop() {
         // Navigation back/home calls model.pause(), blocking genmove via !model check above.
         // No separate navigatingHistory check needed.
 
-        if (gameMode == GameMode::ANALYSIS && coach && !interruptRequested) {
+        if (gameMode == GameMode::ANALYSIS && coach && !stopRequested()) {
             // Analysis mode: human plays either color, engine responds to human moves
             Player* humanPlayer = playerManager->getPlayers()[playerManager->getHumanIndex()];
             spdlog::debug("Game loop: Analysis mode, waiting for human move (color={})",
@@ -638,7 +667,7 @@ void GameThread::gameLoop() {
             if (success)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-        } else if(coach && player && !interruptRequested) {
+        } else if(coach && player && !stopRequested()) {
             // Match mode: strict player roles
             spdlog::debug("Game loop: Match mode, calling genmove for {} (player={})",
                 model.state.colorToMove.toString(), player->getName());
@@ -674,7 +703,7 @@ void GameThread::gameLoop() {
             // move belongs to a position nobody is looking at any more, so drop
             // it rather than playing it into a record that is about to be
             // replaced. Only the human path gets the INTERRUPT sentinel above.
-            if (interruptRequested || deferredPending.load()) {
+            if (shouldDiscardMove()) {
                 spdlog::info("Discarding {} from {}: the current game is being "
                              "replaced or the loop is stopping",
                              move.toString(), player->getName());
@@ -725,7 +754,7 @@ void GameThread::gameLoop() {
         waitForCommandOrTimeout(50);
     }
     spdlog::debug("gameLoop: exiting");
-    hasThreadRunning = false;
+    loop = LoopState::Stopped;
 }
 
 void GameThread::playLocalMove(const Move& move) {
@@ -798,7 +827,7 @@ void GameThread::navigateToTreePath(int pathLength, const std::vector<int>& bran
 void GameThread::waitForCommandOrTimeout(int ms) {
     std::unique_lock<std::mutex> lock(navQueueMutex);
     navQueueCV.wait_for(lock, std::chrono::milliseconds(ms),
-        [this]() { return !navQueue.empty() || interruptRequested.load(); });
+        [this]() { return !navQueue.empty() || stopRequested(); });
 }
 
 void GameThread::wakeGameThread() {
@@ -826,7 +855,7 @@ void GameThread::processScoring() {
     model.game.buildBoardFromMoves(result, koPosition);
     coach->applyTerritory(result);
 
-    if (interruptRequested) return;
+    if (stopRequested()) return;
 
     // Fallback: if coach scoring failed, try other engines (already synced)
     if (result.territoryReady && std::abs(result.score) < 0.1f) {
@@ -1132,10 +1161,10 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
         // Start game thread early — processes any queued navigation (tree path,
         // etc.) and scoring with the coach, without waiting for slow engines.
         // finalizeGameLoad() will skip run() since the thread is already running.
-        // Must reset enginesSynced BEFORE run() — otherwise the game thread sees
+        // Must mark Unsynced BEFORE run() — otherwise the game thread sees
         // stale true from previous game, skips initial sync, and processScoring
         // runs with an unsynced coach (wrong position → final_status_list fails).
-        enginesSynced = false;
+        engineSync = EngineSync::Unsynced;
         run();
     } else {
         // No SGF - wait for coach engine specifically (it handles handicap/scoring)
@@ -1271,7 +1300,7 @@ bool GameThread::syncCoachToCurrentPosition() {
 
 bool GameThread::syncEngineToPosition(Engine* engine, int* syncedMoves) {
     // Core method: sync one engine to current game position
-    if (!engine || interruptRequested) return false;
+    if (!engine || stopRequested()) return false;
 
     int boardSize = model.getBoardSize();
     float komi = model.state.komi;
@@ -1394,7 +1423,7 @@ void GameThread::matchSgfPlayers() {
 bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine* engine) {
     // Common logic for setting up model state after loading/switching a game.
     // Called by both loadSGFWithEngine() and switchGame().
-    // Engine sync happens on game thread (via enginesSynced = false in finalizeGameLoad).
+    // Engine sync happens on game thread (finalizeGameLoad marks Unsynced).
 
     model.state.komi = gameInfo.komi;
     model.state.handicap = gameInfo.handicap;
@@ -1498,7 +1527,7 @@ void GameThread::finalizeGameLoad(Engine* alreadySynced, bool matchPlayers) {
                  model.getBoardSize(), model.game.moveCount());
 
     // Mark for initial sync on game thread
-    enginesSynced = false;
+    engineSync = EngineSync::Unsynced;
 
     // Match SGF player names to engines (only when SGF was loaded)
     if (matchPlayers) {
