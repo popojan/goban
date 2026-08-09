@@ -10,7 +10,7 @@ wait_idle
 expect board_size 9
 expect mode match
 expect move_count 0
-expect started false
+expect phase setup
 
 # Both sides are engines, so starting runs the genmove loop unattended.
 switch_player black mock
@@ -20,7 +20,7 @@ expect black_player mock
 expect white_player mock
 
 start
-expect started true
+expect phase playing
 
 # Let the bots play a few moves. Use >= : the genmove loop is fast and would
 # race past an exact count.
@@ -39,7 +39,7 @@ navigate_start
 wait_idle
 expect view_position 0
 expect navigating true
-expect game_over false
+expect_not phase finished
 
 navigate_end
 wait_idle

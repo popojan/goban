@@ -1,22 +1,21 @@
 // Tests for GamePhase — docs/adr/0002-explicit-game-state.md.
 //
-// Step 1 added the phase as a value derived from the `started` / `isGameOver`
-// pair. Step 2 inverted that: `GobanModel::gamePhase` is now the authoritative
-// state, the two booleans are gone, and `isStarted()` / `isGameOver()` survive
-// only as compatibility accessors that are pure functions of the phase.
+// Steps 1–3: the phase started life derived from the `started` / `isGameOver`
+// pair, then became authoritative, and now those two booleans have no trace
+// left in the codebase. `GobanModel::phase()` is the only way to ask.
 //
-// So this file has two halves. The first pins that the accessors really are
-// functions of the phase — which is what makes step 3 (deleting them) a
-// mechanical substitution rather than a behaviour change — and that the old
-// `started && isGameOver` combination is now unrepresentable. The second pins
-// the transition table: what each named transition, and each operation that
-// triggers one, does to the phase.
+// This file has two halves. The first pins the properties the rest of the
+// program relies on: `operator bool()` is exactly Playing, Setup and Paused are
+// told apart by the record rather than by the caller, and the combination the
+// old flags allowed — playing *and* finished at once — is unrepresentable. The
+// second pins the transition table: what each named transition, and each
+// operation that triggers one, does to the phase.
 //
-// Two step-1 findings were resolved here rather than preserved:
+// Two step-1 findings were resolved rather than preserved:
 //
-//   * a freshly constructed model is now Setup, not Finished;
-//   * `started` no longer outlives the game — ending a live game leaves
-//     isStarted() false, matching a loaded finished game.
+//   * a freshly constructed model is Setup, not Finished;
+//   * ending a live game leaves the phase Finished and nothing else set, so it
+//     is indistinguishable from a loaded finished game. It used to differ.
 #include <doctest/doctest.h>
 
 #include <filesystem>
@@ -149,43 +148,45 @@ struct Fixture {
 // The phase is authoritative; the old flags are functions of it
 // ---------------------------------------------------------------------------
 
-TEST_CASE("the compatibility accessors are pure functions of the phase") {
+TEST_CASE("operator bool is exactly the Playing phase") {
+    // The game loop's genmove guard. Everything else about the lifecycle can be
+    // read from phase(), but this conversion is what `if (!model)` means, and
+    // several call sites still spell it that way.
     Fixture f(9);
     f.newGame(9);
 
-    for (GamePhase phase : {GamePhase::Setup, GamePhase::Playing,
-                            GamePhase::Finished}) {
-        f.enter(phase);
-        CHECK(f.model.isStarted()   == (phase == GamePhase::Playing));
-        CHECK(f.model.isGameOver()  == (phase == GamePhase::Finished));
-        CHECK(static_cast<bool>(f.model) == (phase == GamePhase::Playing));
-    }
+    f.enter(GamePhase::Setup);
+    CHECK_FALSE(static_cast<bool>(f.model));
+    f.enter(GamePhase::Playing);
+    CHECK(static_cast<bool>(f.model));
+    f.enter(GamePhase::Finished);
+    CHECK_FALSE(static_cast<bool>(f.model));
 
     // Paused needs a non-empty record to be reachable at all.
     REQUIRE(f.load("simple.sgf"));
     REQUIRE(f.model.phase() == GamePhase::Paused);
-    CHECK_FALSE(f.model.isStarted());
-    CHECK_FALSE(f.model.isGameOver());
     CHECK_FALSE(static_cast<bool>(f.model));
 }
 
-TEST_CASE("started and game-over can no longer both be true") {
-    // The old model let a live game end without clearing `started`, so the pair
-    // (true, true) was reachable and every reader had to know isGameOver won.
-    // Now Finished is one state and isStarted() is false in it.
-    Fixture f(9);
-    f.newGame(9);
-    f.model.state.black = "Black";
-    f.model.state.white = "White";
-    f.model.start();
-    REQUIRE(f.model.isStarted());
+TEST_CASE("ending a live game is indistinguishable from loading a finished one") {
+    // The old model let a game end without clearing `started`, so the pair
+    // (true, true) was reachable and every reader had to know which flag won.
+    // Now there is one state, reached identically from both directions.
+    Fixture played(9);
+    played.newGame(9);
+    played.model.state.black = "Black";
+    played.model.state.white = "White";
+    played.model.start();
+    played.model.onGameMove(Move(Move::PASS, Color::BLACK), "");
+    played.model.onGameMove(Move(Move::PASS, Color::WHITE), "");
 
-    f.model.onGameMove(Move(Move::PASS, Color::BLACK), "");
-    f.model.onGameMove(Move(Move::PASS, Color::WHITE), "");
+    Fixture loaded(9);
+    REQUIRE(loaded.load("double_pass.sgf"));
+    loaded.model.endGame(GameState::DOUBLE_PASS);   // what finalizeLoadedGame does
 
-    CHECK(f.model.phase() == GamePhase::Finished);
-    CHECK(f.model.isGameOver());
-    CHECK_FALSE(f.model.isStarted());
+    CHECK(played.model.phase() == GamePhase::Finished);
+    CHECK(played.model.phase() == loaded.model.phase());
+    CHECK(static_cast<bool>(played.model) == static_cast<bool>(loaded.model));
 }
 
 TEST_CASE("komi is editable in Setup and Paused, and nowhere else") {
@@ -261,6 +262,32 @@ TEST_CASE("a freshly constructed model starts in Setup") {
     GobanModel fresh(9);
     CHECK(fresh.phase() == GamePhase::Setup);
     CHECK_FALSE(static_cast<bool>(fresh));
+}
+
+TEST_CASE("state.reason outlives the Finished phase — known inconsistency") {
+    // Pinned, not endorsed. enterReview() drops Finished but leaves
+    // state.reason set, and the UI's own notion of "over" is
+    // `state.reason != NO_REASON` (ElementGame::OnUpdate, GobanControl::
+    // setHandicap). So after navigating back from a finished game the phase says
+    // Paused while the toolbar still greys out Start / Pass / Resign / Undo —
+    // even though those commands themselves check the phase and would work.
+    //
+    // Pre-existing: the old code cleared `isGameOver` here and left reason alone
+    // in exactly the same way. The fix is for enterReview() to clear it, as
+    // start() already does; that is a UI behaviour change and wants its own
+    // commit, not a refactor's.
+    Fixture f(9);
+    REQUIRE(f.load("double_pass.sgf"));
+    f.model.endGame(GameState::DOUBLE_PASS);
+    REQUIRE(f.model.state.reason == GameState::DOUBLE_PASS);
+
+    f.model.enterReview();
+    CHECK(f.model.phase() == GamePhase::Paused);
+    CHECK(f.model.state.reason == GameState::DOUBLE_PASS);   // <- the wart
+
+    // start() is the one transition that does clear it.
+    f.model.start();
+    CHECK(f.model.state.reason == GameState::NO_REASON);
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +441,7 @@ TEST_CASE("navigateForward keeps Playing once the user has started") {
 
     for (int i = 0; i < 4; ++i) REQUIRE(f.nav.navigateForward());
     REQUIRE(f.model.game.isAtEndOfNavigation());
-    // The `!isStarted()` guard on the restore means the user's intent to keep
+    // restoreFinishedStateAtEnd()'s Playing check means the user's intent to keep
     // playing wins over the record's result.
     CHECK(f.model.phase() == GamePhase::Playing);
 }

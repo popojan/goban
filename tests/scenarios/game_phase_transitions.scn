@@ -1,10 +1,8 @@
 # The game lifecycle, walked end to end through the real application.
 #
-# Step 1 of docs/adr/0002-explicit-game-state.md adds `phase`, derived from the
-# `started` / `isGameOver` pair. This scenario asserts the derived value and the
-# two raw flags together at every transition, so that when step 2 inverts the
-# relationship — phase authoritative, flags derived — any disagreement between
-# them shows up here rather than as a behaviour change in the field.
+# ADR-0002 replaced the `started` / `isGameOver` pair with a single `phase`.
+# This scenario asserts it at every transition the application can make, which
+# is the coverage the ADR wanted in place before the phase became authoritative.
 #
 # Both players are human and every move is a pass, so nothing advances on its
 # own and no assertion has to race the genmove loop.
@@ -15,10 +13,8 @@ switch_player black human
 switch_player white human
 wait_idle
 
-# Setup: a fresh, empty record. Both flags clear.
+# Setup: a fresh, empty record.
 expect phase setup
-expect started false
-expect game_over false
 expect move_count 0
 
 # Playing: the first move starts the game.
@@ -26,24 +22,18 @@ pass
 wait_until move_count >= 1
 wait_idle
 expect phase playing
-expect started true
-expect game_over false
 
 # Finished: two passes in a row end it.
 pass
-wait_until game_over true
+wait_until phase finished
 # RE is written by the territory pass that follows the double pass, not by the
-# move, so it lags game_over — and wait_idle does not cover scoring, because a
+# move, so it lags the phase — and wait_idle does not cover scoring, because a
 # failed scoring attempt never sets territoryReady and would hang the wait.
 # Everything below depends on RE: the navigation restore reads hasGameResult().
 wait_until has_result true
 wait_idle
 expect phase finished
 expect move_count 2
-# ADR-0002 step 2 normalised this: a game that ends under play used to leave
-# `started` true, so the same Finished position answered differently depending
-# on whether it had been played or loaded. Now both say false.
-expect started false
 
 # Start is refused on a finished game — the phase must not move.
 start
@@ -54,8 +44,6 @@ expect phase finished
 navigate_back
 wait_idle
 expect phase paused
-expect started false
-expect game_over false
 expect view_position 1
 
 # Back to the end of a finished game restores Finished, because the user has
@@ -77,7 +65,6 @@ expect main_line_moves 2
 start
 wait_idle
 expect phase playing
-expect started true
 
 # Setup: a new game discards the record.
 new_game 9
@@ -89,8 +76,6 @@ expect main_line_moves 0
 load_sgf tests/data/double_pass.sgf
 wait_idle
 expect phase finished
-expect game_over true
-expect started false
 expect at_end true
 
 navigate_start

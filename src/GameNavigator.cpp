@@ -19,6 +19,31 @@ void GameNavigator::applyTsumegoHint() {
     }
 }
 
+/// Re-enter Finished when navigation lands on the end of a game that carries a
+/// result. A user who has pressed Start is playing on from here, and their
+/// intent wins over the record's result — hence the Playing check.
+void GameNavigator::restoreFinishedStateAtEnd() {
+    if (model.phase() == GamePhase::Playing) return;
+    if (!model.game.isAtEndOfNavigation() || !model.game.hasGameResult()) return;
+    model.endGame(model.game.isResignationResult()
+        ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
+}
+
+/// Show the end of a finished game: territory when the position needs scoring,
+/// the recorded result otherwise. Must run *after* notifyBoardChange(), whose
+/// updateStones() would overwrite the territory flag.
+void GameNavigator::showEndOfGameResult() {
+    if (model.game.shouldShowTerritory()) {
+        model.board.toggleTerritoryAuto(true);
+        // processScoring() will set CALCULATING_SCORE then the result message
+    } else if (model.phase() == GamePhase::Finished) {
+        auto resultMsg = model.game.getResultMessage();
+        if (resultMsg != GameState::NONE) {
+            model.state.msg = resultMsg;
+        }
+    }
+}
+
 void GameNavigator::syncStateAfterNavigation() {
     // Update state from current SGF node (caller handles msg, game-over, territory, board notify)
     model.state.colorToMove = model.game.getColorToMove();
@@ -63,9 +88,9 @@ void GameNavigator::notifyBoardChangeWithMove(const Board& result, const Move& m
 }
 
 bool GameNavigator::navigateBack() {
-    spdlog::debug("navigateBack: isNavigating={}, hasPrev={}, isGameOver={}, moveCount={}",
+    spdlog::debug("navigateBack: isNavigating={}, hasPrev={}, phase={}, moveCount={}",
         model.game.isNavigating(), model.game.hasPreviousMove(),
-        model.isGameOver(), model.game.moveCount());
+        phaseName(model.phase()), model.game.moveCount());
 
     if (!model.game.isNavigating() || !model.game.hasPreviousMove()) {
         spdlog::debug("navigateBack: cannot navigate (isNavigating={}, hasPrev={})",
@@ -176,12 +201,7 @@ bool GameNavigator::navigateForward() {
 
     syncStateAfterNavigation();
 
-    // Restore game-over state if we've reached the end of a finished game.
-    // But only if user hasn't explicitly started the game.
-    if (!model.isStarted() && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
-        model.endGame(model.game.isResignationResult()
-            ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
-    }
+    restoreFinishedStateAtEnd();
 
     Board boardResult(model.game.getBoardSize());
     buildBoardFromSGF(boardResult);
@@ -263,9 +283,9 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
 }
 
 bool GameNavigator::navigateToStart() {
-    spdlog::debug("navigateToStart: isNavigating={}, hasPrev={}, isGameOver={}, moveCount={}",
+    spdlog::debug("navigateToStart: isNavigating={}, hasPrev={}, phase={}, moveCount={}",
         model.game.isNavigating(), model.game.hasPreviousMove(),
-        model.isGameOver(), model.game.moveCount());
+        phaseName(model.phase()), model.game.moveCount());
 
     if (!model.game.isNavigating()) {
         spdlog::debug("navigateToStart: not in navigation mode");
@@ -356,28 +376,13 @@ bool GameNavigator::navigateToEnd() {
     model.state.msg = GameState::NONE;
     syncStateAfterNavigation();
 
-    // Restore game-over state if at end of a finished game.
-    // But only if user hasn't explicitly started the game.
-    if (!model.isStarted() && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
-        model.endGame(model.game.isResignationResult()
-            ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
-    }
+    restoreFinishedStateAtEnd();
 
     Board boardResult(model.game.getBoardSize());
     buildBoardFromSGF(boardResult);
     notifyBoardChange(boardResult);
 
-    // Set territory flag after notifyBoardChange — updateStones would overwrite it
-    if (model.game.shouldShowTerritory()) {
-        model.board.toggleTerritoryAuto(true);
-        // processScoring() will set CALCULATING_SCORE then result message
-    } else if (model.isGameOver()) {
-        // No territory calculation needed - set result message directly
-        auto resultMsg = model.game.getResultMessage();
-        if (resultMsg != GameState::NONE) {
-            model.state.msg = resultMsg;
-        }
-    }
+    showEndOfGameResult();
 
     return true;  // Always return true - we're at the end now
 }
@@ -413,29 +418,13 @@ bool GameNavigator::navigateToTreePath(int pathLength, const std::vector<int>& b
     model.state.msg = GameState::NONE;
     syncStateAfterNavigation();
 
-    // Restore game-over state if at end of a finished game.
-    // But only if user hasn't explicitly started the game (model.started) -
-    // don't override user's intent to continue playing.
-    if (!model.isStarted() && model.game.isAtEndOfNavigation() && model.game.hasGameResult()) {
-        model.endGame(model.game.isResignationResult()
-            ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
-    }
+    restoreFinishedStateAtEnd();
 
     Board boardResult(model.game.getBoardSize());
     buildBoardFromSGF(boardResult);
     notifyBoardChange(boardResult);
 
-    // Show territory if at end of finished game (after notifyBoardChange)
-    if (model.game.shouldShowTerritory()) {
-        model.board.toggleTerritoryAuto(true);
-        // processScoring() will set CALCULATING_SCORE then result message
-    } else if (model.isGameOver()) {
-        // No territory calculation needed - set result message directly
-        auto resultMsg = model.game.getResultMessage();
-        if (resultMsg != GameState::NONE) {
-            model.state.msg = resultMsg;
-        }
-    }
+    showEndOfGameResult();
 
     spdlog::info("navigateToTreePath: navigated {} steps ({} branch choices), now at move {}",
         pathLength, branchChoices.size(), model.game.getViewPosition());

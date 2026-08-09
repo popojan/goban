@@ -102,13 +102,6 @@ public:
     /// The authoritative lifecycle state (ADR-0002 step 2).
     [[nodiscard]] GamePhase phase() const { return gamePhase.load(); }
 
-    /// Compatibility accessors for the two booleans the phase replaced. Both
-    /// are pure functions of the phase now — that is the whole point — and
-    /// exist only so the ~40 read sites can be converted a file at a time.
-    /// ADR-0002 step 3 deletes them; prefer phase() in new code.
-    [[nodiscard]] bool isStarted() const { return phase() == GamePhase::Playing; }
-    [[nodiscard]] bool isGameOver() const { return phase() == GamePhase::Finished; }
-
     void setCursor(const Position& p) { cursor = p;}
 
 public:

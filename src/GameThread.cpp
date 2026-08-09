@@ -299,7 +299,7 @@ size_t GameThread::activatePlayer(int which, size_t newIndex) {
 }
 
 bool GameThread::setFixedHandicap(int handicap) {
-    if (model.isStarted()) {
+    if (model.phase() == GamePhase::Playing) {
         return false;
     }
 
@@ -504,11 +504,14 @@ void GameThread::gameLoop() {
         processNavigationQueue();
         if (interruptRequested) break;
 
-        // When model is inactive or game is over, skip genmove logic.
+        // Anything but Playing means no genmove: Setup and Paused are waiting
+        // on the user, Finished is done. (This used to read `!model ||
+        // isGameOver`, whose second half the phase makes visibly redundant —
+        // Finished is not Playing.)
         // If engines are synced (live game end), score and wait for nav commands.
         // If not synced (loaded game), fall through to initial sync which
         // syncs the coach first, then scores.
-        if (!model || model.isGameOver()) {
+        if (model.phase() != GamePhase::Playing) {
             if (enginesSynced) {
                 processScoring();
                 waitForCommandOrTimeout(100);
@@ -529,7 +532,7 @@ void GameThread::gameLoop() {
             }
 
             // 2. Score if game is finished (coach now ready)
-            if (model.isGameOver()) {
+            if (model.phase() == GamePhase::Finished) {
                 processScoring();
             }
 
@@ -616,7 +619,7 @@ void GameThread::gameLoop() {
                 processSuccessfulMove(move, humanPlayer, coach, kibitzEngine, wasKibitz);
 
                 // Human-originated move: engine (kibitz) auto-responds
-                if (!wasKibitz && !model.isGameOver() && kibitzEngine) {
+                if (!wasKibitz && model.phase() != GamePhase::Finished && kibitzEngine) {
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis: triggering kibitz response for {}", responseColor.toString());
                     Move response = kibitzEngine->genmove(responseColor);
@@ -628,7 +631,7 @@ void GameThread::gameLoop() {
                 }
             }
 
-            if (model.isGameOver()) {
+            if (model.phase() == GamePhase::Finished) {
                 continue;
             }
 
@@ -698,7 +701,7 @@ void GameThread::gameLoop() {
                 processSuccessfulMove(move, player, coach, kibitzEngine, kibitzed);
             }
 
-            if(model.isGameOver()) {
+            if(model.phase() == GamePhase::Finished) {
                 continue;
             }
 
@@ -731,7 +734,8 @@ void GameThread::playLocalMove(const Move& move) {
     spdlog::debug("playLocalMove: move={}, playerToMove={}", move.toString(), p ? "set" : "null");
     if (p) {
         p->suggestMove(move);
-    } else if (model.isStarted() || move == Move::RESIGN || move == Move::INTERRUPT) {
+    } else if (model.phase() == GamePhase::Playing
+               || move == Move::RESIGN || move == Move::INTERRUPT) {
         queuedMove = move;
     }
 }
@@ -946,7 +950,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             if (varResult.success && gameMode == GameMode::ANALYSIS) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
-                if (kibitz && coach && !model.isGameOver()) {
+                if (kibitz && coach && model.phase() != GamePhase::Finished) {
                     // All engines are synced after initial sync
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis nav: triggering kibitz response for {}", responseColor.toString());

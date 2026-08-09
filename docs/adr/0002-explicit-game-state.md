@@ -249,3 +249,43 @@ Neither is caused by this ADR; both would have corrupted any future scenario.
   ready" — is permanently true when scoring fails, which would hang every
   `wait_idle` instead. Scenarios must `wait_until has_result true` before
   asserting anything that depends on the record being final.
+
+### Step 3 — delete the compatibility accessors. Done 2026-08-09.
+
+`isStarted()` and `isGameOver()` are gone; `phase()` is the only way to ask. The
+`started` and `game_over` keys are gone from `dumpState()` too — one key, one
+truth — and the scenarios that asserted them now say `expect phase <name>`.
+
+The prediction in the step-2 log, that `!isGameOver()` would expand into a
+spelled-out set of phases, was wrong: `Setup || Paused || Playing` is just
+`!= Finished`, so writing it out gains nothing over the comparison. The value of
+this step turned out to be elsewhere — three redundant conditions that only
+became visible once the states were a type:
+
+- `GameThread::gameLoop()`'s `!model || model.isGameOver()` is exactly
+  `phase() != Playing`. `operator bool()` *is* "Playing", so the second half
+  could never add a case. It now says what it means.
+- `GobanControl::boardClick()`'s `if (isGameOver()) … else if (!isGameOver())`
+  had an else-if that was structurally the negation of its own if.
+- `GobanModel::onBoardChange()` re-tested `isGameOver()` inside a branch already
+  guarded by it.
+
+The three identical "restore Finished at the end of a finished game" blocks in
+`GameNavigator`, and the two identical "show the result" blocks, collapsed into
+`restoreFinishedStateAtEnd()` and `showEndOfGameResult()`.
+
+**One inconsistency found and deliberately left**, pinned by a test:
+`state.reason` is not part of the phase and outlives it. `enterReview()` drops
+`Finished` but leaves the reason set, and the UI's own notion of "over" —
+`ElementGame::OnUpdate()` and `GobanControl::setHandicap()` — is
+`state.reason != NO_REASON` rather than the phase. So after navigating back from
+a finished game the phase says `Paused` while the toolbar still greys out Start,
+Pass, Resign and Undo, even though those commands check the phase and would
+work. This predates the ADR: the old code cleared `isGameOver` there and left
+the reason alone in exactly the same way. The fix is for `enterReview()` to
+clear it, as `start()` already does — a UI behaviour change that wants its own
+commit rather than a refactor's.
+
+**`GamePhase` is now complete.** Remaining: step 4 (`EngineSync` and
+`LoopState`, both local to `GameThread`) and step 5 (decompose
+`ElementGame::OnUpdate()`, retiring `syncingUI`).

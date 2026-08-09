@@ -76,6 +76,11 @@ private:
     // Sync model state after navigation (color, comment, markup, board)
     void syncStateAfterNavigation();
 
+    // Shared tail of the forward-navigation methods: re-enter Finished at the
+    // end of a finished game, and display its result.
+    void restoreFinishedStateAtEnd();
+    void showEndOfGameResult();
+
     GobanModel& model;
     CoachProvider getCoach;
     ActivePlayersProvider getActivePlayers;

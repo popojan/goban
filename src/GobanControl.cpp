@@ -245,12 +245,12 @@ void GobanControl::boardClick(const Position& coord) {
     }
 
     bool playNow = true;
-    if (model.isGameOver()) {
+    if (model.phase() == GamePhase::Finished) {
         // Clicking on finished game - reuse "clear" which handles save + settings restore
         command("clear");
         playNow = false;
     }
-    else if(!model.isGameOver()) {
+    else {
        model.start();
        if (!engine.isRunning()) {
            engine.run();
@@ -281,8 +281,8 @@ void GobanControl::buildRegistry() {
     // is thinking would corrupt its board state. Blocking here does *not* skip the
     // post-dispatch menu update, matching the original combined branch.
     auto navigate = [this](const char* name, const std::function<void()>& action) {
-        spdlog::debug("Navigation command '{}': isThinking={}, isRunning={}, isGameOver={}",
-            name, engine.isThinking(), engine.isRunning(), model.isGameOver());
+        spdlog::debug("Navigation command '{}': isThinking={}, isRunning={}, phase={}",
+            name, engine.isThinking(), engine.isRunning(), phaseName(model.phase()));
         if (engine.isThinking()) {
             spdlog::debug("Navigation command '{}' blocked - engine is thinking", name);
             return;
@@ -329,7 +329,7 @@ void GobanControl::buildRegistry() {
 
     add("quit", 0, 0, "save and exit (prompts when a game is in progress)", [this](CommandContext&) {
         // saveCurrentGame() is called by main.cpp cleanup on all exit paths
-        if (model.game.moveCount() > 0 && !model.isGameOver()) {
+        if (model.game.moveCount() > 0 && model.phase() != GamePhase::Finished) {
             parent->showPromptYesNoTemplate("templateQuitWithoutFinishing", [this](bool confirmed) {
                 if (confirmed) {
                     exit = true;
@@ -394,7 +394,7 @@ void GobanControl::buildRegistry() {
             return;
         }
         // Activate genmove if needed (for kibitz to work)
-        if (!model.isGameOver()) {
+        if (model.phase() != GamePhase::Finished) {
             model.start();
             if (!engine.isRunning()) {
                 engine.run();
@@ -462,7 +462,8 @@ void GobanControl::buildRegistry() {
     add("clear", 0, 0, "clear the board and start over (prompts first)", [this](CommandContext& ctx) {
         if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         // Use different prompt for game in progress vs finished game
-        const char* templateId = engine.isRunning() && !model.isGameOver() && !model.tsumegoMode
+        const char* templateId = engine.isRunning() && model.phase() != GamePhase::Finished
+                                 && !model.tsumegoMode
             ? "templateQuitWithoutFinishing"
             : "templateClearBoard";
         parent->showPromptYesNoTemplate(templateId, [this](bool confirmed) {
@@ -482,14 +483,14 @@ void GobanControl::buildRegistry() {
         spdlog::debug("start command: syncingUI={}, phase={}, isRunning={}",
             syncingUI, phaseName(model.phase()), engine.isRunning());
         if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
-        if (!model.isGameOver()) {
+        if (model.phase() != GamePhase::Finished) {
             model.start();
             if (!engine.isRunning()) {
                 engine.run();
             }
             spdlog::info("Game started from menu");
         } else {
-            spdlog::debug("start command blocked: isGameOver=true");
+            spdlog::debug("start command blocked: the game is finished");
         }
     });
 
@@ -1008,7 +1009,7 @@ bool GobanControl::setHandicap(int handicap) const {
     spdlog::debug("setHandicap: handicap={} phase={} isOver={}",
         handicap, phaseName(model.phase()), isOver);
     bool success = false;
-    if(!model.isStarted() && !isOver) {
+    if(model.phase() != GamePhase::Playing && !isOver) {
         model.state.handicap = handicap;
         success = newGame(model.getBoardSize());
     }
@@ -1123,11 +1124,6 @@ nlohmann::json GobanControl::dumpState() const {
     s["mode"]           = (engine.getGameMode() == GameMode::ANALYSIS) ? "analysis" : "match";
     s["ai_vs_ai"]       = engine.isAiVsAi();
     s["phase"]          = phaseName(model.phase());
-    // ADR-0002 step 2: these are now pure functions of the phase. Still reported
-    // so that scenarios written against them keep working until step 3 retires
-    // the accessors.
-    s["started"]        = model.isStarted();
-    s["game_over"]      = model.isGameOver();
     s["running"]        = engine.isRunning();
     s["thinking"]       = engine.isThinking();
     s["syncing_ui"]     = syncingUI;

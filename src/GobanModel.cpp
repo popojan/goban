@@ -231,13 +231,13 @@ void GobanModel::onBoardChange(const Board& result) {
     board.positionNumber += 1;
     updateReservoirs();
 
-    spdlog::debug("over {} ready {} score {} showTerritory={}",
-        isGameOver(), result.territoryReady, result.score, board.showTerritory);
+    spdlog::debug("phase {} ready {} score {} showTerritory={}",
+        phaseName(phase()), result.territoryReady, result.score, board.showTerritory);
 
     bool shouldShow = game.shouldShowTerritory();
     spdlog::debug("onBoardChange: territoryReady={}, shouldShowTerritory={}", result.territoryReady, shouldShow);
 
-    if (isGameOver() && result.territoryReady && shouldShow) {
+    if (phase() == GamePhase::Finished && result.territoryReady && shouldShow) {
         // At end of scored game - compute result message
         spdlog::debug("onBoardChange: ENTERING result block, score={}", result.score);
         board.score = result.score;  // Copy score from result board
@@ -246,12 +246,14 @@ void GobanModel::onBoardChange(const Board& result) {
         spdlog::debug("onBoardChange: after result(), msg={}", static_cast<int>(state.msg));
         // Trigger repaint to show territory
         board.positionNumber += 1;
-        // Finalize and save only once (live game ending, result not yet written)
-        if (isGameOver() && !game.hasGameResult()) {
+        // Finalize and save only once (live game ending, result not yet written).
+        // Already inside the Finished branch, so only the record needs checking.
+        if (!game.hasGameResult()) {
             game.finalizeGame(state.scoreDelta);
             game.saveAs("");
         }
-    } else if (isGameOver() && game.isAtEndOfNavigation() && game.isResignationResult()) {
+    } else if (phase() == GamePhase::Finished && game.isAtEndOfNavigation()
+               && game.isResignationResult()) {
         // At end of resigned game - show resignation message
         state.msg = game.getResultMessage();
         // Auto-save resigned game (RE property already set by GameRecord::move)
@@ -283,7 +285,7 @@ void GobanModel::onPlayerChange(int which, const std::string& name) {
     }
 
     // Only annotate player switches after first move, and not on finished games
-    if (isStarted() && game.moveCount() > 0 && !game.hasGameResult()) {
+    if (phase() == GamePhase::Playing && game.moveCount() > 0 && !game.hasGameResult()) {
         std::ostringstream val;
         val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
         if (which == 0) {

@@ -872,7 +872,7 @@ void ElementGame::OnUpdate()
         // Start: enabled when current player is an engine (to trigger genmove)
         // Disabled when game over, already started, or current player is human
         bool engineToMove = engine.isCurrentPlayerEngine();
-        setElementDisabled("cmdStart", isOver || model.isStarted() || !engineToMove);
+        setElementDisabled("cmdStart", isOver || model.phase() == GamePhase::Playing || !engineToMove);
 
         // Pass/Resign/Undo: disabled when not human's turn, game over, or locked in AI vs AI
         setElementDisabled("cmdPass", !humanTurn || isOver || aiVsAiLocked);
@@ -888,7 +888,7 @@ void ElementGame::OnUpdate()
         setElementDisabled("cmdNavEnd", navDisabled);
 
         // Territory: disabled when game not over
-        setElementDisabled("cmdTerritory", !model.isGameOver());
+        setElementDisabled("cmdTerritory", model.phase() != GamePhase::Finished);
 
         // Clear: disabled when board is empty (no moves or loaded content)
         setElementDisabled("cmdClear", !hasMoves);
