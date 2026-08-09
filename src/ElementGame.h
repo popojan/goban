@@ -118,7 +118,11 @@ private:
     // Determine initial board size by peeking at SGF that will be loaded
     static int determineInitialBoardSize();
 
-    // Sync a dropdown selection to match a value string (with syncingUI guard)
+    // Greys out unavailable actions; rules in availableActions(), inputs from
+    // GobanControl. See UiActions.h.
+    void syncActionAvailability();
+
+    // Sync a dropdown selection to match a value string
     void syncDropdown(Rml::Element* container, const char* elementId, const std::string& value);
 
     // Prompt system callback storage

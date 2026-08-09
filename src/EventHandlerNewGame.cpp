@@ -32,7 +32,7 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         ss >> boardSize;
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selBoard"));
-        if (controller.isSyncingUI()) {
+        if (!controller.acceptsUiEvents()) {
             if (select) lastBoardSelection = select->GetSelection();
         } else if (static_cast<int>(model.getBoardSize()) == boardSize) {
             if (select) lastBoardSelection = select->GetSelection();
@@ -69,7 +69,7 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         ss >> handicap;
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectHandicap"));
-        if (controller.isSyncingUI()) {
+        if (!controller.acceptsUiEvents()) {
             if (select) lastHandicapSelection = select->GetSelection();
         } else if (model.state.handicap == handicap) {
             if (select) lastHandicapSelection = select->GetSelection();
@@ -86,7 +86,7 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         }
     }
     else if(value == "engine") {
-        if (!controller.isSyncingUI()) {
+        if (controller.acceptsUiEvents()) {
             std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
             int index = 0;
             ss >> index;
@@ -114,7 +114,7 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         ss >> komi;
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
-        if (controller.isSyncingUI()) {
+        if (!controller.acceptsUiEvents()) {
             if (select) lastKomiSelection = select->GetSelection();
         } else if (model.state.komi == komi) {
             if (select) lastKomiSelection = select->GetSelection();

@@ -172,7 +172,7 @@ void ElementGame::refreshPlayerDropdowns() {
 
     // Suppress change events during repopulation to prevent transient
     // player switches (e.g. briefly activating an engine during clear)
-    control.setSyncingUI(true);
+    GobanControl::WidgetEventGuard suppressEvents(control);
 
     while (selectBlack->GetNumOptions() > 0)
         selectBlack->Remove(selectBlack->GetNumOptions() - 1);
@@ -190,8 +190,6 @@ void ElementGame::refreshPlayerDropdowns() {
     // Set selection immediately to avoid single-frame glitch after repopulation
     selectBlack->SetSelection(static_cast<int>(engine.getActivePlayer(0)));
     selectWhite->SetSelection(static_cast<int>(engine.getActivePlayer(1)));
-
-    control.setSyncingUI(false);
 
     spdlog::debug("refreshPlayerDropdowns: {} players", players.size());
 }
@@ -789,6 +787,27 @@ void ElementGame::ProcessEvent(Rml::Event& event)
     }
 }
 
+/// Greys out what cannot be done right now. The rules live in
+/// availableActions() (goban_core, unit-tested); GobanControl gathers the
+/// inputs. Both this and the command guards read the same answer, which is what
+/// stops a button and its keybinding disagreeing — they did, twice, before
+/// ADR-0002 step 5 made it one expression.
+void ElementGame::syncActionAvailability() {
+    const UiActions a = control.actions();
+    setElementDisabled("cmdStart",      !a.start);
+    setElementDisabled("cmdPass",       !a.pass);
+    setElementDisabled("cmdResign",     !a.resign);
+    setElementDisabled("cmdUndo",       !a.undo);
+    setElementDisabled("cmdKibitz",     !a.kibitz);
+    setElementDisabled("cmdNavStart",   !a.navigate);
+    setElementDisabled("cmdNavBack",    !a.navigate);
+    setElementDisabled("cmdNavForward", !a.navigate);
+    setElementDisabled("cmdNavEnd",     !a.navigate);
+    setElementDisabled("cmdTerritory",  !a.territory);
+    setElementDisabled("cmdClear",      !a.clear);
+    setElementDisabled("cmdSave",       !a.save);
+}
+
 void ElementGame::OnUpdate()
 {
     if(!view.gobanShader.isReady())
@@ -861,51 +880,7 @@ void ElementGame::OnUpdate()
         }
     }
 
-    // Update disabled state for context-sensitive menu items
-    {
-        bool thinking = engine.isThinking();
-        bool humanTurn = engine.humanToMove() && !thinking;
-        bool hasMoves = model.game.moveCount() > 0
-            || !model.setupBlackStones.empty() || !model.setupWhiteStones.empty()
-            || model.game.getLoadedMovesCount() > 0;
-        bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
-        // Bot-bot match detection: either explicit AI vs AI mode OR both players are engines
-        bool botVsBot = engine.isAiVsAi() || engine.areBothPlayersEngines();
-        // In bot-bot mode without analysis, most play actions are locked
-        bool aiVsAiLocked = botVsBot && !analysisMode;
-
-        // Start: enabled when current player is an engine (to trigger genmove)
-        // Disabled when game over, already started, or current player is human
-        bool engineToMove = engine.isCurrentPlayerEngine();
-        setElementDisabled("cmdStart", isOver || model.phase() == GamePhase::Playing || !engineToMove);
-
-        // Pass/Resign/Undo: disabled when not human's turn, game over, or locked in AI vs AI
-        setElementDisabled("cmdPass", !humanTurn || isOver || aiVsAiLocked);
-        // Resign asks GobanControl the same question the `resign` command asks,
-        // so the button and the keybinding can no longer disagree.
-        setElementDisabled("cmdResign", !control.canResign() || aiVsAiLocked);
-        // Undo is navigateBack under another name; gate it like the navigation
-        // buttons below, not on whose turn it is. Reviewing a finished game is
-        // exactly when you need it.
-        setElementDisabled("cmdUndo", thinking || aiVsAiLocked);
-        setElementDisabled("cmdKibitz", thinking || isOver || aiVsAiLocked);
-
-        // Navigation: disabled when engine thinking or locked in AI vs AI
-        bool navDisabled = thinking || aiVsAiLocked;
-        setElementDisabled("cmdNavStart", navDisabled);
-        setElementDisabled("cmdNavBack", navDisabled);
-        setElementDisabled("cmdNavForward", navDisabled);
-        setElementDisabled("cmdNavEnd", navDisabled);
-
-        // Territory: disabled when game not over
-        setElementDisabled("cmdTerritory", model.phase() != GamePhase::Finished);
-
-        // Clear: disabled when board is empty (no moves or loaded content)
-        setElementDisabled("cmdClear", !hasMoves);
-
-        // Save: disabled when no unsaved changes
-        setElementDisabled("cmdSave", !model.game.hasUnsavedChanges());
-    }
+    syncActionAvailability();
 
     if (view.state.colorToMove != model.state.colorToMove) {
         bool blackMove = model.state.colorToMove == Color::BLACK;

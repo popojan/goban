@@ -204,9 +204,12 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 > `shouldDiscardMove()`, `isRunning()`. `deferredPending` deliberately stays a
 > flag — it is queued work, not lifecycle.
 >
-> Only `syncingUI` is left, waiting on `ElementGame::OnUpdate()` being
-> decomposed (step 5). See `docs/adr/0002-explicit-game-state.md` and its
-> Implementation log.
+> **ADR-0002 is complete** (step 5 done). `syncingUI` was *split*, not retired:
+> it conflated a startup gate with an RmlUi repopulation gate, and decomposing
+> `OnUpdate()` would not have removed either. Ask `acceptsUiEvents()`; suppress
+> events with `GobanControl::WidgetEventGuard`. See
+> `docs/adr/0002-explicit-game-state.md` and its Implementation log, which
+> records where the plan was wrong and what was done instead.
 
 ### Navigation & Engine Synchronization
 - **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
@@ -246,7 +249,8 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **`new_game <size>` deliberately does not prompt.** It is the scripting entry point; scenarios begin with it, and a modal would deadlock them. The `board_size` and `handicap` commands take the dropdowns' route instead, prompt included, which is how `tests/scenarios/discard_game_prompt.scn` can cover a path the harness cannot click.
 
 ### UI Widget State
-- **A button's enabled state must ask the same question its command asks.** `cmdResign` and the `resign` command both call `GobanControl::canResign()`. Where they diverged, the toolbar greyed an action out while its keybinding still performed it — the disabled button looked like a guard and was not one. When adding a guard to a command, give the widget the same predicate rather than a second, hand-rolled condition.
+- **One policy decides what a player may do: `availableActions()` in `src/UiActions.h`.** The toolbar (`ElementGame::syncActionAvailability()`) and the command guards (`GobanControl::actions()`, `canResign()`) read the same answer from the same gatherer, `GobanControl::uiInputs()`. This used to be a rule — "make the button ask the same question the command asks" — and it decayed three separate times, each time producing a disabled button that looked like a guard and was not one. Add a new action's rule to `availableActions()` and a case to `tests/test_uiactions.cpp`; do not hand-roll a second condition at either call site.
+- **Keep `availableActions()` pure over plain data.** It must not take a `GobanModel` or `GameThread`: `isThinking()` reads a member only the game loop sets, so the engine-thinking cases would stop being testable — and they are half of what it decides.
 - **Widget state reads the phase, not `state.reason`.** They diverge after navigating back from a finished game: the phase returns to `Paused` while the reason stays set. See the `state.reason` invariant above.
 
 ### UI Event Suppression

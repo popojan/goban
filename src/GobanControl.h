@@ -4,6 +4,7 @@
 #include "GameThread.h"
 #include "GobanModel.h"
 #include "GobanView.h"
+#include "UiActions.h"
 
 #include <nlohmann/json.hpp>
 
@@ -118,13 +119,43 @@ private:
     bool exit;
     float mouseX, mouseY;
     bool fullscreen;
-    bool syncingUI = true;  // Suppress game actions when syncing UI to match state
+    // The two jobs the old single `syncingUI` flag conflated (ADR-0002 step 5).
+    // Decomposing OnUpdate() would not have retired either of them, contrary to
+    // the ADR's plan: the first is a startup gate and the second is inherent to
+    // RmlUi, which fires change events on programmatic widget edits.
+    bool uiReady = false;                ///< Engines loaded; commands may run.
+    bool widgetEventsSuppressed = false; ///< A programmatic repopulation is in flight.
     std::map<std::string, CommandEntry> registry;  // built lazily on first command()
 
 public:
-    void finishInitialization() { syncingUI = false; }
-    bool isSyncingUI() const { return syncingUI; }
-    void setSyncingUI(bool syncing) { syncingUI = syncing; }
+    /// Engines are up; the UI may start accepting commands.
+    void finishInitialization() { uiReady = true; }
+
+    /// Whether a widget change event should be read as the user's intent. False
+    /// during startup, and while a dropdown is being repopulated — removing and
+    /// re-adding options fires the same events a real selection does.
+    [[nodiscard]] bool acceptsUiEvents() const { return uiReady && !widgetEventsSuppressed; }
+
+    /// Suppresses widget change events for its lifetime. Scope guard rather
+    /// than a manual pair, matching GameNavigator::NavigationGuard — the manual
+    /// version survived only because no early return sat between the two calls.
+    class WidgetEventGuard {
+    public:
+        explicit WidgetEventGuard(GobanControl& c) : control(c) {
+            control.widgetEventsSuppressed = true;
+        }
+        ~WidgetEventGuard() { control.widgetEventsSuppressed = false; }
+        WidgetEventGuard(const WidgetEventGuard&) = delete;
+        WidgetEventGuard& operator=(const WidgetEventGuard&) = delete;
+    private:
+        GobanControl& control;
+    };
+
+    /// Gathers everything availableActions() needs. The single place this
+    /// happens: both the toolbar and the command guards read the result, so
+    /// they cannot drift apart the way cmdResign and the `resign` command did.
+    [[nodiscard]] UiInputs uiInputs() const;
+    [[nodiscard]] UiActions actions() const;
 };
 
 

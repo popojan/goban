@@ -362,6 +362,7 @@ else()
         src/SGF.h
         src/UserSettings.h
         src/Vector.h
+        src/UiActions.h
         src/gtpclient.h
     )
 
@@ -378,6 +379,7 @@ else()
         src/player.cpp
         src/Quaternion.cpp
         src/ScenarioRecorder.cpp
+        src/UiActions.cpp
         src/UserSettings.cpp
         src/Vector.cpp
         src/gtpclient.cpp

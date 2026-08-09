@@ -105,7 +105,7 @@ void GobanControl::finishGameReplacement() const {
         view.animateIntro();
     }
 
-    // refreshPlayerDropdowns() brackets itself with setSyncingUI already.
+    // refreshPlayerDropdowns() raises its own WidgetEventGuard already.
     parent->refreshPlayerDropdowns();
 
     view.updateLastMoveOverlay();
@@ -129,7 +129,7 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     spdlog::debug("COORD [{},{}]", coord.x, coord.y);
     if(model.isPointOnBoard(coord)) {
         // Block stone placement until initialization is complete (players set)
-        if (syncingUI) return;
+        if (!acceptsUiEvents()) return;
         if (button == 0 && state == 1) {
             // Record here rather than in boardClick(), which is shared with the
             // `click` command — that path is already recorded by command().
@@ -387,7 +387,7 @@ void GobanControl::buildRegistry() {
     });
 
     add("play once", 0, 0, "ask the kibitz engine for one move", [this](CommandContext& ctx) {
-        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
+        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         // Don't trigger at end of finished game
         if (model.game.isAtFinishedGame()) {
             ctx.notifyMenu = false;
@@ -435,7 +435,7 @@ void GobanControl::buildRegistry() {
     });
 
     add("resign", 0, 0, "resign the game", [this](CommandContext& ctx) {
-        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
+        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         if (!canResign()) {
             ctx.notifyMenu = false;
             // The button is greyed in this case, but the keybinding is not, so
@@ -455,7 +455,7 @@ void GobanControl::buildRegistry() {
     });
 
     add("pass", 0, 0, "pass", [this](CommandContext& ctx) {
-        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
+        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         // During navigation, pass creates a variation (game is paused — no turn restriction)
         if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
             Color colorToMove = model.game.getColorToMove();
@@ -472,7 +472,7 @@ void GobanControl::buildRegistry() {
     });
 
     add("clear", 0, 0, "clear the board and start over (prompts first)", [this](CommandContext& ctx) {
-        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
+        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         // Use different prompt for game in progress vs finished game
         // Same prompt as the board-size and handicap dropdowns: all three
         // replace the game, and all three save it first, so neither "quit" nor
@@ -495,9 +495,9 @@ void GobanControl::buildRegistry() {
     });
 
     add("start", 0, 0, "start/resume engine play", [this](CommandContext& ctx) {
-        spdlog::debug("start command: syncingUI={}, phase={}, isRunning={}",
-            syncingUI, phaseName(model.phase()), engine.isRunning());
-        if (syncingUI) { ctx.notifyMenu = false; return; }  // Block until initialization complete
+        spdlog::debug("start command: acceptsUiEvents={}, phase={}, isRunning={}",
+            acceptsUiEvents(), phaseName(model.phase()), engine.isRunning());
+        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
         if (model.phase() != GamePhase::Finished) {
             model.start();
             if (!engine.isRunning()) {
@@ -858,7 +858,7 @@ void GobanControl::buildRegistry() {
                 return;
             }
             // Same guard as mouseClick: no stone placement until players are set
-            if (syncingUI) {
+            if (!acceptsUiEvents()) {
                 spdlog::warn("click: ignored, initialization is not complete");
                 return;
             }
@@ -1179,22 +1179,40 @@ void GobanControl::requestHandicap(int handicap, std::function<void(bool)> onSet
         [onSettled]() { if (onSettled) onSettled(false); });
 }
 
+UiInputs GobanControl::uiInputs() const {
+    UiInputs in;
+    in.phase             = model.phase();
+    in.uiReady           = acceptsUiEvents();
+    in.engineThinking    = engine.isThinking();
+    in.humanToMove       = engine.humanToMove();
+    in.engineToMove      = engine.isCurrentPlayerEngine();
+    // Bot-bot detection: the explicit toggle, or simply both sides being
+    // engines. Analysis mode unlocks it, since that is the mode for stepping in.
+    in.aiVsAiLocked      = (engine.isAiVsAi() || engine.areBothPlayersEngines())
+                           && engine.getGameMode() != GameMode::ANALYSIS;
+    in.tsumego           = model.tsumegoMode;
+    in.atEndOfNavigation = model.game.isAtEndOfNavigation();
+    in.hasMoves          = model.game.moveCount() > 0
+                           || !model.setupBlackStones.empty()
+                           || !model.setupWhiteStones.empty()
+                           || model.game.getLoadedMovesCount() > 0;
+    in.hasUnsavedChanges = model.game.hasUnsavedChanges();
+    return in;
+}
+
+UiActions GobanControl::actions() const {
+    return availableActions(uiInputs());
+}
+
 bool GobanControl::canResign() const {
-    if (syncingUI) return false;
-    // A resignation carries no move: GameRecord::move() writes the RE property
-    // on the root and adds no node. So unlike a stone or a pass it cannot
-    // describe a branch — applied anywhere but the end of the line being
-    // played, it relabels a game whose recorded ending then contradicts it.
-    if (!model.game.isAtEndOfNavigation()) return false;
-    // Already decided. Resigning again would overwrite the recorded result.
-    if (model.phase() == GamePhase::Finished) return false;
-    // Tsumego problems are puzzles, not games to concede.
-    if (model.tsumegoMode) return false;
-    return engine.humanToMove();
+    // Deliberately not a second copy of the rules — see UiActions.cpp for what
+    // resignation requires and why. The `resign` command and the cmdResign
+    // button now read the same expression.
+    return actions().resign;
 }
 
 bool GobanControl::isIdle() const {
-    if (syncingUI) return false;
+    if (!acceptsUiEvents()) return false;
     if (engine.isThinking()) return false;
     // Navigation is queued to the game thread, so it can still be outstanding
     // while no engine is thinking. Without this a script would read the board
@@ -1244,7 +1262,8 @@ nlohmann::json GobanControl::dumpState() const {
     s["phase"]          = phaseName(model.phase());
     s["running"]        = engine.isRunning();
     s["thinking"]       = engine.isThinking();
-    s["syncing_ui"]     = syncingUI;
+    // Same meaning as before the flag was split, so scenarios still read.
+    s["syncing_ui"]     = !acceptsUiEvents();
     s["pending_nav"]    = engine.hasPendingNavigation();
     s["queued_nav"]     = engine.hasQueuedNavigation();
     s["deferred_task"]  = engine.hasDeferredTask();

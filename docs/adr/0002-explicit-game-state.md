@@ -347,3 +347,55 @@ to such an enum wants to be conditional on the state it expects.
 `syncingUI`. That is a rendering-layer change with no test harness behind it,
 so it is a different kind of risk from steps 1–4 and should be planned on its
 own.
+
+### Step 5 — UI action policy, and splitting `syncingUI`. Done 2026-08-09.
+
+**The premise was wrong, and saying so is the main content of this entry.** The
+decision above says `syncingUI` "should die when [`ElementGame::OnUpdate()`] is
+decomposed". It has two jobs and neither is `OnUpdate`:
+
+1. a **startup gate** — initialised true, cleared once by
+   `finishInitialization()`, suppressing every command until engines load;
+2. a **repopulation gate** — one bracketed region in
+   `refreshPlayerDropdowns()`, because RmlUi fires change events on programmatic
+   `Add`/`Remove`/`SetSelection`.
+
+`OnUpdate` *does* emit change events, through `syncDropdown()`. Those are
+absorbed by an entirely different guard: each handler in `EventHandlerNewGame`
+first tests `model.state.X == newValue`. So decomposing `OnUpdate` would have
+retired nothing, and job 2 is inherent to RmlUi — it can be made safer, not
+removed. The flag is now split into `uiReady` and a `WidgetEventGuard` RAII
+scope, behind one predicate `acceptsUiEvents()`; `dumpState()` keeps the
+`syncing_ui` key with its old meaning.
+
+**What was worth doing instead.** The ~44-line widget-enablement block was pure
+policy over model and engine state, untested, and restated in prose by every
+command guarding the same action. Both UI bugs found by hand that day lived
+there. It is now `availableActions()` in `src/UiActions.{h,cpp}` — a pure
+function over a plain `UiInputs` struct, in `goban_core`, with ten test cases.
+
+Pure over *plain data*, deliberately, not over `GobanModel` and `GameThread`:
+`isThinking()` reads a member only the game loop sets, so a policy phrased over
+those types could not be tested with an engine thinking, which is half of what
+it decides. `GobanControl::uiInputs()` is the single gatherer;
+`GobanControl::actions()` and `ElementGame::syncActionAvailability()` are its
+only consumers, so a button and its command can no longer drift — the failure
+mode that produced both bugs.
+
+Writing the tests first paid for itself immediately: they caught a *third*
+disagreement of the same family, pre-existing and unnoticed. `cmdResign` was
+greyed by `aiVsAiLocked` while `canResign()` never tested it, so in a locked
+bot-bot match the keybinding resigned and the button did not. Resolved toward
+the stricter side, since the human is a spectator there exactly as for pass and
+undo.
+
+The message and comment tail of `OnUpdate` (~115 lines) was deliberately left
+alone. Its `msgChanged` / `posChanged` / `commentSnapshot` ordering is
+load-bearing for atomic-ordering reasons and nothing in the harness can cover
+it; churning it would be risk without a safety net.
+
+**ADR-0002 is complete.** `started`, `isGameOver`, `enginesSynced`,
+`hasThreadRunning` and `interruptRequested` are gone, replaced by `GamePhase`,
+`EngineSync` and `LoopState`. `syncingUI` is split rather than retired, for the
+reason above. `deferredPending` remains a flag on purpose — it is queued work,
+not lifecycle.
