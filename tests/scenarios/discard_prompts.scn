@@ -1,0 +1,70 @@
+# The two prompts that stand between a user and losing a game: Clear and Quit.
+# discard_game_prompt.scn covers the board-size and handicap dropdowns, which
+# take the same route; these two are the ones nothing exercised.
+#
+# The distinction that matters throughout is between "a prompt appeared and was
+# answered" and "the command silently did nothing", which look identical from
+# the outside — so `prompt_active` is asserted before every answer.
+#
+# Both players are human and every move is a pass, so nothing advances on its own.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect phase setup
+expect move_count 0
+
+# --- Nothing recorded: refused outright, and no prompt ----------------------
+# An empty board has nothing to clear, so asking whether to discard it would be
+# a question with no stakes. The button is greyed for the same reason.
+expect can_clear false
+clear
+expect prompt_active false
+wait_idle
+expect phase setup
+
+# --- With a game under way, Clear asks --------------------------------------
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+expect can_clear true
+
+clear
+expect prompt_active true
+expect move_count 1          # nothing happens until the answer arrives
+prompt_no
+wait_idle
+expect prompt_active false
+expect move_count 1          # declined, and the game survived
+expect phase playing
+
+clear
+expect prompt_active true
+prompt_yes
+wait_idle
+expect prompt_active false
+expect move_count 0
+expect phase setup
+# The board size survives a clear: it is restored from the saved settings, not
+# reset to the application default.
+expect board_size 9
+
+# --- Quit asks before abandoning a game in progress -------------------------
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+
+quit
+expect prompt_active true
+prompt_no
+wait_idle
+expect prompt_active false
+# Declining leaves everything exactly as it was — the application is still here
+# to answer, which is itself the assertion.
+expect move_count 1
+expect phase playing
+expect board_size 9

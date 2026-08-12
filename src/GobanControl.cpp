@@ -1298,8 +1298,12 @@ UiInputs GobanControl::uiInputs() const {
     in.tsumego           = model.tsumegoMode;
     in.atEndOfNavigation = model.game.isAtEndOfNavigation();
     // The predicate toggle_territory used to guard itself with, lifted into the
-    // policy so the button and the command cannot answer differently.
-    in.scoredEnd         = model.game.shouldShowTerritory();
+    // policy so the button and the command cannot answer differently. Read from
+    // the value the game thread publishes, never recomputed here: uiInputs()
+    // runs every frame on the UI thread, and shouldShowTerritory() walks the SGF
+    // tree that the game thread is free to be mutating. See
+    // GobanModel::scoredEndPosition.
+    in.scoredEnd         = model.scoredEndPosition.load();
     in.hasMoves          = model.game.moveCount() > 0
                            || !model.setupBlackStones.empty()
                            || !model.setupWhiteStones.empty()

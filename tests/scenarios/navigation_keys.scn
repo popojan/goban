@@ -1,0 +1,73 @@
+# The navigation keys, which are handled inside GobanControl::keyPress() rather
+# than through the command registry and so could not be scripted at all until
+# the `key` directive existed. The behaviour that most needed it is the last
+# case here: Space at the end of an unfinished branch falls through to kibitz,
+# while Right does not. That distinction is in CLAUDE.md's prose test plan
+# ("Space Key at Branch End") and has never been executable.
+#
+# simple.sgf is 19x19, B[dd] W[pp] B[dp] W[pd], no result. Both players human,
+# so nothing moves on its own.
+
+load_sgf tests/data/simple.sgf
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect main_line_moves 4
+expect at_end true
+
+navigate_start
+wait_idle
+expect view_position 0
+
+# --- Space and Right step forward -------------------------------------------
+key space
+wait_idle
+expect view_position 1
+key right
+wait_idle
+expect view_position 2
+
+# --- Left and Backspace step back -------------------------------------------
+key left
+wait_idle
+expect view_position 1
+key backspace
+wait_idle
+expect view_position 0
+
+# Backspace at the root has nowhere to go, and must not corrupt anything.
+key backspace
+wait_idle
+expect view_position 0
+expect main_line_moves 4
+
+# --- End and Home jump ------------------------------------------------------
+key end
+wait_idle
+expect view_position 4
+expect at_end true
+
+key home
+wait_idle
+expect view_position 0
+
+navigate_end
+wait_idle
+expect view_position 4
+expect at_end true
+
+# --- At the end of an unfinished branch the two keys differ -----------------
+# Right stops. It is navigation and there is nowhere left to navigate.
+key right
+wait_idle
+expect view_position 4
+expect main_line_moves 4
+
+# Space falls through to kibitz and asks the engine for a move, which is the
+# one place these two keys are not synonyms.
+key space
+wait_until main_line_moves >= 5
+wait_idle
+expect main_line_moves 5
+expect view_position 5

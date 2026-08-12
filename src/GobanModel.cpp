@@ -235,6 +235,10 @@ void GobanModel::onBoardChange(const Board& result) {
         phaseName(phase()), result.territoryReady, result.score, board.showTerritory);
 
     bool shouldShow = game.shouldShowTerritory();
+    // Publish it for the UI thread, which needs the answer every frame to decide
+    // whether Territory is offered and must not walk the SGF tree to get it.
+    // See GobanModel::scoredEndPosition.
+    scoredEndPosition = shouldShow;
     spdlog::debug("onBoardChange: territoryReady={}, shouldShowTerritory={}", result.territoryReady, shouldShow);
 
     if (phase() == GamePhase::Finished && result.territoryReady && shouldShow) {

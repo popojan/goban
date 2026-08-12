@@ -121,6 +121,21 @@ public:
     Board board;
 
     std::atomic<bool> tsumegoMode{false};
+
+    /// Whether the position on screen is the end of a game decided on points —
+    /// GameRecord::shouldShowTerritory(), published by the game thread rather
+    /// than recomputed by the reader.
+    ///
+    /// Atomic and cached for the same reason `gamePhase` is: the UI thread needs
+    /// it every frame (it decides whether Territory is offered) and the game
+    /// thread owns the SGF tree. Calling shouldShowTerritory() from the UI
+    /// thread walks that tree — isGameFinished() builds and destroys a vector of
+    /// shared_ptr<ISgfcProperty> per node — while the game thread is free to be
+    /// mutating it, which segfaults in SgfcProperty's destructor. onBoardChange()
+    /// already computes this value on the game thread at every position change,
+    /// so the answer is republished there instead of recomputed here.
+    std::atomic<bool> scoredEndPosition{false};
+
     std::string tsumegoHintBlack;  // Localized "Black to move", set on UI thread
     std::string tsumegoHintWhite;  // Localized "White to move", set on UI thread
     GameState state;

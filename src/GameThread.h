@@ -199,7 +199,7 @@ public:
     bool humanToMove() const;
 
     void playLocalMove(const Move& move);
-    void playKibitzMove() const;
+    void playKibitzMove();
 
     // Analysis mode support
     bool setGameMode(GameMode mode);  // Returns true if mode change succeeded

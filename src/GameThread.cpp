@@ -772,10 +772,21 @@ void GameThread::playLocalMove(const Move& move) {
     }
 }
 
-void GameThread::playKibitzMove() const {
+void GameThread::playKibitzMove() {
+    std::unique_lock<std::mutex> lock(playerMutex);
     Move kibitzed(Move::KIBITZED, model.state.colorToMove);
     Player* p = playerToMove.load();
-    if (p) p->suggestMove(kibitzed);
+    if (p) {
+        p->suggestMove(kibitzed);
+    } else if (model.phase() == GamePhase::Playing) {
+        // The same fallback playLocalMove() has, and for the same reason. Nobody
+        // is blocked in genmove between two moves: the loop clears playerToMove
+        // and then sleeps 500 ms before the next iteration. A kibitz request
+        // arriving in that window used to be dropped on the floor, so pressing
+        // Kibitz just after a move did nothing at all — silently, and often,
+        // since half a second is exactly how long a user takes to reach for it.
+        queuedMove = kibitzed;
+    }
 }
 
 void GameThread::navigateBack() {
