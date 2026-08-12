@@ -22,6 +22,14 @@
  * `GobanControl::actions()` gathers the inputs once, and both the toolbar and
  * the command layer read the result.
  *
+ * That was originally true of `resign` alone, and the other eight commands went
+ * on guarding themselves — differently. A 2026-08-13 audit found six live
+ * disagreements between a button and the command it invokes, including a
+ * Territory button that was enabled on a resigned game and did nothing, and
+ * navigation keys that were accepted in a locked bot-versus-bot match the
+ * toolbar had greyed out. Every command in the registry now dispatches through
+ * `GobanControl::actions()`; see ADR-0005.
+ *
  * **Keep this a pure function of plain data.** It must not take a `GobanModel`
  * or a `GameThread`: `GameThread::isThinking()` reads a member only the game
  * loop sets, so a policy phrased over those types could not be tested in the
@@ -40,8 +48,13 @@ struct UiInputs {
     bool tsumego           = false;
     /// The cursor is at the end of the line being played, with no continuation
     /// ahead of it. Resignation writes the record's result and adds no node, so
-    /// it is only truthful here.
+    /// it is only truthful here. Its negation is "reviewing mid-tree", where a
+    /// move describes a variation rather than a turn — see `pass` below.
     bool atEndOfNavigation = true;
+    /// The position is the end of a game decided on points. False for a
+    /// resignation, which records a result without ever scoring the board, so
+    /// there is no territory to show. Mirrors GameRecord::shouldShowTerritory().
+    bool scoredEnd         = false;
     bool hasMoves          = false;
     bool hasUnsavedChanges = false;
 };

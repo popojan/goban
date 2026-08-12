@@ -5,9 +5,11 @@
 #include "GobanControl.h"
 #include "AppState.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <map>
 #include <sstream>
 
 #include <spdlog/spdlog.h>
@@ -15,6 +17,44 @@
 namespace {
 
 constexpr double DEFAULT_WAIT_SECONDS = 10.0;
+
+/// Maps a key name to an RmlUi KeyIdentifier, so a scenario can exercise the
+/// handful of behaviours that live in GobanControl::keyPress() rather than in
+/// the command registry — Space falling through to kibitz at the end of an
+/// unfinished branch being the one the prose test plan has always described and
+/// no automated test could reach.
+///
+/// The numeric values are RmlUi's, documented in docs/keyboard-shortcuts.md;
+/// a bare number is accepted too, for keys with no name here.
+bool keyCode(std::string name, int& out) {
+    for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    static const std::map<std::string, int> named = {
+        {"space", 1},  {"backspace", 69}, {"enter", 72}, {"escape", 81},
+        {"end", 88},   {"home", 89},      {"left", 90},  {"up", 91},
+        {"right", 92}, {"down", 93},
+    };
+    const auto it = named.find(name);
+    if (it != named.end()) {
+        out = it->second;
+        return true;
+    }
+    // KI_A is 12 and the alphabet runs contiguously from there.
+    if (name.size() == 1 && name[0] >= 'a' && name[0] <= 'z') {
+        out = 12 + (name[0] - 'a');
+        return true;
+    }
+    try {
+        size_t consumed = 0;
+        const int value = std::stoi(name, &consumed);
+        if (consumed == name.size()) {
+            out = value;
+            return true;
+        }
+    } catch (const std::exception&) {
+    }
+    return false;
+}
 
 std::vector<std::string> tokenize(const std::string& line) {
     std::istringstream ss(line);
@@ -179,6 +219,23 @@ bool ScenarioRunner::execute(const Step& step, GobanControl& control) {
         }
         if (control.screenshotPending()) return false;
         screenshotRequested = false;
+        return true;
+    }
+
+    if (name == "key") {
+        if (step.args.empty()) {
+            recordFailure(step, "key needs a key name", control.dumpState());
+            return true;
+        }
+        int code = 0;
+        if (!keyCode(step.args[0], code)) {
+            recordFailure(step, "unknown key '" + step.args[0] + "'", control.dumpState());
+            return true;
+        }
+        // Down then up, as a real press arrives. The adjustment commands act on
+        // the down edge to allow key repeat; everything else acts on the up.
+        control.keyPress(code, 0, 0, true);
+        control.keyPress(code, 0, 0, false);
         return true;
     }
 

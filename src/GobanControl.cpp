@@ -41,6 +41,21 @@ bool parseInt(const std::string& text, int& out) {
     }
 }
 
+// Strict float parse — the whole token must be consumed.
+bool parseFloat(const std::string& text, float& out) {
+    try {
+        size_t consumed = 0;
+        float value = std::stof(text, &consumed);
+        if (consumed != text.size()) {
+            return false;
+        }
+        out = value;
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
 std::string toLower(std::string text) {
     std::transform(text.begin(), text.end(), text.begin(),
         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -244,31 +259,33 @@ void GobanControl::boardClick(const Position& coord) {
         return;
     }
 
-    bool playNow = true;
     if (model.phase() == GamePhase::Finished) {
         // Clicking on finished game - reuse "clear" which handles save + settings restore
         command("clear");
-        playNow = false;
+        return;
     }
-    else {
-       model.start();
-       if (!engine.isRunning()) {
-           engine.run();
-       }
+
+    // Taking a stone out of the bowl is not yet a move, so it must not start the
+    // game. model.start() used to run before this branch, which flipped the
+    // phase to Playing with nothing recorded — and the phase is what the rest of
+    // the UI reads: komi locked itself (setKomi accepts Setup and Paused only)
+    // and the Start button greyed out, both on a board that was still empty.
+    if (engine.humanToMove() && !model.state.holdsStone) {
+        model.state.holdsStone = true;
+        model.updateReservoirs();  // Stone in hand reduces reservoir
+        view.requestRepaint(GobanView::UPDATE_STONES);
+        return;
+    }
+
+    // A stone is actually being placed: this is the act that starts the game.
+    model.start();
+    if (!engine.isRunning()) {
+        engine.run();
     }
     spdlog::debug("engine.isRunning() = {}", engine.isRunning());
-    if(playNow) {
-        if(!engine.humanToMove() || model.state.holdsStone) {
-            const auto move = engine.getLocalMove(coord);
-            engine.playLocalMove(move);
-            view.requestRepaint();
-        }
-        else {
-            model.state.holdsStone = true;
-            model.updateReservoirs();  // Stone in hand reduces reservoir
-            view.requestRepaint(GobanView::UPDATE_STONES);
-        }
-    }
+    const auto move = engine.getLocalMove(coord);
+    engine.playLocalMove(move);
+    view.requestRepaint();
 }
 
 void GobanControl::buildRegistry() {
@@ -277,14 +294,22 @@ void GobanControl::buildRegistry() {
         registry[name] = CommandEntry{std::move(handler), minArgs, maxArgs, help};
     };
 
-    // Shared guard for the four navigation commands: GTP traffic while the engine
-    // is thinking would corrupt its board state. Blocking here does *not* skip the
-    // post-dispatch menu update, matching the original combined branch.
+    // Shared guard for the four navigation commands. GTP traffic while an engine
+    // is thinking would corrupt its board state, and in a locked bot-versus-bot
+    // match the human is a spectator — both terms come from availableActions(),
+    // so these keybindings say exactly what the greyed-out buttons say.
+    //
+    // The second term is why this is no longer a bare isThinking() test: the game
+    // loop clears playerToMove *before* its 500 ms inter-move sleep, so
+    // isThinking() is false for that window and navigation keys were quietly
+    // accepted mid-match — pausing a running match the toolbar had refused to
+    // let anyone touch. Blocking here does *not* skip the post-dispatch menu
+    // update, matching the original combined branch.
     auto navigate = [this](const char* name, const std::function<void()>& action) {
         spdlog::debug("Navigation command '{}': isThinking={}, isRunning={}, phase={}",
             name, engine.isThinking(), engine.isRunning(), phaseName(model.phase()));
-        if (engine.isThinking()) {
-            spdlog::debug("Navigation command '{}' blocked - engine is thinking", name);
+        if (!actions().navigate) {
+            spdlog::debug("Navigation command '{}' refused by availableActions()", name);
             return;
         }
         action();
@@ -368,9 +393,10 @@ void GobanControl::buildRegistry() {
     });
 
     add("toggle_territory", 0, 0, "toggle territory display", [this](CommandContext& ctx) {
-        // Only allow territory toggle at end of a scored game (not resignation).
+        // Only at the end of a scored game — a resignation counted nothing, so
+        // there is no territory to show. The same answer greys the button.
         // On refusal the menu is still updated (with checked == false), unselecting it.
-        if (model.game.shouldShowTerritory()) {
+        if (actions().territory) {
             ctx.checked = model.board.toggleTerritory();
             view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
         }
@@ -387,9 +413,12 @@ void GobanControl::buildRegistry() {
     });
 
     add("play once", 0, 0, "ask the kibitz engine for one move", [this](CommandContext& ctx) {
-        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
-        // Don't trigger at end of finished game
-        if (model.game.isAtFinishedGame()) {
+        // Refused at the end of a finished game, while an engine is already
+        // thinking, and in a locked bot-bot match — the three terms behind the
+        // greyed Kibitz button. The command used to test only the first, so the
+        // keybinding queued a second request onto an engine mid-genmove.
+        if (!actions().kibitz) {
+            spdlog::debug("play once refused by availableActions()");
             ctx.notifyMenu = false;
             return;
         }
@@ -414,6 +443,14 @@ void GobanControl::buildRegistry() {
         if (engine.getGameMode() == GameMode::MATCH) {
             if (engine.setGameMode(GameMode::ANALYSIS)) {
                 ctx.checked = true;
+            } else {
+                // Refused for a human-versus-human game, and silently until now:
+                // the menu entry simply failed to light up. Analysis mode answers
+                // every move with the kibitz engine regardless of who is assigned
+                // to a colour, so entering it here would quietly turn the game
+                // into human-versus-engine. Kibitz on demand needs no mode change
+                // — it already works in a match. See docs/game-modes.md.
+                parent->showMessage("Analysis mode answers every move — use Kibitz in match mode instead");
             }
         } else {
             if (engine.setGameMode(GameMode::MATCH)) {
@@ -455,7 +492,11 @@ void GobanControl::buildRegistry() {
     });
 
     add("pass", 0, 0, "pass", [this](CommandContext& ctx) {
-        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
+        if (!actions().pass) {
+            spdlog::debug("pass refused by availableActions()");
+            ctx.notifyMenu = false;
+            return;
+        }
         // During navigation, pass creates a variation (game is paused — no turn restriction)
         if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
             Color colorToMove = model.game.getColorToMove();
@@ -472,7 +513,13 @@ void GobanControl::buildRegistry() {
     });
 
     add("clear", 0, 0, "clear the board and start over (prompts first)", [this](CommandContext& ctx) {
-        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
+        // Nothing recorded means nothing to clear, and the prompt would ask
+        // about discarding an empty board. Same answer greys the button.
+        if (!actions().clear) {
+            spdlog::debug("clear refused by availableActions()");
+            ctx.notifyMenu = false;
+            return;
+        }
         // Use different prompt for game in progress vs finished game
         // Same prompt as the board-size and handicap dropdowns: all three
         // replace the game, and all three save it first, so neither "quit" nor
@@ -497,16 +544,21 @@ void GobanControl::buildRegistry() {
     add("start", 0, 0, "start/resume engine play", [this](CommandContext& ctx) {
         spdlog::debug("start command: acceptsUiEvents={}, phase={}, isRunning={}",
             acceptsUiEvents(), phaseName(model.phase()), engine.isRunning());
-        if (!acceptsUiEvents()) { ctx.notifyMenu = false; return; }  // Block until initialization complete
-        if (model.phase() != GamePhase::Finished) {
-            model.start();
-            if (!engine.isRunning()) {
-                engine.run();
-            }
-            spdlog::info("Game started from menu");
-        } else {
-            spdlog::debug("start command blocked: the game is finished");
+        // Start hands the turn to an engine, so it needs one waiting to move and
+        // a game that is neither already running nor over. The command used to
+        // test the phase alone, which meant it accepted a human-versus-human
+        // game where the button was greyed and there was nothing to hand over:
+        // `pass` and a board click already start the game themselves.
+        if (!actions().start) {
+            spdlog::debug("start refused by availableActions()");
+            ctx.notifyMenu = false;
+            return;
         }
+        model.start();
+        if (!engine.isRunning()) {
+            engine.run();
+        }
+        spdlog::info("Game started from menu");
     });
 
     add("reset camera", 0, 0, "restore the default camera", [this](CommandContext&) {
@@ -527,9 +579,14 @@ void GobanControl::buildRegistry() {
     });
 
     add("undo move", 0, 0, "take back the last move", [this](CommandContext&) {
-        if (!engine.isThinking()) {
-            engine.navigateBack();
+        // Undo is navigateBack under another name, so it answers to the same
+        // rule as the navigation buttons — including the bot-bot lock the bare
+        // isThinking() test here used to miss.
+        if (!actions().undo) {
+            spdlog::debug("undo move refused by availableActions()");
+            return;
         }
+        engine.navigateBack();
     });
 
     add("navigate_start", 0, 0, "jump to the start of the game", [this, navigate](CommandContext&) {
@@ -630,6 +687,13 @@ void GobanControl::buildRegistry() {
     });
 
     add("save", 0, 0, "save the game record now", [this](CommandContext&) {
+        // Nothing changed since the last save means nothing to write; the same
+        // answer greys the button. Said out loud rather than swallowed, because
+        // a Save that appears to do nothing reads as a failure.
+        if (!actions().save) {
+            parent->showMessage("Nothing to save");
+            return;
+        }
         model.game.saveAs("");
         // Show feedback with filename
         parent->showMessage(model.game.getDefaultFileName());
@@ -677,20 +741,28 @@ void GobanControl::buildRegistry() {
         spdlog::info("Archived to {}, daily session continues as {}", archivedFile, dailyFile);
     });
 
-    add("load_sgf", 1, 2, "<path> [gameIndex] — load an SGF without the file chooser",
-        [this](CommandContext& ctx) {
-        // Same entry point the file chooser uses, exposed for scripted runs and
-        // for the prologue of recorded bug reports.
+    // Shared body of load_sgf/load_tsumego, mirroring what the file chooser does
+    // on "open_file": set the mode on the UI thread first, then defer the load
+    // past any genmove in flight. In tsumego mode the cursor stays at the root
+    // (the puzzle is to be solved, not replayed) and the opening move is
+    // auto-played when it contradicts PL.
+    auto loadGame = [this](CommandContext& ctx, bool tsumego) {
         int gameIndex = 0;
         if (ctx.args.size() > 1 && !parseInt(ctx.args[1], gameIndex)) {
             spdlog::warn("load_sgf: '{}' is not a game index", ctx.args[1]);
             return;
         }
         const std::string path = ctx.args[0];
+        parent->setTsumegoMode(tsumego);
+
         std::string busyEngine;
-        const bool ran = engine.runWhenEngineFree([this, path, gameIndex]() {
-            if (!engine.loadSGF(path, gameIndex, false)) {
+        const bool ran = engine.runWhenEngineFree([this, path, gameIndex, tsumego]() {
+            if (!engine.loadSGF(path, gameIndex, tsumego)) {
                 spdlog::warn("load_sgf: failed to load '{}'", path);
+                return;
+            }
+            if (tsumego) {
+                engine.autoPlayTsumegoSetup();
             }
         }, &busyEngine);
 
@@ -699,6 +771,21 @@ void GobanControl::buildRegistry() {
         } else {
             parent->showMessage("Waiting for " + busyEngine + "...");
         }
+    };
+
+    add("load_sgf", 1, 2, "<path> [gameIndex] — load an SGF without the file chooser",
+        [loadGame](CommandContext& ctx) {
+        // Same entry point the file chooser uses, exposed for scripted runs and
+        // for the prologue of recorded bug reports.
+        loadGame(ctx, false);
+    });
+
+    add("load_tsumego", 1, 2, "<path> [gameIndex] — load an SGF as a tsumego problem",
+        [loadGame](CommandContext& ctx) {
+        // The file chooser's tsumego toggle, which was the *only* way into the
+        // mode — so bad-move paths, Solved/Wrong feedback and the blocked click
+        // on a solved position had no reachable test at all.
+        loadGame(ctx, true);
     });
 
     add("load", 0, 0, "open the SGF file chooser", [this](CommandContext&) {
@@ -842,6 +929,21 @@ void GobanControl::buildRegistry() {
             requestHandicap(handicap, {});
     });
 
+    add("komi", 1, 1, "<points> — as the komi dropdown, refused once play has begun",
+        [this](CommandContext& ctx) {
+            float komi = 0.0f;
+            if (!parseFloat(ctx.args[0], komi)) {
+                spdlog::warn("komi: '{}' is not a number", ctx.args[0]);
+                return;
+            }
+            // Unlike board_size and handicap this never replaces the game, so
+            // there is nothing to confirm — it is simply refused outside Setup
+            // and Paused. The dropdown reverts its selection on the same answer.
+            if (!setKomi(komi)) {
+                parent->showMessage("Komi can only be changed before play starts");
+            }
+    });
+
     add("click", 2, 2, "<col> <row> — place a stone as if the board was clicked there",
         [this](CommandContext& ctx) {
             int col = 0;
@@ -945,19 +1047,17 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         model.game.getViewPosition(), model.game.getLoadedMovesCount());
 
     if (!downNotUp && model.game.isNavigating()) {
-        // Navigation keys - only check isThinking() for these specific keys
-        bool isNavKey = (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT ||
-                         key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK);
-
-        if (isNavKey && engine.isThinking()) {
-            spdlog::debug("Navigation blocked - engine is thinking");
-            return;
-        }
-
+        // These four keys dispatch through the registry rather than calling the
+        // navigator directly. Two things follow from that and neither is
+        // incidental: they answer to the same availableActions() rule as the
+        // toolbar buttons, and they are recorded, so a keyboard-driven review
+        // survives into a bug report. Navigating by key used to be invisible to
+        // ScenarioRecorder, which silently dropped it from every replay.
+        //
         // Space/Right: navigate forward (or trigger kibitz at end of unfinished branch)
         if (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT) {
             if (model.game.hasNextMove()) {
-                engine.navigateForward();
+                command("navigate_forward");
                 return;  // Handled navigation
             }
             // At end of finished game - nothing more to do
@@ -970,7 +1070,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
             }
             // Tsumego: request engine move on dead branch via navigation
             if (view.isTsumegoMode()) {
-                if (model.game.isOnBadMovePath()) {
+                if (model.game.isOnBadMovePath() && actions().kibitz) {
                     engine.requestKibitzNav();
                 }
                 return;  // Don't fall through to "play once" — would break navigation
@@ -978,7 +1078,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
             spdlog::debug("Navigation: at end of branch, Space falls through to kibitz");
         }
         if (key == Rml::Input::KI_LEFT || key == Rml::Input::KI_BACK) {
-            engine.navigateBack();
+            command("navigate_back");
             return;
         }
     }
@@ -1192,6 +1292,9 @@ UiInputs GobanControl::uiInputs() const {
                            && engine.getGameMode() != GameMode::ANALYSIS;
     in.tsumego           = model.tsumegoMode;
     in.atEndOfNavigation = model.game.isAtEndOfNavigation();
+    // The predicate toggle_territory used to guard itself with, lifted into the
+    // policy so the button and the command cannot answer differently.
+    in.scoredEnd         = model.game.shouldShowTerritory();
     in.hasMoves          = model.game.moveCount() > 0
                            || !model.setupBlackStones.empty()
                            || !model.setupWhiteStones.empty()

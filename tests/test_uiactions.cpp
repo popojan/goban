@@ -110,6 +110,7 @@ TEST_CASE("Start is offered only when an engine is waiting to move") {
 TEST_CASE("a finished game offers territory and nothing to play") {
     UiInputs in = playing();
     in.phase = GamePhase::Finished;
+    in.scoredEnd = true;   // decided on points, so there is territory to show
 
     const UiActions a = availableActions(in);
     CHECK(a.territory);
@@ -120,6 +121,55 @@ TEST_CASE("a finished game offers territory and nothing to play") {
     // Undo stays live: rewinding is how you leave a finished game.
     CHECK(a.undo);
     CHECK(a.navigate);
+}
+
+TEST_CASE("a resigned game has no territory to show") {
+    // Found by the 2026-08-13 audit. `territory` tested the phase alone, which
+    // a resignation satisfies just as a scored ending does — so the button lit
+    // up on a resigned game and toggle_territory, guarded by its own
+    // shouldShowTerritory() test, refused. An enabled button that does nothing.
+    UiInputs in = playing();
+    in.phase     = GamePhase::Finished;
+    in.scoredEnd = false;    // +R: nothing was ever counted
+
+    CHECK_FALSE(availableActions(in).territory);
+
+    // And the stale overlay is refused once the user has played on past a
+    // recorded score: the position is at the end, but the game is live again.
+    UiInputs resumed = playing();
+    resumed.scoredEnd = true;
+    CHECK_FALSE(availableActions(resumed).territory);
+}
+
+TEST_CASE("passing mid-tree describes a variation, not a turn") {
+    // Away from the end of the line a pass creates a pass variation, exactly as
+    // a board click creates a stone variation — and GobanControl::boardClick
+    // has never consulted turn ownership there. Phrasing `pass` as humanToMove
+    // alone would have refused a pass onto an engine's colour while a click on
+    // the same node went through, which is the inconsistency this removes.
+    UiInputs in = playing();
+    in.phase             = GamePhase::Paused;
+    in.atEndOfNavigation = false;
+    in.humanToMove       = false;   // an engine is nominally to move here
+
+    CHECK(availableActions(in).pass);
+
+    // At the end of the line it is a turn again, so ownership decides.
+    UiInputs atEnd = in;
+    atEnd.atEndOfNavigation = true;
+    CHECK_FALSE(availableActions(atEnd).pass);
+
+    // Reviewing overrides turn ownership and nothing else. In particular it does
+    // not override the engine-thinking lock: a pass is a preserving action in
+    // ADR-0001's sense, and boardClick's review branch refuses there too, so
+    // allowing it would put pass and click back at odds in exactly the case
+    // that corrupts engine state.
+    UiInputs thinking = in;  thinking.engineThinking = true;
+    UiInputs locked   = in;  locked.aiVsAiLocked = true;
+    UiInputs over     = in;  over.phase = GamePhase::Finished;
+    CHECK_FALSE(availableActions(thinking).pass);
+    CHECK_FALSE(availableActions(locked).pass);
+    CHECK_FALSE(availableActions(over).pass);
 }
 
 TEST_CASE("an engine mid-genmove locks navigation and kibitz") {

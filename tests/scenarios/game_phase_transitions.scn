@@ -61,8 +61,19 @@ expect phase paused
 expect move_count 0
 expect main_line_moves 2
 
-# Playing again: Start is accepted once the game is no longer over.
+# Playing again. Start hands the turn to an engine, so in this human-versus-human
+# game it is refused whatever the phase — there is nobody to hand the turn to,
+# which is what the greyed-out Start button has always said. The command used to
+# test the phase alone and accepted it here; ADR-0005 put both on one answer.
 start
+wait_idle
+expect phase paused
+
+# Playing a move is what resumes a human game. Mid-tree this pass follows the
+# existing continuation rather than branching, but `pass` starts the game before
+# navigating, so the phase moves either way.
+pass
+wait_until move_count >= 1
 wait_idle
 expect phase playing
 
