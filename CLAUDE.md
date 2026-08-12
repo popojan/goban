@@ -249,8 +249,12 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **`new_game <size>` deliberately does not prompt.** It is the scripting entry point; scenarios begin with it, and a modal would deadlock them. The `board_size` and `handicap` commands take the dropdowns' route instead, prompt included, which is how `tests/scenarios/discard_game_prompt.scn` can cover a path the harness cannot click.
 
 ### UI Widget State
-- **One policy decides what a player may do: `availableActions()` in `src/UiActions.h`.** The toolbar (`ElementGame::syncActionAvailability()`) and the command guards (`GobanControl::actions()`, `canResign()`) read the same answer from the same gatherer, `GobanControl::uiInputs()`. This used to be a rule — "make the button ask the same question the command asks" — and it decayed three separate times, each time producing a disabled button that looked like a guard and was not one. Add a new action's rule to `availableActions()` and a case to `tests/test_uiactions.cpp`; do not hand-roll a second condition at either call site.
+- **One policy decides what a player may do: `availableActions()` in `src/UiActions.h`.** The toolbar (`ElementGame::syncActionAvailability()`) and *every* command guard read the same answer from the same gatherer, `GobanControl::uiInputs()`. This used to be a rule — "make the button ask the same question the command asks" — and it decayed three separate times, each time producing a disabled button that looked like a guard and was not one. ADR-0005 finished the job: all nine actions now dispatch through `GobanControl::actions()`, and a command handler holds **no** policy of its own. Add a new action's rule to `availableActions()` and a case to `tests/test_uiactions.cpp`; do not hand-roll a second condition at either call site.
+- **`isThinking()` is not "the engine is busy".** The game loop clears `playerToMove` *before* its 500 ms inter-move sleep, so `isThinking()` is false for that window on every move. Guards written as a bare `isThinking()` test therefore have a hole once per move — that is how navigation keys were accepted in a locked bot-versus-bot match the toolbar had greyed out, and how a kibitz request could be dropped on the floor. Ask `actions()`, which carries the `aiVsAiLocked` term as well.
+- **Away from the end of the line, a move is a variation, not a turn.** `pass` and a board click must agree about this: `boardClick`'s review branch has never consulted turn ownership, so `a.pass` reads `(humanToMove || reviewingMidTree)`. The engine-thinking lock stays outside that disjunction — passing is a *preserving* action in ADR-0001's sense, and a click refuses there too.
+- **Territory needs a score, not just an ending.** `a.territory` is `finished && scoredEnd`; a resignation counted nothing, so it has no territory. `scoredEnd` is `GameRecord::shouldShowTerritory()` **published by the game thread** into `GobanModel::scoredEndPosition`, never recomputed by the reader — see the threading note below.
 - **Keep `availableActions()` pure over plain data.** It must not take a `GobanModel` or `GameThread`: `isThinking()` reads a member only the game loop sets, so the engine-thinking cases would stop being testable — and they are half of what it decides.
+- **`uiInputs()` runs every frame on the UI thread, so it must not walk the SGF tree.** The game thread owns that tree and mutates it freely; `GameRecord`'s const accessors take no lock. Routing `shouldShowTerritory()` through `uiInputs()` segfaulted in `SgfcProperty`'s destructor roughly one run in six, because `isGameFinished()` builds and destroys a vector of `shared_ptr<ISgfcProperty>` per node. Anything the UI needs per frame gets **published by the game thread into an atomic** — `gamePhase` and `scoredEndPosition` are the two — not recomputed by the reader. **Known and unfixed:** `dumpState()` and `uiInputs()` still call `moveCount()`, `getViewPosition()`, `isAtEndOfNavigation()`, `getVariations()` and `hasGameResult()` across the same boundary. Do not add more.
 - **Widget state reads the phase, not `state.reason`.** They diverge after navigating back from a finished game: the phase returns to `Paused` while the reason stays set. See the `state.reason` invariant above.
 
 ### UI Event Suppression
@@ -266,63 +270,27 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 
 ## Test Scenarios
 
-Known error-prone sequences that should be regression tested. Several of these
-are now **executable** under `tests/scenarios/*.scn` — run them with
-`./tests/run_scenarios.sh`, and see `docs/testing.md` for the directive syntax.
-The remaining ones below are still prose; converting one is a good way to pin a
-bug you have just fixed.
+Known error-prone sequences that should be regression tested. **All five prose
+sequences once listed here are now executable** under `tests/scenarios/*.scn` — run them
+with `./tests/run_scenarios.sh`, and see `docs/testing.md` for the directive
+syntax. They are kept here as an index; the scenario file is the specification.
 
-### Navigation During Engine Play
-```
-new_game 13
-switch_player black gnugo
-switch_player white gnugo
-start
-wait 500ms
-navigate_home          # Should be blocked or queue safely
-navigate_back          # Should be blocked or queue safely
-```
+| Sequence | Scenario |
+|---|---|
+| Navigation During Engine Play | `match_mode_blocks_navigation.scn`, `bot_match_locks_player_actions.scn` |
+| Player Switch During Navigation | `player_switch_during_navigation.scn` |
+| Space Key at Branch End | `navigation_keys.scn` |
+| SGF Modification and Save | `variation_promotes_main_line.scn` |
+| Analysis Mode Workflow | `analysis_mode_toggle.scn`, `analysis_mode_auto_reply.scn` |
 
-### Player Switch During Navigation
-```
-load_sgf famous_game.sgf
-navigate_home
-navigate_forward 10
-switch_player black gnugo
-space                  # Should trigger AI response
-navigate_back          # Should work after AI responds
-```
+Areas covered since (each found at least one real defect): board clicking and
+the stone-in-hand model (`board_click_stone_in_hand.scn`), tsumego mode
+(`tsumego_mode.scn`), territory after a resignation
+(`territory_needs_a_score.scn`), multi-game collections
+(`multi_game_collection.scn`), and the Clear/Quit confirmations
+(`discard_prompts.scn`).
 
-### Space Key at Branch End
-```
-load_sgf famous_game.sgf
-navigate_home
-navigate_forward 5
-click_board 4 4        # Create new variation
-space                  # Should trigger kibitz (not block)
-```
-
-### SGF Modification and Save
-```
-load_sgf game_with_result.sgf
-navigate_home
-navigate_forward 3
-click_board 5 5        # New variation becomes main line
-save                   # RE property should be removed (unfinished)
-```
-
-### Analysis Mode Workflow
-```
-new_game 19
-switch_player black gnugo
-switch_player white gnugo
-start
-wait 2000ms
-toggle_analysis_mode   # Pause genmove
-navigate_home          # Should work immediately
-navigate_end
-toggle_analysis_mode   # Resume match
-```
+Converting a prose sequence is a good way to pin a bug you have just fixed.
 
 ## Ray-Traced Rendering - Coordinate System and Shaders
 

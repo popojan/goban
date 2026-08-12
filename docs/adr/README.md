@@ -67,3 +67,4 @@ A compact alternative for small decisions is the *Y-statement*:
 - [ADR-0002: Replace the lifecycle flags with explicit state machines](0002-explicit-game-state.md) — *Accepted; complete. Its implementation log records where the plan was wrong.*
 - [ADR-0003: Goban's GTP server role is a transparent proxy](0003-gtp-server-as-proxy.md) — *Proposed; open questions unresolved*
 - [ADR-0004: Park the raster port; the classic ubershader stays the product look](0004-park-the-raster-port.md)
+- [ADR-0005: Every player action asks `availableActions()`, buttons and keys alike](0005-one-policy-for-player-actions.md) — *completes ADR-0002 step 5, which wired up only `resign`*

@@ -136,8 +136,16 @@ camera. In CI, wrap it: `xvfb-run -s "-screen 0 1024x768x24" tests/run_scenarios
 | `wait_idle [ms]` | wait until no engine is thinking and no navigation is queued |
 | `wait_until <key> [op] <value>` | wait for a state key to reach a value |
 | `wait <ms>` | unconditional delay — prefer `wait_idle` |
+| `key <name>` | press a key, down then up |
 | `dump_state [label]` | log the whole state; use this when authoring |
 | `fail_fast on\|off` | stop at the first failure (default on) |
+
+`key` exists because a few behaviours live in `GobanControl::keyPress()` and
+never reach the command registry — most importantly **Space at the end of an
+unfinished branch, which falls through to kibitz while Right does not**. Names:
+`space`, `left`, `right`, `up`, `down`, `home`, `end`, `backspace`, `enter`,
+`escape`, a single letter `a`–`z`, or a raw RmlUi key code. See
+`tests/scenarios/navigation_keys.scn`.
 
 A value of `$otherKey` compares two pieces of state, e.g.
 `expect view_position $main_line_moves`.
@@ -147,14 +155,28 @@ the same route as the dropdowns, so they ask before replacing a game worth
 keeping. Answer with `prompt_yes` / `prompt_no`, and assert `prompt_active` to
 show the prompt really appeared — otherwise a command that silently does nothing
 looks identical to one that was refused. `new_game <size>` stays unprompted.
+`komi <points>` is the komi dropdown, which never replaces a game and so never
+asks; it is simply refused once play has begun.
 
-Two rules learned the hard way:
+`load_tsumego <path> [gameIndex]` is the file chooser's tsumego toggle. Without
+it the mode was reachable only by clicking that dialog, so nothing about it
+could be tested at all — see `tests/scenarios/tsumego_mode.scn`.
+
+Four rules learned the hard way:
 
 - **Never assert an exact value on something that moves on its own.** The
   genmove loop is fast, so `wait_until move_count 4` can race straight past 4.
   Use `>=`, or compare against another key.
 - **`wait_idle`, not `wait <ms>`.** Navigation is queued onto the game thread,
   so a fixed sleep is both slower and less reliable.
+- **Board coordinates are not SGF coordinates.** `click <col> <row>` takes board
+  columns and rows, and board rows run opposite to SGF rows: board row N is SGF
+  row `size-1-N`. `B[bh]` on a 9×9 is `click 1 1`. Getting it backwards is
+  silent — the click lands on some other empty point, quietly creates a
+  variation, and the scenario fails several assertions further down.
+- **Placing a stone takes two clicks.** One takes it out of the bowl
+  (`holds_stone` becomes true and *nothing is recorded* — the game does not even
+  start), one puts it down. The second click decides the point, not the first.
 
 ### Recording a session: About → Report bug
 
@@ -198,10 +220,26 @@ Currently: `move_count`, `view_position`, `main_line_moves`, `navigating`,
 `at_end`, `variations`, `has_result`, `result`, `board_size`, `color_to_move`, `komi`,
 `handicap`, `black_stones`, `white_stones`, `captured_black`, `captured_white`,
 `mode`, `ai_vs_ai`, `phase`, `loop_state`, `engine_sync`, `running`, `thinking`, `syncing_ui`,
-`tsumego`, `holds_stone`, `show_territory`, `prompt_active`, `msg`, `black_player`,
-`white_player`, `board_hash`.
+`tsumego`, `holds_stone`, `show_territory`, `unsaved_changes`, `prompt_active`,
+`camera_animating`, `msg`, `black_player`, `white_player`, `sgf_file`,
+`game_index`, `board_hash`.
+
+Plus the nine booleans behind the toolbar: `can_start`, `can_pass`,
+`can_resign`, `can_undo`, `can_kibitz`, `can_navigate`, `can_territory`,
+`can_clear`, `can_save`. Since ADR-0005 these are also the guards every command
+applies to itself, so asserting one pins the button *and* the keybinding. Prefer
+them to inferring a refusal from an unchanged position: `expect can_undo false`
+says what you mean, whereas "the move count did not change" cannot tell a
+refusal apart from an action that legitimately had nothing to do.
 
 Add a key there and every scenario can assert on it.
+
+**Beware what `dumpState()` costs.** It runs on the UI thread and reads the SGF
+tree, which the game thread owns and mutates without a lock. Do not add a key
+whose getter walks that tree — publish the value from the game thread into an
+atomic instead, as `phase` and the territory predicate do. Adding one such call
+to `uiInputs()` produced an intermittent segfault in `SgfcProperty`'s
+destructor, roughly one run in six.
 
 ### The engine used by scenarios
 

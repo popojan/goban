@@ -1,0 +1,63 @@
+# Switching a player while reviewing mid-tree. CLAUDE.md's prose test plan
+# ("Player Switch During Navigation") made executable.
+#
+# What could go wrong: activatePlayer() interrupts whoever is blocked in genmove
+# and every enabled engine is supposed to stay at the same position as the
+# record. A switch made mid-tree must therefore leave the cursor and the record
+# exactly where they were, and navigation and play must both still work
+# afterwards — a desynced engine shows up as a refused move or a truncated
+# replay, not as an error.
+#
+# simple.sgf is 19x19, B[dd] W[pp] B[dp] W[pd], no result.
+
+load_sgf tests/data/simple.sgf
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect main_line_moves 4
+
+navigate_start
+wait_idle
+expect view_position 0
+
+navigate_forward
+navigate_forward
+wait_idle
+expect view_position 2
+expect black_stones 1
+expect white_stones 1
+
+# --- The switch itself must be inert -----------------------------------------
+switch_player white mock
+wait_idle
+expect white_player mock
+expect view_position 2
+expect main_line_moves 4
+expect black_stones 1
+expect white_stones 1
+expect phase paused
+
+# --- Navigation still works, in both directions ------------------------------
+navigate_back
+wait_idle
+expect view_position 1
+
+navigate_end
+wait_idle
+expect view_position 4
+expect at_end true
+expect black_stones 2
+expect white_stones 2
+
+# --- And so does play --------------------------------------------------------
+# Space at the end of an unfinished branch asks the kibitz engine for a move.
+# The engine has to be at the right position for this to succeed at all, which
+# is the real assertion: a desynced engine rejects the move.
+key space
+wait_until main_line_moves >= 5
+wait_idle
+# Deliberately >=, not ==: White is an engine now, so once the kibitz move lands
+# it is White to move and the match carries on by itself.
+expect main_line_moves >= 5
+expect phase playing

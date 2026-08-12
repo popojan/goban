@@ -27,7 +27,9 @@ Red Carpet Goban has two game modes that determine how player interaction works.
 ### Behavior
 
 - Human can play either color by clicking on the board
-- After playing a move, the engine assigned to the responding color replies
+- After playing a move, **the configured kibitz engine replies** — whichever
+  color is to move, and regardless of who is assigned to it. Analysis mode does
+  not consult the color assignment at all.
 - **Undo** removes one move
 - Navigation (Home/End/Left/Right) works freely
 
@@ -47,7 +49,15 @@ Red Carpet Goban has two game modes that determine how player interaction works.
 | **Load finished SGF** (has result) | Sets Analysis |
 | **Load unfinished SGF** (no result, e.g. session resume) | Sets Match |
 
-Analysis mode is not available when both players are human (no AI to respond).
+Analysis mode is **not available when both players are human**, and the refusal
+says so. The reason is the reply, not its absence: analysis mode answers every
+move with the kibitz engine, so entering it with two humans would quietly turn
+the game into human-versus-engine.
+
+This costs nothing, because **Kibitz does not need analysis mode**. The Kibitz
+button and the Space key ask the engine for a move in an ordinary match, with
+two humans, at any time. Analysis mode is for handing every reply to the engine;
+Kibitz is for asking once.
 
 ---
 
@@ -102,8 +112,14 @@ Analysis mode is not available when both players are human (no AI to respond).
 ## Interaction with Navigation
 
 Navigation (Home/End/Left/Right) is available in both modes:
-- **Match mode**: Navigation is blocked while the engine is thinking
+- **Match mode**: Navigation is blocked while the engine is thinking, and
+  blocked outright in a bot-versus-bot match — see below
 - **Analysis mode**: Navigation is always available (engine auto-play is paused)
+
+In a **bot-versus-bot match outside analysis mode** the human is a spectator:
+navigation, Undo, Pass, Resign and Kibitz are all refused, by the keys exactly
+as by the greyed-out buttons (ADR-0005). Switching to analysis mode is the
+supported way to step in, and it pauses the match.
 
 Creating a new variation (clicking a new point during navigation) works identically in both modes — the difference is only in whether the engine responds automatically (Match) or on request (Analysis).
 
