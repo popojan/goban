@@ -694,9 +694,14 @@ void GobanControl::buildRegistry() {
             parent->showMessage("Nothing to save");
             return;
         }
-        model.game.saveAs("");
-        // Show feedback with filename
-        parent->showMessage(model.game.getDefaultFileName());
+        // Report what actually happened. This used to show the filename
+        // unconditionally, so a write that failed — a missing games folder was
+        // enough — was indistinguishable from one that succeeded.
+        if (model.game.saveAs("")) {
+            parent->showMessage(model.game.getDefaultFileName());
+        } else {
+            parent->showMessage("Save failed: " + model.game.getDefaultFileName());
+        }
     });
 
     add("archive", 0, 0, "move the daily record to a timestamped file", [this](CommandContext& ctx) {
@@ -1381,7 +1386,26 @@ nlohmann::json GobanControl::dumpState() const {
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;
+    s["unsaved_changes"] = model.game.hasUnsavedChanges();
     s["msg"]            = messageName(model.state.msg);
+
+    // What the toolbar is offering right now. These are the exact booleans
+    // ElementGame::syncActionAvailability() greys the buttons by, and — since
+    // ADR-0005 — the exact booleans every command guards itself with. Exposing
+    // them lets a scenario assert the *policy* rather than only its
+    // consequences: "Undo is greyed here" used to be checkable solely by
+    // pressing it and observing that nothing moved, which cannot tell a refusal
+    // apart from an action that legitimately had nothing to do.
+    const UiActions a = actions();
+    s["can_start"]     = a.start;
+    s["can_pass"]      = a.pass;
+    s["can_resign"]    = a.resign;
+    s["can_undo"]      = a.undo;
+    s["can_kibitz"]    = a.kibitz;
+    s["can_navigate"]  = a.navigate;
+    s["can_territory"] = a.territory;
+    s["can_clear"]     = a.clear;
+    s["can_save"]      = a.save;
 
     // Where the position came from — needed to reconstruct a starting point
     // when replaying a recorded session.

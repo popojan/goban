@@ -1,0 +1,107 @@
+# Playing a move while reviewing creates a variation and promotes it to the main
+# line. This is CLAUDE.md's "SGF Modification and Save" prose scenario made
+# executable, and it covers the branch of GameRecord that decides whether the
+# recorded result survives — the invariant being that a main line which no
+# longer ends in a resignation or a double pass must not keep its RE.
+#
+# Two shapes, and they take different code paths on purpose:
+#   1. an unfinished game is modified in place and the path promoted
+#   2. a finished game is *copied* first, so the historical record survives
+#
+# Coordinates are board columns and rows; board row N is SGF row (size-1-N).
+# Both players are human, so nothing responds on its own.
+
+# --- 1. Unfinished game: promoted in place ----------------------------------
+# simple.sgf is 19x19, B[dd] W[pp] B[dp] W[pd], no result.
+load_sgf tests/data/simple.sgf
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect main_line_moves 4
+expect has_result false
+expect at_end true
+
+navigate_back
+navigate_back
+wait_idle
+expect view_position 2
+expect at_end false
+expect variations 1          # only the recorded continuation, B[dp]
+
+# A point nobody has played. Two clicks: one to take the stone, one to place it.
+click 10 10
+wait_idle
+expect holds_stone true
+click 10 10
+wait_until move_count >= 3
+wait_idle
+
+# The new move became the main line, so the record is three moves long and the
+# original continuation now hangs off move 2 as a sibling.
+expect view_position 3
+expect main_line_moves 3
+expect at_end true
+expect phase playing         # promoting a branch is an act of play
+
+navigate_back
+wait_idle
+expect view_position 2
+expect variations 2          # the new move first, the original B[dp] second
+
+# --- 2. Finished game: forked, and the result does not follow ---------------
+# resign.sgf is 9x9, B[ee] W[cc] B[gg], RE[W+R].
+load_sgf tests/data/resign.sgf
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect board_size 9
+expect main_line_moves 3
+expect phase finished
+expect has_result true
+expect result black_resigned
+
+# Loading a game that carries a result selects analysis mode, per
+# docs/game-modes.md. Leave it: in analysis mode the kibitz engine answers every
+# move, which would add a reply on top of the variation below and is covered on
+# its own in analysis_mode_auto_reply.scn. Entering MATCH is always permitted —
+# only entering ANALYSIS is refused for a human-versus-human game.
+expect mode analysis
+toggle_analysis_mode
+wait_idle
+expect mode match
+
+# Rewind one move. The phase leaves Finished; the record keeps its result until
+# something actually contradicts it.
+navigate_back
+wait_idle
+expect view_position 2
+expect phase paused
+expect has_result true
+
+# Play something other than the recorded B[gg]. Because the game carries a
+# result, this forks a fresh record rather than editing the finished one.
+click 0 0
+wait_idle
+expect holds_stone true
+click 0 0
+wait_until move_count >= 3
+wait_idle
+
+# The forked game is three moves long and is *not* finished: its main line ends
+# in an ordinary stone, so carrying RE[W+R] forward would label a game whose
+# recorded moves no longer support it.
+expect view_position 3
+expect main_line_moves 3
+expect has_result false
+expect result none
+expect phase playing
+
+# There is something to save, and saving clears the flag the Save button reads.
+expect unsaved_changes true
+expect can_save true
+save
+wait_idle
+expect unsaved_changes false
+expect can_save false

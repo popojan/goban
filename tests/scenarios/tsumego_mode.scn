@@ -1,0 +1,77 @@
+# Tsumego mode, which until now could only be entered from the file chooser and
+# so had no automated coverage whatsoever — not the bad-move path, not the
+# Solved/Wrong feedback, not the blocked click on a solved position, not the
+# resign refusal. `load_tsumego` is the file chooser's toggle exposed to scripts.
+#
+# tests/data/tsumego.sgf: a 9x9 corner problem, PL[B], solution B[bh] answered
+# by W[ah]. Clicking takes two clicks in tsumego mode as everywhere else — one
+# to take the stone out of the bowl, one to put it down.
+#
+# Coordinates: `click` takes board columns and rows, and board rows run opposite
+# to SGF rows — board row N is SGF row (size-1-N). So the solution B[bh], SGF
+# row 'h' = 7, is `click 1 1` on this 9x9, and the wrong move W[ah] would be
+# `click 0 1`. Getting this backwards is silent: the click lands on an empty
+# point, creates a branch, and the scenario fails somewhere further down.
+
+load_tsumego tests/data/tsumego.sgf
+wait_idle
+expect tsumego true
+expect board_size 9
+expect view_position 0
+expect main_line_moves 2
+expect color_to_move B
+expect phase paused
+
+# A puzzle is not a game to concede, so Resign is refused — and the cursor is at
+# the root with the solution ahead of it, which refuses it a second time over.
+resign
+wait_idle
+expect has_result false
+expect view_position 0
+
+# --- A wrong move is marked, and says so ------------------------------------
+# The point beside the solution is legal but wrong. It creates a branch off the
+# correct tree, which the game thread infers as the first wrong move and tags BM.
+click 0 1
+wait_idle
+expect holds_stone true
+click 0 1
+wait_until msg tsumego_wrong
+wait_idle
+expect view_position 1
+# The solution is untouched: a wrong move appends without promotion, so the
+# main line still runs through B[bh]. This is what suppressSessionCopy and the
+# non-promoted branch exist to protect.
+expect main_line_moves 2
+
+# Backing out of the dead branch clears the verdict.
+navigate_back
+wait_idle
+expect view_position 0
+expect msg none
+
+# --- The solution plays the answer for you ----------------------------------
+click 1 1
+wait_idle
+expect holds_stone true
+click 1 1
+wait_until msg tsumego_solved
+wait_idle
+# Two moves deep: the solution, and the reply auto-played from the SGF.
+expect view_position 2
+expect at_end true
+
+# --- A solved position is finished with ------------------------------------
+# Clicking must not even pick a stone up, let alone record anything.
+click 4 4
+wait_idle
+expect holds_stone false
+expect view_position 2
+expect msg tsumego_solved
+
+# Tsumego mode survives all of it, and leaves only by starting another game.
+expect tsumego true
+new_game 9
+wait_idle
+expect tsumego false
+expect phase setup

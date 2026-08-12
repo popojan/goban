@@ -41,11 +41,17 @@ fi
 
 # Scratch settings and games directories, so a run cannot touch real data.
 WORK="$(mktemp -d)"
-# The scenario config redirects the games folder here. Wiping it per suite run
-# matters for more than tidiness: the daily session file is appended to on every
-# load, and a large one slows the auto-save enough to blow the scenario waits.
+# The scenario config redirects the games folder here. It is wiped before *every*
+# scenario, not once per suite: the daily session file is appended to on every
+# load and save, so one scenario's games are visible to the next — a fresh
+# user.json is not enough, because with no stored session the app falls back to
+# today's file in the games folder and loads whatever is in it.
+#
+# This used to be per-suite and appeared to work, only because every save was
+# failing silently: writeFileContent() did not create the games folder, so the
+# session file was never written in the first place. Fixing that turned the
+# latent coupling into three order-dependent failures.
 SCENARIO_GAMES="$ROOT/tests/scenarios/.games"
-rm -rf "$SCENARIO_GAMES"
 trap 'rm -rf "$WORK" "$SCENARIO_GAMES"' EXIT
 
 pass=0
@@ -56,6 +62,9 @@ for scn in "${scenarios[@]}"; do
     name="$(basename "$scn")"
     printf '%-44s ' "$name"
     log="$WORK/${name}.log"
+
+    # Every scenario starts from an empty games folder — see above.
+    rm -rf "$SCENARIO_GAMES"
 
     # Seed the throwaway settings with sound off. Stone sounds are pointless in
     # an automated run, and a CI box has no audio device — Pa_Initialize()'s

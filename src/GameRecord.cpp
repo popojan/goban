@@ -759,11 +759,12 @@ void GameRecord::clearSession() {
     spdlog::info("Cleared session document - new session will start fresh");
 }
 
-void GameRecord::saveAsInternal(const std::string& fileName) {
+bool GameRecord::saveAsInternal(const std::string& fileName) {
     // Internal save - caller must hold mutex lock
 
+    // Nothing recorded is not a failure: there is simply nothing to write.
     if(doc == nullptr || doc->GetGames().empty())
-        return;
+        return true;
 
     // If game was modified, check if main line is still finished
     // If not, remove the RE (result) property to maintain invariant
@@ -808,17 +809,18 @@ void GameRecord::saveAsInternal(const std::string& fileName) {
         if (writeFileContent(fn, sgfContent)) {
             unsavedChanges = false;
             spdlog::info("Writing sgf file [{}] success!", fn);
-        } else {
-            spdlog::error("Writing sgf file [{}] failed: could not write to disk", fn);
+            return true;
         }
+        spdlog::error("Writing sgf file [{}] failed: could not write to disk", fn);
     } catch (std::exception& ex) {
         spdlog::error("Writing sgf file [{}] failed: {}", fn, ex.what());
     }
+    return false;
 }
 
-void GameRecord::saveAs(const std::string& fileName) {
+bool GameRecord::saveAs(const std::string& fileName) {
     std::lock_guard<std::mutex> lock(mutex);
-    saveAsInternal(fileName);
+    return saveAsInternal(fileName);
 }
 
 void GameRecord::undo() {
@@ -1709,6 +1711,20 @@ std::optional<std::string> GameRecord::readFileContent(const std::string& filePa
 
 bool GameRecord::writeFileContent(const std::string& filePath, const std::string& content) {
     auto path = std::filesystem::u8path(filePath);
+    // Create the containing folder if it is missing. Without this every save
+    // fails the moment the games folder does not already exist — a fresh
+    // checkout, a first run, or a `games_path` pointed somewhere new. The
+    // failure was invisible: saveAsInternal() logged and returned, and the Save
+    // command went on to show the filename as though it had worked.
+    std::error_code ec;
+    const auto parent = path.parent_path();
+    if (!parent.empty() && !std::filesystem::exists(parent, ec)) {
+        std::filesystem::create_directories(parent, ec);
+        if (ec) {
+            spdlog::error("Could not create folder [{}]: {}", parent.string(), ec.message());
+            return false;
+        }
+    }
     std::ofstream file(path, std::ios::binary);
     if (!file) return false;
     file << content;

@@ -41,7 +41,9 @@ public:
 
     void updateKomi(float komi);
 
-    void saveAs(const std::string& fileName);
+    /// False only when the write itself failed. An empty record is not a
+    /// failure — there is nothing to write — so it reports success.
+    bool saveAs(const std::string& fileName);
 
     [[nodiscard]] std::string getDefaultFileName() const { return defaultFileName; }
     void setDefaultFileName(const std::string& fileName) { defaultFileName = fileName; }
@@ -99,7 +101,7 @@ private:
     void markGameInSessionDocument();
 
     // Internal save without mutex lock (for use within already-locked methods)
-    void saveAsInternal(const std::string& fileName);
+    bool saveAsInternal(const std::string& fileName);
 
     // Helper to extract Move from SGF node (reduces code duplication)
     static std::optional<Move> extractMoveFromNode(

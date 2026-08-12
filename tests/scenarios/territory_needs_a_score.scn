@@ -1,0 +1,70 @@
+# Territory is what a scored ending produced, so a resignation has none: nothing
+# was ever counted. The Territory button used to test the phase alone, which a
+# resignation satisfies exactly as a scored ending does, so it lit up on a
+# resigned game while toggle_territory — guarded by its own shouldShowTerritory()
+# test — refused. An enabled button that did nothing, which is the failure mode
+# CLAUDE.md's "UI Widget State" section exists to prevent.
+#
+# Both players are human and every move is a pass, so nothing advances on its own.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+# --- 1. A resignation records a result without ever scoring the board --------
+pass
+wait_until move_count >= 1
+wait_idle
+resign
+wait_until has_result true
+wait_idle
+expect phase finished
+expect result white_resigned
+expect show_territory false
+
+# Refused, and the button that invokes it is greyed for the same reason.
+toggle_territory
+wait_idle
+expect show_territory false
+
+# Navigating back off the end drops Finished, and territory goes with it —
+# the overlay describes the final position, not this one.
+navigate_back
+wait_idle
+expect phase paused
+expect show_territory false
+toggle_territory
+wait_idle
+expect show_territory false
+
+# --- 2. A double pass is scored, so it does have territory ------------------
+new_game 9
+wait_idle
+expect phase setup
+expect show_territory false
+
+pass
+wait_until move_count >= 1
+wait_idle
+pass
+wait_until phase finished
+# RE is written by the territory pass that follows the double pass, so it lags
+# the phase; wait_idle does not cover scoring.
+wait_until has_result true
+wait_idle
+expect phase finished
+expect result white_won
+
+# Scoring turns the overlay on by itself at the end of a counted game.
+wait_until show_territory true
+
+# And here the toggle genuinely toggles, which is the whole difference from
+# the resigned game above.
+toggle_territory
+wait_idle
+expect show_territory false
+toggle_territory
+wait_idle
+expect show_territory true
