@@ -1,10 +1,12 @@
 #ifndef GOBAN_GAMESNAPSHOT_H
 #define GOBAN_GAMESNAPSHOT_H
 
+#include "Board.h"
 #include "GameState.h"
 
 #include <cstddef>
 #include <string>
+#include <vector>
 
 /** \brief Everything the UI thread needs to know about the game record, as
  *  plain data, computed by whoever owns the record and published for readers.
@@ -47,6 +49,32 @@ struct GameSnapshot {
     bool scoredEnd = false;
 
     GameState::Message resultMessage = GameState::NONE;
+
+    // --- Stage 2: what the command handlers read ----------------------------
+    // boardClick(), `pass` and keyPress() all consult the record to decide what
+    // a click or a key means before handing the work to the game thread. They
+    // run on user input rather than every frame, so the window is narrower than
+    // uiInputs() had — but a click landing while the engine plays its move is
+    // exactly the case, and it is not rare.
+
+    /// Whose turn it is at the cursor, for the move a click would create.
+    Color colorToMove = Color::BLACK;
+
+    /// Children of the current node: the moves already recorded from here. A
+    /// click matching one of these follows it instead of branching. `variations`
+    /// above is the count of these, kept separate because scenarios assert on it.
+    std::vector<Move> variationMoves;
+
+    /// Some node between the root and the cursor is marked BM. Tsumego uses it
+    /// to decide whether the player is on a dead branch.
+    bool onBadMovePath = false;
+
+    /// The cursor sits at a game-ending position — a resignation, a double
+    /// pass, or the end of a line carrying a result.
+    bool atFinishedGame = false;
+
+    /// Games in the loaded SGF collection, for prev_game / next_game.
+    size_t loadedGameCount = 0;
 
     int boardSize = 0;
 

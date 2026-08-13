@@ -187,8 +187,15 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
 // Left click on an on-board intersection. Callers must have validated that the
 // point is on the board and that initialization is complete.
 void GobanControl::boardClick(const Position& coord) {
+    // One snapshot for the whole decision. Reading the SGF tree here would race
+    // the game thread exactly as uiInputs() did — a click landing while the
+    // engine plays its move is the case, and it is not rare — and taking the
+    // fields one at a time would let the position shift underneath the branches
+    // below. See ADR-0006 stage 2.
+    const auto snap = model.snapshot();
+
     // During navigation (not at end), handle clicks specially
-    if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
+    if (snap->navigating && !snap->atEnd) {
         // Block navigation while engine is thinking - would corrupt state
         if (engine.isThinking()) {
             spdlog::debug("Navigation click blocked - engine is thinking");
@@ -208,8 +215,7 @@ void GobanControl::boardClick(const Position& coord) {
         model.updateReservoirs();
 
         // Check if click matches an existing variation
-        auto variations = model.game.getVariations();
-        for (const auto& move : variations) {
+        for (const auto& move : snap->variationMoves) {
             if (move == Move::NORMAL && move.pos == coord) {
                 spdlog::debug("Clicked on existing variation at ({},{})", coord.col(), coord.row());
                 engine.navigateToVariation(move);
@@ -220,28 +226,26 @@ void GobanControl::boardClick(const Position& coord) {
         // No matching variation — new move
         if (view.isTsumegoMode()) {
             // Game thread infers BM marking from context
-            Color colorToMove = model.game.getColorToMove();
-            Move newMove(coord, colorToMove);
+            Move newMove(coord, snap->colorToMove);
             engine.navigateToVariation(newMove, false);
             return;
         }
 
         // Normal mode: create new variation
-        Color colorToMove = model.game.getColorToMove();
         spdlog::debug("New variation during navigation (color={})",
-            colorToMove == Color::BLACK ? "B" : "W");
+            snap->colorToMove == Color::BLACK ? "B" : "W");
         model.start();
         if (!engine.isRunning()) {
             engine.run();
         }
-        Move newMove(coord, colorToMove);
+        Move newMove(coord, snap->colorToMove);
         engine.navigateToVariation(newMove);
         return;
     }
 
     // In tsumego mode at end of variation
-    if (view.isTsumegoMode() && model.game.isAtEndOfNavigation()) {
-        if (!model.game.isOnBadMovePath()) {
+    if (view.isTsumegoMode() && snap->atEnd) {
+        if (!snap->onBadMovePath) {
             return;  // Solved — stay blocked
         }
         // Dead branch: allow exploration
@@ -253,8 +257,7 @@ void GobanControl::boardClick(const Position& coord) {
         }
         model.state.holdsStone = false;
         model.updateReservoirs();
-        Color colorToMove = model.game.getColorToMove();
-        Move newMove(coord, colorToMove);
+        Move newMove(coord, snap->colorToMove);
         engine.navigateToVariation(newMove, false);
         return;
     }
@@ -317,10 +320,11 @@ void GobanControl::buildRegistry() {
 
     // Shared body of prev_game/next_game.
     auto stepLoadedGame = [this](CommandContext& ctx, int delta) {
-        size_t gameCount = model.game.getLoadedGameCount();
+        const auto snap = model.snapshot();
+        size_t gameCount = snap->loadedGameCount;
         if (gameCount <= 1) { ctx.notifyMenu = false; return; }
 
-        int currentIdx = model.game.getLoadedGameIndex();
+        int currentIdx = snap->gameIndex;
         int newIdx = currentIdx + delta;
         if (newIdx < 0 || newIdx >= static_cast<int>(gameCount)) { ctx.notifyMenu = false; return; }
 
@@ -497,10 +501,12 @@ void GobanControl::buildRegistry() {
             ctx.notifyMenu = false;
             return;
         }
-        // During navigation, pass creates a variation (game is paused — no turn restriction)
-        if (model.game.isNavigating() && !model.game.isAtEndOfNavigation()) {
-            Color colorToMove = model.game.getColorToMove();
-            Move passMove(Move::PASS, colorToMove);
+        // During navigation, pass creates a variation (game is paused — no turn
+        // restriction). From the snapshot, as boardClick does: the two must
+        // agree about what "mid-tree" means, and neither may read the tree.
+        const auto snap = model.snapshot();
+        if (snap->navigating && !snap->atEnd) {
+            Move passMove(Move::PASS, snap->colorToMove);
             model.start();
             if (!engine.isRunning()) engine.run();
             engine.navigateToVariation(passMove);
@@ -1140,7 +1146,8 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         key, downNotUp, model.game.isNavigating(),
         model.game.getViewPosition(), model.game.getLoadedMovesCount());
 
-    if (!downNotUp && model.game.isNavigating()) {
+    const auto keySnap = model.snapshot();
+    if (!downNotUp && keySnap->navigating) {
         // These four keys dispatch through the registry rather than calling the
         // navigator directly. Two things follow from that and neither is
         // incidental: they answer to the same availableActions() rule as the
@@ -1150,12 +1157,12 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         //
         // Space/Right: navigate forward (or trigger kibitz at end of unfinished branch)
         if (key == Rml::Input::KI_SPACE || key == Rml::Input::KI_RIGHT) {
-            if (model.game.hasNextMove()) {
+            if (!keySnap->atEnd) {
                 command("navigate_forward");
                 return;  // Handled navigation
             }
             // At end of finished game - nothing more to do
-            if (model.game.isAtFinishedGame()) {
+            if (keySnap->atFinishedGame) {
                 return;
             }
             // At end of unfinished branch - Space falls through to kibitz
@@ -1164,7 +1171,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
             }
             // Tsumego: request engine move on dead branch via navigation
             if (view.isTsumegoMode()) {
-                if (model.game.isOnBadMovePath() && actions().kibitz) {
+                if (keySnap->onBadMovePath && actions().kibitz) {
                     engine.requestKibitzNav();
                 }
                 return;  // Don't fall through to "play once" — would break navigation

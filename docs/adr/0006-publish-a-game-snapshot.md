@@ -1,6 +1,6 @@
 # ADR-0006: The UI reads a published snapshot, not the SGF tree
 
-**Status:** Accepted (stage 1 of 3)
+**Status:** Accepted (stages 1 and 2 of 3 done)
 **Date:** 2026-08-13
 
 ## Context
@@ -57,10 +57,20 @@ a plain scalar and changes off the position-change path.
   and friends after every action, and it caught both missed points on the first
   run of the change. Anything that changes what the UI displays without going
   through `onBoardChange()` must publish for itself.
-- Two stages remain. **Stage 2:** the on-demand command handlers still call the
-  record directly (`boardClick`, `pass`, `toggle_territory`'s neighbours). Those
-  run on the UI thread but only in response to user input, so the window is
-  narrow — narrow, not closed. **Stage 3:** `model.state.comment` and
+- **Stage 2 is done.** `boardClick()`, the `pass` command, `keyPress()`'s
+  navigation block and `prev_game`/`next_game` now take one snapshot and decide
+  from it. Taking a single snapshot matters as much as not reading the tree:
+  reading the fields one at a time would let the position shift between the
+  branches of the same decision. The snapshot gained `colorToMove`,
+  `variationMoves`, `onBadMovePath`, `atFinishedGame` and `loadedGameCount`.
+
+  Two readers were deliberately left: `GobanModel::hasGameWorthKeeping()` and
+  `GobanControl::saveCurrentGame()`. Both run on an explicit user action —
+  confirming a replacement, or quitting — rather than during play, and
+  `hasGameWorthKeeping()` is unit-tested against records that were never
+  published, so moving it would mean changing those tests to publish first.
+
+  **Stage 3 remains:** `model.state.comment` and
   `model.state.markup` are `std::string`/`std::vector` written by the game
   thread in `syncStateAfterNavigation()` and read by the UI thread with no
   synchronisation at all. A reallocation concurrent with a read is a

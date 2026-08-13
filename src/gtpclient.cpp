@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <mutex>
 #include <thread>
 #include <spdlog/spdlog.h>
 
@@ -15,7 +16,31 @@
 
 #ifdef _WIN32
 // Windows implementation
+
+/// Serialises process creation.
+///
+/// Windows has no per-handle close-on-exec: inheritance is decided at
+/// CreateProcess time, and bInheritHandles=TRUE passes *every* currently
+/// inheritable handle in the process. The pipe ends below are created
+/// inheritable and stay that way until the CloseHandle calls at the end of this
+/// constructor, so a second engine spawning in that window inherits the first
+/// one's stdout and stderr write handles and holds them for its whole life. The
+/// parent then never sees a broken pipe when the first engine dies — it simply
+/// stops answering.
+///
+/// Engines are started concurrently (GameThread::loadEnginesParallel), so this
+/// is reachable. The POSIX side solves the same problem precisely, with
+/// pipe2(O_CLOEXEC); there is no equivalent here, so the window is closed by
+/// letting only one spawn run at a time. Engines still *load* in parallel — only
+/// the few milliseconds of pipe-and-spawn are serialised.
+///
+/// The exec-status pipe the POSIX branch carries has no counterpart here and
+/// needs none: CreateProcessW reports failure synchronously.
+static std::mutex g_spawnMutex;
+
 Process::Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir) {
+    std::lock_guard<std::mutex> spawnLock(g_spawnMutex);
+
     SECURITY_ATTRIBUTES sa;
     sa.nLength = sizeof(SECURITY_ATTRIBUTES);
     sa.bInheritHandle = TRUE;
