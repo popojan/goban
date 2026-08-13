@@ -9,6 +9,7 @@
 #include "SGF.h"
 #include "GameState.h"
 #include <mutex>
+#include <atomic>
 
 class GameRecord {
 public:
@@ -50,7 +51,12 @@ public:
     void clearSession();  // Clear doc to start new session (used by archive)
     [[nodiscard]] size_t getNumGames() const { return numGames; }
     [[nodiscard]] bool hasNewMoves() const { return gameHasNewMoves; }
-    [[nodiscard]] bool hasUnsavedChanges() const { return unsavedChanges; }
+    /// Atomic: the Save button reads it every frame from the UI thread while
+    /// the game thread sets it on each move and clears it on each autosave.
+    /// A plain bool here is a data race, and unlike the tree walks it cannot
+    /// be answered from GameSnapshot — saving is not a position change, so it
+    /// has no publish point.
+    [[nodiscard]] bool hasUnsavedChanges() const { return unsavedChanges.load(); }
 
     void setSuppressSessionCopy(bool suppress) { suppressSessionCopy = suppress; }
 
@@ -134,7 +140,7 @@ private:
     size_t numGames;
     bool gameHasNewMoves;
     bool gameInDocument;  // True when game is already part of doc (prevent re-append)
-    bool unsavedChanges = false;  // True when changes made since last save
+    std::atomic<bool> unsavedChanges{false};  // True when changes made since last save
     bool suppressSessionCopy = false;  // True in tsumego mode: don't copy branches to daily session
 
     // Loaded external SGF document (for game cycling with PageUp/PageDown)

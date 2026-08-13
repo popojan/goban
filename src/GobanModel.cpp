@@ -35,6 +35,12 @@ void GobanModel::onBoardSized(int boardSize) {
     metrics.calc(boardSize);
     calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
     state.metricsReady = true;
+
+    // The record was replaced or resized out from under the UI. onBoardChange
+    // is the usual publish point, but the new-game path notifies onBoardSized
+    // instead — and createNewRecord() has not even run yet at this point, so
+    // this publish is refreshed again there.
+    publishSnapshot();
 }
 
 GobanModel::~GobanModel() = default;
@@ -235,10 +241,6 @@ void GobanModel::onBoardChange(const Board& result) {
         phaseName(phase()), result.territoryReady, result.score, board.showTerritory);
 
     bool shouldShow = game.shouldShowTerritory();
-    // Publish it for the UI thread, which needs the answer every frame to decide
-    // whether Territory is offered and must not walk the SGF tree to get it.
-    // See GobanModel::scoredEndPosition.
-    scoredEndPosition = shouldShow;
     spdlog::debug("onBoardChange: territoryReady={}, shouldShowTerritory={}", result.territoryReady, shouldShow);
 
     if (phase() == GamePhase::Finished && result.territoryReady && shouldShow) {
@@ -269,6 +271,38 @@ void GobanModel::onBoardChange(const Board& result) {
             game.saveAs("");
         }
     }
+
+    // Last, so it reflects everything above — finalizeGame() writes RE, and the
+    // snapshot carries hasResult. Every position change in the program funnels
+    // through onBoardChange, which is what makes this the one publish point.
+    publishSnapshot();
+}
+
+void GobanModel::publishSnapshot() {
+    // Reads the SGF tree, so the caller must own the record: the game thread
+    // during play and navigation, or the UI thread while the game loop is
+    // stopped. See GameSnapshot.
+    auto next = std::make_shared<GameSnapshot>();
+    next->moveCount     = game.moveCount();
+    next->viewPosition  = game.getViewPosition();
+    next->mainLineMoves = game.getLoadedMovesCount();
+    next->variations    = game.getVariations().size();
+    next->navigating    = game.isNavigating();
+    next->atEnd         = game.isAtEndOfNavigation();
+    next->hasResult     = game.hasGameResult();
+    next->scoredEnd     = game.shouldShowTerritory();
+    next->resultMessage = game.getResultMessage();
+    next->boardSize     = game.getBoardSize();
+    next->sgfFile       = game.hasLoadedExternalDoc() ? game.getLoadedFilePath() : std::string();
+    next->gameIndex     = game.getLoadedGameIndex();
+
+    std::lock_guard<std::mutex> lock(snapshotMutex);
+    gameSnapshot = std::move(next);
+}
+
+std::shared_ptr<const GameSnapshot> GobanModel::snapshot() const {
+    std::lock_guard<std::mutex> lock(snapshotMutex);
+    return gameSnapshot;
 }
 
 void GobanModel::onKomiChange(float newKomi) {

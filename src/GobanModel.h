@@ -5,8 +5,11 @@
 #include "Board.h"
 #include "GamePhase.h"
 #include "GameState.h"
+#include "GameSnapshot.h"
 #include <spdlog/spdlog.h>
 #include <atomic>
+#include <memory>
+#include <mutex>
 #include "GameObserver.h"
 #include "GameRecord.h"
 
@@ -80,6 +83,10 @@ public:
         game.initGame(board.getSize(), state.komi, setupBlackStones.size(), state.black, state.white);
         game.setHandicapStones(setupBlackStones);
         transitionTo(GamePhase::Setup, "createNewRecord");
+        // Replacing the record is a change the UI must see, and it does not go
+        // through onBoardChange: the new-game path notifies onBoardSized, which
+        // runs *before* this. See GameSnapshot.
+        publishSnapshot();
     }
 
     Color changeTurn() {
@@ -122,19 +129,19 @@ public:
 
     std::atomic<bool> tsumegoMode{false};
 
-    /// Whether the position on screen is the end of a game decided on points —
-    /// GameRecord::shouldShowTerritory(), published by the game thread rather
-    /// than recomputed by the reader.
-    ///
-    /// Atomic and cached for the same reason `gamePhase` is: the UI thread needs
-    /// it every frame (it decides whether Territory is offered) and the game
-    /// thread owns the SGF tree. Calling shouldShowTerritory() from the UI
-    /// thread walks that tree — isGameFinished() builds and destroys a vector of
-    /// shared_ptr<ISgfcProperty> per node — while the game thread is free to be
-    /// mutating it, which segfaults in SgfcProperty's destructor. onBoardChange()
-    /// already computes this value on the game thread at every position change,
-    /// so the answer is republished there instead of recomputed here.
-    std::atomic<bool> scoredEndPosition{false};
+    /// Recompute the published snapshot from the record. Must be called by
+    /// whoever currently owns the record exclusively — the game thread during
+    /// play and navigation, or the UI thread while the game loop is stopped.
+    /// onBoardChange() is the funnel every position change already passes
+    /// through, so that is where it happens; anything that changes what the UI
+    /// displays without going through it must publish for itself.
+    void publishSnapshot();
+
+    /// The UI thread's view of the record. Never reads the SGF tree — see
+    /// GameSnapshot and ADR-0006. Returns a value that stays valid however the
+    /// record changes afterwards, so a caller can read several fields without
+    /// them shifting underneath it.
+    [[nodiscard]] std::shared_ptr<const GameSnapshot> snapshot() const;
 
     std::string tsumegoHintBlack;  // Localized "Black to move", set on UI thread
     std::string tsumegoHintWhite;  // Localized "White to move", set on UI thread
@@ -185,6 +192,12 @@ private:
             spdlog::debug("phase: {} -> {} ({})", phaseName(prev), phaseName(next), via);
         }
     }
+
+    /// Guards only the snapshot pointer swap — never held across anything that
+    /// can block, which is the whole reason the snapshot exists rather than a
+    /// lock over GameRecord itself.
+    mutable std::mutex snapshotMutex;
+    std::shared_ptr<const GameSnapshot> gameSnapshot{std::make_shared<const GameSnapshot>()};
 
     /// Authoritative lifecycle state. Atomic because the game thread ends games
     /// while the UI thread reads the phase every frame.

@@ -1296,18 +1296,19 @@ UiInputs GobanControl::uiInputs() const {
     in.aiVsAiLocked      = (engine.isAiVsAi() || engine.areBothPlayersEngines())
                            && engine.getGameMode() != GameMode::ANALYSIS;
     in.tsumego           = model.tsumegoMode;
-    in.atEndOfNavigation = model.game.isAtEndOfNavigation();
+    // Everything about the record comes from the published snapshot, never from
+    // the record itself: uiInputs() runs every frame on the UI thread, and
+    // GameRecord's accessors walk an SGF tree the game thread owns. See
+    // GameSnapshot and ADR-0006.
+    const auto snap      = model.snapshot();
+    in.atEndOfNavigation = snap->atEnd;
     // The predicate toggle_territory used to guard itself with, lifted into the
-    // policy so the button and the command cannot answer differently. Read from
-    // the value the game thread publishes, never recomputed here: uiInputs()
-    // runs every frame on the UI thread, and shouldShowTerritory() walks the SGF
-    // tree that the game thread is free to be mutating. See
-    // GobanModel::scoredEndPosition.
-    in.scoredEnd         = model.scoredEndPosition.load();
-    in.hasMoves          = model.game.moveCount() > 0
+    // policy so the button and the command cannot answer differently.
+    in.scoredEnd         = snap->scoredEnd;
+    in.hasMoves          = snap->moveCount > 0
                            || !model.setupBlackStones.empty()
                            || !model.setupWhiteStones.empty()
-                           || model.game.getLoadedMovesCount() > 0;
+                           || snap->mainLineMoves > 0;
     in.hasUnsavedChanges = model.game.hasUnsavedChanges();
     return in;
 }
@@ -1343,19 +1344,21 @@ bool GobanControl::isIdle() const {
 nlohmann::json GobanControl::dumpState() const {
     nlohmann::json s;
 
-    // Game record / navigation
-    s["move_count"]     = model.game.moveCount();
-    s["view_position"]  = model.game.getViewPosition();
-    s["main_line_moves"] = model.game.getLoadedMovesCount();
-    s["navigating"]     = model.game.isNavigating();
-    s["at_end"]         = model.game.isAtEndOfNavigation();
-    s["variations"]     = model.game.getVariations().size();
-    s["has_result"]     = model.game.hasGameResult();
+    // Game record / navigation, all from the published snapshot — dumpState()
+    // runs on the UI thread, and on every recorded command. See GameSnapshot.
+    const auto snap     = model.snapshot();
+    s["move_count"]     = snap->moveCount;
+    s["view_position"]  = snap->viewPosition;
+    s["main_line_moves"] = snap->mainLineMoves;
+    s["navigating"]     = snap->navigating;
+    s["at_end"]         = snap->atEnd;
+    s["variations"]     = snap->variations;
+    s["has_result"]     = snap->hasResult;
     // The recorded result itself, read back from the SGF RE property — not
     // model.state.msg, which is transient. Lets a scenario prove that an action
     // did *not* rewrite the outcome.
-    s["result"]         = messageName(model.game.getResultMessage());
-    s["board_size"]     = model.game.getBoardSize();
+    s["result"]         = messageName(snap->resultMessage);
+    s["board_size"]     = snap->boardSize;
 
     // Turn and rules state
     s["color_to_move"]  = (model.state.colorToMove == Color::BLACK) ? "B" : "W";
@@ -1413,10 +1416,8 @@ nlohmann::json GobanControl::dumpState() const {
 
     // Where the position came from — needed to reconstruct a starting point
     // when replaying a recorded session.
-    s["sgf_file"] = model.game.hasLoadedExternalDoc()
-        ? model.game.getLoadedFilePath()
-        : std::string();
-    s["game_index"] = model.game.getLoadedGameIndex();
+    s["sgf_file"] = snap->sgfFile;
+    s["game_index"] = snap->gameIndex;
 
     // Players
     auto players = engine.getPlayers();
@@ -1428,8 +1429,8 @@ nlohmann::json GobanControl::dumpState() const {
     // A cheap, order-independent fingerprint of the position, so a scenario can
     // assert "the board is the same as before" without spelling out 361 points.
     unsigned long hash = 1469598103934665603UL;
-    for (int row = 0; row < model.game.getBoardSize(); ++row) {
-        for (int col = 0; col < model.game.getBoardSize(); ++col) {
+    for (int row = 0; row < snap->boardSize; ++row) {
+        for (int col = 0; col < snap->boardSize; ++col) {
             const Color& stone = model.board[Position(col, row)].stone;
             const unsigned long v = (stone == Color::BLACK) ? 2u
                                   : (stone == Color::WHITE) ? 1u : 0u;
