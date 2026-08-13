@@ -86,9 +86,49 @@ The bundled configuration includes several predefined engines:
 | Attribute | Required | Type | Description | Default |
 |-----------|----------|------|-------------|---------|
 | `name` | yes | string | Display name in GUI and SGF files | |
-| `path` | yes | string | Directory containing the engine executable | |
+| `path` | yes | string | Directory containing the engine executable, **relative to the application folder** | |
 | `command` | yes | string | Executable name (found in `path` or system PATH) | |
-| `parameters` | yes | string | Command line arguments for the engine | |
+| `parameters` | yes | string | Command line arguments for the engine — see *Paths in parameters* below | |
+
+### Paths in parameters
+
+The engine runs **with its working directory set to `path`**, so a relative path
+in `parameters` is resolved by the engine against the engine's own folder — not
+against the application folder that `path` itself is relative to.
+
+With the stock layout the distinction is invisible, because the model sits inside
+the engine folder:
+
+```json
+"path": "./engine/katago",
+"parameters": "gtp -model ./models/kata1.bin.gz -config ./default_gtp.cfg"
+```
+
+`./models/kata1.bin.gz` means `./engine/katago/models/kata1.bin.gz`, which is
+where it is.
+
+It stops being invisible as soon as the engine lives somewhere else. Writing
+`-model ../user_folder/weights/kata1.bin.gz` alongside
+`"path": "../user_folder/katago"` reads naturally as "relative to goban", but the
+engine resolves it against its own folder and looks for
+`../user_folder/katago/../user_folder/weights/…` — the folder name doubled.
+
+Goban corrects this case for you: **an argument that does not exist relative to
+the engine's folder, but does exist relative to the application folder, is
+rewritten to an absolute path**, and the substitution is logged. An argument that
+resolves inside the engine folder is passed exactly as written, so existing
+configurations are unaffected.
+
+If an engine fails to start, the log now says which folder and which program,
+with the system's own reason:
+
+```
+Engine [katago] folder does not exist: '../user_folder/katago' (paths are relative to the application folder)
+cannot start './katago' in '../user_folder/katago': No such file or directory
+```
+
+**Absolute paths always work**, in both `path` and `parameters`, and are the
+simplest option for an engine installed outside the application folder.
 | `main` | no | 0/1 | Primary engine for game rules and board state | 0 |
 | `enabled` | no | 0/1 | Whether this engine is active | 1 |
 | `kibitz` | no | 0/1 | Use for move suggestions (Space key) | 0 |

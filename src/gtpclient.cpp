@@ -253,6 +253,9 @@ bool Process::running() const {
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <cerrno>
+#include <cstring>
 
 Process::Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir) {
     int stdinPipe[2], stdoutPipe[2], stderrPipe[2];
@@ -261,6 +264,16 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
         throw std::runtime_error("Failed to create pipes");
     }
 
+    // A pipe that closes on a successful exec and carries errno otherwise. Without
+    // it a child that cannot start is invisible: fork() succeeds, the parent
+    // reports the engine ready, and the first symptom is "Failed to write
+    // command" against a process that died before it ever ran. See issue #55.
+    int execPipe[2];
+    if (pipe(execPipe) < 0) {
+        throw std::runtime_error("Failed to create pipes");
+    }
+    fcntl(execPipe[1], F_SETFD, fcntl(execPipe[1], F_GETFD) | FD_CLOEXEC);
+
     pid_ = fork();
     if (pid_ < 0) {
         throw std::runtime_error("Failed to fork");
@@ -268,6 +281,7 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
 
     if (pid_ == 0) {
         // Child process
+        close(execPipe[0]);
         close(stdinPipe[1]);
         close(stdoutPipe[0]);
         close(stderrPipe[0]);
@@ -280,8 +294,12 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
         close(stdoutPipe[1]);
         close(stderrPipe[1]);
 
-        if (!workDir.empty()) {
-            chdir(workDir.c_str());
+        // Only async-signal-safe calls from here on, so failures are reported by
+        // writing errno up the pipe rather than logged.
+        if (!workDir.empty() && chdir(workDir.c_str()) != 0) {
+            const int err = errno;
+            (void) !::write(execPipe[1], &err, sizeof(err));
+            _exit(126);
         }
 
         // Build argv
@@ -293,10 +311,30 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
         argv.push_back(nullptr);
 
         execvp(program.c_str(), argv.data());
+        const int err = errno;
+        (void) !::write(execPipe[1], &err, sizeof(err));
         _exit(127); // exec failed
     }
 
     // Parent process
+    close(execPipe[1]);
+    int childErrno = 0;
+    const ssize_t got = ::read(execPipe[0], &childErrno, sizeof(childErrno));
+    close(execPipe[0]);
+    if (got == sizeof(childErrno)) {
+        // The child never reached exec. Reap it, then say what actually went
+        // wrong — which folder, which program, and the system's own reason.
+        int status = 0;
+        waitpid(pid_, &status, 0);
+        pid_ = -1;
+        close(stdinPipe[1]);
+        close(stdoutPipe[0]);
+        close(stderrPipe[0]);
+        throw std::runtime_error(
+            "cannot start '" + program + "' in '" + (workDir.empty() ? "." : workDir)
+            + "': " + std::strerror(childErrno));
+    }
+
     close(stdinPipe[0]);
     close(stdoutPipe[1]);
     close(stderrPipe[1]);
@@ -466,6 +504,48 @@ void StderrReaderThread::readLoop() const {
     }
 }
 
+/// Resolves a relative path argument that the user wrote against the wrong base.
+///
+/// The engine runs with its working directory set to its configured `path`, so
+/// every relative path in `parameters` is resolved by the engine against *that*
+/// folder — while `path` itself is written relative to the goban root. Two bases
+/// in one config block, and the natural reading is the wrong one. With the stock
+/// layout the difference is invisible, because the model sits inside the engine
+/// folder: `path=./engine/katago` with `-model ./models/x.bin.gz` means
+/// `./engine/katago/models/x.bin.gz` either way.
+///
+/// It stops being invisible the moment the engine lives somewhere else. Issue
+/// #55: `path=../user_folder/katago` with `-model ../user_folder/weights/x` was
+/// read as `../user_folder/katago/../user_folder/weights/x` — the folder name
+/// doubled — and KataGo failed to find its weights.
+///
+/// So: an argument that does not resolve against the engine's folder, but does
+/// resolve against the goban root, is rewritten to an absolute path. This can
+/// only ever change a case that is broken today — an argument that resolves in
+/// the engine folder is left exactly as the user wrote it, and one that resolves
+/// in neither place is left alone too, since it may be an output file the engine
+/// has yet to create.
+static std::string resolveAgainstAppRoot(const std::string& arg, const std::string& workDir) {
+    // Only things that look like paths, and only relative ones.
+    if (workDir.empty() || arg.empty() || arg[0] == '-') return arg;
+    if (arg.find('/') == std::string::npos && arg.find('\\') == std::string::npos) return arg;
+
+    std::error_code ec;
+    std::filesystem::path relative(std::filesystem::u8path(arg));
+    if (relative.is_absolute()) return arg;
+
+    const std::filesystem::path inEngineDir = std::filesystem::u8path(workDir) / relative;
+    if (std::filesystem::exists(inEngineDir, ec)) return arg;   // as the user meant it
+
+    if (!std::filesystem::exists(relative, ec)) return arg;      // broken either way, or not a file yet
+
+    const std::filesystem::path absolute = std::filesystem::absolute(relative, ec);
+    if (ec) return arg;
+    spdlog::info("Engine argument '{}' does not exist in '{}' but does relative to the "
+                 "application folder; using '{}'", arg, workDir, absolute.string());
+    return absolute.string();
+}
+
 // GtpClient implementation
 static std::string findExecutable(const std::string& exe, const std::string& path) {
     // Check if executable exists in provided path
@@ -504,14 +584,33 @@ GtpClient::GtpClient(const std::string& exe, const std::string& cmdline,
 {
     spdlog::info("Starting GTP client [{}/{}]", path, exe);
 
+    if (!path.empty()) {
+        std::error_code ec;
+        if (!std::filesystem::is_directory(std::filesystem::u8path(path), ec)) {
+            // Caught here rather than in the child, where nothing can be logged
+            // safely and the only symptom was "Failed to write command".
+            spdlog::error("Engine [{}] folder does not exist: '{}' (paths are relative "
+                          "to the application folder)", exe, path);
+            throw std::runtime_error("engine folder not found: " + path);
+        }
+    }
+
     std::string program = findExecutable(exe, path);
     spdlog::info("About to run GTP engine [{}]", program);
 
     std::istringstream iss(cmdline);
     std::vector<std::string> params((std::istream_iterator<std::string>(iss)),
                                     std::istream_iterator<std::string>());
+    for (auto& param : params) {
+        param = resolveAgainstAppRoot(param, path);
+    }
 
-    spdlog::info("running child [{} {}]", program, cmdline);
+    std::ostringstream resolved;
+    for (const auto& param : params) resolved << ' ' << param;
+    // The resolved arguments, not the configured string: when one has been
+    // rewritten, what the engine actually received is the useful thing to see.
+    spdlog::info("running child [{}{}] in [{}]", program, resolved.str(),
+                 path.empty() ? std::string(".") : path);
 
     initFilters(messages);
 
