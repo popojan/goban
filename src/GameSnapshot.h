@@ -76,6 +76,22 @@ struct GameSnapshot {
     /// Games in the loaded SGF collection, for prev_game / next_game.
     size_t loadedGameCount = 0;
 
+    // --- Stage 3: what the annotation display reads --------------------------
+    // Written by the game thread in GameNavigator::syncStateAfterNavigation()
+    // (and by applyTsumegoHint, which is why this is published from
+    // model.state rather than re-read from the record — the hint is part of
+    // what the user sees). Read by ElementGame::OnUpdate()'s message tail and
+    // by GobanView::updateNavigationOverlay().
+    //
+    // ElementGame guarded its read with the atomic `positionNumber`, which is a
+    // correct message-passing edge and makes the write *visible*. It does not
+    // make it exclusive: a second navigation while the UI copies the string or
+    // walks the vector still races, and for a std::string or std::vector that is
+    // a use-after-free rather than a stale value. Publishing them makes the
+    // reader's copy immutable, which settles both halves.
+    std::string comment;
+    std::vector<BoardMarkup> markup;
+
     int boardSize = 0;
 
     /// Where the position came from. Empty when the game lives in the daily

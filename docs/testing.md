@@ -150,6 +150,12 @@ unfinished branch, which falls through to kibitz while Right does not**. Names:
 A value of `$otherKey` compares two pieces of state, e.g.
 `expect view_position $main_line_moves`.
 
+**Values may contain spaces** — everything after the key, and after the operator
+when one is given, is the value. `expect comment markup node` works; before this
+"markup" was read as an operator and the line failed as malformed, so an SGF
+comment could not be asserted at all. `""` means the empty string, since a value
+is required and an absent one cannot be told from a typo: `expect comment ""`.
+
 Confirmation prompts are scriptable: `board_size <n>` and `handicap <n>` take
 the same route as the dropdowns, so they ask before replacing a game worth
 keeping. Answer with `prompt_yes` / `prompt_no`, and assert `prompt_active` to
@@ -237,7 +243,8 @@ Currently: `move_count`, `view_position`, `main_line_moves`, `navigating`,
 `at_end`, `variations`, `has_result`, `result`, `board_size`, `color_to_move`, `komi`,
 `handicap`, `black_stones`, `white_stones`, `captured_black`, `captured_white`,
 `mode`, `ai_vs_ai`, `phase`, `loop_state`, `engine_sync`, `running`, `thinking`, `syncing_ui`,
-`tsumego`, `holds_stone`, `show_territory`, `unsaved_changes`, `prompt_active`,
+`tsumego`, `holds_stone`, `show_territory`, `unsaved_changes`, `comment`,
+`markup_count`, `prompt_active`,
 `camera_animating`, `msg`, `black_player`, `white_player`, `sgf_file`,
 `game_index`, `board_hash`.
 

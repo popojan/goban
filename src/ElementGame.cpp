@@ -984,11 +984,14 @@ void ElementGame::OnUpdate()
     bool msgChanged = view.state.msg != model.state.msg;
     bool posChanged = view.board.positionNumber.load() != model.board.positionNumber.load();
 
-    // Only read comment when position changed — atomic positionNumber ordering
-    // guarantees the game thread's comment write is complete
+    // Only read the comment when the position changed. The atomic positionNumber
+    // makes the game thread's write visible, but visibility was never the whole
+    // problem: a second navigation while this copies the string is a race on the
+    // string itself. The published snapshot is immutable, so the copy is safe
+    // whatever the game thread does next. See ADR-0006 stage 3.
     std::string commentSnapshot = view.state.comment;
     if (posChanged) {
-        commentSnapshot = model.state.comment;
+        commentSnapshot = model.snapshot()->comment;
     }
     if (msgChanged || posChanged) {
         switch (model.state.msg) {

@@ -297,6 +297,11 @@ void GobanModel::publishSnapshot() {
     next->onBadMovePath = game.isOnBadMovePath();
     next->atFinishedGame = game.isAtFinishedGame();
     next->loadedGameCount = game.getLoadedGameCount();
+    // From state, not from the record: applyTsumegoHint() writes a hint into
+    // state.comment that is not in the SGF, and the hint is part of what the
+    // user sees. Every writer sets these before the notify that lands here.
+    next->comment       = state.comment;
+    next->markup        = state.markup;
     next->boardSize     = game.getBoardSize();
     next->sgfFile       = game.hasLoadedExternalDoc() ? game.getLoadedFilePath() : std::string();
     next->gameIndex     = game.getLoadedGameIndex();

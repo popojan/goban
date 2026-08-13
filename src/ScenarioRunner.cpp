@@ -299,18 +299,41 @@ std::string ScenarioRunner::valueToString(const nlohmann::json& v) {
 }
 
 ScenarioRunner::Condition ScenarioRunner::parseCondition(const std::vector<std::string>& args) {
+    auto isOperator = [](const std::string& t) {
+        return t == "==" || t == "!=" || t == ">=" || t == "<=" || t == ">" || t == "<";
+    };
+    auto join = [&args](size_t from) {
+        std::string out;
+        for (size_t i = from; i < args.size(); ++i) {
+            if (i > from) out += ' ';
+            out += args[i];
+        }
+        return out;
+    };
+
     Condition c;
-    if (args.size() == 2) {
-        c.key = args[0];
-        c.value = args[1];
-        c.valid = true;
-    } else if (args.size() == 3) {
-        c.key = args[0];
+    if (args.size() < 2) return c;
+
+    c.key = args[0];
+    // Everything after the key — and after the operator, when one is given — is
+    // the value, spaces included. SGF comments are the reason: `expect comment
+    // markup node` used to parse "markup" as an operator and fail as malformed,
+    // so a multi-word comment could not be asserted at all. A value that happens
+    // to start with an operator token is still read as one, which is why the
+    // operator is only recognised in second position.
+    if (isOperator(args[1])) {
+        if (args.size() < 3) return c;
         c.op = args[1];
-        c.value = args[2];
-        c.valid = (c.op == "==" || c.op == "!=" || c.op == ">=" ||
-                   c.op == "<=" || c.op == ">"  || c.op == "<");
+        c.value = join(2);
+    } else {
+        c.value = join(1);
     }
+    // `""` is the empty string, since a value is required and an absent one
+    // cannot be told from a malformed line. Comments and filenames are routinely
+    // empty, and `expect comment ""` says so where a bare `expect comment` would
+    // just look like a typo.
+    if (c.value == "\"\"") c.value.clear();
+    c.valid = true;
     return c;
 }
 

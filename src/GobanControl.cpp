@@ -358,7 +358,7 @@ void GobanControl::buildRegistry() {
 
     add("quit", 0, 0, "save and exit (prompts when a game is in progress)", [this](CommandContext&) {
         // saveCurrentGame() is called by main.cpp cleanup on all exit paths
-        if (model.game.moveCount() > 0 && model.phase() != GamePhase::Finished) {
+        if (model.snapshot()->moveCount > 0 && model.phase() != GamePhase::Finished) {
             parent->showPromptYesNoTemplate("templateQuitWithoutFinishing", [this](bool confirmed) {
                 if (confirmed) {
                     exit = true;
@@ -481,7 +481,7 @@ void GobanControl::buildRegistry() {
             ctx.notifyMenu = false;
             // The button is greyed in this case, but the keybinding is not, so
             // say why rather than swallowing the key.
-            if (!model.game.isAtEndOfNavigation()) {
+            if (!model.snapshot()->atEnd) {
                 parent->showMessage("Navigate to the end of the game to resign");
             }
             return;
@@ -1142,11 +1142,13 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
     }
 
     // SGF Navigation keys (on key UP)
-    spdlog::debug("keyPress: key={}, downNotUp={}, isNavigating={}, viewPos={}/{}",
-        key, downNotUp, model.game.isNavigating(),
-        model.game.getViewPosition(), model.game.getLoadedMovesCount());
-
     const auto keySnap = model.snapshot();
+    // The log walked the tree on every keystroke — three accessors, on the UI
+    // thread, purely to print a line that is usually discarded.
+    spdlog::debug("keyPress: key={}, downNotUp={}, isNavigating={}, viewPos={}/{}",
+        key, downNotUp, keySnap->navigating,
+        keySnap->viewPosition, keySnap->mainLineMoves);
+
     if (!downNotUp && keySnap->navigating) {
         // These four keys dispatch through the registry rather than calling the
         // navigator directly. Two things follow from that and neither is
@@ -1500,6 +1502,12 @@ nlohmann::json GobanControl::dumpState() const {
     s["show_territory"] = model.board.showTerritory;
     s["unsaved_changes"] = model.game.hasUnsavedChanges();
     s["msg"]            = messageName(model.state.msg);
+    // What the message tail and the board overlay are showing. Asserting these
+    // is the only way to cover ElementGame::OnUpdate()'s comment/markup handling,
+    // which is the least-tested code in the program and the last thing still
+    // reading across the thread boundary unsynchronised (ADR-0006 stage 3).
+    s["comment"]        = snap->comment;
+    s["markup_count"]   = snap->markup.size();
 
     // What the toolbar is offering right now. These are the exact booleans
     // ElementGame::syncActionAvailability() greys the buttons by, and — since

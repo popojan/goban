@@ -1,6 +1,6 @@
 # ADR-0006: The UI reads a published snapshot, not the SGF tree
 
-**Status:** Accepted (stages 1 and 2 of 3 done)
+**Status:** Accepted (complete)
 **Date:** 2026-08-13
 
 ## Context
@@ -70,12 +70,36 @@ a plain scalar and changes off the position-change path.
   `hasGameWorthKeeping()` is unit-tested against records that were never
   published, so moving it would mean changing those tests to publish first.
 
-  **Stage 3 remains:** `model.state.comment` and
-  `model.state.markup` are `std::string`/`std::vector` written by the game
-  thread in `syncStateAfterNavigation()` and read by the UI thread with no
-  synchronisation at all. A reallocation concurrent with a read is a
-  use-after-free. That is the `ElementGame::OnUpdate()` message tail, which has
-  little coverage, so it should follow coverage rather than precede it.
+- **Stage 3 is done**, coverage first as planned. `model.state.comment` and
+  `model.state.markup` — a `std::string` and a `std::vector` written by the game
+  thread and read by `ElementGame::OnUpdate()`'s message tail and
+  `GobanView::updateNavigationOverlay()` — are now published like everything
+  else.
+
+  `ElementGame` had guarded its read with the atomic `positionNumber`, which is
+  a correct message-passing edge and deserves credit: it makes the game thread's
+  write *visible*. But visibility was only half the problem. It gives no mutual
+  exclusion, so a second navigation while the UI copies the string or walks the
+  vector still races — and for a `std::string` or `std::vector` that is a
+  use-after-free rather than a stale value. An immutable published copy settles
+  both halves.
+
+  `comment` and `markup` are published from `model.state`, not re-read from the
+  record: `applyTsumegoHint()` writes a hint into `state.comment` that is not in
+  the SGF, and the hint is part of what the user sees.
+
+  `tests/scenarios/comments_and_markup.scn` was written *before* the refactor,
+  against behaviour rather than implementation, so that it could check it. It
+  needed two small additions to the scenario language: a value may now contain
+  spaces (an SGF comment could not be asserted at all before), and `""` means
+  the empty string.
+
+- **What deliberately still reads the record on the UI thread:**
+  `hasGameWorthKeeping()`, `saveCurrentGame()`, `archive`, and the `load` /
+  `chooser_open` path that seeds the dialog with the current filename. All run
+  on an explicit user action — confirming a replacement, saving, or opening a
+  dialog — rather than during play, and none is on a per-frame or per-keystroke
+  path.
 
 ## Alternatives rejected
 

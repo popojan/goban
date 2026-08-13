@@ -695,9 +695,14 @@ void GobanView::updateNavigationOverlay() {
 	}
 	markupOverlays.clear();
 
+	// One snapshot for both passes below. Reading model.state.markup directly
+	// walked a std::vector the game thread is free to be replacing; taking it
+	// twice would also let the two loops disagree about what is on the board.
+	const auto snap = model.snapshot();
+
 	// Collect positions with explicit markup (these take precedence over variations)
 	std::set<std::pair<int, int>> markupPositions;
-	for (const auto& markup : model.state.markup) {
+	for (const auto& markup : snap->markup) {
 		if (markup.pos) {
 			markupPositions.insert({markup.pos.col(), markup.pos.row()});
 		}
@@ -743,7 +748,7 @@ void GobanView::updateNavigationOverlay() {
 	}
 
 	// Render SGF markup annotations (explicit markup takes precedence over variations)
-	for (const auto& markup : model.state.markup) {
+	for (const auto& markup : snap->markup) {
 		if (!markup.pos) continue;
 
 		std::string text;
