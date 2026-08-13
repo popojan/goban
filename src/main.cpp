@@ -403,6 +403,7 @@ int main(int argc, char** argv)
     std::string logLevel("warning");
     std::string scenarioFile;
     std::string userSettingsFile;
+    std::string platform;
     bool forceRecord = false;
 
     // Parse the CLI before touching UserSettings: a scenario run redirects
@@ -413,6 +414,7 @@ int main(int argc, char** argv)
         option("-c", "--config") & value("file", configurationFileArg),
         option("-s", "--script") & value("file", scenarioFile),
         option("--user-settings") & value("file", userSettingsFile),
+        option("--platform") & word("name", platform),
         option("--record").set(forceRecord)
     );
 #ifdef RMLUI_PLATFORM_WIN32
@@ -442,7 +444,8 @@ int main(int argc, char** argv)
         option("-v", "--verbosity") & word("level", logLevel),
         option("-c", "--config") & value("file", configurationFile),
         option("-s", "--script") & value("file", scenarioFile),
-        option("--user-settings") & value("file", userSettingsFile)
+        option("--user-settings") & value("file", userSettingsFile),
+        option("--platform") & word("name", platform)
     );
 #ifdef RMLUI_PLATFORM_WIN32
     (void)instance_handle;
@@ -475,6 +478,32 @@ int main(int argc, char** argv)
 
     // Initialize GLFW
     glfwSetErrorCallback(GlfwErrorCallback);
+
+    // Windowing backend. Both are compiled into GLFW, so this is a runtime
+    // choice rather than something to decide when building: by default GLFW
+    // picks Wayland when a compositor is running and X11 otherwise.
+    //
+    // It is worth being able to override, because the two are not equivalent
+    // here. Wayland deliberately exposes no global window position, so
+    // AppState's "fullscreen on the monitor the window is on" cannot work — on
+    // a multi-head Wayland session fullscreen lands on whichever output GLFW
+    // enumerated first. Running under X11 (XWayland is fine) restores it.
+    if (!platform.empty()) {
+#ifdef GLFW_PLATFORM
+        if (platform == "x11") {
+            glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+        } else if (platform == "wayland") {
+            glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+        } else if (platform == "auto") {
+            glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
+        } else {
+            spdlog::warn("Unknown --platform '{}'; expected auto, wayland or x11", platform);
+        }
+#else
+        spdlog::warn("--platform needs GLFW 3.4 or newer; ignoring '{}'", platform);
+#endif
+    }
+
     if (!glfwInit()) {
         spdlog::critical("Failed to initialize GLFW");
         CleanupResources(nullptr);

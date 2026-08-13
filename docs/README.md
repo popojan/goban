@@ -39,9 +39,16 @@ Ray-traced 3D Go/Baduk/Weiqi board application with GLSL shaders, GTP engine sup
 |--------|-------------|---------|
 | `-v`, `--verbosity` | Log level: trace/debug/info/warning/error | warning |
 | `-c`, `--config` | Path to configuration file | last used or config/en.json |
+| `--platform` | Windowing backend: `auto`, `wayland` or `x11` | auto |
 | `-s`, `--script` | Run a scenario script instead of an interactive session | — |
 | `--user-settings` | Persist preferences to another file | `user.json`, or `scenario-user.json` under `--script` |
 | `--record` | Force session recording on during a scripted run | off |
+
+Both windowing backends are compiled in, so `--platform` is a runtime choice and
+needs no rebuild. It is worth knowing about on a **multi-monitor Wayland
+session**: Wayland exposes no global window position, so fullscreen (**F**)
+cannot tell which monitor the window is on and lands on whichever output came
+first. `--platform x11` runs through XWayland, where it works correctly.
 
 The last three are development options; see [Testing](testing.md).
 

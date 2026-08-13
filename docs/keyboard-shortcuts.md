@@ -60,7 +60,7 @@ ordinary bindings like everything else on this page.
 | **M** | Toggle the next-move marker (shows what comes next during review) |
 | **O** | Trigger intro animation |
 | **X** | Toggle max FPS mode (uncapped vs event-driven) |
-| **F** | Toggle fullscreen |
+| **F** | Toggle fullscreen, on the monitor the window is on |
 
 ## Image Adjustments
 
@@ -88,6 +88,10 @@ For use with anaglyph stereo shaders (red/cyan glasses):
 | Key | Function |
 |-----|----------|
 | **Escape** | Quit application |
+
+On a **multi-monitor Wayland session**, fullscreen may open on the wrong output:
+Wayland gives an application no way to ask where its own window is. Run with
+`--platform x11` if this affects you — see [the option table](README.md#command-line).
 
 ## Key Code Reference
 
