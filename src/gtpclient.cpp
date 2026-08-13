@@ -261,10 +261,41 @@ bool Process::running() const {
 /// Longest the parent waits to hear whether exec succeeded.
 static constexpr int EXEC_STATUS_TIMEOUT_MS = 2000;
 
+/// Creates a pipe whose ends are both close-on-exec.
+///
+/// pipe2() sets the flag atomically, which is the point: pipe() followed by
+/// fcntl() leaves a window in which a fork() on another thread inherits the
+/// descriptor without it. That is not hypothetical here — engines start
+/// concurrently, and it hung startup in roughly one suite run in five.
+///
+/// The fallback is for platforms without pipe2 (macOS). The window remains
+/// there, which is why the exec-status read is bounded rather than trusted.
+static int createPipeCloexec(int fds[2]) {
+#if defined(__linux__) || defined(__FreeBSD__)
+    return pipe2(fds, O_CLOEXEC);
+#else
+    if (pipe(fds) < 0) return -1;
+    fcntl(fds[0], F_SETFD, fcntl(fds[0], F_GETFD) | FD_CLOEXEC);
+    fcntl(fds[1], F_SETFD, fcntl(fds[1], F_GETFD) | FD_CLOEXEC);
+    return 0;
+#endif
+}
+
 Process::Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir) {
     int stdinPipe[2], stdoutPipe[2], stderrPipe[2];
 
-    if (pipe(stdinPipe) < 0 || pipe(stdoutPipe) < 0 || pipe(stderrPipe) < 0) {
+    // Close-on-exec, like the exec-status pipe below and for the same reason:
+    // engines are spawned concurrently (GameThread::loadEnginesParallel), and a
+    // plain pipe() leaks into every child forked in the meantime. A leaked write
+    // end of *another* engine's stdout means the parent never sees EOF when that
+    // engine dies — it just stops answering.
+    //
+    // The child's own descriptors survive because dup2() clears FD_CLOEXEC on
+    // the descriptor it creates, so 0/1/2 are inherited across its exec while
+    // every other engine's pipes are not.
+    if (createPipeCloexec(stdinPipe) < 0 ||
+        createPipeCloexec(stdoutPipe) < 0 ||
+        createPipeCloexec(stderrPipe) < 0) {
         throw std::runtime_error("Failed to create pipes");
     }
 
@@ -281,19 +312,9 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
     // the first version of this code did, intermittently, in about one suite run
     // in five.
     int execPipe[2];
-#if defined(__linux__) || defined(__FreeBSD__)
-    if (pipe2(execPipe, O_CLOEXEC) < 0) {
+    if (createPipeCloexec(execPipe) < 0) {
         throw std::runtime_error("Failed to create pipes");
     }
-#else
-    // No atomic form here; the window stays open, which is why the read is
-    // bounded below rather than trusted.
-    if (pipe(execPipe) < 0) {
-        throw std::runtime_error("Failed to create pipes");
-    }
-    fcntl(execPipe[0], F_SETFD, fcntl(execPipe[0], F_GETFD) | FD_CLOEXEC);
-    fcntl(execPipe[1], F_SETFD, fcntl(execPipe[1], F_GETFD) | FD_CLOEXEC);
-#endif
 
     pid_ = fork();
     if (pid_ < 0) {

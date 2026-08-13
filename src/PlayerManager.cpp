@@ -167,6 +167,12 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
 }
 
 void PlayerManager::loadHumanPlayers(const std::shared_ptr<Configuration>& config) {
+    // Same lock loadSingleEngine() takes, and for the same reason: this appends
+    // to `players` and rewrites activePlayer[] while the UI thread may be
+    // reading players[activePlayer[…]] through currentPlayer(). A push_back that
+    // reallocates leaves that read dereferencing freed memory. addPlayer() does
+    // not lock — callers do.
+    std::lock_guard<std::mutex> lock(mutex);
     sgf = static_cast<size_t>(-1);
 
     auto humans = config->data.find("humans");
@@ -201,39 +207,50 @@ void PlayerManager::loadEngines(const std::shared_ptr<Configuration>& config) {
 }
 
 void PlayerManager::removeSgfPlayers() {
-    // Remove players with SGF_PLAYER type (created during SGF loading)
-    // Track if active players were SGF players before removal
-    bool blackWasSgf = players[activePlayer[0]]->isTypeOf(Player::SGF_PLAYER);
-    bool whiteWasSgf = players[activePlayer[1]]->isTypeOf(Player::SGF_PLAYER);
+    // Erasing from `players` is the most destructive thing that happens to it,
+    // so it is done under the lock the readers already take. Observers are
+    // notified afterwards, outside the lock: onPlayerChange() calls into
+    // GobanModel, and holding this mutex across that would put two locks in an
+    // order nothing else uses.
+    bool blackWasSgf = false;
+    bool whiteWasSgf = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        // Remove players with SGF_PLAYER type (created during SGF loading)
+        // Track if active players were SGF players before removal
+        blackWasSgf = players[activePlayer[0]]->isTypeOf(Player::SGF_PLAYER);
+        whiteWasSgf = players[activePlayer[1]]->isTypeOf(Player::SGF_PLAYER);
 
-    // Iterate backwards to avoid index shifting issues
-    for (int i = static_cast<int>(players.size()) - 1; i >= 0; --i) {
-        if (players[i]->isTypeOf(Player::SGF_PLAYER)) {
-            spdlog::info("Removing SGF player '{}' at index {}", players[i]->getName(), i);
-            // Adjust active player indices if they point to players after this one
-            if (static_cast<size_t>(i) < activePlayer[0]) activePlayer[0]--;
-            if (static_cast<size_t>(i) < activePlayer[1]) activePlayer[1]--;
-            delete players[i];
-            players.erase(players.begin() + i);
+        // Iterate backwards to avoid index shifting issues
+        for (int i = static_cast<int>(players.size()) - 1; i >= 0; --i) {
+            if (players[i]->isTypeOf(Player::SGF_PLAYER)) {
+                spdlog::info("Removing SGF player '{}' at index {}", players[i]->getName(), i);
+                // Adjust active player indices if they point to players after this one
+                if (static_cast<size_t>(i) < activePlayer[0]) activePlayer[0]--;
+                if (static_cast<size_t>(i) < activePlayer[1]) activePlayer[1]--;
+                delete players[i];
+                players.erase(players.begin() + i);
+            }
         }
-    }
 
-    numPlayers = players.size();
+        numPlayers = players.size();
 
-    // Restore active players from UserSettings if they were SGF players
-    auto& settings = UserSettings::instance();
-    auto findByName = [this](const std::string& name, size_t fallback) -> size_t {
-        for (size_t i = 0; i < players.size(); i++) {
-            if (players[i]->getName() == name) return i;
+        // Restore active players from UserSettings if they were SGF players
+        auto& settings = UserSettings::instance();
+        auto findByName = [this](const std::string& name, size_t fallback) -> size_t {
+            for (size_t i = 0; i < players.size(); i++) {
+                if (players[i]->getName() == name) return i;
+            }
+            return fallback;
+        };
+        if (blackWasSgf) {
+            activePlayer[0] = findByName(settings.getBlackPlayer(), human);
         }
-        return fallback;
-    };
-    if (blackWasSgf) {
-        activePlayer[0] = findByName(settings.getBlackPlayer(), human);
-    }
-    if (whiteWasSgf) {
-        activePlayer[1] = findByName(settings.getWhitePlayer(), coach);
-    }
+        if (whiteWasSgf) {
+            activePlayer[1] = findByName(settings.getWhitePlayer(), coach);
+        }
+
+    }  // lock released before observers are called
 
     // Notify observers so state.black/state.white reflect the new active players
     if (blackWasSgf) {

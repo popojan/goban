@@ -1375,8 +1375,17 @@ void GobanControl::requestHandicap(int handicap, std::function<void(bool)> onSet
 
 UiInputs GobanControl::uiInputs() const {
     UiInputs in;
+    in.uiReady = acceptsUiEvents();
+    // Nothing below is looked at until the UI is ready — availableActions()
+    // returns an all-false answer on !uiReady — and gathering it anyway meant
+    // interrogating GameThread every frame throughout startup, while
+    // loadEnginesParallel was still appending to the player list on another
+    // thread. humanToMove() reads players[activePlayer[…]], so a push_back that
+    // reallocated the vector left it dereferencing freed memory. Observed as a
+    // segfault in humanToMove() with loadEnginesParallel live in another thread.
+    if (!in.uiReady) return in;
+
     in.phase             = model.phase();
-    in.uiReady           = acceptsUiEvents();
     in.engineThinking    = engine.isThinking();
     in.humanToMove       = engine.humanToMove();
     in.engineToMove      = engine.isCurrentPlayerEngine();
