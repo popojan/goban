@@ -345,6 +345,16 @@ public:
     bool showTerritory;
     bool showTerritoryAuto;
     bool territoryReady;
+    /// Scoring was attempted for *this* position, with every engine in sync,
+    /// and could not produce a result. It stops GameThread::processScoring()
+    /// retrying ten times a second forever, which is what an honest
+    /// `territoryReady = false` would otherwise cause.
+    ///
+    /// It clears itself: every position change builds a fresh Board (see
+    /// GameRecord::buildBoardFromMoves) whose flag is false, and updateStones()
+    /// copies it in, so moving anywhere gives scoring another chance. Do not
+    /// clear it by hand — that reintroduces the retry storm.
+    bool territoryFailed;
 private:
     Position cursor;
     std::atomic<long> moveNumber{0};

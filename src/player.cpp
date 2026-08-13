@@ -79,18 +79,26 @@ bool GtpEngine::undo() {
     return GtpClient::success(GtpClient::issueCommand("undo"));
 }
 
-void GtpEngine::applyTerritory(Board& targetBoard) {
+bool GtpEngine::applyTerritory(Board& targetBoard) {
     // Apply territory calculation to an existing board built locally from the
     // SGF replay, rather than asking the engine for the board state.
+    //
+    // Scoring is bounded more tightly than a genmove. The command timeout has to
+    // tolerate a strong engine thinking, but nothing about scoring a finished
+    // position justifies minutes — and when it does take minutes it is because
+    // the engine is at the wrong position or wedged, which is precisely the case
+    // that should fail rather than freeze the game thread.
+    const ScopedTimeout boundedForScoring(*this, scoringTimeout());
 
     // Get dead stones from engine (requires final_status_list support)
     auto deadResult = GtpClient::issueCommand("final_status_list dead");
 
     if (!GtpClient::success(deadResult)) {
         // Engine doesn't support final_status_list - graceful degradation
-        spdlog::warn("Engine doesn't support final_status_list, territory not shown");
+        spdlog::warn("Engine [{}] doesn't support final_status_list, territory not shown",
+                     getName());
         targetBoard.territoryReady = false;
-        return;
+        return false;
     }
 
     // Parse dead stone positions
@@ -113,24 +121,46 @@ void GtpEngine::applyTerritory(Board& targetBoard) {
     // Calculate territory using flood-fill
     targetBoard.calculateTerritoryFromDeadStones(deadStones);
 
-    // Get score from engine
-    targetBoard.score = final_score();
-
-    // Set display flags
+    // The shading is valid from here on, whatever happens to the score.
     targetBoard.showTerritory = true;
     targetBoard.showTerritoryAuto = true;
+
+    const std::optional<float> score = final_score();
+    if (!score) {
+        // Territory can be shown, but there is no result to state. Leaving
+        // territoryReady false lets the caller try another engine or report the
+        // failure honestly; writing 0.0 here claimed a drawn game instead, and
+        // that invented zero is what set the scoring fallback going.
+        spdlog::warn("Engine [{}] gave dead stones but no final_score", getName());
+        targetBoard.territoryReady = false;
+        return false;
+    }
+
+    targetBoard.score = *score;
     targetBoard.territoryReady = true;
+    return true;
 }
 
-float GtpEngine::final_score() {
-    if(const GtpClient::CommandOutput ret = GtpClient::issueCommand("final_score"); GtpClient::success(ret)) {
-        std::istringstream ss(ret[0].substr(2));
-        char winner;
-        float score = 0.0;
-        ss >> winner >> score;
-        return winner == 'B' ? score : -score;
+std::optional<float> GtpEngine::final_score() {
+    const GtpClient::CommandOutput ret = GtpClient::issueCommand("final_score");
+    if (!GtpClient::success(ret) || ret.empty() || ret[0].size() < 2) {
+        return std::nullopt;
     }
-    return 0.0f;
+    // "= B+12.5" / "= W+3" / "= 0" (jigo). A reply we cannot parse is a failure,
+    // not a zero.
+    std::istringstream ss(ret[0].substr(2));
+    char winner = '\0';
+    float score = 0.0f;
+    if (!(ss >> winner)) {
+        return std::nullopt;
+    }
+    if (winner == '0') {
+        return 0.0f;  // drawn
+    }
+    if ((winner != 'B' && winner != 'W') || !(ss >> score)) {
+        return std::nullopt;
+    }
+    return winner == 'B' ? score : -score;
 }
 
 bool GtpEngine::supportsKataAnalyze() {

@@ -143,19 +143,30 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
             engine->setCommandTimeout(timeout);
             spdlog::info("Engine [{}] command timeout set to {} ms", name, timeout);
         }
+        if (botConfig.contains("scoring_timeout_ms")) {
+            const int timeout = botConfig.value("scoring_timeout_ms",
+                                               GtpClient::DEFAULT_SCORING_TIMEOUT_MS);
+            engine->setScoringTimeout(timeout);
+            spdlog::info("Engine [{}] scoring timeout set to {} ms", name, timeout);
+        }
 
         // Lock while modifying shared player/engine vectors and coach/kibitz indices
         // (loadSingleEngine is called from parallel threads)
         std::lock_guard<std::mutex> lock(mutex);
         size_t id = addEngine(engine);
 
-        // Handle coach/kibitz flags
-        if (botConfig.value("main", 0) && coach == 0) {
+        // Handle coach/kibitz flags. Keyed on the explicit flags rather than on
+        // `index == 0`, which is also a legitimate engine: with the old test, a
+        // main engine that happened to load first was silently overwritten by
+        // the next one carrying "main".
+        if (botConfig.value("main", 0) && !coachConfigured) {
             coach = id;
+            coachConfigured = true;
             spdlog::info("Setting [{}] engine as coach and referee.", players[id]->getName());
         }
-        if (botConfig.value("kibitz", 0) && kibitz == 0) {
+        if (botConfig.value("kibitz", 0) && !kibitzConfigured) {
             kibitz = id;
+            kibitzConfigured = true;
             spdlog::info("Setting [{}] engine as trusted kibitz.", players[id]->getName());
         }
 
@@ -188,8 +199,20 @@ void PlayerManager::loadHumanPlayers(const std::shared_ptr<Configuration>& confi
     activePlayer[0] = human;
     activePlayer[1] = !engines.empty() ? coach : human;
 
+    // The engine carrying "main" never loaded, so currentCoach() is about to
+    // hand out players[0] — an arbitrary engine, and under parallel loading not
+    // even a deterministic one: it is whichever finished first. Say so. Silence
+    // here cost a session, where a missing GNU Go promoted an engine that
+    // answers "unclear groups" to final_score into the referee.
+    if (!engines.empty() && !coachConfigured) {
+        spdlog::warn("No engine claimed \"main\" (the configured one may have failed to "
+                     "load); using [{}] as coach and referee. It decides legality and "
+                     "scoring, so set \"main\": 1 on an engine you trust for that.",
+                     players[coach]->getName());
+    }
+
     // Default kibitz to coach if not set
-    if (!engines.empty() && kibitz == 0) {
+    if (!engines.empty() && !kibitzConfigured) {
         kibitz = coach;
         spdlog::info("No kibitz set. Defaulting to [{}] coach engine.", players[kibitz]->getName());
     }

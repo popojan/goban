@@ -666,25 +666,38 @@ GtpClient::GtpClient(const std::string& exe, const std::string& cmdline,
 {
     spdlog::info("Starting GTP client [{}/{}]", path, exe);
 
-    if (!path.empty()) {
+    // A configured folder that does not exist is *not* fatal on its own. `path`
+    // only ever supplied the working directory; `command` may name a binary the
+    // system resolves from PATH, and the stock configuration relies on exactly
+    // that — "path": "./engine/gnugo" with "command": "gnugo" is how a
+    // distribution-installed GNU Go has always started.
+    //
+    // Refusing here regressed that. Before, the child's chdir() failed silently
+    // and it carried on in the application folder, where execvp() found the
+    // engine on PATH; making the folder an error turned a working setup into
+    // "Failed to load engine 'GNU Go 3.8'". Warn and fall back to the
+    // application folder instead — if the program really is missing, the child's
+    // exec-status pipe still reports it with the system's own reason.
+    std::string workDir = path;
+    if (!workDir.empty()) {
         std::error_code ec;
-        if (!std::filesystem::is_directory(std::filesystem::u8path(path), ec)) {
-            // Caught here rather than in the child, where nothing can be logged
-            // safely and the only symptom was "Failed to write command".
-            spdlog::error("Engine [{}] folder does not exist: '{}' (paths are relative "
-                          "to the application folder)", exe, path);
-            throw std::runtime_error("engine folder not found: " + path);
+        if (!std::filesystem::is_directory(std::filesystem::u8path(workDir), ec)) {
+            spdlog::warn("Engine [{}] folder '{}' does not exist; running from the "
+                         "application folder and letting the system resolve '{}' "
+                         "(paths are relative to the application folder)",
+                         exe, workDir, exe);
+            workDir.clear();
         }
     }
 
-    std::string program = findExecutable(exe, path);
+    std::string program = findExecutable(exe, workDir);
     spdlog::info("About to run GTP engine [{}]", program);
 
     std::istringstream iss(cmdline);
     std::vector<std::string> params((std::istream_iterator<std::string>(iss)),
                                     std::istream_iterator<std::string>());
     for (auto& param : params) {
-        param = resolveAgainstAppRoot(param, path);
+        param = resolveAgainstAppRoot(param, workDir);
     }
 
     std::ostringstream resolved;
@@ -692,12 +705,12 @@ GtpClient::GtpClient(const std::string& exe, const std::string& cmdline,
     // The resolved arguments, not the configured string: when one has been
     // rewritten, what the engine actually received is the useful thing to see.
     spdlog::info("running child [{}{}] in [{}]", program, resolved.str(),
-                 path.empty() ? std::string(".") : path);
+                 workDir.empty() ? std::string(".") : workDir);
 
     initFilters(messages);
 
     try {
-        proc_ = std::make_unique<Process>(program, params, path);
+        proc_ = std::make_unique<Process>(program, params, workDir);
 
         // Always create stderr reader to prevent pipe buffer deadlock.
         // If the child process writes to stderr and nobody reads it,

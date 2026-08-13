@@ -93,6 +93,7 @@ The bundled configuration includes several predefined engines:
 | `enabled` | no | 0/1 | Whether this engine is loaded at all | 1 |
 | `kibitz` | no | 0/1 | Use for move suggestions (Space key) and analysis-mode replies | 0 |
 | `timeout_ms` | no | int | Longest to wait for a reply to one GTP command | 300000 (5 min) |
+| `scoring_timeout_ms` | no | int | Longest to wait when *scoring* a finished game | 30000 (30 s) |
 | `messages` | no | array | Regex rules to parse engine output for display | |
 
 `timeout_ms` is the backstop for an engine that stops answering. The default is
@@ -100,7 +101,20 @@ deliberately generous — a strong engine at long time settings, or KataGo loadi
 network weights, can legitimately take tens of seconds. A negative value waits
 forever.
 
+`scoring_timeout_ms` is deliberately much shorter. Nothing about counting a
+finished position needs minutes, and when it *does* take minutes the engine is
+wedged or sitting at the wrong position — the case that should fail rather than
+freeze the game on "Calculating score…". It never *raises* the limit: an engine
+capped at 5s by `timeout_ms` still gets 5s for scoring, and it overrides a
+negative `timeout_ms`, which is the whole point of having it.
+
 ### Paths in parameters
+
+A `path` that does not exist is **not** fatal. It only ever supplied the working
+directory, so if `command` names something the system can resolve from `PATH`,
+the engine starts from the application folder instead and the log says so. That
+is how the stock `"path": "./engine/gnugo"` with `"command": "gnugo"` works on a
+machine where GNU Go came from the distribution.
 
 The engine runs **with its working directory set to `path`**, so a relative path
 in `parameters` is resolved by the engine against the engine's own folder — not
@@ -145,6 +159,14 @@ simplest option for an engine installed outside the application folder.
 - **Main engine** (`main: 1`), called the *coach* in the code: every move is
   played into it and it does the scoring. Exactly one engine should carry the
   flag — the first enabled one that does wins.
+
+  **If the engine carrying `main` fails to start, another is promoted** — an
+  arbitrary one, since engines load in parallel and it is whichever finished
+  first. The log warns when this happens. It matters more than it sounds: the
+  coach decides legality and scoring, so an engine that cannot count ends up
+  refereeing. If games start ending on "Calculating score…", check the log for
+  that warning first.
+
 - **Kibitz engine** (`kibitz: 1`): provides move suggestions when you press
   Space, and plays every reply in analysis mode. If unset, the coach is used.
 

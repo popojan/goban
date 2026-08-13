@@ -88,8 +88,8 @@ public:
     explicit FakeEngine(const std::string& name = "Fake") : Engine(name) {}
 
     Move genmove(const Color&) override { return Move(Move::PASS, Color::BLACK); }
-    float final_score() override { return 0.0f; }
-    void applyTerritory(Board&) override {}
+    std::optional<float> final_score() override { return 0.0f; }
+    bool applyTerritory(Board&) override { return true; }
 
     bool play(const Move& move) override {
         plays.push_back(move);

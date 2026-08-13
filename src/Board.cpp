@@ -14,7 +14,7 @@ const float Board::safeDist = 1.01f;
 
 Board::Board(int size) : capturedBlack(0), capturedWhite(0), boardSize(size), r1(.0f), rStone(.0f),
     generator(std::random_device()()), dist(0.0f, 0.05f), invalidated(false), squareYtoXRatio(1.0), showTerritory(false),
-    showTerritoryAuto(false), territoryReady(false),
+    showTerritoryAuto(false), territoryReady(false), territoryFailed(false),
     cursor({0, 0}), collision(0.0), score(0.0f)
 {
     clear(size);
@@ -374,6 +374,7 @@ int Board::updateStones(const Board& board) {
     // Always sync territory state from source board — loading a new game must
     // clear stale territory from a previously scored game.
     this->territoryReady = board.territoryReady;
+    this->territoryFailed = board.territoryFailed;
     this->score = board.score;
     this->showTerritory = board.showTerritory;
     this->showTerritoryAuto = board.showTerritoryAuto;
@@ -487,6 +488,7 @@ void Board::copyStateFrom(const Board& b) {
     capturedWhite = b.capturedWhite;
     koPosition = b.koPosition;
     territoryReady = b.territoryReady;
+    territoryFailed = b.territoryFailed;
     moveNumber.store(b.moveNumber.load());
     score = b.score;
 }

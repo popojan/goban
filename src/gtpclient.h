@@ -17,6 +17,7 @@
 #ifndef GTPCLIENT_H
 #define GTPCLIENT_H
 
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <regex>
@@ -160,8 +161,46 @@ public:
 
     static constexpr int DEFAULT_COMMAND_TIMEOUT_MS = 300000;  // 5 minutes
 
+    /// Scoring gets a tighter bound than the general timeout.
+    ///
+    /// The general one has to tolerate a strong engine thinking at long time
+    /// settings, so it is measured in minutes. Nothing about scoring a finished
+    /// position needs that, and when scoring *does* take minutes it is because
+    /// the engine is wedged or sitting at the wrong position — the case that
+    /// should fail rather than freeze the game thread for five minutes with
+    /// "Calculating score…" on screen. Per-engine override: "scoring_timeout_ms".
+    static constexpr int DEFAULT_SCORING_TIMEOUT_MS = 30000;  // 30 seconds
+
+    void setScoringTimeout(int ms) { scoringTimeoutMs_ = ms; }
+
+    /// Never *raises* the limit: an engine configured to answer within 5 s must
+    /// not get 30 s just because it was asked to score. A negative general
+    /// timeout means "wait forever", which the scoring bound overrides — that is
+    /// the whole point of having one.
+    [[nodiscard]] int scoringTimeout() const {
+        if (commandTimeoutMs_ < 0) return scoringTimeoutMs_;
+        return std::min(commandTimeoutMs_, scoringTimeoutMs_);
+    }
+
+    /// Applies a different command timeout for the duration of a scope, and
+    /// restores the previous one however the scope is left.
+    class ScopedTimeout {
+    public:
+        ScopedTimeout(GtpClient& client, int ms)
+            : client_(client), previous_(client.getCommandTimeout()) {
+            client_.setCommandTimeout(ms);
+        }
+        ~ScopedTimeout() { client_.setCommandTimeout(previous_); }
+        ScopedTimeout(const ScopedTimeout&) = delete;
+        ScopedTimeout& operator=(const ScopedTimeout&) = delete;
+    private:
+        GtpClient& client_;
+        int previous_;
+    };
+
 private:
     int commandTimeoutMs_ = DEFAULT_COMMAND_TIMEOUT_MS;
+    int scoringTimeoutMs_ = DEFAULT_SCORING_TIMEOUT_MS;
 };
 
 #endif // GTPCLIENT_H

@@ -22,6 +22,7 @@
 #include <mutex>
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <utility>
 
 class Player
@@ -95,9 +96,21 @@ class Engine: public Player
 public:
     explicit Engine(const std::string& name) : Player(name, LOCAL | ENGINE), board(19)  {}
     Move genmove(const Color& colorToMove) override = 0;
-    virtual float final_score() = 0;
-    // Apply territory calculation to an existing board (uses engine for dead stones + score)
-    virtual void applyTerritory(Board& targetBoard) = 0;
+
+    /// The score from the engine's point of view, positive for Black, or
+    /// nullopt when it could not produce one.
+    ///
+    /// The distinction is not pedantry: 0.0 is a legitimate result (jigo), so a
+    /// float alone cannot say "failed". Reading a failure as a score of zero is
+    /// what sent scoring off to interrogate a second engine, and from there into
+    /// a multi-minute stall — see GameThread::processScoring().
+    virtual std::optional<float> final_score() = 0;
+
+    /// Territory shading from the engine's dead-stone list, applied to a board
+    /// built locally from the SGF. Returns whether a *score* was also obtained;
+    /// the shading may be valid when the score is not, in which case
+    /// `targetBoard.showTerritory` is set but `territoryReady` is not.
+    virtual bool applyTerritory(Board& targetBoard) = 0;
     ~Engine() override = default;
 protected:
     Board board;
@@ -161,8 +174,8 @@ public:
     bool boardsize(unsigned boardSize) override;
     bool clear() override;
     bool undo() override;
-    float final_score() override;
-    void applyTerritory(Board& targetBoard) override;
+    std::optional<float> final_score() override;
+    bool applyTerritory(Board& targetBoard) override;
 
     // KataGo-specific scoring via kata-analyze (returns 0.0 if not supported)
     float kataAnalyzeScore(const Color& colorToMove);

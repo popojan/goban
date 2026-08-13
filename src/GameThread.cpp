@@ -855,7 +855,9 @@ void GameThread::wakeGameThread() {
 }
 
 void GameThread::processScoring() {
-    if (!model.board.showTerritory || model.board.territoryReady)
+    // territoryFailed is the third term, and it is what stops this being called
+    // ten times a second forever once scoring has genuinely failed. See Board.
+    if (!model.board.showTerritory || model.board.territoryReady || model.board.territoryFailed)
         return;
 
     Engine* coach = currentCoach();
@@ -863,31 +865,39 @@ void GameThread::processScoring() {
 
     model.state.msg = GameState::CALCULATING_SCORE;
 
-    // Invariant: All engines stay in sync after initial sync.
-    // Coach is always ready for scoring at this point.
-
     Board result(model.game.getBoardSize());
     Position koPosition;
     model.game.buildBoardFromMoves(result, koPosition);
-    coach->applyTerritory(result);
+    const bool scored = coach->applyTerritory(result);
 
     if (stopRequested()) return;
 
-    // Fallback: if coach scoring failed, try other engines (already synced)
-    if (result.territoryReady && std::abs(result.score) < 0.1f) {
+    // The coach shaded territory but could not put a number on it. Another
+    // engine may be able to — but only one that is actually at this position.
+    //
+    // This is the guard that was missing. The initial sync syncs the coach
+    // (step 1), scores (step 2), then syncs everything else (step 3), so asking
+    // the others here reaches them at whatever position they still held. For an
+    // engine that has just started, that is an empty board it was never told
+    // about, and the answer is not merely wrong: a CPU KataGo asked to score an
+    // empty 19x19 board blocks until the command timeout, with the game thread
+    // stuck inside the sync block and the UI showing "Calculating score…" the
+    // whole time. Skipping it here costs nothing — the loop calls us again once
+    // engineSync reaches Synced, and then the fallback is both safe and useful.
+    if (!scored && result.showTerritory && engineSync.load() == EngineSync::Synced) {
         for (auto* player : playerManager->getPlayers()) {
-            if (player != coach && player->isTypeOf(Player::ENGINE)) {
-                auto* gtpEngine = dynamic_cast<GtpEngine*>(player);
-                if (gtpEngine) {
-                    spdlog::info("Coach scoring failed, trying {} for final_score",
-                        gtpEngine->getName());
-                    float altScore = gtpEngine->final_score();
-                    if (std::abs(altScore) > 0.1f) {
-                        spdlog::info("Using {} score: {:.1f}", gtpEngine->getName(), altScore);
-                        result.score = altScore;
-                        break;
-                    }
-                }
+            if (stopRequested()) return;
+            if (player == coach || !player->isTypeOf(Player::ENGINE)) continue;
+            auto* gtpEngine = dynamic_cast<GtpEngine*>(player);
+            if (!gtpEngine) continue;
+
+            spdlog::info("Coach [{}] could not score; asking [{}] for final_score",
+                coach->getName(), gtpEngine->getName());
+            if (const std::optional<float> altScore = gtpEngine->final_score()) {
+                spdlog::info("Using [{}] score: {:.1f}", gtpEngine->getName(), *altScore);
+                result.score = *altScore;
+                result.territoryReady = true;
+                break;
             }
         }
     }
@@ -896,10 +906,19 @@ void GameThread::processScoring() {
         model.state.scoreDelta = result.score;
         // Update message to show winner (replaces CALCULATING_SCORE)
         model.state.msg = (result.score > 0) ? GameState::BLACK_WON : GameState::WHITE_WON;
-    } else {
-        // Scoring failed - clear the calculating message
+    } else if (engineSync.load() == EngineSync::Synced) {
+        // Every engine was at the right position and none could score it, so
+        // this position is not going to score. Latch it, or the guard above
+        // never becomes true and we retry on every loop iteration.
+        result.territoryFailed = true;
         model.state.msg = GameState::SCORING_FAILED;
-        model.state.scoringError = "Territory calculation failed";
+        model.state.scoringError = "No engine could score this position";
+        spdlog::warn("Scoring failed with all engines synced; not retrying for this position");
+    } else {
+        // Mid-sync: leave both flags clear and say nothing yet. The loop comes
+        // back here once the engines are synced.
+        spdlog::debug("Scoring deferred: engines not synced yet");
+        return;
     }
 
     std::for_each(gameObservers.begin(), gameObservers.end(),

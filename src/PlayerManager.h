@@ -97,6 +97,16 @@ private:
     size_t sgf{0};
     size_t coach{0};
     size_t kibitz{0};
+    /// Whether `coach`/`kibitz` were actually claimed by a bot carrying the
+    /// "main"/"kibitz" flag, as opposed to still holding their initial 0.
+    /// Index 0 is a perfectly valid engine, so the index alone cannot say —
+    /// and when the configured main engine fails to load, currentCoach() hands
+    /// out players[0] regardless. That silent promotion made an engine that
+    /// cannot score the referee, which is how a game hung on "Calculating
+    /// score…". Only the warning is new; the fallback itself is deliberate,
+    /// since some engine is better than none.
+    bool coachConfigured{false};
+    bool kibitzConfigured{false};
     size_t numPlayers{0};
     std::array<size_t, 2> activePlayer{0, 0};
 
