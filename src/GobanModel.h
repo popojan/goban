@@ -1,3 +1,21 @@
+/** \file
+ *  \brief The state everyone agrees on: board, GameState, the record, the
+ *         lifecycle phase, and the snapshot the UI reads.
+ *
+ * Also a GameObserver, which is where a played move is appended to the record,
+ * where a finished game is finalized and autosaved, and where
+ * `publishSnapshot()` runs. `onBoardChange()` is the funnel every position
+ * change passes through, which is exactly why it is the publish point;
+ * `createNewRecord()` and `onBoardSized()` bypass it and so publish for
+ * themselves.
+ *
+ * Written by the game thread, read every frame by the UI thread — hence the
+ * atomic `gamePhase`. The phase may only change through the named transitions
+ * (start, pause, enterReview, endGame, createNewRecord), which all funnel into
+ * the single private writer `transitionTo()`; do not add a second one. And do
+ * not use `state.reason` as a lifecycle test: it outlives the phase by design.
+ * See ADR-0002.
+ */
 #ifndef GOBAN_GOBANMODEL_H
 #define GOBAN_GOBANMODEL_H
 

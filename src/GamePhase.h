@@ -1,17 +1,18 @@
+/** \file
+ *  \brief The authoritative game lifecycle state (ADR-0002).
+ *
+ * `GobanModel::gamePhase` is the only lifecycle state there is; the `started`
+ * and `isGameOver` booleans this replaced are gone with no trace left, and the
+ * old `started && isGameOver` combination is now unrepresentable. Ask
+ * `GobanModel::phase()`, change it only through the named transitions, and read
+ * `phaseName()` for the spelling scenarios assert on.
+ */
 #ifndef GOBAN_GAMEPHASE_H
 #define GOBAN_GAMEPHASE_H
 
 /** \brief What the game itself is doing.
  *
- * Step 1 of `docs/adr/0002-explicit-game-state.md`. The phase is *derived* from
- * `GobanModel::started` and `GobanModel::isGameOver`, which remain the
- * authoritative state; nothing writes a phase yet. Adding it therefore cannot
- * change behaviour. What it buys is a single name for each combination those
- * two booleans actually produce, one place to read the lifecycle from, and —
- * via the tests in `tests/test_gamephase.cpp` — a written-down transition
- * table, which is the prerequisite for step 2 (making the phase authoritative).
- *
- * The four states are exactly the ADR's:
+ * The four states are exactly ADR-0002's:
  *
  *     Setup ──start()──> Playing ──pause()/navigate back──> Paused
  *       ^                   │                                 │

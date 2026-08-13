@@ -1,3 +1,20 @@
+/** \file
+ *  \brief The SGF game tree: the authoritative record, and the least thread-safe
+ *         object in the program.
+ *
+ * Wraps libsgfc++ — the move tree, the navigation cursor, variations, markup,
+ * comments, the result, and save/load of both the daily session document and
+ * external files. `buildBoardFromMoves()` reconstructs any position by replaying
+ * from the root with local capture and ko logic, so the board on screen never
+ * depends on an engine's opinion.
+ *
+ * **Owned exclusively by the game thread while a game is running.** The const
+ * accessors take no lock and the mutex covers neither the readers nor half the
+ * mutators, so reading this from the UI thread is an observed crash rather than
+ * a theoretical one — the UI reads `GobanModel::snapshot()` instead (ADR-0006).
+ * The few direct readers that remain are explicit user actions listed in that
+ * ADR, and they run with the loop stopped.
+ */
 #ifndef GOBAN_GAMERECORD_H
 #define GOBAN_GAMERECORD_H
 

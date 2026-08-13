@@ -1,3 +1,18 @@
+/** \file
+ *  \brief Player and engine lifecycle: registration, ownership, coach and kibitz.
+ *
+ * Owns every Player (and deletes them), and holds the coach, kibitz and human
+ * indices plus `activePlayer[]`, the single source of truth for who plays each
+ * colour.
+ *
+ * This is the one object written from the loader threads at startup and read
+ * from both the game and UI threads for the rest of the session. Everything goes
+ * through `mutex` — *including* the writers, which is the half that was once
+ * missing and cost a SIGSEGV. `addEngine()`/`addPlayer()` deliberately do not
+ * lock: their callers already hold it while assigning the indices in the same
+ * critical section. Observers are notified after the lock is released, so that
+ * a callback into GobanModel cannot nest two mutexes.
+ */
 #ifndef PLAYERMANAGER_H
 #define PLAYERMANAGER_H
 

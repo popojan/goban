@@ -1,3 +1,18 @@
+/** \file
+ *  \brief Per-game display state — whose turn, captures, komi, result, the
+ *         message line — plus the SGF markup types.
+ *
+ * The mutable companion to GameRecord: everything the board and the message line
+ * need that is not the move tree. Written mostly by the game thread and read per
+ * frame by the UI, which is why the fields the UI actually depends on are copied
+ * into GameSnapshot rather than read from here.
+ *
+ * `reason` is **not** part of the lifecycle and outlives it: `enterReview()`
+ * leaves it set, so a game navigated back from a finished position has phase
+ * `Paused` and reason `DOUBLE_PASS` at the same time. Ask `GobanModel::phase()`
+ * for lifecycle questions. The inconsistency is known and pinned by
+ * tests/test_gamephase.cpp; do not add readers of `reason` as a lifecycle test.
+ */
 #ifndef GOBAN_VIEWSTATE_H
 #define GOBAN_VIEWSTATE_H
 

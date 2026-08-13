@@ -1,3 +1,18 @@
+/** \file
+ *  \brief Rendering, camera and sound — the GameObserver on the UI side.
+ *
+ * Turns board changes into repaint flags, overlays and stone sounds, and holds
+ * the authoritative camera state (`cameraPan`, `cameraDistance`, `cam.rLast`),
+ * which `boardCoordinate()` replicates on the C++ side for screen-to-board ray
+ * casting. The board itself is ray traced in the fragment shaders that
+ * GobanShader drives; the coordinate system is documented in CLAUDE.md.
+ *
+ * UI thread only — it holds the OpenGL context. Its observer callbacks arrive
+ * from the game thread, so they may do no more than raise `updateFlag` (atomic
+ * for that reason) and copy plain data. Rendering is event driven: a change
+ * nobody flags is a change nobody draws, because the main loop is otherwise
+ * blocked in glfwWaitEvents().
+ */
 #ifndef GOBAN_GOBANVIEW_H
 #define GOBAN_GOBANVIEW_H
 

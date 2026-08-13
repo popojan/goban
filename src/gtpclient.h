@@ -1,3 +1,19 @@
+/** \file
+ *  \brief Talking to an engine process: pipes, GTP commands, output filters.
+ *
+ * `Process` is the cross-platform half — fork/exec or CreateProcess, three
+ * pipes, timed line reads. `GtpClient` is the protocol half: one command, one
+ * response, plus the configurable regex filters that turn an engine's chatter
+ * into SGF comments and template variables. One StderrReaderThread per process
+ * drains stderr, so a talkative engine cannot deadlock on a full pipe.
+ *
+ * A command in flight owns the pipes until it replies and standard GTP has no
+ * abort, so `issueCommand()` may only be called from the game thread while a
+ * game is running. `setCommandTimeout()` is the backstop for an engine that
+ * stops answering; note that a *killed* engine keeps reporting failure
+ * (`failed_`) rather than pretending success, because move replay and scoring
+ * must not proceed against nothing.
+ */
 #ifndef GTPCLIENT_H
 #define GTPCLIENT_H
 

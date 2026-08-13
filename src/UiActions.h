@@ -1,3 +1,12 @@
+/** \file
+ *  \brief The one policy deciding what a player may do (ADR-0005).
+ *
+ * A pure function over plain data, so it unit-tests without a model, a thread or
+ * a graphics context — and so both the toolbar and every command guard can read
+ * the same answer. Read the struct comment below before adding a rule anywhere
+ * else; three times a second condition was hand-rolled at a call site, and three
+ * times it drifted.
+ */
 #ifndef GOBAN_UIACTIONS_H
 #define GOBAN_UIACTIONS_H
 

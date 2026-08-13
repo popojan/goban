@@ -1,3 +1,17 @@
+/** \file
+ *  \brief The player abstraction: human, SGF replay, and GTP engine.
+ *
+ * One interface — `genmove()` plus the board-manipulating GTP verbs — behind
+ * which the game loop cannot tell a human from an engine. LocalHumanPlayer
+ * blocks in `genmove()` on a condition variable until the UI hands it a move;
+ * GtpEngine blocks on a pipe read. That symmetry is the design, and also its
+ * sharpest edge: a `genmove()` in flight cannot be aborted, so only the game
+ * thread may ever call one (ADR-0001).
+ *
+ * Constructed on the loader threads, used from the game thread, owned by
+ * PlayerManager. `Engine` adds what only a real engine can answer — final score
+ * and territory.
+ */
 #ifndef PLAYER_H
 #define PLAYER_H
 

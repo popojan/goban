@@ -1,3 +1,20 @@
+/** \file
+ *  \brief The UI thread's entry point: mouse, keys, and the command registry.
+ *
+ * Every user action arrives here. RmlUi widgets, keybindings resolved through
+ * Configuration, and ScenarioRunner directives all land in the same registry,
+ * which is what lets a scenario drive precisely the code path a user does. Also
+ * the home of `dumpState()`, the machine-readable state scenarios assert on.
+ *
+ * **UI thread only, and it holds no policy of its own.** What a user may do is
+ * decided by `availableActions()` over inputs gathered once in `uiInputs()`; a
+ * command handler that re-derives its own guard is the bug ADR-0005 removed.
+ * Facts about the record come from `GobanModel::snapshot()`, never from the
+ * tree. Actions that discard the current game go through
+ * `GameThread::runWhenEngineFree()` and finish their widget half in
+ * `finishGameReplacement()`; actions that preserve it are refused while an
+ * engine is thinking (ADR-0001).
+ */
 #ifndef GOBAN_GOBANCONTROL_H
 #define GOBAN_GOBANCONTROL_H
 

@@ -1,3 +1,19 @@
+/** \file
+ *  \brief Board geometry and the value types the whole program speaks:
+ *         Color, Position, Move, Board.
+ *
+ * `Board` is a *position* — stones, captures, territory, and the fuzzy
+ * per-stone placement the renderer uses — not a rules engine; legality lives in
+ * GameRecord's replay. Deliberately free of RmlUi and OpenGL dependencies so
+ * goban_core builds and tests without a graphics context.
+ *
+ * Copied freely across threads by value: the game thread builds a fresh Board in
+ * `GameThread::notifyMoveComplete()` and hands it to the observers, which merge
+ * it into the model's own with `updateStones()` so existing fuzzy positions
+ * survive. `positionNumber` is atomic and is the UI's "something changed" edge —
+ * but an atomic edge grants visibility, not exclusion, so it is not a licence to
+ * read anything else unguarded across it.
+ */
 #ifndef BOARD_H
 #define BOARD_H
 

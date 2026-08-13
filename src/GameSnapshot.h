@@ -1,3 +1,11 @@
+/** \file
+ *  \brief The UI thread's immutable view of the game record (ADR-0006).
+ *
+ * Plain data, computed by whoever owns the record and published for readers.
+ * Produced by `GobanModel::publishSnapshot()`, consumed through
+ * `GobanModel::snapshot()`. The struct comment below records why locking the
+ * tree was not the answer.
+ */
 #ifndef GOBAN_GAMESNAPSHOT_H
 #define GOBAN_GAMESNAPSHOT_H
 

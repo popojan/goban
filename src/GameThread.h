@@ -1,3 +1,18 @@
+/** \file
+ *  \brief The game loop — the only thread allowed to speak GTP while a game runs.
+ *
+ * Owns the game thread, and through it the `GameRecord` inside `GobanModel`: no
+ * other thread may touch that tree while the loop is running (ADR-0006).
+ * Delegates player lifecycle to PlayerManager and tree walking to
+ * GameNavigator, and fans every position change out to the GameObserver list.
+ *
+ * The UI thread talks to it in one direction only, and never blocks — moves via
+ * `playLocalMove()`, navigation via a queue, game-replacing actions via
+ * `runWhenEngineFree()`. It must never call into RmlUi, and it must never be
+ * joined from its own thread, which is why `interrupt()` is a deliberate no-op
+ * there. A genmove in flight cannot be aborted; ADR-0001 explains why a
+ * UI-thread wait on one freezes the whole application.
+ */
 #ifndef GAMETHREAD_H
 #define GAMETHREAD_H
 

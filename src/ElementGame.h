@@ -1,3 +1,16 @@
+/** \file
+ *  \brief The RmlUi element that owns the whole application object graph.
+ *
+ * Holds GobanModel, GobanView, GameThread and GobanControl by value, in that
+ * order, and registers the two GameObservers. Beyond ownership its jobs are the
+ * per-frame `OnUpdate()` (widget sync, action availability, message line), the
+ * async engine-loading state machine that lets the board render before any
+ * engine has spoken, and the prompt/message system.
+ *
+ * UI thread only. It is also where a deferred game-replacing action lands:
+ * `takeDeferredTaskDone()` in `gameLoop()` is the one place the game thread's
+ * completion becomes a widget update, because RmlUi is not thread safe.
+ */
 #ifndef ROCKETINVADERSELEMENTGAME_H
 #define ROCKETINVADERSELEMENTGAME_H
 

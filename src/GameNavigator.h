@@ -1,3 +1,12 @@
+/** \file
+ *  \brief SGF tree navigation, extracted from the game loop.
+ *
+ * Runs on the game thread only, driven by GameThread's navigation queue — never
+ * called directly from the UI. Raises `navigationInProgress` for its whole
+ * duration so the loop will not call genmove underneath it, keeps every engine
+ * at the same position, and ends by syncing model state (colour, comment,
+ * markup, board) and notifying observers.
+ */
 #ifndef GAMENAVIGATOR_H
 #define GAMENAVIGATOR_H
 

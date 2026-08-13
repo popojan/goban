@@ -1,3 +1,15 @@
+/** \file
+ *  \brief What survives a restart: `user.json`, loaded once and saved on change.
+ *
+ * A process-wide singleton holding the preferences the user never explicitly
+ * saves — language config, fullscreen, sound, camera preset, board size, komi,
+ * handicap — plus the session state that lets startup put the board back where
+ * it was: the SGF path, the game index within it, and the tree path (depth plus
+ * the branch choices at multi-child nodes only).
+ *
+ * Distinct from Configuration, which is the read-only application config the
+ * user edits by hand. This one the application writes.
+ */
 #ifndef GOBAN_USERSETTINGS_H
 #define GOBAN_USERSETTINGS_H
 
