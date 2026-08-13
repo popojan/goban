@@ -193,7 +193,11 @@ void GobanView::saveCurrentView() {
 }
 
 void GobanView::clearView() {
-    std::remove("user.json");
+    // Whichever file settings actually live in — not the hardcoded default.
+    // A scripted run redirects persistence to scenario-user.json precisely so it
+    // cannot touch the developer's real session, and `delete camera` was the one
+    // path that ignored that and deleted user.json anyway.
+    std::remove(UserSettings::instance().getSettingsFile().c_str());
 
     // Default camera: same values as initCam()
     DDG::Quaternion targetRot(-1.0, 1.0, 0.0, 0.0);
