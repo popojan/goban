@@ -616,7 +616,12 @@ void GameThread::gameLoop() {
                 playerToMove = humanPlayer;
             }
 
-            player->suggestMove(suggestedMove);
+            // To humanPlayer, which is what genmove() below blocks on. This read
+            // `player` — the player assigned to the colour to move — so whenever
+            // that was an engine, a queued move was handed to an object nobody
+            // was waiting on and silently lost, while the human blocked for a
+            // move that had already been made.
+            humanPlayer->suggestMove(suggestedMove);
             Move move = humanPlayer->genmove(model.state.colorToMove);
 
             bool wasKibitz = false;

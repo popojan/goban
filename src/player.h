@@ -47,7 +47,23 @@ public:
         return ret;
     }
 
+    /// Hand the waiting genmove() a move.
+    ///
+    /// An INVALID move is ignored rather than stored. "Suggest nothing" is not a
+    /// thing anyone means, and treating it as one silently discarded real moves:
+    /// the game loop reads `queuedMove` (usually INVALID), sets `playerToMove`,
+    /// and only then calls suggestMove. A click landing in that gap reaches
+    /// GameThread::playLocalMove(), which sees `playerToMove` already set and
+    /// delivers the move here — and the loop's own suggestMove(INVALID),
+    /// arriving microseconds later, overwrote it. genmove() then waited for a
+    /// move that had already been made.
+    ///
+    /// Rare, because the window is a few instructions wide, and invisible in
+    /// interactive use: a stone fails to appear and the player clicks again. In
+    /// a scripted run it is a scenario that hangs until its wait times out,
+    /// which is how it was found.
     void suggestMove(const Move& m) override {
+        if (m == Move::INVALID) return;
         {
             std::lock_guard<std::mutex> lock(mut);
             this->move = m;

@@ -254,8 +254,12 @@ bool Process::running() const {
 #include <sys/wait.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <cerrno>
 #include <cstring>
+
+/// Longest the parent waits to hear whether exec succeeded.
+static constexpr int EXEC_STATUS_TIMEOUT_MS = 2000;
 
 Process::Process(const std::string& program, const std::vector<std::string>& args, const std::string& workDir) {
     int stdinPipe[2], stdoutPipe[2], stderrPipe[2];
@@ -268,11 +272,28 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
     // it a child that cannot start is invisible: fork() succeeds, the parent
     // reports the engine ready, and the first symptom is "Failed to write
     // command" against a process that died before it ever ran. See issue #55.
+    //
+    // Created close-on-exec *atomically*. pipe() followed by fcntl() is not the
+    // same thing: engines load concurrently (GameThread::loadEnginesParallel),
+    // and a fork() in another thread landing between the two inherits this write
+    // end without the flag. That engine then holds it open for its whole life,
+    // the read below never sees EOF, and startup hangs — which is exactly what
+    // the first version of this code did, intermittently, in about one suite run
+    // in five.
     int execPipe[2];
+#if defined(__linux__) || defined(__FreeBSD__)
+    if (pipe2(execPipe, O_CLOEXEC) < 0) {
+        throw std::runtime_error("Failed to create pipes");
+    }
+#else
+    // No atomic form here; the window stays open, which is why the read is
+    // bounded below rather than trusted.
     if (pipe(execPipe) < 0) {
         throw std::runtime_error("Failed to create pipes");
     }
+    fcntl(execPipe[0], F_SETFD, fcntl(execPipe[0], F_GETFD) | FD_CLOEXEC);
     fcntl(execPipe[1], F_SETFD, fcntl(execPipe[1], F_GETFD) | FD_CLOEXEC);
+#endif
 
     pid_ = fork();
     if (pid_ < 0) {
@@ -319,7 +340,22 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
     // Parent process
     close(execPipe[1]);
     int childErrno = 0;
-    const ssize_t got = ::read(execPipe[0], &childErrno, sizeof(childErrno));
+    ssize_t got = 0;
+    {
+        // Bounded, so a leaked write end can never hang startup again. A
+        // successful exec closes the pipe immediately, so this returns at once
+        // in every normal case; the timeout only fires if something is holding
+        // the descriptor open, and then the right answer is to assume the engine
+        // started and let the usual read timeouts report it.
+        struct pollfd pfd{execPipe[0], POLLIN, 0};
+        const int ready = poll(&pfd, 1, EXEC_STATUS_TIMEOUT_MS);
+        if (ready > 0) {
+            got = ::read(execPipe[0], &childErrno, sizeof(childErrno));
+        } else if (ready == 0) {
+            spdlog::warn("Timed out reading exec status for '{}'; assuming it started",
+                         program);
+        }
+    }
     close(execPipe[0]);
     if (got == sizeof(childErrno)) {
         // The child never reached exec. Reap it, then say what actually went
