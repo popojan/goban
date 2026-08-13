@@ -7,6 +7,7 @@
 #include "spdlog/spdlog.h"
 #include <vector>
 #include <map>
+#include <string>
 
 class FileChooserDataSource;
 
@@ -35,6 +36,29 @@ public:
 
     // Public method to hide the dialog (called from DialogKeyListener)
     void HideDialog() const;
+
+    // --- Scripting seam ------------------------------------------------------
+    // The dialog is where a good share of this project's bugs have lived, and
+    // none of it was reachable from a scenario: every action was bound to an
+    // RmlUi element. These are the same operations the widgets invoke, exposed
+    // so `chooser_*` commands can drive the real dialog rather than a stub. The
+    // accessors read the data source, not the widgets, so they report what the
+    // dialog *is* rather than what it has managed to render.
+    bool OpenSelected();                       ///< The Open button.
+    bool IsDialogVisible() const;
+    void SetPath(const std::string& path);
+    void NavigateUp();
+    bool SelectFileByName(const std::string& name);
+    bool SelectGameByIndex(int index);
+    bool StepFilesPage(int delta);
+    bool StepGamesPage(int delta);
+    int GetFileCount() const;
+    int GetGameCount() const;
+    std::string GetCurrentPath() const;
+    std::string GetSelectedFileName() const;
+    int GetSelectedGameIndex() const;
+    bool IsTsumegoSelected() const;
+    void SetTsumegoSelected(bool enabled);
 
 private:
     void populateFilesList() const;

@@ -807,6 +807,95 @@ void GobanControl::buildRegistry() {
         }
     });
 
+    // --- File chooser (scripting seam) ---------------------------------------
+    // The dialog was reachable only by clicking it, so nothing about it could be
+    // tested — and it is where a good share of this project's bugs have lived.
+    // These drive the real handler, so a scenario takes the same path a user
+    // does, tsumego toggle included.
+    auto chooser = []() -> EventHandlerFileChooser* {
+        auto* handler = dynamic_cast<EventHandlerFileChooser*>(
+            EventManager::GetEventHandler("open"));
+        if (!handler) spdlog::warn("chooser: file chooser handler not found");
+        return handler;
+    };
+
+    add("chooser_open", 0, 0, "open the SGF file chooser", [this, chooser](CommandContext&) {
+        if (auto* h = chooser()) {
+            std::string currentFile = model.game.hasLoadedExternalDoc()
+                ? model.game.getLoadedFilePath()
+                : model.game.getDefaultFileName();
+            h->ShowDialog(currentFile, model.game.getLoadedGameIndex());
+        }
+    });
+
+    add("chooser_cancel", 0, 0, "close the file chooser without loading",
+        [chooser](CommandContext&) {
+        if (auto* h = chooser()) h->HideDialog();
+    });
+
+    add("chooser_confirm", 0, 0, "load the selected file and game",
+        [chooser](CommandContext&) {
+        if (auto* h = chooser()) h->OpenSelected();
+    });
+
+    add("chooser_path", 1, 1, "<dir> — browse to a directory",
+        [chooser](CommandContext& ctx) {
+        if (auto* h = chooser()) h->SetPath(ctx.args[0]);
+    });
+
+    add("chooser_up", 0, 0, "browse to the parent directory", [chooser](CommandContext&) {
+        if (auto* h = chooser()) h->NavigateUp();
+    });
+
+    add("chooser_select_file", 1, 1, "<name> — select a file by name",
+        [chooser](CommandContext& ctx) {
+        // By name, not index: a scenario cannot know the order the filesystem
+        // produced, and pinning one would make the test depend on it.
+        if (auto* h = chooser()) h->SelectFileByName(ctx.args[0]);
+    });
+
+    add("chooser_select_game", 1, 1, "<index> — select a game within the file",
+        [chooser](CommandContext& ctx) {
+        int index = 0;
+        if (!parseInt(ctx.args[0], index)) {
+            spdlog::warn("chooser_select_game: '{}' is not an index", ctx.args[0]);
+            return;
+        }
+        if (auto* h = chooser()) h->SelectGameByIndex(index);
+    });
+
+    add("chooser_tsumego", 1, 1, "<on|off> — set the tsumego toggle",
+        [chooser](CommandContext& ctx) {
+        const std::string arg = toLower(ctx.args[0]);
+        if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
+            && arg != "1" && arg != "0") {
+            spdlog::warn("chooser_tsumego: expected on or off, got '{}'", ctx.args[0]);
+            return;
+        }
+        const bool on = (arg == "on" || arg == "true" || arg == "1");
+        if (auto* h = chooser()) h->SetTsumegoSelected(on);
+    });
+
+    add("chooser_files_page", 1, 1, "<next|prev> — page the file list",
+        [chooser](CommandContext& ctx) {
+        const std::string arg = toLower(ctx.args[0]);
+        if (arg != "next" && arg != "prev") {
+            spdlog::warn("chooser_files_page: expected next or prev, got '{}'", ctx.args[0]);
+            return;
+        }
+        if (auto* h = chooser()) h->StepFilesPage(arg == "next" ? +1 : -1);
+    });
+
+    add("chooser_games_page", 1, 1, "<next|prev> — page the game list",
+        [chooser](CommandContext& ctx) {
+        const std::string arg = toLower(ctx.args[0]);
+        if (arg != "next" && arg != "prev") {
+            spdlog::warn("chooser_games_page: expected next or prev, got '{}'", ctx.args[0]);
+            return;
+        }
+        if (auto* h = chooser()) h->StepGamesPage(arg == "next" ? +1 : -1);
+    });
+
     add("prev_game", 0, 0, "previous game in the loaded SGF collection",
         [stepLoadedGame](CommandContext& ctx) {
             stepLoadedGame(ctx, -1);
@@ -1418,6 +1507,26 @@ nlohmann::json GobanControl::dumpState() const {
     // when replaying a recorded session.
     s["sgf_file"] = snap->sgfFile;
     s["game_index"] = snap->gameIndex;
+
+    // File chooser, so a scenario can assert what the dialog is offering rather
+    // than only what loading it produced.
+    if (auto* h = dynamic_cast<EventHandlerFileChooser*>(EventManager::GetEventHandler("open"))) {
+        s["chooser_active"]     = h->IsDialogVisible();
+        s["chooser_path"]       = h->GetCurrentPath();
+        s["chooser_file_count"] = h->GetFileCount();
+        s["chooser_game_count"] = h->GetGameCount();
+        s["chooser_file"]       = h->GetSelectedFileName();
+        s["chooser_game"]       = h->GetSelectedGameIndex();
+        s["chooser_tsumego"]    = h->IsTsumegoSelected();
+    } else {
+        s["chooser_active"]     = false;
+        s["chooser_path"]       = std::string();
+        s["chooser_file_count"] = 0;
+        s["chooser_game_count"] = 0;
+        s["chooser_file"]       = std::string();
+        s["chooser_game"]       = -1;
+        s["chooser_tsumego"]    = false;
+    }
 
     // Players
     auto players = engine.getPlayers();

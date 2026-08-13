@@ -348,6 +348,8 @@ else()
         src/Board.h
         src/Camera.h
         src/Configuration.h
+        src/FileChooserDataSource.h
+        src/GameSnapshot.h
         src/GameNavigator.h
         src/GameObserver.h
         src/GameRecord.h
@@ -370,6 +372,7 @@ else()
         src/Board.cpp
         src/Camera.cpp
         src/Configuration.cpp
+        src/FileChooserDataSource.cpp
         src/GameNavigator.cpp
         src/GameRecord.cpp
         src/GameThread.cpp
@@ -421,7 +424,6 @@ else()
         src/EventHandlerNewGame.h
         src/EventInstancer.h
         src/EventManager.h
-        src/FileChooserDataSource.h
         src/GobanControl.h
         src/GobanOverlay.h
         src/GobanShader.h
@@ -440,7 +442,6 @@ else()
         src/EventHandlerNewGame.cpp
         src/EventInstancer.cpp
         src/EventManager.cpp
-        src/FileChooserDataSource.cpp
         src/GobanControl.cpp
         src/GobanOverlay.cpp
         src/GobanShader.cpp

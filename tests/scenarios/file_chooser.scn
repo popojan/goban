@@ -1,0 +1,101 @@
+# The Load dialog, driven end to end. Until the chooser_* commands existed every
+# action in it was bound to an RmlUi element, so nothing about it was reachable
+# from a scenario — and it is where a good share of this project's bugs have
+# lived. The logic underneath (enumeration, SGF preview, the tsumego heuristic,
+# selection state) is covered separately and exhaustively by
+# tests/test_filechooser.cpp, now that FileChooserDataSource links into
+# goban_core. This scenario covers the wiring: dialog to board.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect chooser_active false
+
+# --- Opening the dialog, and browsing -------------------------------------
+chooser_open
+expect chooser_active true
+
+chooser_path tests/data
+expect chooser_path tests/data
+expect chooser_file_count > 0
+
+# Selecting a file previews its games without touching the board.
+chooser_select_file two_games.sgf
+expect chooser_file two_games.sgf
+expect chooser_game_count 2
+expect board_size 9          # the board is untouched so far
+expect move_count 0
+
+# --- Cancelling must load nothing -----------------------------------------
+chooser_cancel
+wait_idle
+expect chooser_active false
+expect board_size 9
+expect main_line_moves 0
+
+# --- Confirming loads the selected game, not the first one -----------------
+chooser_open
+expect chooser_active true
+chooser_path tests/data
+chooser_select_file two_games.sgf
+chooser_select_game 1
+expect chooser_game 1
+
+chooser_confirm
+wait_idle
+expect chooser_active false   # confirming closes the dialog
+# Game 1 of the collection is the 13x13 of three moves. Loading game 0 instead
+# would give a 9x9 of two, which is the failure this pins.
+expect board_size 13
+expect main_line_moves 3
+expect game_index 1
+
+# --- An out-of-range game index is refused, not clamped --------------------
+chooser_open
+chooser_path tests/data
+chooser_select_file simple.sgf
+expect chooser_game_count 1
+chooser_select_game 4
+expect chooser_game 0         # unchanged
+chooser_cancel
+wait_idle
+
+# --- The tsumego toggle is the only way into tsumego mode ------------------
+expect tsumego false
+chooser_open
+chooser_path tests/data
+chooser_select_file tsumego.sgf
+# Selecting the file auto-detects a problem and arms the toggle by itself.
+expect chooser_tsumego true
+chooser_confirm
+wait_idle
+expect tsumego true
+expect board_size 9
+expect view_position 0        # a puzzle opens at the root, not at the solution
+
+# --- And the toggle can be overridden by hand ------------------------------
+# Same file, tsumego switched off: it then loads as an ordinary game record.
+chooser_open
+chooser_path tests/data
+chooser_select_file tsumego.sgf
+chooser_tsumego off
+expect chooser_tsumego false
+chooser_confirm
+wait_idle
+expect tsumego false
+expect board_size 9
+
+# --- A malformed SGF must not take the dialog down -------------------------
+chooser_open
+chooser_path tests/data
+chooser_select_file malformed.sgf
+expect chooser_game_count 0
+# Confirming with nothing selected does nothing, and the dialog stays up.
+chooser_confirm
+expect chooser_active true
+chooser_cancel
+wait_idle
+expect chooser_active false
+expect board_size 9

@@ -162,6 +162,23 @@ asks; it is simply refused once play has begun.
 it the mode was reachable only by clicking that dialog, so nothing about it
 could be tested at all — see `tests/scenarios/tsumego_mode.scn`.
 
+The Load dialog itself is scriptable through the `chooser_*` family:
+`chooser_open`, `chooser_cancel`, `chooser_confirm`, `chooser_path <dir>`,
+`chooser_up`, `chooser_select_file <name>`, `chooser_select_game <index>`,
+`chooser_tsumego <on|off>`, `chooser_files_page <next|prev>` and
+`chooser_games_page <next|prev>`. They drive the real handler, so a scenario
+takes the path a user does. Files are selected **by name**, never by index — a
+scenario cannot know the order the filesystem produced, and pinning one would
+make the test depend on it. State keys: `chooser_active`, `chooser_path`,
+`chooser_file_count`, `chooser_game_count`, `chooser_file`, `chooser_game`,
+`chooser_tsumego`.
+
+The logic *underneath* the dialog is unit-tested instead, in
+`tests/test_filechooser.cpp`. `FileChooserDataSource` includes no RmlUi at all —
+it is filesystem, SGF parsing and pagination — and was untestable only because
+it sat in the `goban` app target rather than `goban_core`. Prefer a doctest case
+there to a scenario for anything that does not involve the widgets.
+
 Four rules learned the hard way:
 
 - **Never assert an exact value on something that moves on its own.** The

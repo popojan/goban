@@ -1,4 +1,5 @@
 #include "EventHandlerFileChooser.h"
+#include <filesystem>
 #include "ElementGame.h"
 #include "Event.h"
 #include "EventManager.h"
@@ -59,45 +60,7 @@ void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String&
         updatePaginationInfo();
     }
     else if (value == "open_file") {
-        // Load the selected game
-        if (dataSource->GetSelectedGame()) {
-            std::string filePath = dataSource->GetSelectedFilePath();
-            int gameIndex = dataSource->GetSelectedGameIndex();
-            spdlog::info("Opening SGF file: {} game index: {}", filePath, gameIndex);
-
-            // Get the game element and load the SGF
-            if (dialogDocument) {
-                auto context = dialogDocument->GetContext();
-                if (auto gameDoc = context->GetDocument("game_window")) {
-                    if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
-                        bool tsumego = isTsumegoToggled();
-                        gameElement->setTsumegoMode(tsumego);
-
-                        // Loading replaces the current game, so a move an engine
-                        // is still computing is worthless. GTP cannot abort a
-                        // command in flight, so rather than freeze the UI the
-                        // work is handed to the game thread. See docs/adr/0001.
-                        auto& gameThread = gameElement->getGameThread();
-                        std::string busyEngine;
-                        const bool ran = gameThread.runWhenEngineFree(
-                            [&gameThread, filePath, gameIndex, tsumego]() {
-                                if (gameThread.loadSGF(filePath, gameIndex, tsumego) && tsumego) {
-                                    gameThread.autoPlayTsumegoSetup();
-                                }
-                            }, &busyEngine);
-
-                        if (ran) {
-                            gameElement->getController().finishGameReplacement();
-                        } else {
-                            gameElement->showMessage("Waiting for " + busyEngine + "...");
-                        }
-                    }
-                }
-            }
-            HideDialog();
-        } else {
-            spdlog::warn("No game selected");
-        }
+        OpenSelected();
     }
     else if (value == "files_prev_page") {
         if (dataSource->CanGoToFilesPrevPage()) {
@@ -183,6 +146,168 @@ void EventHandlerFileChooser::UnloadDialog(Rml::Context* context) {
         context->UnloadDocument(dialogDocument);
         dialogDocument = nullptr;
     }
+}
+
+
+/// Load whatever the dialog currently has selected. Shared by the Open button
+/// and the `chooser_confirm` command, so a scripted run takes the identical
+/// path — including the tsumego toggle, which is the only way into that mode.
+bool EventHandlerFileChooser::OpenSelected() {
+    if (!dataSource->GetSelectedGame()) {
+        spdlog::warn("No game selected");
+        return false;
+    }
+    if (!dialogDocument) {
+        spdlog::error("Dialog document not loaded");
+        return false;
+    }
+
+    const std::string filePath = dataSource->GetSelectedFilePath();
+    const int gameIndex = dataSource->GetSelectedGameIndex();
+    spdlog::info("Opening SGF file: {} game index: {}", filePath, gameIndex);
+
+    auto context = dialogDocument->GetContext();
+    auto gameDoc = context ? context->GetDocument("game_window") : nullptr;
+    auto gameElement = gameDoc
+        ? dynamic_cast<ElementGame*>(gameDoc->GetElementById("game")) : nullptr;
+    if (!gameElement) {
+        spdlog::error("Game element not found");
+        return false;
+    }
+
+    const bool tsumego = isTsumegoToggled();
+    gameElement->setTsumegoMode(tsumego);
+
+    // Loading replaces the current game, so a move an engine is still computing
+    // is worthless. GTP cannot abort a command in flight, so rather than freeze
+    // the UI the work is handed to the game thread. See docs/adr/0001.
+    auto& gameThread = gameElement->getGameThread();
+    std::string busyEngine;
+    const bool ran = gameThread.runWhenEngineFree(
+        [&gameThread, filePath, gameIndex, tsumego]() {
+            if (gameThread.loadSGF(filePath, gameIndex, tsumego) && tsumego) {
+                gameThread.autoPlayTsumegoSetup();
+            }
+        }, &busyEngine);
+
+    if (ran) {
+        gameElement->getController().finishGameReplacement();
+    } else {
+        gameElement->showMessage("Waiting for " + busyEngine + "...");
+    }
+
+    HideDialog();
+    return true;
+}
+
+/// Scripting accessors. These read the data source rather than the widgets, so
+/// they report what the dialog *is*, not what it has managed to render.
+bool EventHandlerFileChooser::IsDialogVisible() const {
+    return dialogDocument && dialogDocument->IsVisible();
+}
+
+int EventHandlerFileChooser::GetFileCount() const {
+    return static_cast<int>(dataSource->GetFiles().size());
+}
+
+int EventHandlerFileChooser::GetGameCount() const {
+    return dataSource->GetNumRows("games");
+}
+
+std::string EventHandlerFileChooser::GetCurrentPath() const {
+    return dataSource->GetCurrentPath().string();
+}
+
+std::string EventHandlerFileChooser::GetSelectedFileName() const {
+    const FileEntry* entry = dataSource->GetSelectedFile();
+    return entry ? entry->name : std::string();
+}
+
+int EventHandlerFileChooser::GetSelectedGameIndex() const {
+    return dataSource->GetSelectedGameIndex();
+}
+
+bool EventHandlerFileChooser::IsTsumegoSelected() const {
+    return isTsumegoToggled();
+}
+
+void EventHandlerFileChooser::SetTsumegoSelected(bool enabled) {
+    setTsumegoToggle(enabled);
+}
+
+void EventHandlerFileChooser::SetPath(const std::string& path) {
+    dataSource->SetCurrentPath(std::filesystem::path(path));
+    populateFilesList();
+    populateGamesList();
+    updateCurrentPath();
+    updatePaginationInfo();
+}
+
+void EventHandlerFileChooser::NavigateUp() {
+    dataSource->NavigateUp();
+    populateFilesList();
+    populateGamesList();
+    updateCurrentPath();
+    updatePaginationInfo();
+}
+
+/// Select by name rather than index: a scenario cannot know the ordering the
+/// filesystem produced, and pinning one would make the test depend on it.
+bool EventHandlerFileChooser::SelectFileByName(const std::string& name) {
+    const auto& files = dataSource->GetFiles();
+    int dataIndex = -1;
+    for (size_t i = 0; i < files.size(); ++i) {
+        if (files[i].name == name) { dataIndex = static_cast<int>(i); break; }
+    }
+    if (dataIndex < 0) {
+        spdlog::warn("chooser: no file named '{}' in {}", name, GetCurrentPath());
+        return false;
+    }
+
+    // handleFileSelection() takes a *widget row* index, not a data index: row 0
+    // is the ".." entry whenever the directory has a parent, and the remaining
+    // rows are offset by the current page. Invert that mapping here rather than
+    // duplicate everything the handler does after the selection — populating the
+    // games list, arming the tsumego toggle, and re-selecting the board's own
+    // game when the user browses back to the file already open.
+    const bool hasParent = dataSource->GetCurrentPath().has_parent_path();
+    const int perPage = FileChooserDataSource::GetFilesPageSize() - (hasParent ? 1 : 0);
+    const int page = dataIndex / perPage + 1;
+    if (page != dataSource->GetFilesCurrentPage()) {
+        dataSource->SetFilesPage(page);
+        populateFilesList();
+        updatePaginationInfo();
+    }
+    const int row = dataIndex - (page - 1) * perPage + (hasParent ? 1 : 0);
+    handleFileSelection(row);
+    return true;
+}
+
+bool EventHandlerFileChooser::SelectGameByIndex(int index) {
+    if (index < 0 || index >= GetGameCount()) {
+        spdlog::warn("chooser: game index {} out of range (0..{})", index, GetGameCount() - 1);
+        return false;
+    }
+    handleGameSelection(index);
+    return true;
+}
+
+bool EventHandlerFileChooser::StepFilesPage(int delta) {
+    const int target = dataSource->GetFilesCurrentPage() + delta;
+    if (target < 1 || target > dataSource->GetFilesTotalPages()) return false;
+    dataSource->SetFilesPage(target);
+    populateFilesList();
+    updatePaginationInfo();
+    return true;
+}
+
+bool EventHandlerFileChooser::StepGamesPage(int delta) {
+    const int target = dataSource->GetGamesCurrentPage() + delta;
+    if (target < 1 || target > dataSource->GetGamesTotalPages()) return false;
+    dataSource->SetGamesPage(target);
+    populateGamesList();
+    updatePaginationInfo();
+    return true;
 }
 
 void EventHandlerFileChooser::ShowDialog(const std::string& currentFile, int currentGameIndex) {
