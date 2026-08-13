@@ -89,6 +89,16 @@ The bundled configuration includes several predefined engines:
 | `path` | yes | string | Directory containing the engine executable, **relative to the application folder** | |
 | `command` | yes | string | Executable name (found in `path` or system PATH) | |
 | `parameters` | yes | string | Command line arguments for the engine — see *Paths in parameters* below | |
+| `main` | no | 0/1 | Primary engine ("coach"): holds the authoritative board and does the scoring | 0 |
+| `enabled` | no | 0/1 | Whether this engine is loaded at all | 1 |
+| `kibitz` | no | 0/1 | Use for move suggestions (Space key) and analysis-mode replies | 0 |
+| `timeout_ms` | no | int | Longest to wait for a reply to one GTP command | 300000 (5 min) |
+| `messages` | no | array | Regex rules to parse engine output for display | |
+
+`timeout_ms` is the backstop for an engine that stops answering. The default is
+deliberately generous — a strong engine at long time settings, or KataGo loading
+network weights, can legitimately take tens of seconds. A negative value waits
+forever.
 
 ### Paths in parameters
 
@@ -129,15 +139,17 @@ cannot start './katago' in '../user_folder/katago': No such file or directory
 
 **Absolute paths always work**, in both `path` and `parameters`, and are the
 simplest option for an engine installed outside the application folder.
-| `main` | no | 0/1 | Primary engine for game rules and board state | 0 |
-| `enabled` | no | 0/1 | Whether this engine is active | 1 |
-| `kibitz` | no | 0/1 | Use for move suggestions (Space key) | 0 |
-| `messages` | no | array | Rules to parse engine output for display | |
 
 ### Engine Roles
 
-- **Main engine** (`main: 1`): Handles game rules, validates moves, tracks board state. Exactly one engine should have this flag.
-- **Kibitz engine** (`kibitz: 1`): Provides move suggestions when you press Space. If not set, the main engine is used.
+- **Main engine** (`main: 1`), called the *coach* in the code: every move is
+  played into it and it does the scoring. Exactly one engine should carry the
+  flag — the first enabled one that does wins.
+- **Kibitz engine** (`kibitz: 1`): provides move suggestions when you press
+  Space, and plays every reply in analysis mode. If unset, the coach is used.
+
+All enabled engines are kept in sync at the same position regardless of role, so
+you can switch a player to any of them mid-game.
 
 ### Message Parsing
 
@@ -200,33 +212,44 @@ See [Keyboard Shortcuts](keyboard-shortcuts.md) for the complete mapping.
 
 ### Available Commands
 
+The authoritative list is the `help` command, which prints every registered name
+with its arguments. The ones worth binding to a key:
+
 | Command | Description |
 |---------|-------------|
-| `play once` | Trigger kibitz/AI move |
-| `quit` | Exit application |
-| `toggle_fullscreen` | Toggle fullscreen mode |
-| `fps` | Toggle FPS display/unlimited mode |
-| `animate` | Trigger intro animation |
-| `toggle_territory` | Show/hide territory markers |
-| `toggle_overlay` | Show/hide coordinate overlay |
-| `resign` | Resign current game |
+| `play once` | Ask the kibitz engine for a move (Space) |
+| `genmove` | Make the engine move for the colour to play |
+| `start` | Hand the turn to the engine |
 | `pass` | Pass turn |
-| `reset camera` | Center camera view |
-| `undo move` | Undo last move |
-| `pan camera` | End pan mode |
-| `rotate camera` | End rotation mode |
-| `zoom camera` | End zoom mode |
-| `cycle shaders` | Switch to next shader |
+| `resign` | Resign current game |
+| `clear` | Start a new game on the same board size (asks first) |
+| `undo move` | Step back one move |
+| `navigate_start` / `navigate_end` | Go to the start / end of the game |
+| `navigate_back` / `navigate_forward` | Step one move back / forward |
+| `prev_game` / `next_game` | Cycle games within a loaded SGF collection |
+| `save` | Save the current game |
+| `archive` | Close the daily session file and start a new one |
+| `load` | Open the file browser |
+| `report_bug` | Write a replayable script of the recent session |
+| `toggle_analysis_mode` | Toggle analysis mode |
+| `toggle ai vs ai` | Let both engines play each other |
+| `toggle_territory` | Show/hide territory markers |
+| `toggle_last_move_overlay` / `toggle_next_move_overlay` | Show/hide the move markers |
+| `toggle_fullscreen` | Toggle fullscreen mode |
+| `toggle_fps` | Toggle uncapped rendering (and the FPS counter) |
+| `toggle_sound` | Toggle stone sounds |
+| `quit` | Exit application |
+| `animate` | Trigger the intro animation |
+| `reset camera` | Return to the saved camera preset |
+| `save camera` / `delete camera` | Store / remove the preset (see [User Settings](user-settings.md)) |
+| `zoom stones` | Frame all stones on screen |
+| `pan camera` / `rotate camera` / `zoom camera` | Hold-to-drag camera modes |
+| `cycle shaders` | Switch to the next shader |
 | `increase gamma` / `decrease gamma` | Adjust gamma |
 | `increase contrast` / `decrease contrast` | Adjust contrast |
-| `reset contrast and gamma` | Reset to defaults |
+| `reset contrast and gamma` | Reset both to defaults |
 | `increase eof` / `decrease eof` | Adjust stereo eye separation |
 | `increase dof` / `decrease dof` | Adjust depth of field |
-| `toggle_analysis_mode` | Toggle analysis mode |
-| `navigate_start` | Go to game start |
-| `navigate_end` | Go to game end |
-| `save` | Save current game |
-| `load` | Open file browser |
 
 ---
 

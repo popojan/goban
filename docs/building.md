@@ -9,10 +9,10 @@
 
 ## Dependencies
 
-Most dependencies are built automatically via CMake's ExternalProject:
+Most dependencies are fetched and built automatically by CMake:
 
-- boost (system, filesystem, iostreams)
 - clipp
+- doctest (tests only)
 - freetype2
 - GLFW
 - GLM
@@ -23,6 +23,12 @@ Most dependencies are built automatically via CMake's ExternalProject:
 - portaudio
 - RmlUi
 - spdlog
+
+glad is vendored in `src/glad/`. Boost is no longer used.
+
+The `BuildPrerequisites` option below controls the first pass. Spelling it any
+other way is silently ignored by CMake, and the dependencies then never get
+built.
 
 ## Linux Build
 
@@ -40,11 +46,11 @@ mkdir -p cmake-build-release
 cd cmake-build-release
 
 # First pass: build dependencies
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PREREQUISITIES=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON
 make -j$(nproc)
 
 # Second pass: build application
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PREREQUISITIES=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
 make -j$(nproc)
 ```
 
@@ -54,10 +60,10 @@ make -j$(nproc)
 mkdir -p cmake-build-debug
 cd cmake-build-debug
 
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_PREREQUISITIES=ON
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBuildPrerequisites=ON
 make -j$(nproc)
 
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_PREREQUISITIES=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBuildPrerequisites=OFF
 make -j$(nproc)
 ```
 
@@ -71,7 +77,6 @@ Windows builds use vcpkg for some dependencies.
 2. Install required packages:
    ```cmd
    vcpkg install freetype:x64-windows-static
-   vcpkg install boost:x64-windows-static
    vcpkg install portaudio:x64-windows-static
    vcpkg install libsndfile:x64-windows-static
    ```
@@ -82,10 +87,10 @@ Windows builds use vcpkg for some dependencies.
 mkdir cmake-build-release
 cd cmake-build-release
 
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PREREQUISITIES=ON -DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON -DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
 cmake --build . --config Release
 
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PREREQUISITIES=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
 cmake --build . --config Release
 ```
 
@@ -136,6 +141,9 @@ goban/
 - `src/GameThread.cpp` - GTP engine communication
 - `src/ElementGame.cpp` - RmlUi game interface
 
+See [Architecture](architecture.md) for how these fit together and which thread
+owns what.
+
 ### Shaders
 
 GLSL shaders are in `config/shaders/`:
@@ -143,6 +151,8 @@ GLSL shaders are in `config/shaders/`:
 - `vertex/stereo.glsl` - Stereoscopic vertex shader
 - `fragment/red_carpet.glsl` - Main ray-traced shader
 - `fragment/thin.glsl`, `flat.glsl`, `2d.glsl` - Simplified variants
+- `fragment/red_carpet_stereo.glsl`, `thin_stereo.glsl` - Anaglyph variants
+- `fragment/partial/` - Shared includes pulled in by the above
 
 ## Troubleshooting
 

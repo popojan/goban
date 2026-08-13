@@ -243,6 +243,7 @@ Currently: `move_count`, `view_position`, `main_line_moves`, `navigating`,
 `at_end`, `variations`, `has_result`, `result`, `board_size`, `color_to_move`, `komi`,
 `handicap`, `black_stones`, `white_stones`, `captured_black`, `captured_white`,
 `mode`, `ai_vs_ai`, `phase`, `loop_state`, `engine_sync`, `running`, `thinking`, `syncing_ui`,
+`pending_nav`, `queued_nav`, `deferred_task`,
 `tsumego`, `holds_stone`, `show_territory`, `unsaved_changes`, `comment`,
 `markup_count`, `prompt_active`,
 `camera_animating`, `msg`, `black_player`, `white_player`, `sgf_file`,
@@ -257,6 +258,11 @@ says what you mean, whereas "the move count did not change" cannot tell a
 refusal apart from an action that legitimately had nothing to do.
 
 Add a key there and every scenario can assert on it.
+
+`pending_nav`, `queued_nav` and `deferred_task` are the quiescence terms
+`wait_idle` is built from, exposed separately so a scenario can pin *which* of
+them is holding things up. `pending_nav` covers commands that have been popped
+from the queue but not yet finished; `queued_nav` is the queue alone.
 
 **Beware what `dumpState()` costs.** It runs on the UI thread and reads the SGF
 tree, which the game thread owns and mutates without a lock. Do not add a key

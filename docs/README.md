@@ -17,6 +17,7 @@ Ray-traced 3D Go/Baduk/Weiqi board application with GLSL shaders, GTP engine sup
 - [User Settings](user-settings.md) - Settings persisted between sessions (user.json)
 - [SGF Game Records](sgf-records.md) - Game saving, loading, and the games folder
 - [Building from Source](building.md) - Compilation instructions for developers
+- [Architecture](architecture.md) - Component and thread map, and four data flows end to end
 - [Testing](testing.md) - Unit test suite, the mock GTP engine, adding a test
 - [Architecture Decision Records](adr/README.md) - Why the code is the way it is
 
@@ -38,6 +39,11 @@ Ray-traced 3D Go/Baduk/Weiqi board application with GLSL shaders, GTP engine sup
 |--------|-------------|---------|
 | `-v`, `--verbosity` | Log level: trace/debug/info/warning/error | warning |
 | `-c`, `--config` | Path to configuration file | last used or config/en.json |
+| `-s`, `--script` | Run a scenario script instead of an interactive session | — |
+| `--user-settings` | Persist preferences to another file | `user.json`, or `scenario-user.json` under `--script` |
+| `--record` | Force session recording on during a scripted run | off |
+
+The last three are development options; see [Testing](testing.md).
 
 ## Links
 

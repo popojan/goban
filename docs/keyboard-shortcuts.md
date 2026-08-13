@@ -6,10 +6,10 @@ Complete reference of keyboard controls. Keys can be customized in the [configur
 
 | Key | Function |
 |-----|----------|
-| **Space** | Play AI-suggested move (kibitz) / trigger AI move in Analysis mode |
+| **Space** | Navigate forward if there is a move ahead; otherwise ask the engine for one (kibitz) |
 | **P** | Pass |
 | **R** | Resign game |
-| **U** | Undo last move |
+| **U** | Undo — step back one move |
 | **Enter** | Toggle Analysis mode (pause AI-vs-AI matches for review) |
 
 ## SGF Navigation
@@ -22,6 +22,16 @@ When an SGF game is loaded or during game review:
 | **Left Arrow** or **Backspace** | Navigate back one move |
 | **Home** | Navigate to start of game |
 | **End** | Navigate to end of game |
+| **Page Up** / **Page Down** | Previous / next game in a loaded SGF collection |
+
+**Space and Right differ at the end of a branch.** With no move ahead, Space
+falls through to whatever `controls` binds it to — `play once` by default, which
+asks the engine for a move; Right simply does nothing. That is what makes Space a
+single "carry on" key. At the end of a *finished* game neither does anything.
+
+Left, Right, Backspace and Space's forward step are handled directly and are
+**not** remappable through `controls`. Home, End, Page Up and Page Down are
+ordinary bindings like everything else on this page.
 
 **Mouse**: Click on an existing variation marker to follow it, or click on an empty intersection to create a new variation.
 
@@ -30,7 +40,7 @@ When an SGF game is loaded or during game review:
 | Key | Function |
 |-----|----------|
 | **B** | Zoom to stones (fit all stones in view) |
-| **C** | Center camera (top-down view) |
+| **C** | Reset camera to the saved preset (see [User Settings](user-settings.md)) |
 | **A** + mouse move | Rotate view |
 | **S** + mouse move | Zoom view |
 | **D** + mouse move | Pan/drag view |
@@ -46,7 +56,8 @@ When an SGF game is loaded or during game review:
 |-----|----------|
 | **V** | Cycle through shader variants |
 | **T** | Toggle territory display |
-| **N** | Toggle coordinate overlay |
+| **N** | Toggle the last-move marker |
+| **M** | Toggle the next-move marker (shows what comes next during review) |
 | **O** | Trigger intro animation |
 | **X** | Toggle max FPS mode (uncapped vs event-driven) |
 | **F** | Toggle fullscreen |
@@ -94,6 +105,8 @@ Keys are mapped using [RmlUi KeyIdentifier](https://github.com/mikke89/RmlUi/blo
 | 69 | Backspace |
 | 72 | Enter |
 | 81 | Escape |
+| 86 | Page Up |
+| 87 | Page Down |
 | 88 | End |
 | 89 | Home |
 | 90 | Left Arrow |

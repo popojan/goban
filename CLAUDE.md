@@ -53,6 +53,11 @@ See `docs/testing.md`.
 
 ## Architecture Overview
 
+**The map is `docs/architecture.md`** — object graph, thread ownership, the
+observer fan-out, and four data flows (a move, a navigation, an SGF load, a new
+game) drawn end to end. Read that before changing anything cross-cutting. What
+follows here is only an index of names.
+
 ### Core Components
 
 #### Target layout
@@ -73,7 +78,7 @@ See `docs/testing.md`.
 - **player**: Player abstraction for both human and AI players
 
 #### UI Framework
-- **ElementGame**: Main game UI element using libRocket
+- **ElementGame**: Main game UI element (RmlUi); owns the whole object graph
 - **EventManager/EventHandler**: Event system for UI interactions
 - **EventHandlerNewGame**: New game dialog handling
 - **EventHandlerFileChooser**: File selection dialog handling
@@ -97,11 +102,11 @@ See `docs/testing.md`.
 
 ### External Dependencies
 
-The project uses CMake's ExternalProject system to manage dependencies:
-- **boost**: System, filesystem, and iostreams libraries
-- **libRocket**: GUI framework for game interface
+Dependencies are fetched by CMake (FetchContent / ExternalProject):
+- **RmlUi**: GUI framework for the game interface (successor to libRocket)
+- **GLFW**: Window, input and context creation
 - **libsgfcplusplus**: SGF file parsing and generation
-- **glyphy**: Text rendering library for overlay
+- **glyphy**: Text rendering library for the overlay
 - **freetype2**: Font rendering
 - **portaudio**: Audio playback
 - **libsndfile**: Audio file format support
@@ -109,24 +114,30 @@ The project uses CMake's ExternalProject system to manage dependencies:
 - **spdlog**: Logging framework
 - **clipp**: Command-line argument parsing
 - **GLM**: OpenGL mathematics library
+- **doctest**: Unit test framework
+- **glad**: OpenGL loader (vendored in `src/glad/`)
+
+Boost is no longer used.
 
 ### Platform-Specific Code
 
-The codebase supports multiple platforms with platform-specific implementations in:
-- **shell/src/win32/**: Windows-specific shell implementation
-- **shell/src/x11/**: Linux X11 implementation
-- **shell/src/macosx/**: macOS implementation (if needed)
+There is **no `shell/` layer**; it was replaced by GLFW plus the small `AppState`
+namespace (`src/AppState.h`), which owns the window handle, fullscreen toggling
+and exit/restart requests. The remaining platform-specific code is `#ifdef
+_WIN32` inline — process creation and pipes in `gtpclient.cpp`, the window icon
+and `_spawnv` restart in `main.cpp`.
 
 ### Key Directories
 
 - **src/**: Main source code
 - **config/**: Configuration files, shaders, fonts, sounds, GUI resources
 - **config/shaders/**: GLSL shader files for ray-traced rendering
-- **config/gui/**: libRocket GUI templates and stylesheets
+- **config/gui/**: RmlUi GUI templates and stylesheets, one folder per language
 - **games/**: SGF game record storage
 - **engine/**: External Go engines (GNU Go, KataGo, etc.)
 - **cmake/**: CMake find modules for dependencies
 - **tests/**: unit tests, SGF fixtures, the mock GTP engine, and `tests/scenarios/`
+- **docs/architecture.md**: the component and thread map — start here
 - **docs/adr/**: Architecture Decision Records — why the code is the way it is
 
 ### Configuration System

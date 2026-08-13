@@ -28,7 +28,11 @@ The path can be configured in [configuration.md](configuration.md):
 Games are automatically saved:
 - When a game ends (resignation or double pass)
 - When starting a new game (saves the previous game)
+- When switching or loading another game
 - When quitting the application
+
+The **Save** button is enabled only when there is something unsaved; between
+those points the record is held in memory.
 
 ### File Naming
 
@@ -49,9 +53,15 @@ Examples:
 3. Games are listed with metadata: board size, players, moves, result
 4. Click a game to load it
 
+### Automatically, on startup
+
+The application reopens what you had last time — the file, the game within it,
+and the position in the tree. See [User Settings](user-settings.md).
+
 ### Via Command Line
 
-Currently, SGF files can only be loaded through the GUI file browser.
+There is no command-line option to open an SGF. Scripted runs can use the
+`load_sgf` and `load_tsumego` commands; see [Testing](testing.md).
 
 ## Navigation
 

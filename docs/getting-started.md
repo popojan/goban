@@ -48,7 +48,10 @@ Add an entry to the `bots` array in `config/base.json`. See [Configuration](conf
 
 2. **The intro animation plays** - The camera swoops down to the board
 
-3. **Place a stone**: Click on any intersection to place a black stone. The AI will respond.
+3. **Place a stone**: Placing a stone takes **two clicks** — the first takes one
+   out of the bowl, the second puts it down on the intersection you choose.
+   Nothing is recorded until the second click, so the first one commits you to
+   nothing. The AI then responds.
 
 4. **Continue playing**: Alternate placing stones. The AI responds after each human move.
 
@@ -91,21 +94,28 @@ Common setups:
 
 ## Analysis Mode
 
-Analysis mode enables free exploration of positions. It is set automatically when loading SGF files and can be toggled manually at any time.
+Analysis mode enables free exploration of positions. It is set automatically when
+loading a **finished** SGF game, and can be toggled manually at any time.
 
 **Toggle Analysis Mode**: Press **Enter** or use the Game menu
 
 When Analysis mode is active:
 - You can play either color by clicking on the board
-- The engine responds with one move (if assigned to the responding color)
+- The **configured kibitz engine** replies to every move, whichever colour is to
+  move and regardless of who is assigned to it
 - Bot-vs-bot games pause automatically
 - Undo removes a single move
 - Press **Space** to trigger a kibitz suggestion without playing
 
+It is **not available when both players are human**, since every move would then
+be answered by the engine — quietly turning a hotseat game into
+human-versus-engine. Kibitz needs no such thing: **Space** asks the engine for one
+move in an ordinary match, with two humans, at any time.
+
 When Match mode is active:
 - Strict turn alternation with assigned player roles
 - Engine responds automatically after your move
-- Undo removes two moves (your move + engine's automatic response)
+- Undo removes a single move, exactly as in Analysis mode
 
 See [Game Modes](game-modes.md) for detailed use cases and behavior.
 
@@ -140,5 +150,8 @@ Press **V** to cycle through visual styles:
 
 - **Save your camera position**: After adjusting the view, use **Menu > Camera > Save** to remember it
 - **Kibitz move**: Press **Space** to see the AI's suggested move
-- **Undo**: Press **U** to undo the last move (when playing against AI)
+- **Undo**: Press **U** to step back one move
 - **Quick new game**: Click anywhere on the board after a game ends
+- **You are where you left off**: board size, komi, handicap, player assignments
+  and the position you were looking at all come back on the next launch. See
+  [User Settings](user-settings.md).

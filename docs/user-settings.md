@@ -1,105 +1,150 @@
 # User Settings
 
-The application stores user preferences in `user.json` in the working directory. This file is created automatically and remembers settings between sessions.
+The application stores user preferences in `user.json` in the working directory.
+The file is created automatically and remembers your setup between sessions —
+including, since the session-restore work, the game you were in the middle of.
 
 ## File Location
 
 - **Working directory**: `./user.json`
-- Created on first settings change
-- Delete to reset all preferences
+- Created on the first settings change
+- Delete it to reset every preference
 
-## Settings Overview
+A scripted run never touches it: `--script` redirects persistence to
+`scenario-user.json`, and `--user-settings <file>` redirects it anywhere you
+like. See [Testing](testing.md).
 
-### Automatically Saved
+## What is saved
 
-These settings are saved immediately when changed:
+### Saved immediately, when the setting changes
 
-| Setting | Trigger | Description |
-|---------|---------|-------------|
-| `last_config` | On startup | Path to the configuration file used; restored on next launch |
+| Key | Trigger | Description |
+|---|---|---|
+| `last_config` | Language menu, or `-c` on the command line | Configuration file used; restored on next launch |
 | `fullscreen` | **F** key | Fullscreen window state |
-| `shader.name` | **V** key or dropdown | Selected shader variant name |
+| `sound_enabled` | Sound toggle | Stone-placement sound |
+| `shader.name` | **V** key or the shader dropdown | Selected shader variant |
+| `game.board_size`, `game.handicap` | Whenever a new game starts — which the board-size and handicap dropdowns both do | |
+| `game.komi` | Komi dropdown | |
+| `game.black_player`, `game.white_player` | Player dropdowns | Who plays each colour, by name |
 
-### Saved on Explicit Action
+The `game` block is what the *next* fresh start uses — board size, komi, handicap
+and the two player assignments are **all remembered**, so the application comes
+back configured the way you left it. Starting a new game also clears the
+`session` block below: you asked for a fresh board, so there is nothing to
+restore.
 
-These settings are saved when using **Menu > Camera > Save**:
+### Saved on **Menu > Camera > Save**
 
-| Setting | Description |
-|---------|-------------|
-| `camera.rotation` | Camera view angle (quaternion x, y, z, w) |
-| `camera.translation` | Camera position including zoom level (x, y, z) |
-| `shader.gamma` | Gamma adjustment (**]** / **[** keys) |
-| `shader.contrast` | Contrast adjustment (**+** / **-** keys) |
-| `shader.eof` | Eye offset factor for stereo shaders |
-| `shader.dof` | Depth of field parameter |
+| Key | Description |
+|---|---|
+| `camera.rotation` | View angle, as a quaternion (x, y, z, w) |
+| `camera.pan` | Look-at point on the board plane (x, y) |
+| `camera.distance` | Distance from the camera to that point |
+| `shader.gamma` | Gamma adjustment (**]** / **[**) |
+| `shader.contrast` | Contrast adjustment (**+** / **-**) |
+| `shader.eof` | Eye offset factor, for the stereo shaders (**H** / **L**) |
+| `shader.dof` | Depth of field (**J** / **K**) |
 
-### Not Persisted
+This is the *preset*, restored by **Menu > Camera > Reset** (**C**). It is
+separate from the camera you happen to be looking through — see below.
 
-The following settings are **not** saved between sessions:
+### Saved on exit
 
-- Board size, komi, handicap (reset to defaults on new game)
-- Player selections (human vs engine assignments)
+| Key | Description |
+|---|---|
+| `camera_current` | Where the camera actually was when you quit, in the same format as `camera` |
+| `last_sgf_path` | The SGF that was open |
+| `start_fresh` | Set when you cleared the board, so the next launch does not reload a game |
+| `session.file` | SGF file to restore |
+| `session.game_index` | Which game within that file (a daily session file holds many) |
+| `session.tree_path_length` | Navigation depth to restore |
+| `session.tree_path` | Branch choices, recorded **only at multi-child nodes** |
+| `session.is_external` | Whether the file was an external SGF rather than the daily session |
+| `session.tsumego_mode`, `session.analysis_mode` | Modes that were active |
+
+On the next launch, startup peeks at `session.file` for the board size, renders
+the board immediately, and queues the tree-path navigation so it runs on the game
+thread as soon as the first engine is up. If the file has gone missing the
+session state is cleared and the application falls back to `last_sgf_path`, then
+to today's daily session file.
+
+### Not persisted
+
 - Window size and position
-- Current game state
+- Which shader *adjustments* are live, unless you saved the camera preset
 
 ## Example user.json
 
 ```json
 {
   "camera": {
-    "rotation": {
-      "w": 0.0,
-      "x": -0.886,
-      "y": 0.464,
-      "z": 0.0
-    },
-    "translation": {
-      "x": 0.077,
-      "y": 0.273,
-      "z": -0.432
-    }
+    "distance": 3.1,
+    "pan": { "x": 0.0, "y": -0.2 },
+    "rotation": { "w": 0.0, "x": -0.9, "y": 0.5, "z": 0.0 }
+  },
+  "camera_current": {
+    "distance": 3.1,
+    "pan": { "x": 0.0, "y": -0.2 },
+    "rotation": { "w": 0.0, "x": -0.874, "y": 0.486, "z": 0.0 }
   },
   "fullscreen": false,
-  "last_config": "./config/en.json",
+  "game": {
+    "black_player": "GNU Go 3.8",
+    "board_size": 13,
+    "handicap": 0,
+    "komi": 7.5,
+    "white_player": "Katago #kata9x9 b18"
+  },
+  "last_config": "./config/cs.json",
+  "last_sgf_path": "./games/2026-08-12.sgf",
+  "session": {
+    "analysis_mode": false,
+    "file": "./games/2026-08-12.sgf",
+    "game_index": 1,
+    "is_external": false,
+    "tree_path": [],
+    "tree_path_length": 96,
+    "tsumego_mode": false
+  },
   "shader": {
     "contrast": 0.0,
-    "dof": 0.01,
-    "eof": 0.025,
+    "dof": 0.0925,
+    "eof": 0.0725,
     "gamma": 1.0,
-    "name": "Red Carpet"
-  }
+    "name": "Minimal Thin"
+  },
+  "sound_enabled": true,
+  "start_fresh": false
 }
 ```
 
+Every key is optional. A missing one falls back to its default, so a hand-edited
+file with only `last_config` in it is perfectly valid.
+
 ## Managing Settings
 
-### Save Camera Position
+### Save the camera position
 
-After adjusting the view to your liking:
+Adjust the view, then **Menu > Camera > Save**. The camera *and* the four shader
+adjustments are written to the preset.
 
-1. Open **Menu > Camera**
-2. Click **Save**
+### Reset to defaults
 
-The camera position and shader adjustments are now saved.
+**Menu > Camera > Delete** removes `user.json` entirely and returns the camera to
+its built-in default. That resets every preference in this document, not just the
+camera. Deleting the file by hand does the same thing.
 
-### Reset to Defaults
+### Change the default language
 
-To reset all user settings:
-
-1. Open **Menu > Camera**
-2. Click **Delete**
-
-Or manually delete `user.json` from the application directory.
-
-### Change Default Language
-
-The application remembers which language configuration was last used. To change:
+The application remembers the configuration last used:
 
 1. Start with a different config: `./goban -c config/zh.json`
-2. The choice is saved to `last_config` automatically
-3. Next time, `./goban` will use Chinese
+2. The choice is saved to `last_config`
+3. Next time, plain `./goban` uses it
 
-Or edit `user.json` directly:
+Or edit the file directly:
+
 ```json
 "last_config": "./config/ja.json"
 ```
