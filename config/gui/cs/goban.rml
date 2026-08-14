@@ -246,8 +246,9 @@
     <!-- Status indicator templates. %s is the engine name for the loading case,
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">Načítání %s…</div>
-    <div class="template" id="tplStatusWarning">⚠ %d zpráv</div>
-    <div class="template" id="tplStatusError">⚠ %d zpráv</div>
+    <div class="template" id="tplStatusMessages">× Zprávy</div>
+    <div class="template" id="tplStatusWarning">⚠ Zprávy (%d)</div>
+    <div class="template" id="tplStatusError">⚠ Zprávy (%d)</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

@@ -564,31 +564,42 @@ void ElementGame::syncStatusIndicator() {
 
     auto& log = MessageLog::instance();
     const std::string loading = enginesLoaded ? std::string() : engine.engineLoadingSummary();
-    const bool unseen = log.hasUnseen();
 
     std::string text;
     const char* severityClass = nullptr;
-    if (!loading.empty()) {
+    if (logPanelOpen) {
+        // While the panel is open this line is the only way to close it again,
+        // so it must always be present. It was not: opening marked the messages
+        // seen, which emptied the badge, which hid the element — leaving the
+        // panel up with nothing to click but a menu nobody thinks to look in.
+        text = getTemplateText(context, "tplStatusMessages");
+        severityClass = "open";
+    } else if (!loading.empty()) {
         text = Rml::CreateString(getTemplateText(context, "tplStatusLoading").c_str(),
                                  loading.c_str()).c_str();
         severityClass = "loading";
-    } else if (unseen) {
+    } else if (log.hasUnseen()) {
+        // Messages since the panel was last opened, not the size of the buffer.
+        // The count is parenthesised rather than agreeing with a noun: Czech
+        // needs three plural forms (1 zpráva / 2 zprávy / 5 zpráv), Japanese,
+        // Korean and Chinese have none, and "Zprávy (3)" is correct in all five
+        // without a plural-rules library.
         const bool isError = log.unseenSeverity() == MessageSeverity::Error;
         text = Rml::CreateString(
             getTemplateText(context, isError ? "tplStatusError" : "tplStatusWarning").c_str(),
-            static_cast<int>(log.size())).c_str();
+            static_cast<int>(log.unseenCount())).c_str();
         severityClass = isError ? "error" : "warning";
     }
 
-    // Loading takes precedence over the badge deliberately: during startup the
-    // warnings that raise it are usually about the very engines still loading,
-    // and the badge stays behind to be shown the moment loading ends.
+    // Open beats loading beats the badge. Loading over the badge is deliberate:
+    // during startup the warnings that raise it are usually about the very
+    // engines still loading, and it waits to be shown the moment loading ends.
     const bool changed = (text != statusTextShown);
     if (changed) {
         status->SetInnerRML(text.c_str());
         statusTextShown = text;
     }
-    for (const char* c : {"loading", "warning", "error"}) {
+    for (const char* c : {"loading", "warning", "error", "open"}) {
         const bool want = severityClass && std::string(c) == severityClass;
         if (status->IsClassSet(c) != want) {
             status->SetClass(c, want);
@@ -617,6 +628,10 @@ void ElementGame::rebuildLogPanel() {
     auto& log = MessageLog::instance();
     const auto entries = log.entries();
     logVersionShown = log.version();
+    // The panel is on screen showing these, so they are seen by definition.
+    // Without this, messages arriving while it is open would still be counted as
+    // new, and closing it would raise a badge for entries already read.
+    log.markSeen();
 
     // Newest first. The alternative — oldest first, scrolled to the bottom —
     // needs a layout pass before SetScrollTop() means anything, so the panel

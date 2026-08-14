@@ -234,8 +234,9 @@
     <!-- Status indicator templates. %s is the engine name for the loading case,
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">%s 불러오는 중…</div>
-    <div class="template" id="tplStatusWarning">⚠ %d개의 메시지</div>
-    <div class="template" id="tplStatusError">⚠ %d개의 메시지</div>
+    <div class="template" id="tplStatusMessages">× 메시지</div>
+    <div class="template" id="tplStatusWarning">⚠ 메시지 (%d)</div>
+    <div class="template" id="tplStatusError">⚠ 메시지 (%d)</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

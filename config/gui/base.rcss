@@ -231,10 +231,17 @@ div.template {
 #lblStatus {
   display: none;             /* shown only while loading, or with unseen messages */
   padding: 0.25rem 0.5rem;
+  /* Its own backing, for two reasons: over a lit wooden board and a bowl of
+     white stones, coloured text alone is unreadable; and when the panel is open
+     this is its header, so the two must read as one surface. */
+  background-color: #000000b0;
 }
 #lblStatus.loading { display: block; color: #ffffffa0; }
 #lblStatus.warning { display: block; color: #ffd080f0; }
 #lblStatus.error   { display: block; color: #ff9090f0; }
+/* Shown whenever the panel is open, whatever the badge would otherwise say:
+   it is the only close affordance the panel has. */
+#lblStatus.open    { display: block; color: #ffffffa0; font-size: 11pt; }
 #lblStatus:hover { color: #fffffff0; }
 
 #pnlLog {

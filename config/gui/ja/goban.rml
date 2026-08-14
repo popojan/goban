@@ -234,8 +234,9 @@
     <!-- Status indicator templates. %s is the engine name for the loading case,
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">%s を読み込み中…</div>
-    <div class="template" id="tplStatusWarning">⚠ %d 件のメッセージ</div>
-    <div class="template" id="tplStatusError">⚠ %d 件のメッセージ</div>
+    <div class="template" id="tplStatusMessages">× メッセージ</div>
+    <div class="template" id="tplStatusWarning">⚠ メッセージ (%d)</div>
+    <div class="template" id="tplStatusError">⚠ メッセージ (%d)</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

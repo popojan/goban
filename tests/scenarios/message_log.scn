@@ -17,7 +17,10 @@ expect log_count 0
 expect log_badge none
 expect log_open false
 
-# The panel opens and closes on command.
+# The panel opens and closes on command. Closing matters more than it looks:
+# opening marks the messages seen, which empties the badge, which used to hide
+# the status line — leaving the panel up with nothing to click but a menu entry
+# nobody thinks to look in. The line now shows a close header while open.
 toggle_log
 expect log_open true
 
@@ -51,3 +54,37 @@ load_sgf tests/data/still_not_there.sgf
 settle
 expect log_badge error
 expect log_count >= 1
+
+# Closing is still possible after the badge has been cleared — the dead end
+# above. Open with messages pending, which marks them seen, then close.
+toggle_log on
+expect log_open true
+expect log_badge none
+expect log_unseen 0
+toggle_log
+expect log_open false
+
+# And clearing from inside the panel does not strand it open either.
+load_sgf tests/data/gone_again.sgf
+settle
+toggle_log on
+log_clear
+expect log_count 0
+expect log_open true
+toggle_log
+expect log_open false
+
+# The badge counts what arrived since the last look, not the buffer.
+log_clear
+expect log_unseen 0
+load_sgf tests/data/nope_one.sgf
+settle
+load_sgf tests/data/nope_two.sgf
+settle
+# Two failed loads, each logging a warning and an error.
+expect log_unseen >= 2
+expect log_badge error
+toggle_log on
+expect log_unseen 0
+toggle_log
+expect log_badge none

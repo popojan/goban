@@ -247,8 +247,9 @@
     <!-- Status indicator templates. %s is the engine name for the loading case,
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">Loading %s…</div>
-    <div class="template" id="tplStatusWarning">⚠ %d messages</div>
-    <div class="template" id="tplStatusError">⚠ %d messages</div>
+    <div class="template" id="tplStatusMessages">× Messages</div>
+    <div class="template" id="tplStatusWarning">⚠ Messages (%d)</div>
+    <div class="template" id="tplStatusError">⚠ Messages (%d)</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

@@ -1530,6 +1530,10 @@ nlohmann::json GobanControl::dumpState() const {
     {
         const auto& log = MessageLog::instance();
         s["log_count"]  = static_cast<int>(log.size());
+        // What the badge actually counts: arrivals since the panel was last
+        // opened. log_count saturates at the buffer capacity and so cannot tell
+        // "nothing new" from "the buffer is full".
+        s["log_unseen"] = static_cast<int>(log.unseenCount());
         s["log_open"]   = parent->isLogPanelOpen();
         s["log_badge"]  = !log.hasUnseen() ? "none"
                         : (log.unseenSeverity() == MessageSeverity::Error ? "error" : "warning");

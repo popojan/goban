@@ -87,10 +87,39 @@ TEST_CASE("markSeen clears the badge but keeps the entries") {
     log.markSeen();
     CHECK_FALSE(log.hasUnseen());
     CHECK(log.unseenSeverity() == MessageSeverity::Info);
+    CHECK(log.unseenCount() == 0);
     CHECK(log.size() == 1);          // opening the panel must not empty it
 
     log.add(MessageSeverity::Warning, "10:00:01", "again");
     CHECK(log.hasUnseen());          // and a new one flags again
+    CHECK(log.unseenCount() == 1);
+}
+
+TEST_CASE("the badge counts arrivals since the last look, not the buffer") {
+    // The badge reads "Messages (3)". If that number were size(), it would
+    // saturate at the capacity and mean "200 or more, ever" — which says
+    // nothing about whether anything happened since the user last looked.
+    auto& log = freshLog(4);
+
+    log.add(MessageSeverity::Warning, "10:00:00", "one");
+    log.add(MessageSeverity::Warning, "10:00:01", "two");
+    CHECK(log.unseenCount() == 2);
+    CHECK(log.size() == 2);
+
+    log.markSeen();
+    CHECK(log.unseenCount() == 0);
+    CHECK(log.size() == 2);          // the entries are still there to read
+
+    log.add(MessageSeverity::Error, "10:00:02", "three");
+    CHECK(log.unseenCount() == 1);   // one new, not three
+
+    // Past the capacity: size() is pinned at 4, the unseen count keeps counting
+    // what actually arrived.
+    for (int i = 0; i < 6; ++i) {
+        log.add(MessageSeverity::Warning, "10:00:03", "more " + std::to_string(i));
+    }
+    CHECK(log.size() == 4);
+    CHECK(log.unseenCount() == 7);
 }
 
 TEST_CASE("the version counter changes on every add, so the panel knows to rebuild") {
@@ -148,6 +177,7 @@ TEST_CASE("clear empties the buffer and the badge") {
     log.clear();
     CHECK(log.size() == 0);
     CHECK_FALSE(log.hasUnseen());
+    CHECK(log.unseenCount() == 0);
 }
 
 TEST_CASE("concurrent writers neither lose entries nor corrupt the buffer") {
@@ -172,6 +202,7 @@ TEST_CASE("concurrent writers neither lose entries nor corrupt the buffer") {
 
     CHECK(log.size() == kThreads * kPerThread);
     CHECK(log.entries().size() == kThreads * kPerThread);
+    CHECK(log.unseenCount() == kThreads * kPerThread);
     CHECK(log.unseenSeverity() == MessageSeverity::Error);
 }
 

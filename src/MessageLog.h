@@ -76,8 +76,19 @@ public:
     [[nodiscard]] bool hasUnseen() const {
         return unseen_.load(std::memory_order_relaxed) > static_cast<int>(MessageSeverity::Info);
     }
-    /// The user has looked. Clears the badge, not the buffer.
-    void markSeen() { unseen_.store(static_cast<int>(MessageSeverity::Info), std::memory_order_relaxed); }
+
+    /// How many entries have arrived since the last markSeen(). This, not
+    /// size(), is what the badge counts: the buffer saturates at its capacity,
+    /// so "200 messages" would mean "200 or more, at some point, ever" — which
+    /// tells a user nothing about whether anything has happened since they last
+    /// looked.
+    [[nodiscard]] size_t unseenCount() const { return unseenCount_.load(std::memory_order_relaxed); }
+
+    /// The user has looked. Clears the badge and the count, not the buffer.
+    void markSeen() {
+        unseen_.store(static_cast<int>(MessageSeverity::Info), std::memory_order_relaxed);
+        unseenCount_.store(0, std::memory_order_relaxed);
+    }
 
     void clear();
 
@@ -95,6 +106,7 @@ private:
     size_t capacity_ = 200;
     std::atomic<uint64_t> version_{0};
     std::atomic<int> unseen_{static_cast<int>(MessageSeverity::Info)};
+    std::atomic<size_t> unseenCount_{0};
 };
 
 /// Attach the log to spdlog's default logger. Captures `info` and worse: the

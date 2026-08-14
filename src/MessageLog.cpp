@@ -26,6 +26,7 @@ void MessageLog::add(MessageSeverity severity, std::string timestamp, std::strin
     // a reader that sees a new version and copies one entry late simply shows it
     // on the next frame.
     version_.fetch_add(1, std::memory_order_relaxed);
+    unseenCount_.fetch_add(1, std::memory_order_relaxed);
     const int level = static_cast<int>(severity);
     int previous = unseen_.load(std::memory_order_relaxed);
     while (level > previous
