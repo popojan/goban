@@ -74,13 +74,46 @@ touch each other's. Results reach the UI the way everything else does — publis
 as plain immutable data, read per frame ([ADR-0006](0006-publish-a-game-snapshot.md)),
 never by the UI thread reaching into the engine.
 
+**6. Analysis yields to the game.** The stream is stopped while any playing
+engine is searching, and resumed when the human is on move. This is not a
+courtesy: on the GPU it is the difference between this feature and a
+bot-versus-bot match, which never has two searches in flight at once — see the
+contention consequence below. It costs little, because analysis is worth most
+exactly when the human is thinking and the coach is idle.
+
 ## Consequences
 
 - **Memory and compute double for the analysis-capable engine.** A second KataGo
-  loads a second copy of the weights and competes for the same GPU or CPU. On a
-  weak machine this is strictly worse than no analysis, which is why (3) makes it
-  opt-out-able and why the default must be considered carefully — see open
-  question 1.
+  loads a second copy of the weights — nothing is shared across processes — and
+  competes for the same device. On a weak machine this is strictly worse than no
+  analysis, which is why (3) makes it opt-out-able and why the default must be
+  considered carefully; see open question 1.
+- **GPU contention is a known, reported failure mode, and this feature is the
+  worst case for it.** Issue #45: a single KataGo repeatedly failing `boardsize`
+  on a GT 730 (1 GB VRAM, driver 474), under both CUDA and OpenCL, while
+  standalone KataGo and Sabaki worked on the same machine. The differentiator was
+  goban's own ray-traced renderer on the same GPU. Three things follow.
+
+  *Idle contention no longer exists.* Issue #52 — 50% GPU load doing nothing —
+  was a real bug (unconditional redraw) and is fixed: rendering is event driven,
+  `getIdleTimeout()` returns -1 with nothing to draw, and the loop blocks in
+  `glfwWaitEvents()`. A static board costs nothing, so the window in which
+  analysis is most useful — the human thinking over a still position — is also
+  the window in which the GPU is most free. That is the fact this feature rests
+  on.
+
+  *The remaining overlap is startup.* `animateIntro()` renders continuously at
+  exactly the moment engines load their weights, which is #45's timeline. Two
+  analysis-capable engines means two weight loads inside that same window, on top
+  of the animation. Starting the analysis engine lazily — on first enable rather
+  than at startup — costs nothing and avoids the one sustained collision.
+
+  *A bot-versus-bot match is not the precedent it looks like.* Two engines in a
+  match search **alternately**; there are never two searches in flight. Analysis
+  as naively specified overlaps the coach's genmove by construction, making it
+  harder on the device than the two-bot case people already run. Decision (6)
+  removes the difference by serialising them, which is why it is a decision and
+  not an optimisation.
 - **A new position-change consumer.** The analysis thread has to be told where the
   view is, including during review. That is a second subscriber to the same
   position-change signal the snapshot already carries, and it must tolerate the
@@ -137,6 +170,14 @@ be settled by accident during implementation.
    richer (ownership map, score lead, PV) but KataGo-specific; `lz-analyze` is
    the portable subset. Probe for both, or declare KataGo the only supported
    analysis engine?
+7. **Should the analysis instance get its own engine config?** A search tuned for
+   a live overlay wants few threads, a small batch and a visit cap — the opposite
+   of a playing configuration. Inheriting the kibitz engine's command line
+   (decision 2) inherits its `default_gtp.cfg` too. An `analysis_parameters`
+   override would fix it; whether that is worth a second configuration knob is
+   open. Related: allowing the analysis instance on a CPU backend while the
+   playing engine keeps the GPU, which sidesteps the contention above entirely
+   on machines with cores to spare.
 3. **What does the overlay show while the analysis engine is still loading?**
    Same question as the startup gap in the UX work, and it should get the same
    answer.
