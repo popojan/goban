@@ -2,6 +2,10 @@
 
 **Status:** Proposed
 **Date:** 2026-08-14
+**Revised:** 2026-08-14 — the six open questions are resolved into decisions
+7–15; three narrower ones are left open. Revising in place is allowed only
+because this ADR is still `Proposed`; once it is `Accepted` the append-only rule
+in [README](README.md) applies.
 
 ## Context
 
@@ -46,6 +50,8 @@ report waiting to happen.
 
 ## Decision
 
+### The process
+
 **1. Continuous analysis runs in a dedicated engine process with its own pipes.**
 It is never the coach's process and never the kibitz engine's process, even when
 all three are the same binary with the same command line.
@@ -81,13 +87,155 @@ bot-versus-bot match, which never has two searches in flight at once — see the
 contention consequence below. It costs little, because analysis is worth most
 exactly when the human is thinking and the coach is idle.
 
+### What position it analyses
+
+**7. Analysis follows the review cursor, not the game position.** The overlay
+reports on the position that is on screen, including inside a variation the user
+navigated into rather than played into.
+
+This is the decision that justifies decision 1. If analysis only ever tracked the
+game position, the coach already holds that position, and the rejected
+"time-slice one process" alternative below comes back into contention — a
+separate process would be tidiness rather than necessity. Following the cursor is
+also the case a Go player actually wants numbers in.
+
+Three consequences are part of the decision, because the naive implementation of
+each is wrong:
+
+- **Sync by diff, not by replay.** Reusing `GameThread::syncEngineToPosition()`
+  (`boardsize` → `clear_board` → setup stones → replay every move) would make an
+  arrow key cost one command per move played so far. The analysis thread owns its
+  own pipe and tracks the path it last sent, so it sends the difference: common
+  prefix, then *k* × `undo`, then *m* × `play`. An arrow key is **one command**.
+  Only a jump or a branch switch pays a replay, and that replay is abandonable.
+  This is also more *correct* for KataGo, whose network reads recent-move history
+  planes: reconstructing a position as setup stones changes the policy output,
+  replaying moves does not.
+- **Latest-wins, never a queue.** Holding an arrow key must *replace* the pending
+  target, not enqueue one analysis per key repeat, behind a short debounce
+  (~200 ms). This is not a concession to cost: analysing a position the user is
+  already flicking past has no value, so discarding it is the correct semantics.
+- **The path has to be published.** `GameSnapshot` carries `moveCount` and
+  `lastStoneMove`, not the move list. Following the cursor needs a position
+  identity plus the moves that reach it, published from the same funnel
+  (`GobanModel::onBoardChange()`) as everything else in ADR-0006. That is an
+  addition to an existing mechanism, not a new one.
+
+### Defaults and configuration
+
+**8. Off by default, discoverable, sticky, and started lazily.** The toggle is
+present whenever an analysis-capable engine resolves; enabling it is what starts
+the process; the choice persists in `user.json`. On-by-default would ship a
+second weight load to every machine — including the ones issue #45 says this can
+break — to save one click, and a sticky toggle costs the KataGo user that click
+once ever, not once per session. Lazy start also keeps the second weight load out
+of `animateIntro()`, which is the one sustained contention window (see below).
+
+**9. Speak `lz-analyze`; treat `kata-analyze`'s extra fields as optional.**
+KataGo's line format is lz-analyze's with extra keys, so parsing the shared
+subset (`move`, `visits`, `winrate`, `order`, `pv`) and reading `scoreLead` and
+`ownership` when present costs almost nothing over a KataGo-only parser, and
+keeps Leela Zero, Sai and the KataGo forks working. Capability is decided by
+`list_commands` at startup, **not** by the engine's name: the existing
+`GtpEngine::supportsKataAnalyze()` (`src/player.cpp:166`) substring-matches
+"kata" in the reported name and must be replaced, not extended. Each optional
+field is offered only where it is reported: an engine that speaks `lz-analyze`
+but not `ownership` gets win rate and suggested moves and no ownership toggle,
+which is decision 12 applied per field rather than per engine.
+
+**10. The analysis instance takes a configuration override, not a second engine
+entry.** `analysis_parameters` (and, if needed, `analysis_command`) on the engine
+it inherits from; absent means inherit unchanged. A search tuned for a live
+overlay wants few threads, a small batch and a visit cap, which is the opposite
+of a playing configuration and would otherwise arrive via the inherited
+`default_gtp.cfg`. The decisive argument is not tuning, though: this is what lets
+the analysis instance run a CPU/Eigen backend while the playing engine keeps the
+GPU, which **sidesteps the contention consequence below entirely** on any machine
+with cores to spare. That makes the knob the mitigation for this ADR's worst
+risk, not a convenience.
+
+### What the user sees
+
+**11. Analysis gets its own display surface, and it is a third one.** Not
+`#lblMessage`. CLAUDE.md's two message surfaces split on ownership —
+application status versus game content — and this splits on a different axis that
+now has to be named:
+
+> `#lblMessage` carries **events**: things that happened once, that scroll past.
+> The analysis surface carries **state**: a value that is continuously true.
+
+A continuously-changing number in `#lblMessage` would be the fifth claimant *and*
+the only one that repaints twice a second, flickering over results and SGF
+comments. Build it in RmlUi — a bar and a label get layout, styling and
+translation for free — and reserve `GobanOverlay`/glyphy for the on-board move
+labels, which genuinely need board coordinates. The per-colour corners in
+`grpPlayers`, which already carry the capture counts, are the natural home for a
+per-colour evaluation. **Fix the frame of reference at display time:** KataGo
+reports winrate for the side to move, so showing it raw flips every move and
+reads as noise. Pick one colour and convert. This is the same shape as the
+prisoner counts that shipped swapped.
+
+**12. Absent data is absent. Never a placeholder.** While the analysis engine is
+loading, or after a failed probe, the overlay shows nothing — no empty bar, no
+zeroed score, no spinner on the board. Loading progress goes to `#lblStatus`,
+which is where application status already lives. A winrate bar sitting at 50%
+because nothing has been computed is indistinguishable from a genuine 50%; that
+is CLAUDE.md's "a failed score is not a score of zero" restated for a new
+subsystem, and it is the same mistake that cost a day on 2026-08-13.
+
+The yield window (decision 6) is the one case that is *stale* rather than absent,
+and it is different in kind: the numbers were true for a position the board no
+longer shows. Blanking them once per move would flicker; leaving them unmarked
+would assert them. They stay, visibly marked as stale, until the next report
+replaces them.
+
+**13. Live ownership and the Territory toggle are mutually exclusive, and look
+different.** They are different claims about the board: Territory is a final,
+scored fact gated on `scoredEnd`; ownership is a live estimate that is wrong by
+construction early in the game. Territory keeps the existing opaque area markers;
+ownership renders as continuous shading, so the two cannot be mistaken for each
+other, and enabling either disables the other. Ownership is its own sub-toggle,
+below win rate and score, because `kata-analyze ... ownership true` roughly
+doubles the stream volume for something most users will not want on.
+
+This also settles the shipping order. `backlog/issue-49-realtime-analysis.md`
+treats shader work as a prerequisite for the whole feature. Half of it is already
+done — grid-line hiding at annotated points shipped as `Board::mAnnotation` /
+`cidAnnotation` (`src/Board.cpp:9`, `fragment/partial/scene/object/stones.glsl`)
+— and the half that remains, the two-layer glyphy overlay, gates only the
+**on-board move labels**. Win rate and score need no rendering work at all;
+ownership shading needs a *different* rendering decision (open question 1), not
+that one. **Ship the numbers first; the board annotations follow.**
+
+### Transport and cost
+
+**14. The redraw rate is decoupled from the analysis update rate.** The
+overlay wakes the renderer via `glfwPostEmptyEvent()` only when a *displayed*
+value changes materially, capped at roughly 2 Hz — not by returning a polling
+interval from `ElementGame::getIdleTimeout()`. Without this, the argument in the
+consequences below eats itself: it rests on issue #52's fix (a static board
+blocks in `glfwWaitEvents()` and costs nothing), and a stream that dirties the UI
+on every report turns the ray-traced renderer back on continuously, on the same
+GPU, in exactly the window the argument claims is free. This is a decision rather
+than an implementation detail because it is where issue #45's class of bug lives.
+
+**15. The stream is not an `issueCommand()`, and stopping it is not a `stop`
+command.** `GtpClient::issueCommand()` is request/response and structurally
+cannot consume an unbounded stream; the analysis client needs its own reader loop
+over `Process::readLine(line, timeoutMs)`, which already exists. And there is no
+`stop` in the lz/kata-analyze extension — the convention is that **any** input
+line terminates the stream, which `src/player.cpp:194` already exploits by
+sending `name`. The timeout obligation stands as written: bound the wait for the
+stream to go quiet, and kill an engine that will not, on the `scoringTimeout()`
+precedent.
+
 ## Consequences
 
 - **Memory and compute double for the analysis-capable engine.** A second KataGo
   loads a second copy of the weights — nothing is shared across processes — and
   competes for the same device. On a weak machine this is strictly worse than no
-  analysis, which is why (3) makes it opt-out-able and why the default must be
-  considered carefully; see open question 1.
+  analysis, which is why (3) makes it opt-out-able, why (8) makes it off by
+  default, and why (10) exists to let the second instance run somewhere else.
 - **GPU contention is a known, reported failure mode, and this feature is the
   worst case for it.** Issue #45: a single KataGo repeatedly failing `boardsize`
   on a GT 730 (1 GB VRAM, driver 474), under both CUDA and OpenCL, while
@@ -100,13 +248,14 @@ exactly when the human is thinking and the coach is idle.
   `glfwWaitEvents()`. A static board costs nothing, so the window in which
   analysis is most useful — the human thinking over a still position — is also
   the window in which the GPU is most free. That is the fact this feature rests
-  on.
+  on, and decision 14 is what stops the feature from spending it.
 
   *The remaining overlap is startup.* `animateIntro()` renders continuously at
   exactly the moment engines load their weights, which is #45's timeline. Two
   analysis-capable engines means two weight loads inside that same window, on top
   of the animation. Starting the analysis engine lazily — on first enable rather
-  than at startup — costs nothing and avoids the one sustained collision.
+  than at startup — costs nothing and avoids the one sustained collision; (8)
+  makes that the default rather than an option.
 
   *A bot-versus-bot match is not the precedent it looks like.* Two engines in a
   match search **alternately**; there are never two searches in flight. Analysis
@@ -119,14 +268,20 @@ exactly when the human is thinking and the coach is idle.
   position-change signal the snapshot already carries, and it must tolerate the
   user navigating faster than the engine answers — every position change cancels
   the outstanding analysis.
-- **`stop` is itself a command.** Cancelling a stream is not free, and an engine
-  that ignores `stop` wedges the analysis thread. The scoring timeout precedent
-  applies: bound it, and kill an engine that will not answer.
+- **Decision 7 makes decision 4 load-bearing, not merely true.** Once analysis
+  follows the cursor, the analysis engine is *permanently* at a position nobody
+  else is at, so it can never be borrowed for a kibitz move, a legality check or
+  a score — not "should not", *cannot*. Any future code that reaches for "an
+  engine that is already loaded" must exclude it explicitly.
 - Accepted: two engines may hold the same weights, and a user who wants exactly
   one KataGo must choose between analysis and playing against it.
 - Accepted: the overlay can disagree with the coach about the score, since they
   are different processes with possibly different rulesets. Goban has no ruleset
   concept (see ADR-0003), so this is not newly broken, only newly visible.
+- Accepted: a third display surface. CLAUDE.md's "two surfaces, and they do not
+  overlap" becomes three, with the event-versus-state split in (11) as the rule
+  that keeps them from colliding. That invariant moves into CLAUDE.md when the
+  surface exists, not before.
 - Good: nothing in the existing game loop changes. No genmove is interrupted, no
   pipe is shared, and the feature can be built and tested without touching
   `gameLoop()`.
@@ -143,11 +298,29 @@ exactly when the human is thinking and the coach is idle.
   because the only reliable idle window is the 500 ms inter-move sleep; every
   navigation, `play`, and `final_score` would have to stop and restart the
   stream, and a `stop` that is slow to answer stalls the game rather than just
-  the overlay. It also does nothing for the two-positions-at-once problem. Worth
-  revisiting only as the low-memory mode if open question 1 demands one.
+  the overlay. It also does nothing for the two-positions-at-once problem, which
+  decision 7 makes the central one. Worth revisiting only as the low-memory mode
+  if the memory cost proves unaffordable in practice.
 - **Analyse on the coach between moves.** Same as above with the additional
   property that a wedged analysis stream takes down scoring and legality. This is
   the failure that took the whole chain down on 2026-08-13.
+- **Track the game position only, and hide the overlay during review.** The
+  cheap half of decision 7: no path diffing, no new published field, and the
+  overlay is never wrong about what it describes. Rejected because it removes the
+  reason for a separate process — the coach is already at that position — and
+  because review is where the numbers are worth most. The cost that motivated it
+  turned out to be an artefact of reusing `syncEngineToPosition()`; incremental
+  `undo`/`play` makes an arrow key one command.
+- **Bind the overlay to `GameMode::ANALYSIS`.** Superficially attractive: a mode
+  called Analysis showing analysis. Rejected because that flag means something
+  unrelated — Sabaki-style turn handling, where the human plays either colour and
+  the engine auto-replies — and it is refused outright for human-versus-human
+  matches (`GameThread.cpp:1065`). Enabling a display feature would change *who
+  plays*. Given what `coach`/`kibitz`-as-indices already cost, the overlay gets
+  its own toggle and a name that is not "analysis mode".
+- **Put win rate and score in `#lblMessage`.** Zero new UI. Rejected by (11): it
+  is already contended by results, comments, diagnostics and prompts, and this
+  would be the only claimant that repaints continuously.
 - **A separate lightweight estimator inside goban** (no engine at all). Goban has
   no evaluation function and no ruleset concept; territory flood-fill is local
   but dead-stone determination already comes from an engine. Building one is a
@@ -160,40 +333,32 @@ exactly when the human is thinking and the coach is idle.
 
 ## Open questions
 
-Deliberately unresolved. The decision above stands without them, but none should
-be settled by accident during implementation.
+The six that shipped with this proposal are resolved above. Three narrower ones
+remain, and none of them blocks the numbers-only first stage.
 
-1. **Is analysis on or off by default when an analysis-capable engine exists?**
-   Off is safe and surprises nobody; on is what a user who configured KataGo
-   expects. Entangled with the memory cost.
-2. **Which protocol?** `kata-analyze`/`kata-analyze ... ownership true` is far
-   richer (ownership map, score lead, PV) but KataGo-specific; `lz-analyze` is
-   the portable subset. Probe for both, or declare KataGo the only supported
-   analysis engine?
-7. **Should the analysis instance get its own engine config?** A search tuned for
-   a live overlay wants few threads, a small batch and a visit cap — the opposite
-   of a playing configuration. Inheriting the kibitz engine's command line
-   (decision 2) inherits its `default_gtp.cfg` too. An `analysis_parameters`
-   override would fix it; whether that is worth a second configuration knob is
-   open. Related: allowing the analysis instance on a CPU backend while the
-   playing engine keeps the GPU, which sidesteps the contention above entirely
-   on machines with cores to spare.
-3. **What does the overlay show while the analysis engine is still loading?**
-   Same question as the startup gap in the UX work, and it should get the same
-   answer.
-4. **Does analysis follow the cursor during review, or only the game position?**
-   Following the cursor is the useful behaviour and the reason for a separate
-   process — but it means re-sending the whole position on every arrow key.
-5. **Ownership/territory display vs. the existing territory toggle.** They are
-   different things (live estimate vs. final score) drawn on the same board, and
-   `backlog/issue-49-realtime-analysis.md` assumes shader work (grid-line hiding
-   at annotated points) that is not done.
-6. **Where do win rate and score go?** The message box is already contended by
-   results, comments, engine diagnostics and prompts — see the UX work; this
-   feature should not be the fifth claimant.
+1. **What does continuous ownership shading render as?** The board carries one
+   float per point, and it is already doing two jobs: a small enum of material
+   values (`Board::mEmpty` 0, `mAnnotation` 1, `mBlackArea` 2, `mWhiteArea` 3,
+   `mBlack` 5, `mWhite` 6 — the backlog's claim that 1.0 is free is stale, the
+   grid-hiding material exists) plus a fractional offset, `mDeltaCaptured` 0.5,
+   added on top. Territory is binary and fits an enum slot; a continuous
+   ownership value in [-1, 1] does not, and the one free slot (4.0) buys nothing.
+   Whether ownership extends the fractional convention that `mDeltaCaptured`
+   started, or takes a second channel, is a rendering decision of its own and
+   blocks only ownership — not win rate or score.
+2. **Does analysis run in tsumego mode?** An overlay that stars the correct move
+   destroys the puzzle. Off is almost certainly right, but tsumego already
+   carries blanket exclusions elsewhere (`suppressSessionCopy`), and whether this
+   is one more of those or a user-visible choice should be settled when tsumego's
+   UX is next touched rather than guessed at here.
+3. **The stream's visit budget and report cadence.** Decision 14 caps the
+   *redraw* rate; the engine-side `maxVisits` and report interval that keep a
+   live search from saturating a device are a measurement question on real
+   hardware, not an argument. Settle them with numbers.
 
 ## What this does not change
 
 The coach, the kibitz engine, and the sync invariant are untouched. Space still
 asks the kibitz engine for a move on the game thread, exactly as today. This ADR
-only says where the *continuous* analysis stream lives.
+only says where the *continuous* analysis stream lives, what position it tracks,
+and where its output is allowed to appear.
