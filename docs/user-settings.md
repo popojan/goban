@@ -9,6 +9,13 @@ including, since the session-restore work, the game you were in the middle of.
 - **Working directory**: `./user.json`
 - Created on the first settings change
 - Delete it to reset every preference
+- Not tracked in the repository, and nothing ships one: it is yours, and it holds
+  local paths and your language choice. Defaults that ship live in
+  `config/base.json` — see [The default camera](#the-default-camera).
+
+Writes are atomic. The file is written to `user.json.tmp` and renamed over the
+target, so an interrupted save cannot leave a truncated file behind — losing
+every preference at once, which is what the previous truncate-then-write did.
 
 A scripted run never touches it: `--script` redirects persistence to
 `scenario-user.json`, and `--user-settings <file>` redirects it anywhere you
@@ -132,8 +139,30 @@ adjustments are written to the preset.
 ### Reset to defaults
 
 **Menu > Camera > Delete** removes `user.json` entirely and returns the camera to
-its built-in default. That resets every preference in this document, not just the
-camera. Deleting the file by hand does the same thing.
+the default in `config/base.json`. That resets every preference in this document,
+not just the camera. Deleting the file by hand does the same thing.
+
+### The default camera
+
+The view a fresh install opens on — and what **Camera > Reset** returns to when
+you have not saved a preset of your own — is the `camera` block at the top of
+`config/base.json`:
+
+```json
+"camera": {
+  "distance": 3.1,
+  "pan": { "x": 0.0, "y": -0.2 },
+  "rotation": { "w": 0.0, "x": -0.9, "y": 0.5, "z": 0.0 }
+}
+```
+
+Edit it to change the opening view for every new installation. It lives there,
+rather than in `user.json`, because `user.json` is the file the application
+rewrites on every settings change: a default kept in it cannot be shipped without
+also shipping whatever the last session happened to leave behind.
+
+The camera is resolved most-specific-first — where you left it, then your saved
+preset, then this.
 
 ### Change the default language
 

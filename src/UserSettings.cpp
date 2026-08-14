@@ -1,5 +1,7 @@
 #include "UserSettings.h"
+#include <filesystem>
 #include <fstream>
+#include <system_error>
 #include <spdlog/spdlog.h>
 
 UserSettings& UserSettings::instance() {
@@ -8,6 +10,7 @@ UserSettings& UserSettings::instance() {
 }
 
 void UserSettings::load() {
+    std::lock_guard<std::mutex> lock(mutex);
     std::ifstream fin(settingsFile);
     if (!fin) {
         spdlog::debug("No user settings file found");
@@ -119,6 +122,63 @@ void UserSettings::load() {
 }
 
 void UserSettings::save() {
+    std::lock_guard<std::mutex> lock(mutex);
+    saveLocked();
+}
+
+/// Serialise and write. The caller holds the lock.
+void UserSettings::saveLocked() const {
+    const std::string payload = serialize();
+
+    // Write to a sibling temp file and rename over the target. std::ofstream
+    // truncates on open, so the previous form left a window in which the file
+    // on disk was empty or half-written: a crash or a power cut there lost every
+    // setting, silently — load() would find unparseable JSON, warn to a log
+    // nobody reads, and fall back to defaults. rename() is atomic on POSIX and
+    // on Windows when the target exists (MoveFileEx semantics via std::rename
+    // are not, hence the remove-first dance there).
+    const std::string tmp = settingsFile + ".tmp";
+    {
+        std::ofstream fout(tmp, std::ios::binary | std::ios::trunc);
+        if (!fout) {
+            spdlog::warn("Failed to save user settings: cannot write {}", tmp);
+            return;
+        }
+        fout << payload;
+        fout.flush();
+        if (!fout) {
+            spdlog::warn("Failed to save user settings: write to {} failed", tmp);
+            fout.close();
+            std::error_code ec;
+            std::filesystem::remove(tmp, ec);
+            return;
+        }
+    }
+
+    std::error_code ec;
+#ifdef _WIN32
+    // std::filesystem::rename replaces an existing file on Windows too, but only
+    // via the error_code overload; the throwing one is documented as
+    // implementation-defined when the target exists.
+    std::filesystem::rename(tmp, settingsFile, ec);
+    if (ec) {
+        std::filesystem::remove(settingsFile, ec);
+        std::filesystem::rename(tmp, settingsFile, ec);
+    }
+#else
+    std::filesystem::rename(tmp, settingsFile, ec);
+#endif
+    if (ec) {
+        spdlog::warn("Failed to save user settings: cannot replace {} ({})",
+                     settingsFile, ec.message());
+        std::error_code ignored;
+        std::filesystem::remove(tmp, ignored);
+        return;
+    }
+    spdlog::debug("User settings saved");
+}
+
+std::string UserSettings::serialize() const {
     nlohmann::json user;
 
     user["last_config"] = lastConfig;
@@ -156,6 +216,8 @@ void UserSettings::save() {
         };
     };
 
+    // defaultCamera is deliberately absent: it belongs to config/base.json,
+    // which ships with the application and is never written here.
     if (savedCameraLoaded) {
         user["camera"] = serializeCamera(savedCamera);
     }
@@ -176,106 +238,117 @@ void UserSettings::save() {
         };
     }
 
-    std::ofstream fout(settingsFile);
-    if (fout) {
-        fout << user.dump(2);
-        fout.close();
-        spdlog::debug("User settings saved");
-    } else {
-        spdlog::warn("Failed to save user settings");
-    }
+    return user.dump(2);
 }
 
 void UserSettings::setLastConfig(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
     lastConfig = value;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setFullscreen(bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
     fullscreen = value;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setSoundEnabled(bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
     soundEnabled = value;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setLastSgfPath(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
     lastSgfPath = value;
 }
 
 void UserSettings::setStartFresh(bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
     startFresh = value;
 }
 
 void UserSettings::setShaderName(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
     shaderName = value;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setShaderEof(float value) {
+    std::lock_guard<std::mutex> lock(mutex);
     shaderEof = value;
 }
 
 void UserSettings::setShaderDof(float value) {
+    std::lock_guard<std::mutex> lock(mutex);
     shaderDof = value;
 }
 
 void UserSettings::setShaderGamma(float value) {
+    std::lock_guard<std::mutex> lock(mutex);
     shaderGamma = value;
 }
 
 void UserSettings::setShaderContrast(float value) {
+    std::lock_guard<std::mutex> lock(mutex);
     shaderContrast = value;
 }
 
 void UserSettings::setBoardSize(int value) {
+    std::lock_guard<std::mutex> lock(mutex);
     boardSize = value;
     gameSettingsLoaded = true;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setKomi(float value) {
+    std::lock_guard<std::mutex> lock(mutex);
     komi = value;
     gameSettingsLoaded = true;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setHandicap(int value) {
+    std::lock_guard<std::mutex> lock(mutex);
     handicap = value;
     gameSettingsLoaded = true;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setBlackPlayer(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
     blackPlayer = value;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setWhitePlayer(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
     whitePlayer = value;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setPlayers(const std::string& black, const std::string& white) {
+    std::lock_guard<std::mutex> lock(mutex);
     blackPlayer = black;
     whitePlayer = white;
-    save();
+    saveLocked();
 }
 
 void UserSettings::setGameSettings(int newBoardSize, float newKomi, int newHandicap,
                                    const std::string& black, const std::string& white) {
+    std::lock_guard<std::mutex> lock(mutex);
     boardSize = newBoardSize;
     komi = newKomi;
     handicap = newHandicap;
     blackPlayer = black;
     whitePlayer = white;
     gameSettingsLoaded = true;
-    save();
+    saveLocked();
 }
 
 void UserSettings::clearSessionState() {
+    std::lock_guard<std::mutex> lock(mutex);
     sessionFile.clear();
     sessionGameIndex = 0;
     sessionTreePathLength = 0;

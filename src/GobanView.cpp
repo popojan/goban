@@ -20,23 +20,30 @@ GobanView::GobanView(GobanModel& m)
 
     initCam();
 
-    // Restore current camera if available (auto-saved on last exit)
-    // Fall back to saved preset if no current camera (e.g., fresh user.json with only preset)
+    // Where the view starts, most specific first: where the user left it, then
+    // the preset they saved, then the default shipped in the application config.
+    // The last of these is why a fresh install has a considered opening view
+    // without user.json needing to exist — see UserSettings::setDefaultCamera.
     auto& settings = UserSettings::instance();
-    const CameraState* camToRestore = nullptr;
+    CameraState camToRestore;
+    bool haveCamera = true;
     if (settings.hasCurrentCamera()) {
-        camToRestore = &settings.getCurrentCamera();
+        camToRestore = settings.getCurrentCamera();
     } else if (settings.hasSavedCamera()) {
-        camToRestore = &settings.getSavedCamera();
+        camToRestore = settings.getSavedCamera();
+    } else if (settings.hasDefaultCamera()) {
+        camToRestore = settings.getDefaultCamera();
+    } else {
+        haveCamera = false;
     }
-    if (camToRestore) {
-        cam.rLast[0] = camToRestore->rotX;
-        cam.rLast[1] = camToRestore->rotY;
-        cam.rLast[2] = camToRestore->rotZ;
-        cam.rLast[3] = camToRestore->rotW;
+    if (haveCamera) {
+        cam.rLast[0] = camToRestore.rotX;
+        cam.rLast[1] = camToRestore.rotY;
+        cam.rLast[2] = camToRestore.rotZ;
+        cam.rLast[3] = camToRestore.rotW;
         cam.rLast.normalize();
-        cameraPan = glm::vec2(camToRestore->panX, camToRestore->panY);
-        cameraDistance = camToRestore->distance;
+        cameraPan = glm::vec2(camToRestore.panX, camToRestore.panY);
+        cameraDistance = camToRestore.distance;
         baseCameraPan = cameraPan;
         baseCameraDistance = cameraDistance;
     }
@@ -125,15 +132,21 @@ void GobanView::resetView() {
     glm::vec2 targetPan = cameraPan;
     float targetDist = cameraDistance;
 
-    if (settings.hasSavedCamera()) {
-        const auto& cam = settings.getSavedCamera();
-        targetRot[0] = cam.rotX;
-        targetRot[1] = cam.rotY;
-        targetRot[2] = cam.rotZ;
-        targetRot[3] = cam.rotW;
+    // The user's own preset if they saved one, otherwise the shipped default.
+    // Without the second branch, `reset camera` on a fresh install — or after
+    // `delete camera` — reset to wherever the view already was, which looks like
+    // a broken command.
+    const bool haveSaved = settings.hasSavedCamera();
+    if (haveSaved || settings.hasDefaultCamera()) {
+        const CameraState preset = haveSaved ? settings.getSavedCamera()
+                                             : settings.getDefaultCamera();
+        targetRot[0] = preset.rotX;
+        targetRot[1] = preset.rotY;
+        targetRot[2] = preset.rotZ;
+        targetRot[3] = preset.rotW;
         targetRot.normalize();
-        targetPan = glm::vec2(cam.panX, cam.panY);
-        targetDist = cam.distance;
+        targetPan = glm::vec2(preset.panX, preset.panY);
+        targetDist = preset.distance;
     }
 
     if (settings.hasShaderSettings()) {

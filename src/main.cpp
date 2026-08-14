@@ -600,6 +600,27 @@ int main(int argc, char** argv)
         return -1;
     }
 
+    // The view a fresh install opens on, and what `reset camera` falls back to.
+    // It ships in the application config rather than in user.json, which the
+    // application rewrites on every settings change — see UserSettings.h.
+    {
+        using nlohmann::json;
+        const auto cam = config->data.value("camera", json::object());
+        if (!cam.empty()) {
+            const auto rot = cam.value("rotation", json::object());
+            const auto pan = cam.value("pan", json::object());
+            CameraState def;
+            def.rotX = rot.value("x", def.rotX);
+            def.rotY = rot.value("y", def.rotY);
+            def.rotZ = rot.value("z", def.rotZ);
+            def.rotW = rot.value("w", def.rotW);
+            def.panX = pan.value("x", def.panX);
+            def.panY = pan.value("y", def.panY);
+            def.distance = cam.value("distance", def.distance);
+            UserSettings::instance().setDefaultCamera(def);
+        }
+    }
+
     // Create the main RmlUi context
     context = Rml::CreateContext("main", Rml::Vector2i(window_width, window_height));
     if (context == nullptr) {

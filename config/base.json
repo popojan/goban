@@ -1,4 +1,10 @@
 {
+  "_comment_camera": "The view a fresh install opens on, and what `reset camera` returns to when the user has not saved a preset of their own. It lives here, in the file that ships with the application and is never written at runtime, rather than in user.json — that file is the runtime scratchpad, rewritten on every settings change, and keeping the shipped default in it leaked local paths and language into the repository once already (5fe4d48).",
+  "camera": {
+    "distance": 3.1,
+    "pan": { "x": 0.0, "y": -0.2 },
+    "rotation": { "w": 0.0, "x": -0.9, "y": 0.5, "z": 0.0 }
+  },
   "bots": [
     {
       "name": "GNU Go 3.8",
@@ -9,10 +15,10 @@
     },
     {
       "name": "Pachi 12.60",
-      "path": "",
-      "command": "./engine/Pachi-12.60/pachi",
+      "path": "./engine/Pachi",
+      "command": "pachi-12.60-amd64",
       "parameters": "-r japanese --smart-pass",
-      "enabled": 0
+      "enabled": 1
     },
     {
       "name": "Katago #kata1 b28",
@@ -42,8 +48,8 @@
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata9x9-b18c384nbt-20231025.bin.gz -config ./default_gtp.cfg",
-      "enabled": 0,
-      "kibitz": 0,
+      "enabled": 1,
+      "kibitz": 1,
       "messages": [
           {
             "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",

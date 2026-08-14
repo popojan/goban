@@ -13,6 +13,7 @@
 #ifndef GOBAN_USERSETTINGS_H
 #define GOBAN_USERSETTINGS_H
 
+#include <mutex>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
@@ -31,104 +32,131 @@ public:
     void save();
 
     // Config
-    std::string getLastConfig() const { return lastConfig; }
+    std::string getLastConfig() const { std::lock_guard<std::mutex> lock(mutex); return lastConfig; }
     void setLastConfig(const std::string& value);
 
     // Fullscreen
-    bool getFullscreen() const { return fullscreen; }
+    bool getFullscreen() const { std::lock_guard<std::mutex> lock(mutex); return fullscreen; }
     void setFullscreen(bool value);
 
     // Sound
-    bool getSoundEnabled() const { return soundEnabled; }
+    bool getSoundEnabled() const { std::lock_guard<std::mutex> lock(mutex); return soundEnabled; }
     void setSoundEnabled(bool value);
 
     // Last SGF (for resuming after restart)
-    std::string getLastSgfPath() const { return lastSgfPath; }
+    std::string getLastSgfPath() const { std::lock_guard<std::mutex> lock(mutex); return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
 
     // Start fresh (skip auto-loading when user cleared board)
-    bool getStartFresh() const { return startFresh; }
+    bool getStartFresh() const { std::lock_guard<std::mutex> lock(mutex); return startFresh; }
     void setStartFresh(bool value);
 
     // Game settings
-    int getBoardSize() const { return boardSize; }
+    int getBoardSize() const { std::lock_guard<std::mutex> lock(mutex); return boardSize; }
     void setBoardSize(int value);
-    float getKomi() const { return komi; }
+    float getKomi() const { std::lock_guard<std::mutex> lock(mutex); return komi; }
     void setKomi(float value);
-    int getHandicap() const { return handicap; }
+    int getHandicap() const { std::lock_guard<std::mutex> lock(mutex); return handicap; }
     void setHandicap(int value);
-    std::string getBlackPlayer() const { return blackPlayer; }
+    std::string getBlackPlayer() const { std::lock_guard<std::mutex> lock(mutex); return blackPlayer; }
     void setBlackPlayer(const std::string& value);
-    std::string getWhitePlayer() const { return whitePlayer; }
+    std::string getWhitePlayer() const { std::lock_guard<std::mutex> lock(mutex); return whitePlayer; }
     void setWhitePlayer(const std::string& value);
     void setPlayers(const std::string& black, const std::string& white);
     void setGameSettings(int boardSize, float komi, int handicap,
                          const std::string& black, const std::string& white);
-    bool hasGameSettings() const { return gameSettingsLoaded; }
+    bool hasGameSettings() const { std::lock_guard<std::mutex> lock(mutex); return gameSettingsLoaded; }
 
     // Shader
-    std::string getShaderName() const { return shaderName; }
+    std::string getShaderName() const { std::lock_guard<std::mutex> lock(mutex); return shaderName; }
     void setShaderName(const std::string& value);
 
-    float getShaderEof() const { return shaderEof; }
+    float getShaderEof() const { std::lock_guard<std::mutex> lock(mutex); return shaderEof; }
     void setShaderEof(float value);
 
-    float getShaderDof() const { return shaderDof; }
+    float getShaderDof() const { std::lock_guard<std::mutex> lock(mutex); return shaderDof; }
     void setShaderDof(float value);
 
-    float getShaderGamma() const { return shaderGamma; }
+    float getShaderGamma() const { std::lock_guard<std::mutex> lock(mutex); return shaderGamma; }
     void setShaderGamma(float value);
 
-    float getShaderContrast() const { return shaderContrast; }
+    float getShaderContrast() const { std::lock_guard<std::mutex> lock(mutex); return shaderContrast; }
     void setShaderContrast(float value);
 
     // Camera preset (saved via "save camera", applied via "reset camera")
-    const CameraState& getSavedCamera() const { return savedCamera; }
-    void setSavedCamera(const CameraState& state) { savedCamera = state; }
-    bool hasSavedCamera() const { return savedCameraLoaded; }
+    CameraState getSavedCamera() const { std::lock_guard<std::mutex> lock(mutex); return savedCamera; }
+    void setSavedCamera(const CameraState& state) { std::lock_guard<std::mutex> lock(mutex); savedCamera = state; savedCameraLoaded = true; }
+    bool hasSavedCamera() const { std::lock_guard<std::mutex> lock(mutex); return savedCameraLoaded; }
+
+    /// The view a fresh install opens on, from `camera` in the application
+    /// config. Seeded by main() once the config is loaded, and never written
+    /// back — this file is not where shipped defaults belong.
+    ///
+    /// It used to live in `user.json`, which is also the runtime scratchpad the
+    /// application rewrites on every settings change. That put a tracked file in
+    /// permanent conflict with the running program, and it leaked local paths
+    /// and language into the repository once already (5fe4d48, "removed leaked
+    /// local settings" — whose `.gitignore` entry could not help, because
+    /// ignoring does nothing to a file already tracked).
+    void setDefaultCamera(const CameraState& state) { std::lock_guard<std::mutex> lock(mutex); defaultCamera = state; defaultCameraLoaded = true; }
+    CameraState getDefaultCamera() const { std::lock_guard<std::mutex> lock(mutex); return defaultCamera; }
+    bool hasDefaultCamera() const { std::lock_guard<std::mutex> lock(mutex); return defaultCameraLoaded; }
 
     // Current camera (auto-saved on exit, restored on startup)
-    const CameraState& getCurrentCamera() const { return currentCamera; }
-    void setCurrentCamera(const CameraState& state) { currentCamera = state; currentCameraLoaded = true; }
-    bool hasCurrentCamera() const { return currentCameraLoaded; }
+    CameraState getCurrentCamera() const { std::lock_guard<std::mutex> lock(mutex); return currentCamera; }
+    void setCurrentCamera(const CameraState& state) { std::lock_guard<std::mutex> lock(mutex); currentCamera = state; currentCameraLoaded = true; }
+    bool hasCurrentCamera() const { std::lock_guard<std::mutex> lock(mutex); return currentCameraLoaded; }
 
     // Session restoration
-    std::string getSessionFile() const { return sessionFile; }
-    void setSessionFile(const std::string& value) { sessionFile = value; }
-    int getSessionGameIndex() const { return sessionGameIndex; }
-    void setSessionGameIndex(int value) { sessionGameIndex = value; }
-    const std::vector<int>& getSessionTreePath() const { return sessionTreePath; }
-    void setSessionTreePath(const std::vector<int>& value) { sessionTreePath = value; }
-    int getSessionTreePathLength() const { return sessionTreePathLength; }
-    void setSessionTreePathLength(int value) { sessionTreePathLength = value; }
-    bool getSessionIsExternal() const { return sessionIsExternal; }
-    void setSessionIsExternal(bool value) { sessionIsExternal = value; }
-    bool getSessionTsumegoMode() const { return sessionTsumegoMode; }
-    void setSessionTsumegoMode(bool value) { sessionTsumegoMode = value; }
-    bool getSessionAnalysisMode() const { return sessionAnalysisMode; }
-    void setSessionAnalysisMode(bool value) { sessionAnalysisMode = value; }
-    bool hasSessionState() const { return !sessionFile.empty(); }
+    std::string getSessionFile() const { std::lock_guard<std::mutex> lock(mutex); return sessionFile; }
+    void setSessionFile(const std::string& value) { std::lock_guard<std::mutex> lock(mutex); sessionFile = value; }
+    int getSessionGameIndex() const { std::lock_guard<std::mutex> lock(mutex); return sessionGameIndex; }
+    void setSessionGameIndex(int value) { std::lock_guard<std::mutex> lock(mutex); sessionGameIndex = value; }
+    std::vector<int> getSessionTreePath() const { std::lock_guard<std::mutex> lock(mutex); return sessionTreePath; }
+    void setSessionTreePath(const std::vector<int>& value) { std::lock_guard<std::mutex> lock(mutex); sessionTreePath = value; }
+    int getSessionTreePathLength() const { std::lock_guard<std::mutex> lock(mutex); return sessionTreePathLength; }
+    void setSessionTreePathLength(int value) { std::lock_guard<std::mutex> lock(mutex); sessionTreePathLength = value; }
+    bool getSessionIsExternal() const { std::lock_guard<std::mutex> lock(mutex); return sessionIsExternal; }
+    void setSessionIsExternal(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionIsExternal = value; }
+    bool getSessionTsumegoMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionTsumegoMode; }
+    void setSessionTsumegoMode(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionTsumegoMode = value; }
+    bool getSessionAnalysisMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionAnalysisMode; }
+    void setSessionAnalysisMode(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionAnalysisMode = value; }
+    bool hasSessionState() const { std::lock_guard<std::mutex> lock(mutex); return !sessionFile.empty(); }
     void clearSessionState();
 
     // Check if settings were loaded (file existed)
-    bool hasSettings() const { return settingsLoaded; }
-    bool hasShaderSettings() const { return shaderLoaded; }
+    bool hasSettings() const { std::lock_guard<std::mutex> lock(mutex); return settingsLoaded; }
+    bool hasShaderSettings() const { std::lock_guard<std::mutex> lock(mutex); return shaderLoaded; }
 
     /// Redirect persistence to another file. Must be called before load().
     /// Scenario runs use this so that driving the app from a script cannot
     /// overwrite the developer's real session, camera and game settings.
-    void setSettingsFile(const std::string& path) { settingsFile = path; }
-    const std::string& getSettingsFile() const { return settingsFile; }
+    void setSettingsFile(const std::string& path) { std::lock_guard<std::mutex> lock(mutex); settingsFile = path; }
+    std::string getSettingsFile() const { std::lock_guard<std::mutex> lock(mutex); return settingsFile; }
 
 private:
     UserSettings() = default;
     UserSettings(const UserSettings&) = delete;
     UserSettings& operator=(const UserSettings&) = delete;
 
+    /// Serialise and write atomically. Both assume the caller holds the lock,
+    /// which every public setter does — they lock, mutate, then call through.
+    void saveLocked() const;
+    std::string serialize() const;
+
+    /// Every setter calls save(), and the setters are not all on one thread:
+    /// GameThread::setFixedHandicap() calls setKomi() from the game thread while
+    /// GobanView saves the camera from the UI thread, each rewriting the entire
+    /// file. Without this they interleave in the same std::ofstream and in the
+    /// members feeding it.
+    mutable std::mutex mutex;
+
     std::string settingsFile = "user.json";
 
     bool settingsLoaded = false;
     bool savedCameraLoaded = false;
+    bool defaultCameraLoaded = false;
     bool currentCameraLoaded = false;
     bool shaderLoaded = false;
     bool gameSettingsLoaded = false;
@@ -162,6 +190,7 @@ private:
 
     // Camera states
     CameraState savedCamera;    // Preset saved via menu
+    CameraState defaultCamera;  // Shipped default, from the application config
     CameraState currentCamera;  // Auto-saved on exit
 
     // Session restoration
