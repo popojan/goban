@@ -1038,3 +1038,101 @@ TEST_CASE("model.start resumes a finished game and model.pause stops it") {
     f.model.enterReview();
     CHECK(f.model.phase() != GamePhase::Finished);
 }
+
+// ---------------------------------------------------------------------------
+// The published snapshot — what the board overlays read (ADR-0006 stage 4)
+// ---------------------------------------------------------------------------
+//
+// GobanView::updateLastMoveOverlay() and updateNavigationOverlay() run inside
+// Render(), on the UI thread, once per repaint. They used to walk the SGF tree
+// the game thread owns — moveCount(), lastStoneMoveIndex(), isNavigating(),
+// getVariations(), getViewPosition() — which is the race ADR-0006 exists to
+// remove. They now read these fields instead, so what the user sees on the
+// board is exactly what these cases pin.
+
+TEST_CASE("the snapshot carries the last stone move and its number") {
+    Fixture f;
+    REQUIRE(f.load("simple.sgf"));
+    f.model.publishSnapshot();
+
+    auto snap = f.model.snapshot();
+    CHECK(snap->lastStoneMove == Move::NORMAL);
+    CHECK(snap->lastStoneMove.pos == Position(15, 15));   // pd, the fourth move
+    CHECK(snap->lastStoneMove.col == Color::WHITE);
+    CHECK(snap->lastStoneMoveNumber == 4);
+}
+
+TEST_CASE("an empty record publishes no last stone move") {
+    Fixture f;
+    REQUIRE(f.load("simple.sgf", /*startAtRoot=*/true));
+    f.model.publishSnapshot();
+
+    // Move::INVALID, so the overlay draws nothing rather than a stray marker at
+    // (0,0) — which is a real point on the board.
+    auto snap = f.model.snapshot();
+    CHECK_FALSE(snap->lastStoneMove == Move::NORMAL);
+    CHECK(snap->lastStoneMoveNumber == 0);
+}
+
+TEST_CASE("the last stone move skips passes and numbers the stone, not the depth") {
+    Fixture f(9);
+    REQUIRE(f.load("double_pass.sgf"));
+    f.model.publishSnapshot();
+
+    // Four nodes deep — B[ee], W[cc], B[], W[] — but the marker belongs on the
+    // last *stone*, which is the second move. Numbering it 4 would label a
+    // stone with the move number of a pass played two nodes later.
+    // Board rows run opposite to SGF rows, so cc on a 9x9 is (2, 9-1-2).
+    auto snap = f.model.snapshot();
+    CHECK(snap->moveCount == 4);
+    CHECK(snap->lastStoneMove == Move::NORMAL);
+    CHECK(snap->lastStoneMove.pos == Position(2, 6));     // cc
+    CHECK(snap->lastStoneMove.col == Color::WHITE);
+    CHECK(snap->lastStoneMoveNumber == 2);
+}
+
+TEST_CASE("navigating republishes the last stone move") {
+    Fixture f;
+    FakeEngine coach;
+    f.useCoach(coach);
+    // The model observes for this case only: in the application it is the first
+    // observer registered (ElementGame's constructor), and onBoardChange is what
+    // publishes. Without it here, navigation would update the record and leave
+    // the snapshot — and so the board overlay — showing the old move.
+    f.observers.push_back(&f.model);
+    REQUIRE(f.load("simple.sgf"));
+
+    REQUIRE(f.nav.navigateBack());
+    auto snap = f.model.snapshot();
+    CHECK(snap->lastStoneMove.pos == Position(3, 3));     // dp, the third move
+    CHECK(snap->lastStoneMoveNumber == 3);
+
+    REQUIRE(f.nav.navigateToStart());
+    snap = f.model.snapshot();
+    CHECK_FALSE(snap->lastStoneMove == Move::NORMAL);
+    CHECK(snap->lastStoneMoveNumber == 0);
+}
+
+TEST_CASE("the snapshot carries the variation list the next-move overlay draws") {
+    Fixture f(9);
+    REQUIRE(f.load("pass_vs_corner.sgf", /*startAtRoot=*/true));
+    f.forward(2);
+    f.model.publishSnapshot();
+
+    // Two children — a pass and a stone at A1. The overlay labels them "3a" and
+    // "3b" off viewPosition, and skips the pass because it has no point to sit
+    // on; both facts come from here rather than from getVariations().
+    auto snap = f.model.snapshot();
+    CHECK(snap->navigating);
+    CHECK(snap->viewPosition == 2);
+    CHECK(snap->variations == 2);
+    REQUIRE(snap->variationMoves.size() == 2);
+
+    int passes = 0, stones = 0;
+    for (const auto& m : snap->variationMoves) {
+        if (m == Move::PASS) ++passes;
+        if (m == Move::NORMAL) ++stones;
+    }
+    CHECK(passes == 1);
+    CHECK(stones == 1);
+}

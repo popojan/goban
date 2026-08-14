@@ -106,6 +106,23 @@ struct GameSnapshot {
     /// session document rather than an external file.
     std::string sgfFile;
     int gameIndex = 0;
+
+    // --- Stage 4: what the board overlays read -------------------------------
+    // GobanView::updateLastMoveOverlay() and updateNavigationOverlay() run
+    // inside Render() — the UI thread, once per repaint. They were the last
+    // readers walking the tree: moveCount(), lastStoneMoveIndex(),
+    // isNavigating(), getVariations() and getViewPosition(), the last of which
+    // allocates a vector of shared_ptr<ISgfcNode> per child on every frame that
+    // redraws. Same hazard as the rest of ADR-0006, on the hottest path in the
+    // program.
+
+    /// The most recent stone actually placed on the path to the cursor, and its
+    /// move number. INVALID when the position has no stone move behind it — a
+    /// game at the root, or one whose only moves are passes. Passes are skipped
+    /// deliberately: the marker belongs on a stone, and the number shown is the
+    /// stone's index, not the tree depth.
+    Move lastStoneMove{Move::INVALID, Color::EMPTY};
+    size_t lastStoneMoveNumber = 0;
 };
 
 #endif // GOBAN_GAMESNAPSHOT_H

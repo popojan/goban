@@ -659,25 +659,23 @@ void GobanView::updateLastMoveOverlay() {
 		lastMove = Position(-1, -1);
 	}
 
-	// Get current move number from SGF tree depth
-	size_t moveNum = model.game.moveCount();
+	// From the published snapshot, never from the record: this runs inside
+	// Render() on the UI thread, and the game thread owns the SGF tree. See
+	// GameSnapshot and ADR-0006.
+	const auto snap = model.snapshot();
 
-	if (moveNum > 0) {
-		auto [move, moveIndex] = model.game.lastStoneMoveIndex();
-		if (move == Move::NORMAL) {
-			lastMove = move.pos;
-			if (showLastMoveOverlay) {
-				std::ostringstream ss;
-				ss << moveIndex;  // Use the stone's actual move index, not total depth (which includes passes)
-				spdlog::debug("updateLastMoveOverlay: setting '{}' at ({},{}) color={}",
-					ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
-				board.setOverlay(move.pos, ss.str(), move.col);
-			}
-		} else {
-			spdlog::debug("updateLastMoveOverlay: lastStoneMoveIndex returned non-NORMAL");
+	if (snap->lastStoneMove == Move::NORMAL) {
+		const Move& move = snap->lastStoneMove;
+		lastMove = move.pos;
+		if (showLastMoveOverlay) {
+			std::ostringstream ss;
+			ss << snap->lastStoneMoveNumber;  // The stone's own index, not the tree depth, which counts passes too
+			spdlog::debug("updateLastMoveOverlay: setting '{}' at ({},{}) color={}",
+				ss.str(), move.pos.col(), move.pos.row(), move.col == Color::BLACK ? "B" : "W");
+			board.setOverlay(move.pos, ss.str(), move.col);
 		}
 	} else {
-		spdlog::debug("updateLastMoveOverlay: no moves");
+		spdlog::debug("updateLastMoveOverlay: no stone move behind the cursor");
 	}
 }
 
@@ -699,9 +697,11 @@ void GobanView::updateNavigationOverlay() {
 	}
 	markupOverlays.clear();
 
-	// One snapshot for both passes below. Reading model.state.markup directly
+	// One snapshot for every pass below. Reading model.state.markup directly
 	// walked a std::vector the game thread is free to be replacing; taking it
-	// twice would also let the two loops disagree about what is on the board.
+	// twice would also let the loops disagree about what is on the board. The
+	// variation list comes from here too — getVariations() allocated a vector of
+	// shared_ptr<ISgfcNode> per child, on the UI thread, per repaint.
 	const auto snap = model.snapshot();
 
 	// Collect positions with explicit markup (these take precedence over variations)
@@ -713,9 +713,9 @@ void GobanView::updateNavigationOverlay() {
 	}
 
 	// Get all variations (branches) from current position
-	if (model.game.isNavigating()) {
-		auto variations = model.game.getVariations();
-		size_t viewPos = model.game.getViewPosition();
+	if (snap->navigating) {
+		const auto& variations = snap->variationMoves;
+		size_t viewPos = snap->viewPosition;
 		size_t nextMoveNum = viewPos + 1;
 
 		spdlog::debug("updateNavigationOverlay: viewPos={}, found {} variations",

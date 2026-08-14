@@ -305,6 +305,14 @@ void GobanModel::publishSnapshot() {
     next->boardSize     = game.getBoardSize();
     next->sgfFile       = game.hasLoadedExternalDoc() ? game.getLoadedFilePath() : std::string();
     next->gameIndex     = game.getLoadedGameIndex();
+    // The board overlays' share (ADR-0006 stage 4). lastStoneMoveIndex() walks
+    // from the cursor to the root, so publishing it also removes a per-repaint
+    // cost proportional to the length of the game.
+    if (next->moveCount > 0) {
+        auto [lastStone, lastStoneNumber] = game.lastStoneMoveIndex();
+        next->lastStoneMove       = lastStone;
+        next->lastStoneMoveNumber = lastStoneNumber;
+    }
 
     std::lock_guard<std::mutex> lock(snapshotMutex);
     gameSnapshot = std::move(next);
