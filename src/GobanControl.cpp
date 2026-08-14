@@ -76,7 +76,9 @@ bool GobanControl::newGame(unsigned boardSize) const {
     if (ran) {
         finishGameReplacement();
     } else {
-        parent->showMessage("Waiting for " + busyEngine + "...");
+        parent->showMessage(Rml::CreateString(
+            parent->templateText("tplWaitingFor", "Waiting for %s...").c_str(),
+            busyEngine.c_str()).c_str());
     }
     // Accepted either way; a deferred failure is only logged, since the caller
     // (e.g. the board-size dropdown) has already moved on.
@@ -345,7 +347,9 @@ void GobanControl::buildRegistry() {
         if (ran) {
             finishGameReplacement();
         } else {
-            parent->showMessage("Waiting for " + busyEngine + "...");
+            parent->showMessage(Rml::CreateString(
+            parent->templateText("tplWaitingFor", "Waiting for %s...").c_str(),
+            busyEngine.c_str()).c_str());
         }
     };
 
@@ -455,7 +459,8 @@ void GobanControl::buildRegistry() {
                 // to a colour, so entering it here would quietly turn the game
                 // into human-versus-engine. Kibitz on demand needs no mode change
                 // — it already works in a match. See docs/game-modes.md.
-                parent->showMessage("Analysis mode answers every move — use Kibitz in match mode instead");
+                parent->showMessage(parent->templateText("tplAnalysisAnswersEveryMove",
+                    "Analysis mode answers every move — use Kibitz in match mode instead"));
             }
         } else {
             if (engine.setGameMode(GameMode::MATCH)) {
@@ -483,7 +488,8 @@ void GobanControl::buildRegistry() {
             // The button is greyed in this case, but the keybinding is not, so
             // say why rather than swallowing the key.
             if (!model.snapshot()->atEnd) {
-                parent->showMessage("Navigate to the end of the game to resign");
+                parent->showMessage(parent->templateText("tplResignAtEndOnly",
+                    "Navigate to the end of the game to resign"));
             }
             return;
         }
@@ -712,7 +718,7 @@ void GobanControl::buildRegistry() {
         // something odd, then save what led up to it.
         const std::string path = ScenarioRecorder::instance().save("reports");
         if (path.empty()) {
-            parent->showMessage("Nothing recorded yet");
+            parent->showMessage(parent->templateText("tplNothingRecorded", "Nothing recorded yet"));
         } else {
             parent->showMessage(path);
         }
@@ -723,7 +729,7 @@ void GobanControl::buildRegistry() {
         // answer greys the button. Said out loud rather than swallowed, because
         // a Save that appears to do nothing reads as a failure.
         if (!actions().save) {
-            parent->showMessage("Nothing to save");
+            parent->showMessage(parent->templateText("tplNothingToSave", "Nothing to save"));
             return;
         }
         // Report what actually happened. This used to show the filename
@@ -732,7 +738,9 @@ void GobanControl::buildRegistry() {
         if (model.game.saveAs("")) {
             parent->showMessage(model.game.getDefaultFileName());
         } else {
-            parent->showMessage("Save failed: " + model.game.getDefaultFileName());
+            parent->showMessage(Rml::CreateString(
+                parent->templateText("tplSaveFailed", "Save failed: %s").c_str(),
+                model.game.getDefaultFileName().c_str()).c_str());
         }
     });
 
@@ -743,7 +751,7 @@ void GobanControl::buildRegistry() {
 
         // Check if there's actually a file to archive
         if (!std::filesystem::exists(dailyFile)) {
-            parent->showMessage("Nothing to archive");
+            parent->showMessage(parent->templateText("tplNothingToArchive", "Nothing to archive"));
             ctx.notifyMenu = false;
             return;
         }
@@ -763,7 +771,7 @@ void GobanControl::buildRegistry() {
             spdlog::info("Renamed {} to {}", dailyFile, archivedFile);
         } catch (const std::exception& e) {
             spdlog::error("Failed to rename session file: {}", e.what());
-            parent->showMessage("Archive failed");
+            parent->showMessage(parent->templateText("tplArchiveFailed", "Archive failed"));
             ctx.notifyMenu = false;
             return;
         }
@@ -806,7 +814,9 @@ void GobanControl::buildRegistry() {
         if (ran) {
             finishGameReplacement();
         } else {
-            parent->showMessage("Waiting for " + busyEngine + "...");
+            parent->showMessage(Rml::CreateString(
+            parent->templateText("tplWaitingFor", "Waiting for %s...").c_str(),
+            busyEngine.c_str()).c_str());
         }
     };
 
@@ -1066,7 +1076,8 @@ void GobanControl::buildRegistry() {
             // there is nothing to confirm — it is simply refused outside Setup
             // and Paused. The dropdown reverts its selection on the same answer.
             if (!setKomi(komi)) {
-                parent->showMessage("Komi can only be changed before play starts");
+                parent->showMessage(parent->templateText("tplKomiBeforePlayOnly",
+                    "Komi can only be changed before play starts"));
             }
     });
 

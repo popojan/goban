@@ -709,6 +709,48 @@ void ElementGame::cacheTsumegoHints() {
     model.tsumegoHintWhite = getTemplateText(context, "tplWhiteToMove");
 }
 
+/// Writes the four prisoner labels — the two board-corner counters and the two
+/// in the Analysis menu — from one place.
+///
+/// It is one function because it was two, and they disagreed. `capturedBlack`
+/// counts *black stones removed from the board* (`Board::updateCaptures`
+/// increments it when the captured colour is black), so it is what **White** has
+/// taken. The in-game branch had that right and the game-over branch had it
+/// backwards, so every game's final position showed both counts swapped. Same
+/// shape as the buttons that disagreed with their commands before ADR-0005: two
+/// copies of a rule, one of them wrong.
+void ElementGame::syncPrisonerLabels() {
+    auto context = GetContext();
+    if (!context) return;
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+
+    const std::string whiteTpl = templateText("templatePrisonersWhite", "White: %d");
+    const std::string blackTpl = templateText("templatePrisonersBlack", "Black: %d");
+
+    // White's prisoners are the black stones taken, and vice versa.
+    const int whiteHasTaken = model.state.capturedBlack;
+    const int blackHasTaken = model.state.capturedWhite;
+
+    for (const char* id : {"cntWhite", "lblPrisonersWhite"}) {
+        if (auto* el = doc->GetElementById(id)) {
+            el->SetInnerRML(Rml::CreateString(whiteTpl.c_str(), whiteHasTaken).c_str());
+        }
+    }
+    for (const char* id : {"cntBlack", "lblPrisonersBlack"}) {
+        if (auto* el = doc->GetElementById(id)) {
+            el->SetInnerRML(Rml::CreateString(blackTpl.c_str(), blackHasTaken).c_str());
+        }
+    }
+}
+
+std::string ElementGame::templateText(const char* id, const std::string& fallback) const {
+    auto context = GetContext();
+    if (!context) return fallback;
+    const std::string text = getTemplateText(context, id);
+    return text.empty() ? fallback : text;
+}
+
 void ElementGame::showMessage(const std::string& text) {
     // Don't overwrite active prompts (quit confirmation, clear board, etc.)
     if (hasActivePrompt()) return;
@@ -1033,36 +1075,8 @@ void ElementGame::OnUpdate()
         || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */
         || (view.state.reason != GameState::NO_REASON && model.state.reason == GameState::NO_REASON) /* new game */)
     {
-        Rml::Element* elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
-        Rml::Element* elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
-        if (elWhiteCnt != nullptr) {
-            elWhiteCnt->SetInnerRML(Rml::CreateString( "White: %d", model.state.capturedBlack).c_str());
-            requestRepaint();
-        }
-        if (elBlackCnt != nullptr) {
-            elBlackCnt->SetInnerRML(Rml::CreateString( "Black: %d", model.state.capturedWhite).c_str());
-            requestRepaint();
-        }
-
-        // Update prisoner counts in Analysis menu
-        Rml::Element* elPrisonersWhite = context->GetDocument("game_window")->GetElementById("lblPrisonersWhite");
-        Rml::Element* elPrisonersBlack = context->GetDocument("game_window")->GetElementById("lblPrisonersBlack");
-        if (elPrisonersWhite != nullptr) {
-            auto templateWhite = context->GetDocument("game_window")->GetElementById("templatePrisonersWhite");
-            if (templateWhite != nullptr) {
-                elPrisonersWhite->SetInnerRML(
-                    Rml::CreateString( templateWhite->GetInnerRML().c_str(), model.state.capturedBlack).c_str()
-                );
-            }
-        }
-        if (elPrisonersBlack != nullptr) {
-            auto templateBlack = context->GetDocument("game_window")->GetElementById("templatePrisonersBlack");
-            if (templateBlack != nullptr) {
-                elPrisonersBlack->SetInnerRML(
-                    Rml::CreateString( templateBlack->GetInnerRML().c_str(), model.state.capturedWhite).c_str()
-                );
-            }
-        }
+        syncPrisonerLabels();
+        requestRepaint();
 
         view.state.capturedBlack = model.state.capturedBlack;
         view.state.capturedWhite = model.state.capturedWhite;
@@ -1078,7 +1092,9 @@ void ElementGame::OnUpdate()
         auto doc = context->GetDocument("game_window");
         Rml::Element* hand = doc->GetElementById("lblHandicap");
         if (hand != nullptr) {
-            hand->SetInnerRML(Rml::CreateString( "Handicap: %d", model.state.handicap).c_str());
+            hand->SetInnerRML(Rml::CreateString(
+                templateText("templateHandicap", "Handicap: %d").c_str(),
+                model.state.handicap).c_str());
             requestRepaint();
         }
         syncDropdown(doc, "selectHandicap", std::to_string(model.state.handicap));
@@ -1088,7 +1104,9 @@ void ElementGame::OnUpdate()
         auto doc = context->GetDocument("game_window");
         Rml::Element* elKomi = doc->GetElementById("lblKomi");
         if (elKomi != nullptr) {
-            elKomi->SetInnerRML(Rml::CreateString( "Komi: %.1f", model.state.komi).c_str());
+            elKomi->SetInnerRML(Rml::CreateString(
+                templateText("templateKomi", "Komi: %.1f").c_str(),
+                model.state.komi).c_str());
             requestRepaint();
         }
         std::ostringstream komiStr;
@@ -1138,7 +1156,9 @@ void ElementGame::OnUpdate()
             showMessage(getTemplateText(context, "templateCalculatingScore"));
             break;
         case GameState::SCORING_FAILED:
-            showMessage("Scoring failed: " + model.state.scoringError);
+            showMessage(Rml::CreateString(
+                templateText("tplScoringFailed", "Scoring failed: %s").c_str(),
+                model.state.scoringError.c_str()).c_str());
             break;
         case GameState::BLACK_RESIGNS:
             showMessage(getTemplateText(context, "templateBlackResigns"));
@@ -1176,13 +1196,10 @@ void ElementGame::OnUpdate()
         }
         case GameState::BLACK_WON:
         case GameState::WHITE_WON: {
-            Rml::Element *elWhiteCnt = context->GetDocument("game_window")->GetElementById("cntWhite");
-            Rml::Element *elBlackCnt = context->GetDocument("game_window")->GetElementById("cntBlack");
-            // Show simplified captured stone counts (no detailed scoring breakdown)
-            elWhiteCnt->SetInnerRML(
-                    Rml::CreateString("White captured: %d", model.state.capturedWhite).c_str());
-            elBlackCnt->SetInnerRML(
-                    Rml::CreateString("Black captured: %d", model.state.capturedBlack).c_str());
+            // The same call as the in-game branch, which is the point: this
+            // branch had its own copy and gave cntWhite capturedWhite, so both
+            // prisoner counts silently swapped on the last move of every game.
+            syncPrisonerLabels();
             // Build result message, combining with SGF comment if present
             std::string resultMsg;
             if (model.state.winner == Color::WHITE)

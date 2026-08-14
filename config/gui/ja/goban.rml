@@ -238,6 +238,20 @@
     <div class="template" id="tplStatusWarning">⚠ メッセージ (%d)</div>
     <div class="template" id="tplStatusError">⚠ メッセージ (%d)</div>
 
+    <!-- Status and command feedback -->
+    <div class="template" id="templateKomi">コミ: %.1f</div>
+    <div class="template" id="templateHandicap">置石: %d</div>
+    <div class="template" id="tplWaitingFor">%s を待っています...</div>
+    <div class="template" id="tplSaveFailed">保存に失敗しました: %s</div>
+    <div class="template" id="tplNothingToSave">保存するものがありません</div>
+    <div class="template" id="tplNothingRecorded">まだ記録がありません</div>
+    <div class="template" id="tplNothingToArchive">アーカイブするものがありません</div>
+    <div class="template" id="tplArchiveFailed">アーカイブに失敗しました</div>
+    <div class="template" id="tplScoringFailed">計算に失敗しました: %s</div>
+    <div class="template" id="tplAnalysisAnswersEveryMove">検討モードでは毎手応手します — 対局中はヒントをお使いください</div>
+    <div class="template" id="tplResignAtEndOnly">棋譜の最後に移動してから投了してください</div>
+    <div class="template" id="tplKomiBeforePlayOnly">コミは対局開始前のみ変更できます</div>
+
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
     <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">はい</span> <span class="prompt-btn" onmouseup="prompt_no">いいえ</span></div>

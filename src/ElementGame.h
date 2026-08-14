@@ -82,6 +82,16 @@ public:
     void OnMenuToggle(const std::string& cmd, bool checked) const;
     void setElementDisabled(const std::string& elementId, bool disabled) const;
 
+    /// Localised text for a template id, or `fallback` when the interface
+    /// language's .rml does not define it.
+    ///
+    /// The fallback matters: a template that is merely absent used to produce an
+    /// *empty* message, so a translated interface silently said nothing where
+    /// English said "Save failed". Degrading to English is the lesser failure,
+    /// and it means a new string can be added to en/goban.rml alone without the
+    /// other four becoming mute until someone translates them.
+    [[nodiscard]] std::string templateText(const char* id, const std::string& fallback = "") const;
+
     // Message system - template-based messages in lblMessage
     void showMessage(const std::string& text);  // Dismissable message
     void showPromptYesNo(const std::string& message, std::function<void(bool)> callback);
@@ -145,6 +155,10 @@ private:
     // an open panel over a quiet log costs one relaxed load.
     void syncStatusIndicator();
     void rebuildLogPanel();
+
+    /// The four prisoner labels, written from one place so the two callers
+    /// cannot disagree about which colour took which stones — they did.
+    void syncPrisonerLabels();
     bool logPanelOpen{false};
     uint64_t logVersionShown{0};
     std::string statusTextShown;

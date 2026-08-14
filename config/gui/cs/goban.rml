@@ -250,6 +250,20 @@
     <div class="template" id="tplStatusWarning">⚠ Zprávy (%d)</div>
     <div class="template" id="tplStatusError">⚠ Zprávy (%d)</div>
 
+    <!-- Status and command feedback -->
+    <div class="template" id="templateKomi">Komi: %.1f</div>
+    <div class="template" id="templateHandicap">Handicap: %d</div>
+    <div class="template" id="tplWaitingFor">Čeká se na %s...</div>
+    <div class="template" id="tplSaveFailed">Uložení selhalo: %s</div>
+    <div class="template" id="tplNothingToSave">Není co uložit</div>
+    <div class="template" id="tplNothingRecorded">Zatím nic nezaznamenáno</div>
+    <div class="template" id="tplNothingToArchive">Není co archivovat</div>
+    <div class="template" id="tplArchiveFailed">Archivace selhala</div>
+    <div class="template" id="tplScoringFailed">Počítání bodů selhalo: %s</div>
+    <div class="template" id="tplAnalysisAnswersEveryMove">V režimu analýzy odpovídá engine na každý tah — v zápase použijte Radu</div>
+    <div class="template" id="tplResignAtEndOnly">Vzdát se lze jen na konci partie</div>
+    <div class="template" id="tplKomiBeforePlayOnly">Komi lze změnit jen před začátkem hry</div>
+
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
     <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">Ano</span> <span class="prompt-btn" onmouseup="prompt_no">Ne</span></div>

@@ -251,6 +251,20 @@
     <div class="template" id="tplStatusWarning">⚠ Messages (%d)</div>
     <div class="template" id="tplStatusError">⚠ Messages (%d)</div>
 
+    <!-- Status and command feedback -->
+    <div class="template" id="templateKomi">Komi: %.1f</div>
+    <div class="template" id="templateHandicap">Handicap: %d</div>
+    <div class="template" id="tplWaitingFor">Waiting for %s...</div>
+    <div class="template" id="tplSaveFailed">Save failed: %s</div>
+    <div class="template" id="tplNothingToSave">Nothing to save</div>
+    <div class="template" id="tplNothingRecorded">Nothing recorded yet</div>
+    <div class="template" id="tplNothingToArchive">Nothing to archive</div>
+    <div class="template" id="tplArchiveFailed">Archive failed</div>
+    <div class="template" id="tplScoringFailed">Scoring failed: %s</div>
+    <div class="template" id="tplAnalysisAnswersEveryMove">Analysis mode answers every move — use Kibitz in match mode instead</div>
+    <div class="template" id="tplResignAtEndOnly">Navigate to the end of the game to resign</div>
+    <div class="template" id="tplKomiBeforePlayOnly">Komi can only be changed before play starts</div>
+
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
     <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">Yes</span> <span class="prompt-btn" onmouseup="prompt_no">No</span></div>

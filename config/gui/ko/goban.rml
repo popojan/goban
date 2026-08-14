@@ -238,6 +238,20 @@
     <div class="template" id="tplStatusWarning">⚠ 메시지 (%d)</div>
     <div class="template" id="tplStatusError">⚠ 메시지 (%d)</div>
 
+    <!-- Status and command feedback -->
+    <div class="template" id="templateKomi">덤: %.1f</div>
+    <div class="template" id="templateHandicap">접바둑: %d</div>
+    <div class="template" id="tplWaitingFor">%s 기다리는 중...</div>
+    <div class="template" id="tplSaveFailed">저장 실패: %s</div>
+    <div class="template" id="tplNothingToSave">저장할 내용이 없습니다</div>
+    <div class="template" id="tplNothingRecorded">아직 기록이 없습니다</div>
+    <div class="template" id="tplNothingToArchive">보관할 내용이 없습니다</div>
+    <div class="template" id="tplArchiveFailed">보관 실패</div>
+    <div class="template" id="tplScoringFailed">계가 실패: %s</div>
+    <div class="template" id="tplAnalysisAnswersEveryMove">검토 모드는 모든 수에 응수합니다 — 대국 중에는 훈수를 사용하세요</div>
+    <div class="template" id="tplResignAtEndOnly">기보 끝으로 이동해야 기권할 수 있습니다</div>
+    <div class="template" id="tplKomiBeforePlayOnly">덤은 대국 시작 전에만 변경할 수 있습니다</div>
+
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
     <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">예</span> <span class="prompt-btn" onmouseup="prompt_no">아니오</span></div>

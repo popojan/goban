@@ -250,6 +250,20 @@
     <div class="template" id="tplStatusWarning">⚠ 消息 (%d)</div>
     <div class="template" id="tplStatusError">⚠ 消息 (%d)</div>
 
+    <!-- Status and command feedback -->
+    <div class="template" id="templateKomi">贴目: %.1f</div>
+    <div class="template" id="templateHandicap">让子: %d</div>
+    <div class="template" id="tplWaitingFor">正在等待 %s...</div>
+    <div class="template" id="tplSaveFailed">保存失败: %s</div>
+    <div class="template" id="tplNothingToSave">没有可保存的内容</div>
+    <div class="template" id="tplNothingRecorded">尚无记录</div>
+    <div class="template" id="tplNothingToArchive">没有可存档的内容</div>
+    <div class="template" id="tplArchiveFailed">存档失败</div>
+    <div class="template" id="tplScoringFailed">计分失败: %s</div>
+    <div class="template" id="tplAnalysisAnswersEveryMove">分析模式会回应每一手 — 对局中请使用形势判断</div>
+    <div class="template" id="tplResignAtEndOnly">请移动到棋局末尾才能认输</div>
+    <div class="template" id="tplKomiBeforePlayOnly">贴目只能在开局前修改</div>
+
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
     <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">是</span> <span class="prompt-btn" onmouseup="prompt_no">否</span></div>
