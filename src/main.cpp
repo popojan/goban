@@ -44,6 +44,7 @@
 #include <fstream>
 #include <set>
 
+#include "MessageLog.h"
 #include "UserSettings.h"
 #include "ScenarioRunner.h"
 #include "ScenarioRecorder.h"
@@ -472,6 +473,13 @@ int main(int argc, char** argv)
     spdlog::set_default_logger(logger);
     logger->set_level(spdlog::level::from_str(logLevel));
     logger->flush_on(spdlog::level::from_str(logLevel));  // Flush immediately for crash debugging
+
+    // Third sink: the tail the user can actually read. Everything goban already
+    // logs at info and worse is now reachable from the interface, without a
+    // single call site changing — which is the point, since the diagnostics that
+    // matter most (an engine that will not start) are in code nobody would think
+    // to route through the UI. See src/MessageLog.h.
+    installMessageLogSink();
 
     int window_width = 1024;
     int window_height = 768;

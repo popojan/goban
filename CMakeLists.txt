@@ -356,6 +356,7 @@ else()
         src/GameState.h
         src/GameThread.h
         src/GobanModel.h
+        src/MessageLog.h
         src/Metrics.h
         src/PlayerManager.h
         src/player.h
@@ -377,6 +378,7 @@ else()
         src/GameRecord.cpp
         src/GameThread.cpp
         src/GobanModel.cpp
+        src/MessageLog.cpp
         src/Metrics.cpp
         src/PlayerManager.cpp
         src/player.cpp
