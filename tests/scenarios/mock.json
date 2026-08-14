@@ -7,6 +7,7 @@
       "command": "mock_gtp_engine",
       "parameters": "",
       "enabled": 1,
+      "main": 1,
       "kibitz": 1
     },
     {

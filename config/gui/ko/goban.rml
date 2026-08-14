@@ -190,6 +190,7 @@
                         <div class="grp">
                             <div class="hr">버전</div>
                             <div class="cmd" id="lblVersion" onmouseup="nop">Goban %s</div>
+                            <div class="cmd" onmouseup="toggle_log">메시지</div>
                             <div class="cmd" onmouseup="report_bug">버그 신고</div>
                         </div>
                     </div>
@@ -212,6 +213,15 @@
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
+        <!-- Status indicator and the log behind it. Placement is one rule in
+             base.rcss (#grpStatus); nothing here depends on where it sits. -->
+        <div id="grpStatus" class="top left">
+            <div class="cmd" id="lblStatus" onmouseup="toggle_log"></div>
+            <div id="pnlLog" class="hide">
+                <div id="lstLog"></div>
+                <div class="cmd" id="cmdLogClear" onmouseup="log_clear">지우기</div>
+            </div>
+        </div>
     </game>
     <!-- Mode label templates -->
     <div class="template" id="tplAnalysisMode">분석 모드</div>
@@ -220,6 +230,12 @@
     <div class="template" id="tplTsumegoWrong">오답!</div>
     <div class="template" id="tplBlackToMove">흑선</div>
     <div class="template" id="tplWhiteToMove">백선</div>
+
+    <!-- Status indicator templates. %s is the engine name for the loading case,
+         and the unseen-message count for the warning and error cases. -->
+    <div class="template" id="tplStatusLoading">%s 불러오는 중…</div>
+    <div class="template" id="tplStatusWarning">⚠ %d개의 메시지</div>
+    <div class="template" id="tplStatusError">⚠ %d개의 메시지</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

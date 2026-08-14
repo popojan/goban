@@ -19,7 +19,12 @@ cd "$ROOT"   # asset paths in the config are relative to the repo root
 BUILD="$ROOT/cmake-build-release"
 GOBAN="$BUILD/goban"
 MOCK="$BUILD/mock_gtp_engine"
-CONFIG="$ROOT/tests/scenarios/mock.json"
+# Overridable so a scenario can be run against another language's GUI —
+# GOBAN_SCENARIO_CONFIG=tests/scenarios/mock-cs.json ./tests/run_scenarios.sh ...
+# Do not be tempted to run ./goban directly instead: this script also redirects
+# user.json and the games folder, and without it a scripted run writes to the
+# real ones.
+CONFIG="${GOBAN_SCENARIO_CONFIG:-$ROOT/tests/scenarios/mock.json}"
 
 for f in "$GOBAN" "$MOCK"; do
     if [ ! -x "$f" ]; then

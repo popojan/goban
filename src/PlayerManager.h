@@ -69,6 +69,24 @@ public:
     const std::vector<Player*>& getPlayers() const { return players; }
     size_t getNumPlayers() const { return numPlayers; }
 
+    // Engine loading progress, for the status indicator.
+    //
+    // Until uiReady flips, availableActions() returns all-false and the whole
+    // toolbar is greyed. That is correct, and it is also indistinguishable from
+    // a broken application — for up to a minute, if a CPU KataGo is loading
+    // weights. These three name what is happening so the interface can say so,
+    // and they name the *engine*, because "still loading" without a name tells a
+    // user with two engines nothing about which one is wedged.
+    //
+    // Written from the per-engine loader threads and read from the UI thread;
+    // loadMutex is its own rather than the player-list mutex, so an engine
+    // finishing cannot block a frame behind loadSingleEngine().
+    void beginLoading(const std::string& name);
+    void finishLoading(const std::string& name);
+    /// Empty when nothing is loading. One name, or "name (+N more)".
+    [[nodiscard]] std::string loadingSummary() const;
+    [[nodiscard]] bool isLoading() const;
+
     // Configuration
     void loadEngines(const std::shared_ptr<Configuration>& config);
     void loadHumanPlayers(const std::shared_ptr<Configuration>& config);  // Load human player entries
@@ -111,6 +129,8 @@ private:
     std::array<size_t, 2> activePlayer{0, 0};
 
     mutable std::mutex mutex;
+    mutable std::mutex loadMutex;
+    std::vector<std::string> loadingEngines;
     InterruptCallback interruptPlayer;
 };
 

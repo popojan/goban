@@ -202,6 +202,7 @@
                         <div class="grp">
                             <div class="hr">Version</div>
                             <div class="cmd" id="lblVersion" onmouseup="nop">Goban %s</div>
+                            <div class="cmd" onmouseup="toggle_log">Messages</div>
                             <div class="cmd" onmouseup="report_bug">Report bug</div>
                         </div>
                     </div>
@@ -224,6 +225,16 @@
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
+
+        <!-- Status indicator and the log behind it. Placement is one rule in
+             base.rcss (#grpStatus); nothing here depends on where it sits. -->
+        <div id="grpStatus" class="top left">
+            <div class="cmd" id="lblStatus" onmouseup="toggle_log"></div>
+            <div id="pnlLog" class="hide">
+                <div id="lstLog"></div>
+                <div class="cmd" id="cmdLogClear" onmouseup="log_clear">Clear</div>
+            </div>
+        </div>
     </game>
     <!-- Mode label templates -->
     <div class="template" id="tplAnalysisMode">Analysis Mode</div>
@@ -232,6 +243,12 @@
     <div class="template" id="tplTsumegoWrong">Wrong!</div>
     <div class="template" id="tplBlackToMove">Black to move</div>
     <div class="template" id="tplWhiteToMove">White to move</div>
+
+    <!-- Status indicator templates. %s is the engine name for the loading case,
+         and the unseen-message count for the warning and error cases. -->
+    <div class="template" id="tplStatusLoading">Loading %s…</div>
+    <div class="template" id="tplStatusWarning">⚠ %d messages</div>
+    <div class="template" id="tplStatusError">⚠ %d messages</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

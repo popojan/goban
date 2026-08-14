@@ -212,16 +212,19 @@ TEST_CASE("the spdlog sink captures existing call sites without editing them") {
 
     spdlog::error("Failed to load engine '{}': {}", "GNU Go", "not found");
     spdlog::warn("Engine [{}] folder '{}' does not exist", "katago", "./engine");
+    // Both below the sink's level. Info matters as much as debug here: GtpClient
+    // logs every GTP command and response at info, so admitting info would let
+    // one genmove evict the engine failure above.
     spdlog::info("Setting [{}] engine as coach and referee.", "GNU Go");
-    spdlog::debug("gtp err = {}", "noise");   // below the sink's level
+    spdlog::info("{1} << {0}", "genmove B", "katago");
+    spdlog::debug("gtp err = {}", "noise");
 
     auto entries = log.entries();
-    REQUIRE(entries.size() == 3);
+    REQUIRE(entries.size() == 2);
     CHECK(entries[0].severity == MessageSeverity::Error);
     CHECK(entries[0].text == "Failed to load engine 'GNU Go': not found");
     CHECK(entries[1].severity == MessageSeverity::Warning);
-    CHECK(entries[2].severity == MessageSeverity::Info);
-    CHECK(entries[2].text == "Setting [GNU Go] engine as coach and referee.");
+    CHECK(entries[1].text == "Engine [katago] folder './engine' does not exist");
 
     // Formatted payload only — no level, no logger name, and a timestamp the
     // panel can show.

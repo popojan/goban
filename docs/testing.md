@@ -259,6 +259,13 @@ refusal apart from an action that legitimately had nothing to do.
 
 Add a key there and every scenario can assert on it.
 
+Plus the message log: `log_count`, `log_open`, `log_badge` (`none`/`warning`/
+`error`) and `engine_loading` (the engine the status indicator is naming, empty
+once loading is done). **Assert `log_badge`, not `log_count`** when you mean "the
+user was told": the count changes even when nothing is shown, so a test written
+against it passes even if the badge never appears — which is the entire failure
+this feature exists to prevent.
+
 `pending_nav`, `queued_nav` and `deferred_task` are the quiescence terms
 `wait_idle` is built from, exposed separately so a scenario can pin *which* of
 them is holding things up. `pending_nav` covers commands that have been popped
@@ -276,6 +283,24 @@ destructor, roughly one run in six.
 `tests/scenarios/mock.json` overrides the bot list with `mock_gtp_engine`, so
 scenarios are deterministic and need no installed engine. It `$include`s
 `config/en.json`, so the GUI, fonts and shaders are the real ones.
+
+It declares `"main": 1` on the mock engine, and that is not decoration. With no
+engine carrying the flag, `currentCoach()` falls back to `players[0]` — under
+parallel loading, whichever of the two mock engines finished first. The suite ran
+that way for months; the coach being the fast mock rather than the slow one was
+luck, not design.
+
+To run a scenario against another language's interface — worth doing after
+touching any `.rml`, since a missing element degrades silently to no display:
+
+```bash
+GOBAN_SCENARIO_CONFIG=$PWD/tests/scenarios/mock-cs.json \
+    ./tests/run_scenarios.sh tests/scenarios/message_log.scn
+```
+
+**Do not run `./goban --script` directly to get around the harness.**
+`run_scenarios.sh` also redirects `user.json` and the games folder into a scratch
+directory; without it a scripted run saves over the real ones.
 
 ## What to test, and what not to
 

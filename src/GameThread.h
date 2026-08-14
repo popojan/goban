@@ -260,6 +260,10 @@ public:
 
     std::vector<Player*> getPlayers() const { return playerManager->getPlayers(); }
 
+    /// Which engine the status indicator should name while starting up. Empty
+    /// once every engine has answered or failed. See PlayerManager.
+    std::string engineLoadingSummary() const { return playerManager->loadingSummary(); }
+
     bool loadSGF(const std::string& fileName, int gameIndex = 0, bool startAtRoot = false);
 
     bool loadSGFWithEngine(const std::string& fileName, Engine* engine = nullptr, int gameIndex = 0, bool startAtRoot = false);

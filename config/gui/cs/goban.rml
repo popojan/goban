@@ -202,6 +202,7 @@
                         <div class="grp">
                             <div class="hr">Verze</div>
                             <div class="cmd" id="lblVersion" onmouseup="nop">Goban %s</div>
+                            <div class="cmd" onmouseup="toggle_log">Zprávy</div>
                             <div class="cmd" onmouseup="report_bug">Nahlásit chybu</div>
                         </div>
                     </div>
@@ -224,6 +225,15 @@
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
+        <!-- Status indicator and the log behind it. Placement is one rule in
+             base.rcss (#grpStatus); nothing here depends on where it sits. -->
+        <div id="grpStatus" class="top left">
+            <div class="cmd" id="lblStatus" onmouseup="toggle_log"></div>
+            <div id="pnlLog" class="hide">
+                <div id="lstLog"></div>
+                <div class="cmd" id="cmdLogClear" onmouseup="log_clear">Vymazat</div>
+            </div>
+        </div>
     </game>
     <!-- Mode label templates -->
     <div class="template" id="tplAnalysisMode">Analytický režim</div>
@@ -232,6 +242,12 @@
     <div class="template" id="tplTsumegoWrong">Špatně!</div>
     <div class="template" id="tplBlackToMove">Černý na tahu</div>
     <div class="template" id="tplWhiteToMove">Bílý na tahu</div>
+
+    <!-- Status indicator templates. %s is the engine name for the loading case,
+         and the unseen-message count for the warning and error cases. -->
+    <div class="template" id="tplStatusLoading">Načítání %s…</div>
+    <div class="template" id="tplStatusWarning">⚠ %d zpráv</div>
+    <div class="template" id="tplStatusError">⚠ %d zpráv</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

@@ -91,6 +91,14 @@ public:
     void clearMessage();
     bool hasActivePrompt() const { return pendingPromptCallback != nullptr; }
 
+    // Status indicator and log panel — the user-visible end of MessageLog.
+    // Opening the panel is what marks the messages seen, which is why the badge
+    // and the panel are one feature rather than two.
+    void toggleLogPanel();
+    void setLogPanelOpen(bool open);
+    void clearLog();
+    [[nodiscard]] bool isLogPanelOpen() const { return logPanelOpen; }
+
 protected:
     void OnUpdate() override;
 public:
@@ -131,6 +139,15 @@ private:
     void checkEngineLoadingComplete();
     void performDeferredInitialization();
     void updateLoadingStatus(const std::string& message);
+
+    // Status indicator / log panel state. logVersionShown is what stops the
+    // panel being rebuilt on every frame: MessageLog::version() is an atomic, so
+    // an open panel over a quiet log costs one relaxed load.
+    void syncStatusIndicator();
+    void rebuildLogPanel();
+    bool logPanelOpen{false};
+    uint64_t logVersionShown{0};
+    std::string statusTextShown;
 
     // Determine initial board size by peeking at SGF that will be loaded
     static int determineInitialBoardSize();

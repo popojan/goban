@@ -177,6 +177,39 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
     }
 }
 
+void PlayerManager::beginLoading(const std::string& name) {
+    std::lock_guard<std::mutex> lock(loadMutex);
+    loadingEngines.push_back(name);
+}
+
+void PlayerManager::finishLoading(const std::string& name) {
+    std::lock_guard<std::mutex> lock(loadMutex);
+    auto it = std::find(loadingEngines.begin(), loadingEngines.end(), name);
+    if (it != loadingEngines.end()) {
+        loadingEngines.erase(it);
+    }
+}
+
+std::string PlayerManager::loadingSummary() const {
+    std::lock_guard<std::mutex> lock(loadMutex);
+    if (loadingEngines.empty()) {
+        return {};
+    }
+    // The first one still pending, which under parallel loading is whichever
+    // was spawned first and has not answered — usually the slow one, which is
+    // the one worth naming.
+    std::string summary = loadingEngines.front();
+    if (loadingEngines.size() > 1) {
+        summary += " (+" + std::to_string(loadingEngines.size() - 1) + " more)";
+    }
+    return summary;
+}
+
+bool PlayerManager::isLoading() const {
+    std::lock_guard<std::mutex> lock(loadMutex);
+    return !loadingEngines.empty();
+}
+
 void PlayerManager::loadHumanPlayers(const std::shared_ptr<Configuration>& config) {
     // Same lock loadSingleEngine() takes, and for the same reason: this appends
     // to `players` and rewrites activePlayer[] while the UI thread may be

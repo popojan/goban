@@ -146,6 +146,27 @@ Press **V** to cycle through visual styles:
 - **F** - Toggle fullscreen
 - **X** - Toggle max FPS mode
 
+## When something looks wrong
+
+Goban keeps a short log of anything that needs attention — an engine that would
+not start, a GTP command that timed out, a game that could not be saved. When one
+arrives, a **⚠ badge appears in the top-left corner**; click it, or choose
+**Options > Messages**, to see what happened. Opening the panel dismisses the
+badge; the messages stay until you press *Clear*.
+
+Two things worth knowing:
+
+- **A quiet badge means a clean run.** Only warnings and errors appear here.
+  Everything else — which engines loaded, every command sent to them — goes to
+  `last_run.log` in the application folder, which is the file to attach to a bug
+  report.
+- **While engines are starting, the same corner names the one it is waiting
+  for**, for example *Loading KataGo…*. Until they are all up, the game controls
+  stay greyed out; a neural-net engine on a CPU can take a minute.
+
+If something looks wrong enough to report, **Options > Report bug** writes a
+replayable script of what you just did into `reports/`.
+
 ## Tips
 
 - **Save your camera position**: After adjusting the view, use **Menu > Camera > Save** to remember it

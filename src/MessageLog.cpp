@@ -109,13 +109,20 @@ void installMessageLogSink() {
     if (!logger) return;
 
     auto sink = std::make_shared<MessageLogSink>();
-    // info and worse. The logger's own level may be debug during development,
-    // and a debug-level firehose would evict everything worth reading within
-    // seconds of startup.
-    sink->set_level(spdlog::level::info);
+    // Warnings and errors only — the panel answers "what needs attention", and
+    // at info it does not: GtpClient logs every command and every response at
+    // info (gtpclient.cpp, `<<` and `>>`), so a single genmove against KataGo
+    // pushes the engine failure the user opened the panel for out of a 200-entry
+    // buffer within seconds.
+    //
+    // The other fix would be to demote that traffic to debug. Deliberately not
+    // done: `last_run.log` at default verbosity is what users are asked to
+    // attach to a bug report, and that GTP trace is the most diagnostic thing in
+    // it — issue #45 was read from exactly those lines. The file keeps
+    // everything; the panel is the filtered view.
+    sink->set_level(spdlog::level::warn);
     logger->sinks().push_back(std::move(sink));
 
-    // The logger only forwards what passes its own level, so a run started with
-    // --verbosity warn shows warnings and errors and no info. That is the
-    // correct behaviour: the panel reflects the log the user asked for.
+    // The logger's own level still gates this, so --verbosity error shows errors
+    // alone. The panel reflects the log the user asked for.
 }

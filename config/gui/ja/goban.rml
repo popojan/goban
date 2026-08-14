@@ -190,6 +190,7 @@
                         <div class="grp">
                             <div class="hr">バージョン</div>
                             <div class="cmd" id="lblVersion" onmouseup="nop">Goban %s</div>
+                            <div class="cmd" onmouseup="toggle_log">メッセージ</div>
                             <div class="cmd" onmouseup="report_bug">バグを報告</div>
                         </div>
                     </div>
@@ -212,6 +213,15 @@
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
+        <!-- Status indicator and the log behind it. Placement is one rule in
+             base.rcss (#grpStatus); nothing here depends on where it sits. -->
+        <div id="grpStatus" class="top left">
+            <div class="cmd" id="lblStatus" onmouseup="toggle_log"></div>
+            <div id="pnlLog" class="hide">
+                <div id="lstLog"></div>
+                <div class="cmd" id="cmdLogClear" onmouseup="log_clear">クリア</div>
+            </div>
+        </div>
     </game>
     <!-- Mode label templates -->
     <div class="template" id="tplAnalysisMode">検討モード</div>
@@ -220,6 +230,12 @@
     <div class="template" id="tplTsumegoWrong">不正解！</div>
     <div class="template" id="tplBlackToMove">黒先</div>
     <div class="template" id="tplWhiteToMove">白先</div>
+
+    <!-- Status indicator templates. %s is the engine name for the loading case,
+         and the unseen-message count for the warning and error cases. -->
+    <div class="template" id="tplStatusLoading">%s を読み込み中…</div>
+    <div class="template" id="tplStatusWarning">⚠ %d 件のメッセージ</div>
+    <div class="template" id="tplStatusError">⚠ %d 件のメッセージ</div>
 
     <!-- Message templates -->
     <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>

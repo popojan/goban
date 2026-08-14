@@ -1149,8 +1149,19 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
     // Spawn a thread for each engine
     std::vector<std::thread> threads;
     for (int i = 0; i < totalEngines; ++i) {
-        threads.emplace_back([this, &botConfigs, i, &mtx, &cv, &firstReadyEngine, &enginesLoaded, &loadedEngines]() {
+        // Registered before the thread starts, so the indicator names every
+        // engine from the first frame rather than only those whose thread has
+        // been scheduled. The name is what the user configured; falling back to
+        // the command keeps an unnamed bot from showing as a blank.
+        const std::string botName = botConfigs[i].value("name", botConfigs[i].value("command", "engine"));
+        playerManager->beginLoading(botName);
+
+        threads.emplace_back([this, &botConfigs, i, botName, &mtx, &cv, &firstReadyEngine, &enginesLoaded, &loadedEngines]() {
             Engine* engine = playerManager->loadSingleEngine(botConfigs[i]);
+            // Whether or not it loaded: a failure is reported through the log,
+            // and leaving a failed engine "still loading" forever would leave
+            // the indicator up for the session.
+            playerManager->finishLoading(botName);
 
             std::lock_guard<std::mutex> lock(mtx);
             loadedEngines[i] = engine;

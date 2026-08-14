@@ -1,4 +1,5 @@
 #include "ElementGame.h"
+#include "MessageLog.h"
 #include "AppState.h"
 #include "UserSettings.h"
 #include "version.h"
@@ -307,7 +308,8 @@ void ElementGame::startAsyncEngineLoading() {
     }
 
     spdlog::info("Starting parallel engine loading");
-    updateLoadingStatus("Loading engines...");
+    // The indicator names the engines itself, from PlayerManager's pending list,
+    // and clears when they have all answered. See syncStatusIndicator().
 
     // Determine which SGF (if any) we'll load - check session state first
     auto& settings = UserSettings::instance();
@@ -406,15 +408,10 @@ void ElementGame::checkEngineLoadingComplete() {
         enginesLoaded = true;
 
         spdlog::info("All engines ready, updating UI");
-        // Only clear loading message if no important game message is showing
-        // (result messages like "Black won" should not be overwritten)
-        auto msg = model.state.msg;
-        bool isImportantMessage = msg == GameState::WHITE_WON || msg == GameState::BLACK_WON ||
-                                  msg == GameState::WHITE_RESIGNED || msg == GameState::BLACK_RESIGNED ||
-                                  msg == GameState::SCORING_FAILED;
-        if (!isImportantMessage) {
-            updateLoadingStatus("");  // Clear loading message
-        }
+        // Nothing to clear: the loading text lives in #lblStatus, which
+        // syncStatusIndicator() empties as soon as the pending list does, and it
+        // never occupied the message box in the first place. That box is for
+        // results, comments and prompts.
 
         // Perform deferred initialization if needed
         if (deferredInitNeeded && !deferredInitDone) {
@@ -548,7 +545,133 @@ void ElementGame::performDeferredInitialization() {
     view.requestRepaint();
 }
 
+/// The status indicator: what is loading, or how many messages want attention.
+///
+/// This used to write "Loading engines..." into lblMessage — unnamed, in English
+/// regardless of the interface language, and in the box that also carries game
+/// results, SGF comments and confirmation prompts. It now drives #lblStatus,
+/// which is nobody else's, and names the engine: with two engines configured,
+/// "still loading" says nothing about which one is wedged, and a CPU KataGo can
+/// hold that state for a minute while every action is correctly greyed out and
+/// indistinguishable from a broken program.
+void ElementGame::syncStatusIndicator() {
+    auto context = GetContext();
+    if (!context) return;
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+    auto status = doc->GetElementById("lblStatus");
+    if (!status) return;   // a translated .rml without the element degrades to silence
+
+    auto& log = MessageLog::instance();
+    const std::string loading = enginesLoaded ? std::string() : engine.engineLoadingSummary();
+    const bool unseen = log.hasUnseen();
+
+    std::string text;
+    const char* severityClass = nullptr;
+    if (!loading.empty()) {
+        text = Rml::CreateString(getTemplateText(context, "tplStatusLoading").c_str(),
+                                 loading.c_str()).c_str();
+        severityClass = "loading";
+    } else if (unseen) {
+        const bool isError = log.unseenSeverity() == MessageSeverity::Error;
+        text = Rml::CreateString(
+            getTemplateText(context, isError ? "tplStatusError" : "tplStatusWarning").c_str(),
+            static_cast<int>(log.size())).c_str();
+        severityClass = isError ? "error" : "warning";
+    }
+
+    // Loading takes precedence over the badge deliberately: during startup the
+    // warnings that raise it are usually about the very engines still loading,
+    // and the badge stays behind to be shown the moment loading ends.
+    const bool changed = (text != statusTextShown);
+    if (changed) {
+        status->SetInnerRML(text.c_str());
+        statusTextShown = text;
+    }
+    for (const char* c : {"loading", "warning", "error"}) {
+        const bool want = severityClass && std::string(c) == severityClass;
+        if (status->IsClassSet(c) != want) {
+            status->SetClass(c, want);
+        }
+    }
+    if (changed) {
+        view.requestRepaint();
+    }
+
+    if (logPanelOpen && log.version() != logVersionShown) {
+        rebuildLogPanel();
+    }
+}
+
+/// Rebuilds #lstLog from the buffer. Only called when the panel is open and the
+/// log has actually changed — the version counter is an atomic, so the common
+/// case of an open panel and a quiet log costs one relaxed load per frame.
+void ElementGame::rebuildLogPanel() {
+    auto context = GetContext();
+    if (!context) return;
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+    auto list = doc->GetElementById("lstLog");
+    if (!list) return;
+
+    auto& log = MessageLog::instance();
+    const auto entries = log.entries();
+    logVersionShown = log.version();
+
+    // Newest first. The alternative — oldest first, scrolled to the bottom —
+    // needs a layout pass before SetScrollTop() means anything, so the panel
+    // opened showing the OpenGL and font-loading chatter from startup while the
+    // error the user opened it for sat off-screen. Reversing costs nothing and
+    // needs no scrolling at all for the common case.
+    Rml::String rml;
+    for (auto it = entries.rbegin(); it != entries.rend(); ++it) {
+        const auto& e = *it;
+        const char* cls = e.severity == MessageSeverity::Error   ? "log-error"
+                        : e.severity == MessageSeverity::Warning ? "log-warning"
+                                                                 : "log-info";
+        // The text comes from spdlog, so it can contain anything an engine put
+        // on stderr. Escape it rather than letting a stray '<' eat the panel.
+        rml += Rml::CreateString("<div class=\"%s\">%s  %s</div>",
+                                 cls, e.timestamp.c_str(), escapeRml(e.text).c_str());
+    }
+    list->SetInnerRML(rml);
+    view.requestRepaint();
+}
+
+void ElementGame::toggleLogPanel() {
+    setLogPanelOpen(!logPanelOpen);
+}
+
+void ElementGame::setLogPanelOpen(bool open) {
+    auto context = GetContext();
+    if (!context) return;
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+    auto panel = doc->GetElementById("pnlLog");
+    if (!panel) return;
+
+    logPanelOpen = open;
+    panel->SetClass("hide", !open);
+    panel->SetClass("show", open);
+    if (open) {
+        // Opening is what "seen" means. The entries stay; only the badge clears.
+        MessageLog::instance().markSeen();
+        logVersionShown = 0;   // force a rebuild, the buffer may have rolled
+        rebuildLogPanel();
+    }
+    view.requestRepaint();
+}
+
+void ElementGame::clearLog() {
+    MessageLog::instance().clear();
+    logVersionShown = 0;
+    if (logPanelOpen) rebuildLogPanel();
+    view.requestRepaint();
+}
+
 void ElementGame::updateLoadingStatus(const std::string& message) {
+    // Kept for the one caller that still wants a plain string in the message
+    // box; engine progress goes through syncStatusIndicator() now.
     auto context = GetContext();
     if (!context) return;
 
@@ -881,6 +1004,7 @@ void ElementGame::OnUpdate()
     }
 
     syncActionAvailability();
+    syncStatusIndicator();
 
     if (view.state.colorToMove != model.state.colorToMove) {
         bool blackMove = model.state.colorToMove == Color::BLACK;

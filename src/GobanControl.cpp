@@ -3,6 +3,7 @@
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
 #include "AppState.h"
 #include "GobanControl.h"
+#include "MessageLog.h"
 #include "EventHandlerFileChooser.h"
 #include "EventManager.h"
 #include "UserSettings.h"
@@ -678,6 +679,31 @@ void GobanControl::buildRegistry() {
 
     add("free camera toggle", 0, 0, "toggle the horizontal camera lock", [this](CommandContext&) {
         view.cam.setHorizontalLock(!view.cam.lock);
+    });
+
+    // The log panel. No availableActions() term: this is not a game action —
+    // it changes nothing about the position and must work in every phase,
+    // including while engines load, which is exactly when it is needed.
+    add("toggle_log", 0, 1, "[on|off] — show or hide the message log",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->toggleLogPanel();
+            return;
+        }
+        // Explicit form for scripts: a bare toggle asserts nothing about where
+        // it started, so a scenario that toggles twice by mistake reads as
+        // passing while testing the opposite state.
+        const std::string arg = toLower(ctx.args[0]);
+        if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
+            && arg != "1" && arg != "0") {
+            spdlog::warn("toggle_log: expected on or off, got '{}'", ctx.args[0]);
+            return;
+        }
+        parent->setLogPanelOpen(arg == "on" || arg == "true" || arg == "1");
+    });
+
+    add("log_clear", 0, 0, "empty the message log", [this](CommandContext&) {
+        parent->clearLog();
     });
 
     add("report_bug", 0, 0, "write the recent interactions to a replayable bug report",
@@ -1497,6 +1523,18 @@ nlohmann::json GobanControl::dumpState() const {
     // A screenshot taken while this is true is not reproducible: the camera is
     // between positions and the shader is fed a live clock while animating.
     s["camera_animating"] = view.animationRunning || view.cameraAnim.active;
+    // The status indicator and the log behind it. `log_badge` is what the user
+    // sees without opening anything, so a scenario can assert that a failure was
+    // actually surfaced rather than only logged — which is the whole point of
+    // the feature and otherwise invisible to the harness.
+    {
+        const auto& log = MessageLog::instance();
+        s["log_count"]  = static_cast<int>(log.size());
+        s["log_open"]   = parent->isLogPanelOpen();
+        s["log_badge"]  = !log.hasUnseen() ? "none"
+                        : (log.unseenSeverity() == MessageSeverity::Error ? "error" : "warning");
+        s["engine_loading"] = engine.engineLoadingSummary();
+    }
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;
