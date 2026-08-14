@@ -542,6 +542,33 @@ they are not repeated here.
 Text overlays go through `GobanOverlay` (glyphy + freetype). Sound goes through
 `AudioPlayer` (PortAudio + libsndfile), driven from `onStonePlaced`.
 
+Both overlay builders — `updateLastMoveOverlay()` and `updateNavigationOverlay()`
+— run inside `Render()`, on the UI thread, once per repaint. They read
+`GobanModel::snapshot()` and nothing else; they were the last readers walking the
+SGF tree from that thread (ADR-0006 stage 4).
+
+---
+
+## 10a. Saying something to the user
+
+Two surfaces, deliberately disjoint:
+
+| Surface | Carries | Fed by |
+|---|---|---|
+| `#lblStatus` + `#pnlLog` (top left) | Which engine is loading; a badge for warnings and errors | `MessageLog`, via a **spdlog sink** |
+| `#lblMessage` (bottom centre) | Game results, SGF comments, command feedback, confirmation prompts | `ElementGame::showMessage()` |
+
+The sink is the important part: `installMessageLogSink()` means every
+`spdlog::warn`/`error` already in the codebase reaches the interface without its
+call site being touched. Before it, engine failures, GTP timeouts and failed
+saves went to `last_run.log` and nowhere else, so "my engine does not work" and
+"the application does nothing" looked identical from outside.
+
+It takes `warn` and above. `GtpClient` logs every command and response at `info`,
+so admitting `info` would let one genmove evict the failure the panel exists to
+show — and demoting that traffic is not an option, because `last_run.log` is what
+users attach to bug reports. See CLAUDE.md § Telling the User Something.
+
 ---
 
 ## 11. Scripting and tests

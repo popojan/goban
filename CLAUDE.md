@@ -276,6 +276,77 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 - **Keep `availableActions()` pure over plain data.** It must not take a `GobanModel` or `GameThread`: `isThinking()` reads a member only the game loop sets, so the engine-thinking cases would stop being testable — and they are half of what it decides.
 - **The UI thread must not read the SGF tree — it reads `GobanModel::snapshot()`.** The game thread owns that tree and mutates it freely; `GameRecord`'s const accessors take no lock, and its own mutex covers neither the readers nor half the mutators. `uiInputs()` and `dumpState()` take every record fact from the published `GameSnapshot` (ADR-0006). **Whoever changes what the UI displays must publish it**: `onBoardChange()` is the funnel that covers moves, navigation, load, switch, scoring and handicap; `createNewRecord()` and `onBoardSized()` publish for themselves because the new-game path bypasses it. A missed publish shows up as stale UI and the scenario suite catches it — both misses in the original change were caught on the first run. A plain scalar that changes off the position-change path becomes atomic instead, as `GameRecord::unsavedChanges` did; saving is not a position change. **ADR-0006 is complete**: `comment` and `markup` are published too, so nothing on a per-frame or per-keystroke path reads the record. What remains by design is listed in the ADR — `hasGameWorthKeeping()`, save/archive, and the dialog seed — all on explicit user actions. Note that `ElementGame`'s old `positionNumber` guard was not wrong, only insufficient: an atomic edge makes a write *visible* but grants no exclusion, so copying a `std::string` or walking a `std::vector` across it is still a use-after-free. The same partial-locking shape has now been found three times — `GameRecord`, `PlayerManager` (writers unlocked while readers locked), and the process pipes — so when a reader crosses this boundary, check the writers before assuming a mutex means anything.
 - **Widget state reads the phase, not `state.reason`.** They diverge after navigating back from a finished game: the phase returns to `Paused` while the reason stays set. See the `state.reason` invariant above.
+- **A quantity displayed in two places is written by one function.**
+  `ElementGame::syncPrisonerLabels()` writes all four prisoner labels. It was two
+  copies, and they disagreed: `capturedBlack` counts *black stones removed*, so
+  it is what **White** has taken, and the game-over branch had the pairing
+  backwards — every finished game showed both counts swapped. Same shape as the
+  buttons that disagreed with their commands before ADR-0005.
+
+### Telling the User Something
+- **Two surfaces, and they do not overlap.** `#lblStatus` / `#pnlLog` (top left)
+  carry *application* status: which engine is still loading, and a badge for
+  warnings and errors. `#lblMessage` (bottom, centre) carries *game* content —
+  results, SGF comments — plus command feedback and confirmation prompts. Loading
+  text used to live in `lblMessage`; it was unnamed, English in every language,
+  and competing with four other claimants.
+- **Diagnostics reach the user through a spdlog sink, not through call sites.**
+  `installMessageLogSink()` feeds `MessageLog`, so every existing
+  `spdlog::warn`/`error` surfaces without being touched, and a new one surfaces
+  by existing. Do not add a parallel "show this error" path.
+- **The sink takes `warn` and above.** At `info` the panel is useless:
+  `GtpClient` logs every command and response at that level, so one genmove
+  against KataGo evicts the engine failure the user opened the panel for.
+  Demoting that traffic to `debug` is *not* the fix — `last_run.log` at default
+  verbosity is what users attach to a bug report, and that trace is the most
+  diagnostic thing in it.
+- **The badge counts arrivals since the panel was last opened**, not
+  `MessageLog::size()`, which saturates at the buffer capacity and so cannot tell
+  "nothing new" from "the buffer is full". Opening the panel is what marks them
+  seen.
+- **While the panel is open, the status line must stay visible.** It is the only
+  close affordance; when it hid itself (because opening cleared the badge) the
+  panel could not be dismissed except from a menu.
+- **Counts go in parentheses after the noun** — "Zprávy (3)", never "3 zpráv".
+  Czech needs three plural forms and ja/ko/zh have none; the parenthesised form
+  is grammatical in all five without a plural-rules library.
+- **A user-visible string comes from a template, with an English fallback.**
+  `ElementGame::templateText(id, fallback)`. A missing template used to yield an
+  *empty* message, so a translation lacking one entry said nothing at all.
+
+### Persisted Settings
+- **`user.json` is the runtime scratchpad and is not tracked.** Defaults that
+  ship — the opening camera — live in `config/base.json`, which the application
+  never writes. Keeping both in one file leaked local paths and language into the
+  repository once (5fe4d48), and a `.gitignore` entry cannot prevent a repeat
+  because ignoring does nothing to a file already tracked.
+- **The camera resolves most-specific-first**: where the user left it
+  (`camera_current`), then their saved preset (`camera`), then the config
+  default. `reset camera` uses the last two — without the fallback it reset to
+  wherever the view already was on a fresh install.
+- **Writes are atomic and locked on both sides.** `std::ofstream` truncates on
+  open, so the previous save lost every preference if interrupted; it now writes
+  a `.tmp` and renames. `GameThread::setFixedHandicap()` calls `setKomi()` from
+  the game thread while `GobanView` saves the camera from the UI thread, so the
+  mutex covers the readers too — a writers-only lock is the partial-locking shape
+  this codebase has produced three times, and the camera accessors return by
+  value because a reference handed out under a lock is not protected by it.
+
+### Keybindings
+- **A binding is a chord**: key plus a `KeyMod` bitmask from optional
+  `ctrl`/`shift`/`alt` booleans. An entry with none means the unmodified key,
+  which is what every binding meant before, so old configs keep working.
+- **Modifiers match exactly, with no fallback.** Otherwise every accelerator
+  would also fire its unmodified twin — Ctrl+S would `save` *and* `zoom camera`.
+- **Navigation and prompt keys are handled before the table, and only
+  unmodified**, which leaves Ctrl+Left bindable.
+- **Bind `clear`, never `new_game`.** `new_game` is the scripting entry point and
+  deliberately does not prompt; putting it on a key would be a silent
+  game-discarder, against the rule that all three replacement paths confirm.
+- **Keybindings accumulate across an `$include` chain.** `load()` recurses before
+  `merge_patch` replaces the `controls` array, so an includer can *add* a binding
+  but cannot remove one, and only the JSON looks replaced. Pinned by
+  `tests/test_configuration.cpp`.
 
 ### UI Event Suppression
 - **`syncingUI` flag**: `GobanControl::syncingUI` suppresses game actions triggered by UI change events during programmatic dropdown updates. Any method that repopulates dropdowns (player, board size, komi, handicap) must wrap the repopulation with `setSyncingUI(true/false)`. Event handlers in `EventHandlerNewGame` check `isSyncingUI()` and skip side effects when true. This prevents transient intermediate states (e.g. briefly activating an engine player during dropdown clear/repopulate) from triggering game actions.

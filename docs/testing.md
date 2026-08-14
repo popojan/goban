@@ -259,8 +259,8 @@ refusal apart from an action that legitimately had nothing to do.
 
 Add a key there and every scenario can assert on it.
 
-Plus the message log: `log_count`, `log_open`, `log_badge` (`none`/`warning`/
-`error`) and `engine_loading` (the engine the status indicator is naming, empty
+Plus the message log: `log_count`, `log_unseen`, `log_open`, `log_badge`
+(`none`/`warning`/`error`) and `engine_loading` (the engine the status indicator is naming, empty
 once loading is done). **Assert `log_badge`, not `log_count`** when you mean "the
 user was told": the count changes even when nothing is shown, so a test written
 against it passes even if the badge never appears — which is the entire failure
