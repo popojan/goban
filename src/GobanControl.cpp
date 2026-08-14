@@ -1162,12 +1162,10 @@ void GobanControl::command(const std::string& name, const std::vector<std::strin
     }
 }
 
-void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
-    (void) x;
-    (void) y;
+void GobanControl::keyPress(int key, unsigned mods, bool downNotUp){
 
     // Handle prompt keyboard shortcuts (on key UP)
-    if (!downNotUp && parent->hasActivePrompt()) {
+    if (!downNotUp && mods == KeyMod::NONE && parent->hasActivePrompt()) {
         if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER) {
             parent->handlePromptResponse(true);  // Enter = confirm
             return;
@@ -1186,7 +1184,7 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         key, downNotUp, keySnap->navigating,
         keySnap->viewPosition, keySnap->mainLineMoves);
 
-    if (!downNotUp && keySnap->navigating) {
+    if (!downNotUp && mods == KeyMod::NONE && keySnap->navigating) {
         // These four keys dispatch through the registry rather than calling the
         // navigator directly. Two things follow from that and neither is
         // incidental: they answer to the same availableActions() rule as the
@@ -1223,8 +1221,8 @@ void GobanControl::keyPress(int key, int x, int y, bool downNotUp){
         }
     }
 
-    std::string cmd(config->getCommand(static_cast<Rml::Input::KeyIdentifier>(key)));
-    spdlog::debug("keyPress: key={} mapped to cmd='{}'", key, cmd);
+    std::string cmd(config->getCommand(static_cast<Rml::Input::KeyIdentifier>(key), mods));
+    spdlog::debug("keyPress: key={} mods={} mapped to cmd='{}'", key, mods, cmd);
 
     // Adjustment commands should trigger on key DOWN (enables key repeat)
     if (downNotUp && !cmd.empty()) {

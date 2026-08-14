@@ -234,8 +234,8 @@ bool ScenarioRunner::execute(const Step& step, GobanControl& control) {
         }
         // Down then up, as a real press arrives. The adjustment commands act on
         // the down edge to allow key repeat; everything else acts on the up.
-        control.keyPress(code, 0, 0, true);
-        control.keyPress(code, 0, 0, false);
+        control.keyPress(code, KeyMod::NONE, true);
+        control.keyPress(code, KeyMod::NONE, false);
         return true;
     }
 

@@ -47,19 +47,31 @@ bool Configuration::load(const std::string& fileName) {
             auto key = it.find("key");
             auto command = it.find("command");
             if (key != it.end() && command != it.end()) {
-                addKey(static_cast<Rml::Input::KeyIdentifier>(*key), *command);
+                // An entry with no modifier keys is the historical form and
+                // means "this key, unmodified".
+                addKey(KeyChord{static_cast<Rml::Input::KeyIdentifier>(*key),
+                                parseModifiers(it)},
+                       *command);
             }
         }
     }
     return true;
 }
 
-void Configuration::addKey(Rml::Input::KeyIdentifier key, const std::string& cmd) {
-    keyToCommand[key] = cmd;
+unsigned Configuration::parseModifiers(const nlohmann::json& entry) {
+    unsigned mods = KeyMod::NONE;
+    if (entry.value("ctrl", false))  mods |= KeyMod::CTRL;
+    if (entry.value("shift", false)) mods |= KeyMod::SHIFT;
+    if (entry.value("alt", false))   mods |= KeyMod::ALT;
+    return mods;
 }
 
-std::string Configuration::getCommand(Rml::Input::KeyIdentifier key) const {
-    auto it = keyToCommand.find(key);
+void Configuration::addKey(KeyChord chord, const std::string& cmd) {
+    keyToCommand[chord] = cmd;
+}
+
+std::string Configuration::getCommand(Rml::Input::KeyIdentifier key, unsigned mods) const {
+    auto it = keyToCommand.find(KeyChord{key, mods});
     if(it != keyToCommand.end()) {
         return it->second;
     }

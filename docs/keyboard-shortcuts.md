@@ -83,6 +83,27 @@ For use with anaglyph stereo shaders (red/cyan glasses):
 | **J** | Increase depth of field (dof) |
 | **K** | Decrease depth of field (dof) |
 
+## File and game
+
+These use modifier keys, which the `controls` table gained in order to have them
+— every unmodified letter was already spent on the camera and shader controls.
+
+| Key | Function |
+|-----|----------|
+| **Ctrl+S** | Save the game record now |
+| **Ctrl+O** | Open the file browser |
+| **Ctrl+N** | New game on the same board size (asks first if there is a game worth keeping) |
+| **Ctrl+Z** | Undo — step back one move |
+| **Ctrl+B** | Toggle bot-versus-bot play |
+| **Ctrl+M** | Show or hide the message log |
+
+`Ctrl+N` runs `clear` rather than `new_game`, because `clear` is the path that
+asks before discarding a game in progress.
+
+A binding with modifiers is distinct from the same key without them: **S** still
+zooms the camera, and **U** still undoes. See
+[Configuration](configuration.md#modifier-keys) for the format.
+
 ## Application
 
 | Key | Function |

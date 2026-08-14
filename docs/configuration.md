@@ -230,6 +230,35 @@ Maps keyboard keys to commands. Keys are specified as [RmlUi KeyIdentifier](http
 ]
 ```
 
+### Modifier keys
+
+An entry may also carry `ctrl`, `shift` and `alt` booleans, in any combination:
+
+```json
+"controls": [
+  {"key": 30, "command": "zoom camera"},
+  {"key": 30, "ctrl": true, "command": "save"},
+  {"key": 26, "ctrl": true, "shift": true, "command": "archive"}
+]
+```
+
+Three rules:
+
+- **An entry with no modifiers means the unmodified key**, which is what every
+  binding meant before modifiers existed. Existing `controls` arrays keep working
+  unchanged.
+- **Modifiers must match exactly.** `S` and `Ctrl+S` are different bindings on
+  the same key, and neither falls back to the other — otherwise every accelerator
+  would also fire its unmodified twin.
+- **Navigation keys ignore bindings entirely when modified.** Left, Right,
+  Backspace and Space's forward step are handled before the table is consulted,
+  but only unmodified, so `Ctrl+Left` is free to be bound.
+
+Modifiers exist because there was nowhere left to put an accelerator: every
+unmodified letter was already spent on the camera and shader controls, so `save`,
+`load`, `clear` and `toggle ai vs ai` were registered commands that no key could
+reach.
+
 See [Keyboard Shortcuts](keyboard-shortcuts.md) for the complete mapping.
 
 ### Available Commands

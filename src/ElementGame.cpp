@@ -934,8 +934,16 @@ void ElementGame::ProcessEvent(Rml::Event& event)
 
     if (event == "keydown" || event == "keyup") {
         Rml::Input::KeyIdentifier key_identifier = static_cast<Rml::Input::KeyIdentifier>(event.GetParameter<int>("key_identifier", 0));
-        spdlog::debug("ElementGame received {} key={}", event.GetType().c_str(), static_cast<int>(key_identifier));
-        control.keyPress(key_identifier, 0, 0, event == "keydown");
+        // RmlUi reports the modifier state on the event itself. Without it the
+        // keybinding table could only express bare keys, and every unmodified
+        // letter was already taken by the camera and shader controls.
+        unsigned mods = KeyMod::NONE;
+        if (event.GetParameter<int>("ctrl_key", 0))  mods |= KeyMod::CTRL;
+        if (event.GetParameter<int>("shift_key", 0)) mods |= KeyMod::SHIFT;
+        if (event.GetParameter<int>("alt_key", 0))   mods |= KeyMod::ALT;
+        spdlog::debug("ElementGame received {} key={} mods={}",
+                      event.GetType().c_str(), static_cast<int>(key_identifier), mods);
+        control.keyPress(key_identifier, mods, event == "keydown");
     }
     else if (event == "mousemove") {
         int x = event.GetParameter<int>("mouse_x", -1);

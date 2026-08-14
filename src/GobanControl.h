@@ -46,7 +46,10 @@ public:
 
     void mouseClick(int button, int state, int x, int y);
     void mouseMove(int x, int y);
-    void keyPress(int key, int x, int y, bool downNotUp = false);
+    /// A key event, with the modifiers held with it (a KeyMod bitmask). The
+    /// two unused x/y parameters this replaced were passed 0 by every caller
+    /// and read by none.
+    void keyPress(int key, unsigned mods, bool downNotUp = false);
     [[nodiscard]] bool isExiting() const {
         return exit;
     }
