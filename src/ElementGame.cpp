@@ -560,6 +560,7 @@ void ElementGame::performDeferredInitialization() {
     // default is off so that turning the panel on never silently starts
     // pointing at the board.
     view.setAnalysisOverlay(UserSettings::instance().getEvaluationMoves());
+    view.setEvaluationOnBoard(UserSettings::instance().getEvaluationOnBoard());
 
     // Invalidate view state to force OnUpdate to sync all dropdowns
     // (model and view start with identical defaults, so diffs won't fire otherwise)
@@ -795,8 +796,12 @@ void ElementGame::syncEvaluationPanel() {
     auto* panel = doc->GetElementById("grpAnalysis");
     if (!panel) return;   // a translated .rml without the element degrades to silence
 
+    // One readout, in one place. With the board version on, the panel steps
+    // aside rather than saying the same thing twice — which is the whole point
+    // of the experiment: to see the diegetic one *instead of* the panel, not
+    // beside it.
     const auto report = analysis.report();
-    const bool show = report != nullptr;
+    const bool show = report != nullptr && !view.isEvaluationOnBoard();
     if (panel->IsClassSet("show") != show) {
         panel->SetClass("show", show);
         panel->SetClass("hide", !show);
@@ -1086,6 +1091,7 @@ void ElementGame::syncActionAvailability() {
     // Same answer, two buttons: the board annotations need exactly what the
     // panel needs — an engine that can analyse, and not a tsumego.
     setElementDisabled("cmdEvaluationMoves", !a.evaluation);
+    setElementDisabled("cmdEvaluationBoard", !a.evaluation);
 }
 
 void ElementGame::OnUpdate()
@@ -1135,6 +1141,11 @@ void ElementGame::OnUpdate()
         const bool movesChecked = view.isAnalysisOverlayShown();
         if (movesEl && movesEl->IsClassSet("selected") != movesChecked) {
             OnMenuToggle("toggle_evaluation_moves", movesChecked);
+        }
+        auto* boardEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationBoard");
+        const bool boardChecked = view.isEvaluationOnBoard();
+        if (boardEl && boardEl->IsClassSet("selected") != boardChecked) {
+            OnMenuToggle("toggle_evaluation_board", boardChecked);
         }
     }
     syncEvaluationPanel();

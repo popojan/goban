@@ -58,6 +58,12 @@ public:
     bool getEvaluationMoves() const { std::lock_guard<std::mutex> lock(mutex); return evaluationMoves; }
     void setEvaluationMoves(bool value);
 
+    /// The evaluation as text on the board's near edge instead of in the panel.
+    /// Off by default: it replaces a readout that always works with one that is
+    /// an open question about how a live element feels in world space.
+    bool getEvaluationOnBoard() const { std::lock_guard<std::mutex> lock(mutex); return evaluationOnBoard; }
+    void setEvaluationOnBoard(bool value);
+
     // Last SGF (for resuming after restart)
     std::string getLastSgfPath() const { std::lock_guard<std::mutex> lock(mutex); return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
@@ -188,6 +194,7 @@ private:
     // Live evaluation overlay
     bool evaluationEnabled = false;
     bool evaluationMoves = false;
+    bool evaluationOnBoard = false;
 
     // Last SGF
     std::string lastSgfPath;

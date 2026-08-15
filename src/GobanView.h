@@ -172,6 +172,23 @@ public:
     /// "3a" stays and only takes on colour.
     void updateAnalysisOverlay();
 
+    /// The evaluation as text on the wood, in the margin nearest the camera,
+    /// instead of in the RmlUi panel. The panel is small, overlays a board that
+    /// took some trouble to render, and is the one piece of the interface not in
+    /// the scene; this is the experiment in putting it there.
+    ///
+    /// Bottom edge because it is the only strip independent of the shader — all
+    /// four variants draw the same wood there, and it is empty in every one.
+    void updateEvaluationReadout();
+    bool toggleEvaluationOnBoard();
+    [[nodiscard]] bool isEvaluationOnBoard() const { return showEvaluationOnBoard; }
+    void setEvaluationOnBoard(bool shown);
+    /// What the board readout currently says, empty when it says nothing. The
+    /// glyphs themselves are unreachable from a headless run, so this is the
+    /// only way a scenario can check that the text was composed correctly —
+    /// which colour leads, and how the score is written.
+    [[nodiscard]] const std::string& evaluationReadoutText() const { return readoutText; }
+
     /// Off by default, and that is the point. The panel's numbers are read
     /// *after* a move, so a player can invent their own and judge it. Stars on
     /// the board are read *before*, and once the engine has pointed at a point
@@ -237,6 +254,8 @@ public:
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
     bool showAnalysisOverlay = false;
+    bool showEvaluationOnBoard = false;
+    std::string readoutText;
     const AnalysisService* analysis = nullptr;
     /// Kept apart because they are undone differently: a label this overlay
     /// added is removed, whereas a point it merely tinted belongs to somebody

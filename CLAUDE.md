@@ -417,6 +417,16 @@ of its decisions, and `tests/test_analysis.cpp` plus
   sets the annotation material, and that has to reach the stone upload or the
   grid stays drawn under it. This is why the publish gate does not ask for a
   bare repaint.
+- **A label can sit off the grid.** `FloatingLabel` carries its own board
+  coordinate — the same space the point overlays use, but float and signed. The
+  grid is [0, N-1]; the wood extends **0.85 grid spacings past it on all four
+  sides**, on every board size, because the constant in `Metrics::calc()` is in
+  grid units. So a margin coordinate needs no per-size arithmetic. Unlike a point
+  overlay it touches no material — there is no grid out there to erase — and
+  nothing clears it when a stone lands. `add_text` centres on the point given.
+- **Every character drawn must be in the atlas string** (`GobanOverlay.cpp:59`).
+  The font is not the gate; that string is. A glyph absent from it simply does
+  not appear, silently.
 - **The overlay is not part of `isIdle()`.** An analysis stream never finishes on
   its own, so treating it as work-in-flight would make quiescence unreachable —
   the same trap as waiting on `EngineSync::Unsynced`.

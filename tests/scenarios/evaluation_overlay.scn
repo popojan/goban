@@ -126,3 +126,26 @@ toggle_evaluation off
 wait_until eval_state disabled
 expect eval_enabled false
 expect eval_winrate -1
+
+# The diegetic readout: the same numbers on the board's near edge instead of in
+# the panel. One readout in one place — turning it on takes the panel away
+# rather than saying the same thing twice.
+toggle_evaluation on
+wait_until eval_state running
+wait_until eval_winrate 60
+expect eval_on_board false
+
+toggle_evaluation_board on
+expect eval_on_board true
+expect eval_winrate 60
+
+# The composed text, which is the only part of the board readout a headless run
+# can check — the glyphs themselves are never drawn here. Black leads at 60%,
+# and the mock reports a 2.5 point lead for the side to move, who is Black.
+wait_until eval_board_text B 60% B+2.5
+
+toggle_evaluation_board off
+expect eval_on_board false
+# wait_until, not expect: this key reports what was last *drawn*, so it needs a
+# frame to catch up — same as eval_labels.
+wait_until eval_board_text ""

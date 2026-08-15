@@ -59,7 +59,11 @@ bool GobanOverlay::init() {
         // Warms the atlas; the geometry is cleared before anything is drawn, so
         // the colour is irrelevant here.
         static const GLfloat white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-	    b->add_text("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#^O",
+        // Every character that can ever be drawn has to be in the atlas. The
+        // punctuation is for the evaluation readout ("B+4.5", "62%"); the font
+        // has all of it, but a glyph absent from this string simply does not
+        // appear.
+	    b->add_text("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#^O+-.%",
 	                font, 12.0, white);
 		buffer[i] = b;
 	}
@@ -113,6 +117,23 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 			}
 			idx++;
 		}
+		// Free-positioned labels ride the same buffers. Same coordinate space
+		// as the loop above — board units from the centre — but float and
+		// signed, so they can sit out in the margin where there is no point to
+		// hang them on. add_text centres on the cursor, so the coordinate given
+		// is the middle of the text.
+		for (const auto& label : floating) {
+			if (label.layer != layer) continue;
+			glyphy_point_t pos = {
+				model.metrics.squareSizeX * (label.boardPos.x - halfN),
+				-model.metrics.squareSizeY * (label.boardPos.y - halfN)
+			};
+			buffer[layer]->move_to(&pos);
+			buffer[layer]->add_text(label.text.c_str(), font, label.size,
+			                        glm::value_ptr(label.color));
+			cnt += 1;
+		}
+
 		layers[layer].empty = cnt == 0;
 	}
 

@@ -530,6 +530,31 @@ void GobanControl::buildRegistry() {
         ctx.checked = next;
     });
 
+    add("toggle_evaluation_board", 0, 1,
+        "[on|off] — show the evaluation on the board's edge instead of in the panel",
+        [this](CommandContext& ctx) {
+        if (!actions().evaluation) {
+            spdlog::debug("toggle_evaluation_board refused by availableActions()");
+            ctx.notifyMenu = false;
+            return;
+        }
+        bool next = !view.isEvaluationOnBoard();
+        if (!ctx.args.empty()) {
+            const std::string arg = toLower(ctx.args[0]);
+            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
+                && arg != "1" && arg != "0") {
+                spdlog::warn("toggle_evaluation_board: expected on or off, got '{}'",
+                             ctx.args[0]);
+                ctx.notifyMenu = false;
+                return;
+            }
+            next = (arg == "on" || arg == "true" || arg == "1");
+        }
+        view.setEvaluationOnBoard(next);
+        UserSettings::instance().setEvaluationOnBoard(next);
+        ctx.checked = next;
+    });
+
     add("genmove", 0, 0, "reserved for a future \"resume match from here\" feature (no-op)",
         [](CommandContext&) {
     });
@@ -1655,6 +1680,8 @@ nlohmann::json GobanControl::dumpState() const {
         // by default — `eval_labels` reading 0 with the panel running is the
         // normal case, not a fault.
         s["eval_moves_shown"] = view.isAnalysisOverlayShown();
+        s["eval_on_board"] = view.isEvaluationOnBoard();
+        s["eval_board_text"] = view.evaluationReadoutText();
         s["eval_labels"]  = static_cast<int>(view.analysisLabelCount());
         // Suggestions that landed on a move already in the record: the label
         // stays and only takes on colour. The split between these two keys is

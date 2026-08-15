@@ -3,8 +3,11 @@
 #include "AudioPlayer.hpp"
 #include "ElementGame.h"
 
+#include <cmath>
 #include <cstdio>
+#include <iomanip>
 #include <set>
+#include <sstream>
 #include "UserSettings.h"
 
 GobanView::GobanView(GobanModel& m)
@@ -383,6 +386,7 @@ void GobanView::Render(int w, int h)
         // After the navigation overlay, never before: it tints the labels that
         // pass has just written.
         updateAnalysisOverlay();
+        updateEvaluationReadout();
 	}
 
 	if (flags & UPDATE_STONES) {
@@ -857,6 +861,58 @@ void GobanView::updateAnalysisOverlay() {
 			analysisLabels.push_back(label.pos);
 		}
 	}
+}
+
+void GobanView::updateEvaluationReadout() {
+	std::vector<FloatingLabel> labels;
+	readoutText.clear();
+
+	if (showEvaluationOnBoard && analysis) {
+		if (const auto report = analysis->report()) {
+			// The margin runs from row -0.85 to row 0 — 0.85 grid spacings of
+			// wood on every board size, because the constant in Metrics::calc()
+			// is in grid units. Centre of that strip is -0.425.
+			constexpr float MARGIN_ROW = -0.425f;
+			// Around 1.5x a move number, which is 0.42 spacings. Leaves room
+			// inside the 0.85 strip for the descenders and a little air.
+			const float size = 0.60f * model.metrics.squareSizeY;
+			const float halfN = 0.5f * static_cast<float>(model.getBoardSize()) - 0.5f;
+
+			std::ostringstream text;
+			text << (report->winrateBlack >= 0.5 ? "B " : "W ")
+			     << static_cast<int>(std::lround(
+			            (report->winrateBlack >= 0.5 ? report->winrateBlack
+			                                         : 1.0 - report->winrateBlack) * 100.0))
+			     << "%";
+			if (report->scoreLeadBlack) {
+				const double lead = *report->scoreLeadBlack;
+				// One space, not a run of them: the scenario runner re-joins an
+				// expected value with single spaces, so a wider gap could not be
+				// asserted. How this should actually be spaced on a board edge
+				// is a look-at-it question anyway.
+				text << " " << (lead >= 0.0 ? "B+" : "W+")
+				     << std::fixed << std::setprecision(1) << std::fabs(lead);
+			}
+
+			// add_text centres on the point, so this is the middle of the board
+			// edge. Black on wood, like every other board-level label.
+			readoutText = text.str();
+			labels.push_back({glm::vec2(halfN, MARGIN_ROW), readoutText, size,
+			                  glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 0u});
+		}
+	}
+	gobanOverlay.setFloatingLabels(std::move(labels));
+}
+
+bool GobanView::toggleEvaluationOnBoard() {
+	setEvaluationOnBoard(!showEvaluationOnBoard);
+	return showEvaluationOnBoard;
+}
+
+void GobanView::setEvaluationOnBoard(bool shown) {
+	if (showEvaluationOnBoard == shown) return;
+	showEvaluationOnBoard = shown;
+	requestRepaint(UPDATE_OVERLAY);
 }
 
 bool GobanView::toggleAnalysisOverlay() {

@@ -166,6 +166,8 @@ when one is given, is the value. `expect comment markup node` works; before this
 "markup" was read as an operator and the line failed as malformed, so an SGF
 comment could not be asserted at all. `""` means the empty string, since a value
 is required and an absent one cannot be told from a typo: `expect comment ""`.
+Runs of whitespace cannot be expressed, though: the value is re-joined from the
+split tokens with single spaces, so `a  b` and `a b` are the same expectation.
 
 Confirmation prompts are scriptable: `board_size <n>` and `handicap <n>` take
 the same route as the dropdowns, so they ask before replacing a game worth
@@ -285,6 +287,11 @@ For the board suggestions: `eval_moves_shown` (the toggle, off by default),
 `eval_labels` (suggestions this overlay labelled) and `eval_tints` (suggestions
 that landed on a move already in the record and were only coloured). The split
 between the last two *is* the combine rule, which is why they are separate keys.
+For the diegetic readout: `eval_on_board` (the toggle) and `eval_board_text`, the
+composed string. The glyphs are never drawn in a headless run, so that string is
+the only way to check the readout's *content* — which colour leads, how the score
+is written. Both report what was last **drawn**, so they need `wait_until` rather
+than `expect` right after a toggle.
 Note that the mock always proposes the first two empty points in scan order, so a
 scenario testing a collision has to play *there* — A1 and B1 — for a suggestion
 and a recorded move to meet.
