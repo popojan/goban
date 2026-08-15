@@ -76,6 +76,12 @@ public:
     std::string getEvaluationColor() const { std::lock_guard<std::mutex> lock(mutex); return evaluationColor; }
     void setEvaluationColor(const std::string& value);
 
+    /// Column letters and row numbers printed on the board's margins. Off by
+    /// default: this board is unusually pretty and the labels are a study aid,
+    /// not part of the object.
+    bool getCoordinates() const { std::lock_guard<std::mutex> lock(mutex); return coordinates; }
+    void setCoordinates(bool value);
+
     // Last SGF (for resuming after restart)
     std::string getLastSgfPath() const { std::lock_guard<std::mutex> lock(mutex); return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
@@ -207,6 +213,7 @@ private:
     bool evaluationEnabled = false;
     bool evaluationMoves = false;
     bool evaluationOnBoard = false;
+    bool coordinates = false;
     std::string evaluationAlign = "center";
     std::string evaluationColor;
 

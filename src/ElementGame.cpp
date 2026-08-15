@@ -561,6 +561,7 @@ void ElementGame::performDeferredInitialization() {
     // pointing at the board.
     view.setAnalysisOverlay(UserSettings::instance().getEvaluationMoves());
     view.setEvaluationOnBoard(UserSettings::instance().getEvaluationOnBoard());
+    view.setCoordinates(UserSettings::instance().getCoordinates());
     if (auto align = GobanView::parseAlign(UserSettings::instance().getEvaluationAlign())) {
         view.setEvaluationAlign(*align);
     }
@@ -1151,6 +1152,11 @@ void ElementGame::OnUpdate()
         const bool movesChecked = view.isAnalysisOverlayShown();
         if (movesEl && movesEl->IsClassSet("selected") != movesChecked) {
             OnMenuToggle("toggle_evaluation_moves", movesChecked);
+        }
+        auto* coordEl = context->GetDocument("game_window")->GetElementById("cmdCoordinates");
+        const bool coordChecked = view.areCoordinatesShown();
+        if (coordEl && coordEl->IsClassSet("selected") != coordChecked) {
+            OnMenuToggle("toggle_coordinates", coordChecked);
         }
         auto* boardEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationBoard");
         const bool boardChecked = view.isEvaluationOnBoard();

@@ -610,6 +610,28 @@ void GobanControl::buildRegistry() {
         UserSettings::instance().setEvaluationColor(hexFromColor(*parsed));
     });
 
+    add("toggle_coordinates", 0, 1,
+        "[on|off] — column letters and row numbers on the board's margins",
+        [this](CommandContext& ctx) {
+        // No availability term: unlike the evaluation toggles this needs no
+        // engine and works on any board.
+        bool next = !view.areCoordinatesShown();
+        if (!ctx.args.empty()) {
+            const std::string arg = toLower(ctx.args[0]);
+            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
+                && arg != "1" && arg != "0") {
+                spdlog::warn("toggle_coordinates: expected on or off, got '{}'",
+                             ctx.args[0]);
+                ctx.notifyMenu = false;
+                return;
+            }
+            next = (arg == "on" || arg == "true" || arg == "1");
+        }
+        view.setCoordinates(next);
+        UserSettings::instance().setCoordinates(next);
+        ctx.checked = next;
+    });
+
     add("genmove", 0, 0, "reserved for a future \"resume match from here\" feature (no-op)",
         [](CommandContext&) {
     });
@@ -1738,6 +1760,7 @@ nlohmann::json GobanControl::dumpState() const {
         s["eval_on_board"] = view.isEvaluationOnBoard();
         s["eval_board_text"] = view.evaluationReadoutText();
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());
+        s["coordinates_shown"] = view.areCoordinatesShown();
         s["eval_color"] = hexFromColor(view.readoutColor());
         s["eval_labels"]  = static_cast<int>(view.analysisLabelCount());
         // Suggestions that landed on a move already in the record: the label

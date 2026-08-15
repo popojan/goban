@@ -456,6 +456,11 @@ of its decisions, and `tests/test_analysis.cpp` plus
   `evaluation_color` only when it is non-empty — writing it unconditionally would
   pin today's default into every `user.json` and quietly defeat any later change
   to it. Same two-level arrangement as the camera.
+- **The coordinate convention has one implementation.** `Position::columnLabel()`
+  and `rowLabel()` — skipping `I`, numbering rows from 1 at the bottom — are what
+  both the board's margin labels and `operator<<` use. Board rows run opposite to
+  SGF rows, so a second copy would drift silently and the board would end up
+  disagreeing with what `click` and the record mean by the same point.
 - **Every character drawn must be in the atlas string** (`GobanOverlay.cpp:59`).
   The font is not the gate; that string is. A glyph absent from it simply does
   not appear, silently.

@@ -180,7 +180,10 @@ public:
     ///
     /// Bottom edge because it is the only strip independent of the shader — all
     /// four variants draw the same wood there, and it is empty in every one.
-    void updateEvaluationReadout();
+    /// Every label placed by board coordinate rather than by board point: the
+    /// evaluation readout and, when shown, the coordinate labels. One function
+    /// because setFloatingLabels() replaces the whole list.
+    void updateFloatingLabels();
     bool toggleEvaluationOnBoard();
     [[nodiscard]] bool isEvaluationOnBoard() const { return showEvaluationOnBoard; }
     void setEvaluationOnBoard(bool shown);
@@ -210,6 +213,14 @@ public:
     void setReadoutColor(const glm::vec4& color);
     void setReadoutStaleColor(const glm::vec4& color);
     [[nodiscard]] const glm::vec4& readoutColor() const { return readoutInk; }
+
+    /// Column letters along the top margin and row numbers down the left, in
+    /// the same 0.85-spacing strip of wood the readout uses at the bottom.
+    /// Fixed to those two edges whether or not the readout is on, so nothing
+    /// ever moves and they can never collide.
+    bool toggleCoordinates();
+    [[nodiscard]] bool areCoordinatesShown() const { return showCoordinates; }
+    void setCoordinates(bool shown);
 
     /// Off by default, and that is the point. The panel's numbers are read
     /// *after* a move, so a player can invent their own and judge it. Stars on
@@ -277,6 +288,8 @@ public:
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
     bool showAnalysisOverlay = false;
     bool showEvaluationOnBoard = false;
+    bool showCoordinates = false;
+    glm::vec4 coordinateInk{0.0f, 0.0f, 0.0f, 1.0f};
     TextAlign readoutAlign = TextAlign::Center;
     glm::vec4 readoutInk{0.0f, 0.0f, 0.0f, 1.0f};
     /// Ink for a readout describing a position that has been left. Follows

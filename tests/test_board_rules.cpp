@@ -1159,3 +1159,31 @@ TEST_CASE("streaming a board prints every row") {
     CHECK(out.find('W') != std::string::npos);
     CHECK(out.find('B') != std::string::npos);
 }
+
+TEST_CASE("coordinate labels agree with how a point prints") {
+    // The labels drawn on the board's margins and `operator<<` share one
+    // implementation on purpose. Board rows run opposite to SGF rows, so a
+    // second copy of the convention would drift silently — and the board would
+    // then disagree with what `click` and the record mean by the same point.
+    for (const int size : {9, 13, 19}) {
+        for (int col = 0; col < size; ++col) {
+            for (int row = 0; row < size; ++row) {
+                std::ostringstream printed;
+                printed << Position(col, row);
+                std::ostringstream fromLabels;
+                fromLabels << Position::columnLabel(col) << Position::rowLabel(row);
+                CHECK(printed.str() == fromLabels.str());
+            }
+        }
+    }
+}
+
+TEST_CASE("the column letter I is skipped, as Go requires") {
+    CHECK(Position::columnLabel(0) == 'A');
+    CHECK(Position::columnLabel(7) == 'H');
+    CHECK(Position::columnLabel(8) == 'J');   // not I
+    CHECK(Position::columnLabel(18) == 'T');
+    // Rows number from 1 at the bottom, which is board row 0.
+    CHECK(Position::rowLabel(0) == 1);
+    CHECK(Position::rowLabel(18) == 19);
+}

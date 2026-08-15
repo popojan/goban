@@ -48,6 +48,7 @@
                             <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">下一手</div>
                             <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">推荐手</div>
                             <div class="cmd toggle_evaluation_board unselected" id="cmdEvaluationBoard" onmouseup="toggle_evaluation_board">盘上胜率</div>
+                            <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">坐标</div>
                         </div>
                         <!--
                         <div class="grp">

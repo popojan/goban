@@ -310,7 +310,8 @@ For the diegetic readout: `eval_on_board` (the toggle), `eval_align`
 composed string. The glyphs are never drawn in a headless run, so that string is
 the only way to check the readout's *content* — which colour leads, how the score
 is written. Both report what was last **drawn**, so they need `wait_until` rather
-than `expect` right after a toggle.
+than `expect` right after a toggle. `coordinates_shown` covers the board's
+coordinate labels, which are independent of any engine.
 Note that the mock always proposes the first two empty points in scan order, so a
 scenario testing a collision has to play *there* — A1 and B1 — for a suggestion
 and a recorded move to meet.

@@ -67,9 +67,7 @@ std::istream& operator>> (std::istream& stream, Position& pos) {
 }
 
 std::ostream& operator<< (std::ostream& stream, const Position& pos) {
-    char c = pos.c < 8 ? static_cast<char>('A' + pos.c) : static_cast<char>('I' + pos.c - 7);
-    unsigned d = pos.r + 1u;
-    stream << c << d;
+    stream << Position::columnLabel(pos.c) << Position::rowLabel(pos.r);
     return stream;
 }
 

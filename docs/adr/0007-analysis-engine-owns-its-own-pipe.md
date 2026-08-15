@@ -1,6 +1,7 @@
 # ADR-0007: Continuous analysis runs in a process of its own, configured from the kibitz engine
 
-**Status:** Accepted — Stages 1 and 2 implemented 2026-08-15
+**Status:** Accepted — Stages 1 and 2 implemented 2026-08-15; the readout has a
+diegetic form since the same day
 **Date:** 2026-08-14
 **Revised:** 2026-08-14 — the six open questions are resolved into decisions
 7–15; three narrower ones are left open. That was the last edit: from `Accepted`
@@ -451,6 +452,26 @@ stays and is only tinted.** Colour then means quality everywhere on the board an
 nothing is lost, which is what made a per-glyph colour worth building first
 (`4313d70`) rather than settling for a palette of discrete quality buckets. SGF
 markup is exempt entirely — it is the user's own annotation.
+
+### The readout on the board, 2026-08-15
+
+Decision 11 gave the evaluation its own RmlUi panel, on the grounds that it
+carries *state* where `#lblMessage` carries *events*. That still holds, and the
+panel is still the default — but the panel is also the only part of the
+interface not in the scene, and it overlays a board that is the point of the
+program. So the same numbers can now be drawn on the wood of the near margin
+instead, behind a View → Overlay toggle that swaps the two rather than showing
+both.
+
+Off by default, because it trades a readout that always works for one that
+disappears when the board edge leaves the screen. Enabled by per-glyph colour in
+glyphy (`4313d70`) and by letting an overlay label carry a float, signed board
+coordinate, which is also what coordinate labels needed.
+
+One thing the first screenshot found immediately, and no test would have: at a
+scored end it read `B+10.6` directly above the result line's `B+10.5`. The
+readout now stands down at `scoredEnd` — the result there is a fact, not an
+estimate. This is decision 13's exclusivity principle applied to the number.
 
 ## What this does not change
 

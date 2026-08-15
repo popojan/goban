@@ -90,6 +90,17 @@ public:
     [[nodiscard]] int col() const { return c; }
     [[nodiscard]] int row() const { return r; }
 
+    /// The displayed column letter. `I` is skipped, as Go and GTP both require.
+    /// The board's coordinate labels and `operator<<` share this so they cannot
+    /// disagree about what a point is called — and board rows run opposite to
+    /// SGF rows, so a second copy of the convention would drift silently.
+    static char columnLabel(int col) {
+        return col < 8 ? static_cast<char>('A' + col)
+                       : static_cast<char>('I' + col - 7);
+    }
+    /// The displayed row number. Board row 0 is row 1, nearest the viewer.
+    static int rowLabel(int row) { return row + 1; }
+
     [[nodiscard]] std::string toSgf(int boardSize) const {
         std::ostringstream ss;
         ss << static_cast<char>('a' + c) << static_cast<char>('a' + boardSize - r - 1);

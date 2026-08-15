@@ -67,6 +67,17 @@ GobanView::GobanView(GobanModel& m)
                              "or #rrggbbaa", configured);
             }
         }
+        const std::string coordConfigured = config->data
+                .value("annotations", nlohmann::json::object())
+                .value("coordinate_color", std::string());
+        if (!coordConfigured.empty()) {
+            if (const auto parsed = parseHexColor(coordConfigured)) {
+                coordinateInk = *parsed;
+            } else {
+                spdlog::warn("annotations.coordinate_color: '{}' is not #rgb, "
+                             "#rrggbb or #rrggbbaa", coordConfigured);
+            }
+        }
         const std::string staleConfigured = config->data
                 .value("annotations", nlohmann::json::object())
                 .value("readout_stale_color", std::string());
@@ -416,7 +427,7 @@ void GobanView::Render(int w, int h)
         // After the navigation overlay, never before: it tints the labels that
         // pass has just written.
         updateAnalysisOverlay();
-        updateEvaluationReadout();
+        updateFloatingLabels();
 	}
 
 	if (flags & UPDATE_STONES) {
@@ -893,7 +904,9 @@ void GobanView::updateAnalysisOverlay() {
 	}
 }
 
-void GobanView::updateEvaluationReadout() {
+void GobanView::updateFloatingLabels() {
+	// One list, one setter: setFloatingLabels() replaces wholesale, so the
+	// readout and the coordinates have to be built together.
 	std::vector<FloatingLabel> labels;
 	readoutText.clear();
 
@@ -954,7 +967,39 @@ void GobanView::updateEvaluationReadout() {
 			                  stale ? readoutStaleInk : readoutInk, 0u, readoutAlign});
 		}
 	}
+	if (showCoordinates) {
+		const int N = static_cast<int>(model.getBoardSize());
+		const float size = 0.8f / static_cast<float>(N);
+		// The margin centres: 0.85 grid spacings of wood past the outermost
+		// line, on every board size. Top and left, always — fixed whether or not
+		// the readout is on, so nothing ever moves and the bottom edge stays
+		// free for it by construction.
+		constexpr float MARGIN = 0.425f;
+		for (int col = 0; col < N; ++col) {
+			labels.push_back({glm::vec2(static_cast<float>(col),
+			                            static_cast<float>(N - 1) + MARGIN),
+			                  std::string(1, Position::columnLabel(col)), size,
+			                  coordinateInk, 0u, TextAlign::Center});
+		}
+		for (int row = 0; row < N; ++row) {
+			labels.push_back({glm::vec2(-MARGIN, static_cast<float>(row)),
+			                  std::to_string(Position::rowLabel(row)), size,
+			                  coordinateInk, 0u, TextAlign::Center});
+		}
+	}
+
 	gobanOverlay.setFloatingLabels(std::move(labels));
+}
+
+bool GobanView::toggleCoordinates() {
+	setCoordinates(!showCoordinates);
+	return showCoordinates;
+}
+
+void GobanView::setCoordinates(bool shown) {
+	if (showCoordinates == shown) return;
+	showCoordinates = shown;
+	requestRepaint(UPDATE_OVERLAY);
 }
 
 void GobanView::setReadoutColor(const glm::vec4& color) {

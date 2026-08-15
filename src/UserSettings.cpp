@@ -44,6 +44,10 @@ void UserSettings::load() {
             evaluationMoves = user["evaluation_moves"].get<bool>();
         }
 
+        if (user.contains("coordinates")) {
+            coordinates = user["coordinates"].get<bool>();
+        }
+
         if (user.contains("evaluation_on_board")) {
             evaluationOnBoard = user["evaluation_on_board"].get<bool>();
         }
@@ -207,6 +211,7 @@ std::string UserSettings::serialize() const {
     user["evaluation_enabled"] = evaluationEnabled;
     user["evaluation_moves"] = evaluationMoves;
     user["evaluation_on_board"] = evaluationOnBoard;
+    user["coordinates"] = coordinates;
     user["evaluation_align"] = evaluationAlign;
     if (!evaluationColor.empty()) {
         user["evaluation_color"] = evaluationColor;
@@ -307,6 +312,12 @@ void UserSettings::setEvaluationOnBoard(bool value) {
 void UserSettings::setEvaluationAlign(const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex);
     evaluationAlign = value;
+    saveLocked();
+}
+
+void UserSettings::setCoordinates(bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    coordinates = value;
     saveLocked();
 }
 
