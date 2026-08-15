@@ -1037,19 +1037,55 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             break;
         }
         case NavCommand::KIBITZ_NAV: {
+            // Every way out of here used to be a bare `break`. A kibitz that
+            // did nothing was therefore indistinguishable from one that was
+            // never requested, in the log as much as on screen — which cost two
+            // rounds of guessing at a bug report. Say why.
             Engine* kibitz = currentKibitz();
             Engine* coach = currentCoach();
-            if (!kibitz || !coach) break;
-
-            // All engines are synced after initial sync
-            Color responseColor = model.state.colorToMove;
-            spdlog::debug("KIBITZ_NAV: requesting move for {}", responseColor.toString());
-            Move response = kibitz->genmove(responseColor);
-            if (!response || response == Move::RESIGN) break;
-
-            if (kibitz == coach || coach->play(response)) {
-                processSuccessfulMove(response, kibitz, coach, kibitz, false);
+            if (!kibitz || !coach) {
+                spdlog::warn("kibitz: no {} engine is loaded, so there is nothing "
+                             "to ask", !kibitz ? "kibitz" : "coach");
+                break;
             }
+
+            const Color responseColor = model.state.colorToMove;
+            spdlog::debug("kibitz: asking [{}] for a {} move at the cursor",
+                          kibitz->getName(), responseColor.toString());
+            Move response = kibitz->genmove(responseColor);
+            if (!response || response == Move::RESIGN) {
+                spdlog::warn("kibitz: [{}] offered no move for {} — it answered {}",
+                             kibitz->getName(), responseColor.toString(),
+                             response.toString());
+                break;
+            }
+
+            // The coach owns the authoritative board, so it has to accept the
+            // move before it can be recorded. A rejection means the two engines
+            // are not at the same position — navigation syncs them move by move
+            // and ignores every failure while doing it, so a single refused
+            // `undo` earlier leaves exactly this state. Resync both from the
+            // record and ask again rather than dropping the request on the
+            // floor, which is what it did before.
+            if (kibitz != coach && !coach->play(response)) {
+                spdlog::warn("kibitz: [{}] suggested {} but the coach [{}] refused "
+                             "it — resyncing both to the current position and "
+                             "retrying", kibitz->getName(), response.toString(),
+                             coach->getName());
+                if (!syncEngineToPosition(coach) || !syncEngineToPosition(kibitz)) {
+                    spdlog::error("kibitz: could not resync the engines; the "
+                                  "suggestion is lost");
+                    break;
+                }
+                response = kibitz->genmove(responseColor);
+                if (!response || response == Move::RESIGN || !coach->play(response)) {
+                    spdlog::error("kibitz: [{}] still cannot place a {} move the "
+                                  "coach accepts", kibitz->getName(),
+                                  responseColor.toString());
+                    break;
+                }
+            }
+            processSuccessfulMove(response, kibitz, coach, kibitz, false);
             break;
         }
         case NavCommand::TO_TREE_PATH: {

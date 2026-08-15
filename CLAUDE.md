@@ -280,6 +280,13 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   cursor, so the stale request later fired against a position nobody was looking
   at and the turn order broke. Asking once must not resume the match; `Start`
   lights up for that, since it is then the engine's turn.
+- **Navigation's engine sync must not swallow failures.** `GameNavigator::syncEngines()`
+  discarded the result of every `undo`/`play` it issued, so one refusal left that
+  engine tracking a different board with nothing said about it — and everything
+  it was asked afterwards answered for the wrong position. It warns now. The
+  matching rule for `KIBITZ_NAV`: a coach that rejects the suggestion means the
+  engines have diverged, so resync both from the record and ask again rather than
+  dropping the request.
 - **`isThinking()` is not "the engine is busy".** The game loop clears `playerToMove` *before* its 500 ms inter-move sleep, so `isThinking()` is false for that window on every move. Guards written as a bare `isThinking()` test therefore have a hole once per move — that is how navigation keys were accepted in a locked bot-versus-bot match the toolbar had greyed out, and how a kibitz request could be dropped on the floor. Ask `actions()`, which carries the `aiVsAiLocked` term as well.
 - **Away from the end of the line, a move is a variation, not a turn.** `pass` and a board click must agree about this: `boardClick`'s review branch has never consulted turn ownership, so `a.pass` reads `(humanToMove || reviewingMidTree)`. The engine-thinking lock stays outside that disjunction — passing is a *preserving* action in ADR-0001's sense, and a click refuses there too.
 - **Territory needs a score, not just an ending.** `a.territory` is `finished && scoredEnd`; a resignation counted nothing, so it has no territory. `scoredEnd` is `GameRecord::shouldShowTerritory()` **published by the game thread** into `GobanModel::scoredEndPosition`, never recomputed by the reader — see the threading note below.

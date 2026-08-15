@@ -66,10 +66,17 @@ void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo) co
         if (!player->isTypeOf(Player::ENGINE)) continue;
         if (player == reinterpret_cast<Player*>(coach)) continue;
 
-        if (isUndo) {
-            player->undo();
-        } else {
-            player->play(move);
+        // Both results used to be discarded, which is how an engine quietly
+        // stopped tracking the cursor: one refused `undo` somewhere in a run of
+        // them, no word about it, and every later question put to that engine
+        // was answered for a different position. CLAUDE.md's "check return
+        // values from operations that can fail" exists for exactly this.
+        const bool ok = isUndo ? player->undo() : player->play(move);
+        if (!ok) {
+            spdlog::warn("navigation: [{}] refused {} — it is no longer at the "
+                         "same position as the coach, and what it says next will "
+                         "be about a different board",
+                         player->getName(), isUndo ? "undo" : move.toString());
         }
     }
 }

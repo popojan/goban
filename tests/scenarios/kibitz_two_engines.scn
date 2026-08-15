@@ -1,0 +1,37 @@
+# config: mock-twoengine.json
+#
+# The same kibitz-while-reviewing workflow, but with the coach and the kibitz
+# engine as *different processes* — which is what a real configuration looks
+# like (GNU Go carrying "main", KataGo carrying "kibitz").
+#
+# It is a distinct code path, not a variation on the other one:
+# NavCommand::KIBITZ_NAV short-circuits `kibitz == coach || coach->play(...)`,
+# so a config where one engine carries both flags never asks the coach to accept
+# the suggestion at all. Every other scenario uses such a config.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/kibitz_two_engines.scn
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white coachmock
+wait_idle
+
+click 2 2
+click 2 2
+wait_until move_count >= 2
+click 4 4
+click 4 4
+wait_until move_count >= 4
+
+undo move
+wait_idle
+undo move
+wait_idle
+expect at_end false
+expect phase paused
+
+play once
+wait_until move_count >= 3
+expect at_end true
+expect phase paused

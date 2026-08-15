@@ -1,0 +1,12 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "Coach and kibitz are DIFFERENT processes, as a real config with GNU Go plus KataGo is. That path is not the same as one engine carrying both flags: KIBITZ_NAV short-circuits `kibitz == coach || coach->play(response)`, so a single-engine config never exercises coach->play() at all.",
+  "bots": [
+    { "name": "coachmock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "", "enabled": 1, "main": 1 },
+    { "name": "kibitzmock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "", "enabled": 1, "kibitz": 1 }
+  ],
+  "humans": [ "Human" ],
+  "sgf_dialog": { "games_path": "./tests/scenarios/.games" }
+}
