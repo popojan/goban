@@ -284,3 +284,27 @@ TEST_CASE("the evaluation overlay asks only whether an engine can answer") {
     UiInputs notReady = in;  notReady.uiReady = false;
     CHECK_FALSE(availableActions(notReady).evaluation);
 }
+
+TEST_CASE("kibitz stays available while reviewing mid-tree") {
+    // Deliberately *not* gated on atEndOfNavigation, unlike resign. Away from
+    // the end a move is a variation rather than a turn, which `pass` and board
+    // clicks already honour — kibitz is the third move-producing action and
+    // must agree with them. docs/game-modes.md's "undo and try a different move
+    // in a match" is this workflow, and it notes the engine will not *auto*
+    // respond at a historical position: asking once is the tool that leaves.
+    //
+    // Refusing here would be the tempting fix for the bug where kibitz mid-tree
+    // silently did nothing. It was the wrong one — the fault was in how the
+    // request was delivered, not in whether it was allowed.
+    UiInputs in = playing();
+    in.atEndOfNavigation = false;
+    CHECK(availableActions(in).kibitz);
+
+    // The terms it does have, unchanged.
+    UiInputs thinking = in;  thinking.engineThinking = true;
+    UiInputs over     = in;  over.phase = GamePhase::Finished;
+    UiInputs locked   = in;  locked.aiVsAiLocked = true;
+    CHECK_FALSE(availableActions(thinking).kibitz);
+    CHECK_FALSE(availableActions(over).kibitz);
+    CHECK_FALSE(availableActions(locked).kibitz);
+}

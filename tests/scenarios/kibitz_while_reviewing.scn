@@ -1,0 +1,62 @@
+# Kibitz away from the end of the line plays a move at the cursor, as a board
+# click and a pass do there — docs/game-modes.md use case 2 is exactly this
+# workflow, and it says the engine will not *auto*-respond at a historical
+# position, which is what asking once is for.
+#
+# It used to do nothing at all. `playKibitzMove()` hands the move to whoever is
+# blocked in genmove and otherwise leaves it in `queuedMove` without waking
+# anything — and while reviewing nobody is in genmove. Worse, the command called
+# model.start() first, so a kibitz that did nothing still left the game Playing
+# with the cursor mid-tree; the stale request then fired against a position
+# nobody was looking at, and the turn order broke. From a recorded session.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/kibitz_while_reviewing.scn
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white mock
+wait_idle
+
+click 2 2
+click 2 2
+wait_until move_count >= 2
+click 4 4
+click 4 4
+wait_until move_count >= 4
+
+# Back up two moves. The undone moves stay in the tree — undo is navigation, not
+# deletion — so this is a review position with a continuation ahead of it.
+undo move
+wait_idle
+undo move
+wait_idle
+expect view_position 2
+expect at_end false
+expect variations 1
+expect phase paused
+expect can_kibitz true
+
+# One move, at the cursor, for whoever is to move there.
+play once
+wait_until move_count >= 3
+expect view_position 3
+expect at_end true
+
+# And the game is still *not* running. Asking for one move while reviewing must
+# not resume the match — that is what left the loop turning at a mid-tree cursor
+# and broke the turn order afterwards. A click, by contrast, does resume it, and
+# that difference is the documented one between asking once and handing every
+# reply to the engine.
+expect phase paused
+expect thinking false
+
+# It is the engine's turn now, so Start lights up — that is the affordance for
+# resuming, and the reason kibitz does not resume by itself: asking for one move
+# is not asking to restart the match you were reviewing.
+expect can_start true
+
+start
+wait_until move_count >= 4
+expect phase playing
+expect color_to_move B

@@ -77,6 +77,21 @@ Kibitz is for asking once.
 - Click a different point — engine responds to your new move
 - No mode switch occurs; the match continues naturally
 
+### 2b. Ask the engine what it would play, mid-game
+
+- **Mode**: Match (stays Match)
+- Undo back to the position you want to reconsider
+- Press Kibitz (or Space) — the engine plays **one** move at the cursor, as a
+  variation, for whichever colour is to move there
+- The game stays **paused**: asking once is not asking to resume the match
+- If it is now the engine's turn, **Start** lights up; press it to hand the game
+  back to the engine and continue from the new line
+
+The difference from clicking a point yourself is only the reply: a click resumes
+the match and the engine answers automatically, while Kibitz plays the one move
+and stops. That is the same distinction as the one between the two modes, at the
+scale of a single move.
+
 ### 3. Reviewing a loaded SGF
 
 - **Mode**: Analysis (set automatically on load)

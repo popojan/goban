@@ -270,6 +270,16 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 
 ### UI Widget State
 - **One policy decides what a player may do: `availableActions()` in `src/UiActions.h`.** The toolbar (`ElementGame::syncActionAvailability()`) and *every* command guard read the same answer from the same gatherer, `GobanControl::uiInputs()`. This used to be a rule — "make the button ask the same question the command asks" — and it decayed three separate times, each time producing a disabled button that looked like a guard and was not one. ADR-0005 finished the job: all nine actions now dispatch through `GobanControl::actions()`, and a command handler holds **no** policy of its own. Add a new action's rule to `availableActions()` and a case to `tests/test_uiactions.cpp`; do not hand-roll a second condition at either call site.
+- **Kibitz away from the end of the line is a variation, delivered by
+  navigation.** `play once` routes to `GameThread::requestKibitzNav()` when the
+  snapshot says `!atEnd`, and does **not** call `model.start()` there. Two
+  reasons, both learned from a recorded session: `playKibitzMove()` only reaches
+  a player already blocked in `genmove()` and otherwise leaves the move in
+  `queuedMove` *without waking the loop*, so while reviewing it did nothing at
+  all — and the `start()` that ran first left the game Playing at a mid-tree
+  cursor, so the stale request later fired against a position nobody was looking
+  at and the turn order broke. Asking once must not resume the match; `Start`
+  lights up for that, since it is then the engine's turn.
 - **`isThinking()` is not "the engine is busy".** The game loop clears `playerToMove` *before* its 500 ms inter-move sleep, so `isThinking()` is false for that window on every move. Guards written as a bare `isThinking()` test therefore have a hole once per move — that is how navigation keys were accepted in a locked bot-versus-bot match the toolbar had greyed out, and how a kibitz request could be dropped on the floor. Ask `actions()`, which carries the `aiVsAiLocked` term as well.
 - **Away from the end of the line, a move is a variation, not a turn.** `pass` and a board click must agree about this: `boardClick`'s review branch has never consulted turn ownership, so `a.pass` reads `(humanToMove || reviewingMidTree)`. The engine-thinking lock stays outside that disjunction — passing is a *preserving* action in ADR-0001's sense, and a click refuses there too.
 - **Territory needs a score, not just an ending.** `a.territory` is `finished && scoredEnd`; a resignation counted nothing, so it has no territory. `scoredEnd` is `GameRecord::shouldShowTerritory()` **published by the game thread** into `GobanModel::scoredEndPosition`, never recomputed by the reader — see the threading note below.

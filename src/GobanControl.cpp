@@ -432,6 +432,26 @@ void GobanControl::buildRegistry() {
             ctx.notifyMenu = false;
             return;
         }
+        // Away from the end of the line a kibitz is a *variation*, exactly as a
+        // board click and a pass are there — docs/game-modes.md use case 2 is
+        // this workflow, and it says the engine simply will not auto-respond at
+        // a historical position, which is precisely what asking once is for.
+        //
+        // It goes through the navigation queue rather than the game loop.
+        // `playKibitzMove()` hands the move to whoever is blocked in genmove and
+        // otherwise leaves it in `queuedMove` without waking anything, so while
+        // reviewing — where nobody is in genmove — it did nothing at all, and
+        // the stale request fired later against a position nobody was looking
+        // at. KIBITZ_NAV asks the engine for the *cursor's* colour and applies
+        // the answer where the cursor is.
+        //
+        // And no model.start() on this path: reviewing must not flip the game
+        // to Playing. That is what left the loop running at a mid-tree cursor.
+        if (!model.snapshot()->atEnd) {
+            engine.requestKibitzNav();
+            view.requestRepaint();
+            return;
+        }
         // Activate genmove if needed (for kibitz to work)
         if (model.phase() != GamePhase::Finished) {
             model.start();
