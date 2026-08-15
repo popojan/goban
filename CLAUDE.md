@@ -320,6 +320,19 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   `ElementGame::templateText(id, fallback)`. A missing template used to yield an
   *empty* message, so a translation lacking one entry said nothing at all.
 
+### Screenshots and the Windowing Platform
+- **A hidden Wayland window renders nothing.** It is never mapped, so its surface
+  has no buffer attached and every draw is discarded — `glReadPixels` returns
+  black with no GL error. Rendering into a framebuffer object of our own does
+  *not* help: the discard is not about the target. Scripted runs therefore ask
+  GLFW for X11 (XWayland counts) when `DISPLAY` is set, and fall back if that
+  fails. This is why `screenshot` produced black images for as long as it existed.
+- **SIGPIPE is ignored.** Two callers need it: `GtpClient` writes into an engine's
+  pipe and is written to handle a failed write — which it only gets to do if the
+  default disposition has not already killed the process — and the X11 display
+  connection closing during shutdown raises it too, which killed every scripted
+  run with signal 13 *after* the scenario had passed.
+
 ### Persisted Settings
 - **`user.json` is the runtime scratchpad and is not tracked.** Defaults that
   ship — the opening camera — live in `config/base.json`, which the application

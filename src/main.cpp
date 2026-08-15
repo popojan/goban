@@ -6,6 +6,7 @@
 #include <process.h>
 #else
 #include <unistd.h>
+#include <csignal>
 #endif
 
 #include <clipp.h>
@@ -390,6 +391,17 @@ int APIENTRY WinMain(HINSTANCE instance_handle, HINSTANCE previous_instance_hand
 int main(int argc, char** argv)
 #endif
 {
+#ifndef _WIN32
+    // Writing to a pipe nobody is reading must be an error, not a death
+    // sentence. Two places need it: an engine that dies mid-command leaves
+    // GtpClient writing into a closed pipe, and it is written to handle a failed
+    // write — but only gets the chance if the default SIGPIPE disposition is not
+    // killing the process first. And under X11 the display connection closing
+    // during shutdown raises it too, which killed every scripted run with signal
+    // 13 *after* the scenario had already passed.
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     // Store executable path for potential restart
 #ifdef RMLUI_PLATFORM_WIN32
     static char exe_path[MAX_PATH];
@@ -496,6 +508,23 @@ int main(int argc, char** argv)
     // AppState's "fullscreen on the monitor the window is on" cannot work — on
     // a multi-head Wayland session fullscreen lands on whichever output GLFW
     // enumerated first. Running under X11 (XWayland is fine) restores it.
+    // And it is worth choosing *for* a scripted run. A window hidden under
+    // Wayland is never mapped, so its surface has no buffer attached and
+    // everything rendered into it is discarded — including into a framebuffer
+    // object of our own, which was the first thing tried. `glReadPixels` then
+    // returns black with no GL error, which is exactly what every screenshot
+    // this feature ever took produced. Under X11, XWayland included, a hidden
+    // window renders normally and the capture works.
+    //
+    // Only when an X server is actually reachable: forcing X11 without one
+    // makes glfwInit() fail outright, and a scenario suite that cannot start is
+    // worse than one that cannot screenshot.
+    if (!scenarioFile.empty() && platform.empty() && getenv("DISPLAY") != nullptr) {
+        platform = "x11";
+        spdlog::debug("scripted run: preferring X11, since a hidden Wayland "
+                      "surface renders nothing");
+    }
+
     if (!platform.empty()) {
 #ifdef GLFW_PLATFORM
         if (platform == "x11") {
@@ -513,9 +542,21 @@ int main(int argc, char** argv)
     }
 
     if (!glfwInit()) {
-        spdlog::critical("Failed to initialize GLFW");
-        CleanupResources(nullptr);
-        return -1;
+        // A forced platform is a preference, not a requirement — most of all
+        // when this process chose it rather than the user. Let GLFW decide and
+        // try once more before giving up.
+#ifdef GLFW_PLATFORM
+        if (!platform.empty()) {
+            spdlog::warn("GLFW could not start on '{}'; retrying with whatever "
+                         "it finds", platform);
+            glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
+        }
+#endif
+        if (platform.empty() || !glfwInit()) {
+            spdlog::critical("Failed to initialize GLFW");
+            CleanupResources(nullptr);
+            return -1;
+        }
     }
 
     // Request OpenGL 2.1 compatibility profile for GL2 renderer

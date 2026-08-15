@@ -137,6 +137,24 @@ The window is created hidden, and settings are redirected to a scratch file, so
 a run cannot take over your screen or touch `user.json`, `games/` or your saved
 camera. In CI, wrap it: `xvfb-run -s "-screen 0 1024x768x24" tests/run_scenarios.sh`.
 
+### Screenshots need X11
+
+The `screenshot <path>` directive writes the finished frame as a binary PPM
+(`magick shot.ppm shot.png` to view it). It only works under X11 — XWayland
+counts — because **a window hidden under Wayland is never mapped, so its surface
+has no buffer and everything rendered into it is discarded**: `glReadPixels`
+returns black with no GL error to explain it. Rendering into a framebuffer object
+does not help; the discard happens regardless of the target.
+
+So a scripted run asks GLFW for X11 when `DISPLAY` is set, and falls back to
+whatever GLFW finds if that fails. Override with `--platform wayland|x11|auto`.
+On a Wayland-only box with no XWayland, scenarios run fine and screenshots come
+out black — there is no way around that short of Xvfb.
+
+For a one-off look at something, write a throwaway scenario ending in
+`screenshot /tmp/shot.ppm` rather than adding a permanent one: the harness cannot
+assert on pixels, so a committed screenshot scenario guards nothing.
+
 ### Script syntax
 
 | Directive | Meaning |
