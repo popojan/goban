@@ -1,6 +1,6 @@
 # ADR-0007: Continuous analysis runs in a process of its own, configured from the kibitz engine
 
-**Status:** Accepted — Stage 1 implemented 2026-08-15
+**Status:** Accepted — Stages 1 and 2 implemented 2026-08-15
 **Date:** 2026-08-14
 **Revised:** 2026-08-14 — the six open questions are resolved into decisions
 7–15; three narrower ones are left open. That was the last edit: from `Accepted`
@@ -430,6 +430,27 @@ Also: open question 1 says the board carries "one float per point". It carries
 four; `iStones` is a `vec4` whose `.w` (stone rotation) is unread wherever there
 is no stone. That does not help on occupied points, which is where an ownership
 map matters most.
+
+### Stage 2, 2026-08-15: the suggestions on the board
+
+Top moves as `A`/`B`/`C`, coloured by win-rate loss against the engine's best.
+Two decisions were taken during implementation and belong here rather than in a
+new ADR, because neither reverses anything above.
+
+**The board suggestions are a separate feature from the panel, and off by
+default.** Not a clutter preference: the numbers are read *after* a move, so a
+player can invent their own and judge it post-hoc — which is how this actually
+gets enjoyed — while stars on the board are read *before*, and once the engine
+has pointed at a point the choice is no longer the player's. Decision 8's
+argument for off-by-default was memory; this one is stronger and applies even on
+a machine that can afford the engine. `toggle_evaluation_moves` lives in View →
+Overlay beside Last Move and Next Move, its siblings in kind.
+
+**Where a suggestion meets a move already in the record, the record's label
+stays and is only tinted.** Colour then means quality everywhere on the board and
+nothing is lost, which is what made a per-glyph colour worth building first
+(`4313d70`) rather than settling for a palette of discrete quality buckets. SGF
+markup is exempt entirely — it is the user's own annotation.
 
 ## What this does not change
 

@@ -46,6 +46,7 @@
                             <div class="hr">标注</div>
                             <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">上一手</div>
                             <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">下一手</div>
+                            <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">推荐手</div>
                         </div>
                         <!--
                         <div class="grp">

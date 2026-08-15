@@ -501,6 +501,35 @@ void GobanControl::buildRegistry() {
         view.requestRepaint();
     });
 
+    add("toggle_evaluation_moves", 0, 1,
+        "[on|off] — show or hide the engine's suggested moves on the board",
+        [this](CommandContext& ctx) {
+        // Same availability as the panel: an analysis engine exists and this is
+        // not a tsumego. Deliberately not also gated on the panel being *on* —
+        // an inert toggle you can pre-set is less confusing than one greyed for
+        // a reason the menu cannot explain.
+        if (!actions().evaluation) {
+            spdlog::debug("toggle_evaluation_moves refused by availableActions()");
+            ctx.notifyMenu = false;
+            return;
+        }
+        bool next = !view.isAnalysisOverlayShown();
+        if (!ctx.args.empty()) {
+            const std::string arg = toLower(ctx.args[0]);
+            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
+                && arg != "1" && arg != "0") {
+                spdlog::warn("toggle_evaluation_moves: expected on or off, got '{}'",
+                             ctx.args[0]);
+                ctx.notifyMenu = false;
+                return;
+            }
+            next = (arg == "on" || arg == "true" || arg == "1");
+        }
+        view.setAnalysisOverlay(next);
+        UserSettings::instance().setEvaluationMoves(next);
+        ctx.checked = next;
+    });
+
     add("genmove", 0, 0, "reserved for a future \"resume match from here\" feature (no-op)",
         [](CommandContext&) {
     });
@@ -1622,6 +1651,15 @@ nlohmann::json GobanControl::dumpState() const {
         const auto& analysis = parent->getAnalysis();
         s["eval_enabled"] = analysis.isEnabled();
         s["eval_state"]   = analysisStateName(analysis.state());
+        // The board annotations are a separate feature from the panel, and off
+        // by default — `eval_labels` reading 0 with the panel running is the
+        // normal case, not a fault.
+        s["eval_moves_shown"] = view.isAnalysisOverlayShown();
+        s["eval_labels"]  = static_cast<int>(view.analysisLabelCount());
+        // Suggestions that landed on a move already in the record: the label
+        // stays and only takes on colour. The split between these two keys is
+        // the combine rule.
+        s["eval_tints"]   = static_cast<int>(view.analysisTintCount());
         if (const auto rep = analysis.report()) {
             s["eval_winrate"] = static_cast<int>(std::lround(rep->winrateBlack * 100.0));
             s["eval_score"]   = rep->scoreLeadBlack ? *rep->scoreLeadBlack : 0.0;

@@ -380,6 +380,9 @@ void GobanView::Render(int w, int h)
 	if (flags & UPDATE_OVERLAY){
         updateLastMoveOverlay();
         updateNavigationOverlay();
+        // After the navigation overlay, never before: it tints the labels that
+        // pass has just written.
+        updateAnalysisOverlay();
 	}
 
 	if (flags & UPDATE_STONES) {
@@ -806,11 +809,77 @@ void GobanView::updateNavigationOverlay() {
 
 }
 
+void GobanView::updateAnalysisOverlay() {
+	// Undo the previous pass first, and differently for the two kinds: a label
+	// this overlay added is removed outright, while a point it merely tinted
+	// belongs to the navigation overlay and only loses its colour.
+	for (const auto& pos : analysisLabels) {
+		if (pos) board.removeBoardOverlay(pos);
+	}
+	analysisLabels.clear();
+	for (const auto& pos : analysisTints) {
+		if (pos) board.setOverlayTint(pos, std::nullopt);
+	}
+	analysisTints.clear();
+
+	if (!showAnalysisOverlay || !analysis) return;
+	const auto report = analysis->report();
+	if (!report) return;
+
+	// Only for the position on screen. A report for a position that has since
+	// been left describes a different board, and drawing it would put the
+	// engine's opinion of one position onto the stones of another.
+	const auto snap = model.snapshot();
+	if (report->positionId != snap->positionId) return;
+
+	// The two claims already on the board. Markup is the user's own annotation
+	// and is left alone entirely; a variation label is kept and tinted.
+	std::set<std::pair<int, int>> markupPositions;
+	for (const auto& markup : snap->markup) {
+		if (markup.pos) markupPositions.insert({markup.pos.col(), markup.pos.row()});
+	}
+	std::set<std::pair<int, int>> labelledPositions;
+	for (const auto& pos : navOverlays) {
+		if (pos) labelledPositions.insert({pos.col(), pos.row()});
+	}
+
+	for (const auto& label : evaluationLabels(*report, labelledPositions,
+	                                          markupPositions, DEFAULT_EVAL_LABELS)) {
+		// A suggestion can only land on an empty point — the engine proposes
+		// legal moves — but the board is a frame behind the model during a
+		// capture, so check rather than assume.
+		if (model.board[label.pos].stone != Color::EMPTY) continue;
+		if (label.text.empty()) {
+			board.setOverlayTint(label.pos, label.color);
+			analysisTints.push_back(label.pos);
+		} else {
+			board.setBoardOverlay(label.pos, label.text, label.color);
+			analysisLabels.push_back(label.pos);
+		}
+	}
+}
+
+bool GobanView::toggleAnalysisOverlay() {
+	setAnalysisOverlay(!showAnalysisOverlay);
+	return showAnalysisOverlay;
+}
+
+void GobanView::setAnalysisOverlay(bool shown) {
+	if (showAnalysisOverlay == shown) return;
+	showAnalysisOverlay = shown;
+	// UPDATE_STONES as well as UPDATE_OVERLAY: a label sets the annotation
+	// material, and that has to reach the stone upload or the grid stays drawn
+	// under it.
+	requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
+}
+
 void GobanView::onBoardSized(int newBoardSize) {
 	board.clear(newBoardSize);
 	lastMove = Position(-1, -1);
 	navOverlays.clear();
 	markupOverlays.clear();
+	analysisLabels.clear();
+	analysisTints.clear();
 	// Only request UPDATE_BOARD (for shader dimension) and UPDATE_OVERLAY
 	// Don't request UPDATE_STONES - let onBoardChange handle that when stones are ready
 	requestRepaint(UPDATE_BOARD | UPDATE_OVERLAY);

@@ -25,6 +25,7 @@
 #include <random>
 #include <atomic>
 #include <glm/glm.hpp>
+#include <optional>
 #include "Metrics.h"
 
 class Color {
@@ -174,6 +175,14 @@ public:
 struct Overlay {
     std::string text;
 	unsigned layer;
+	/// An explicit colour for this label, or none to take the layer's.
+	///
+	/// The layer array is still the palette every ordinary label draws from;
+	/// this exists so the evaluation overlay can tint one label — including a
+	/// label somebody else wrote — without needing a layer of its own. Possible
+	/// only since glyphy started carrying colour per glyph rather than per draw
+	/// call.
+	std::optional<glm::vec4> color;
 };
 
 //stonePlace
@@ -298,8 +307,16 @@ public:
     bool collides(int i, int j, int i0, int j0) const;
     void removeOverlay(const Position& p);
     void setOverlay(const Position& p, const std::string& text, const Color& c);
-    void setBoardOverlay(const Position& p, const std::string& text);  // Board-level overlay (layer 0)
+    /// Board-level overlay (layer 0). `color` overrides the layer's default.
+    void setBoardOverlay(const Position& p, const std::string& text,
+                         const std::optional<glm::vec4>& color = std::nullopt);
     void removeBoardOverlay(const Position& p);
+
+    /// Recolour a label that is already there, leaving its text alone. Nothing
+    /// happens if the point carries no label — the evaluation overlay tints
+    /// what the navigation overlay wrote, and the two are rebuilt in the same
+    /// pass, but a point can legitimately have been dropped in between.
+    void setOverlayTint(const Position& p, const std::optional<glm::vec4>& color);
     void setRandomStoneRotation() {
     	randomStoneRotation = 3.1415f * uDist(generator);
     }

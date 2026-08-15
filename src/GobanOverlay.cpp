@@ -99,12 +99,16 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 				}
                 glyphy_point_t pos = { model.metrics.squareSizeX * posX, -model.metrics.squareSizeY * posY };
 				buffer[layer]->move_to(&pos);
-				// The layer's colour, carried per glyph. Identical output to the
-				// uniform it replaces, but the buffer is no longer limited to
-				// one colour — which is what lets a future caller tint a single
-				// label without a layer of its own.
+				// The label's own colour when it has one, else the layer's. The
+				// layer array is still the palette everything ordinary draws
+				// from; an explicit colour is how the evaluation overlay tints a
+				// single label — including one the navigation overlay wrote —
+				// without needing a layer of its own.
+				const glm::vec4& color = point.overlay.color
+				                       ? *point.overlay.color
+				                       : layers[layer].color;
 				buffer[layer]->add_text(point.overlay.text.c_str(), font, font_size,
-				                        glm::value_ptr(layers[layer].color));
+				                        glm::value_ptr(color));
 				cnt += 1;
 			}
 			idx++;

@@ -51,7 +51,14 @@ ElementGame::ElementGame(const Rml::String& tag)
     // The analysis thread publishes from its own thread and must not touch
     // RmlUi; waking the renderer is all it is allowed to ask for, and it only
     // asks when a displayed value actually changed (ADR-0007 decision 14).
-    analysis.setOnUpdate([this] { view.requestRepaint(); });
+    //
+    // UPDATE_OVERLAY|UPDATE_STONES rather than a bare repaint: a move suggestion
+    // is a board label, and a label sets the annotation material, which has to
+    // reach the stone upload or the grid stays drawn under it.
+    analysis.setOnUpdate([this] {
+        view.requestRepaint(GobanView::UPDATE_OVERLAY | GobanView::UPDATE_STONES);
+    });
+    view.setAnalysisService(&analysis);
 
     // Game record creation deferred to loadEnginesParallel (after board size/komi/handicap known)
     // Engine loading is deferred to async thread - board renders immediately
@@ -549,6 +556,10 @@ void ElementGame::performDeferredInitialization() {
     // the *process* does not, and will not until the user asks for it.
     analysis.start();
     analysis.setEnabled(UserSettings::instance().getEvaluationEnabled());
+    // Restored separately from the panel: it is a separate feature, and its
+    // default is off so that turning the panel on never silently starts
+    // pointing at the board.
+    view.setAnalysisOverlay(UserSettings::instance().getEvaluationMoves());
 
     // Invalidate view state to force OnUpdate to sync all dropdowns
     // (model and view start with identical defaults, so diffs won't fire otherwise)
@@ -1072,6 +1083,9 @@ void ElementGame::syncActionAvailability() {
     setElementDisabled("cmdClear",      !a.clear);
     setElementDisabled("cmdSave",       !a.save);
     setElementDisabled("cmdEvaluation", !a.evaluation);
+    // Same answer, two buttons: the board annotations need exactly what the
+    // panel needs — an engine that can analyse, and not a tsumego.
+    setElementDisabled("cmdEvaluationMoves", !a.evaluation);
 }
 
 void ElementGame::OnUpdate()
@@ -1116,6 +1130,11 @@ void ElementGame::OnUpdate()
         const bool checked = analysis.isEnabled();
         if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
             OnMenuToggle("toggle_evaluation", checked);
+        }
+        auto* movesEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationMoves");
+        const bool movesChecked = view.isAnalysisOverlayShown();
+        if (movesEl && movesEl->IsClassSet("selected") != movesChecked) {
+            OnMenuToggle("toggle_evaluation_moves", movesChecked);
         }
     }
     syncEvaluationPanel();

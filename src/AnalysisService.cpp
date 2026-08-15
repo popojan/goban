@@ -7,6 +7,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cmath>
 #include <set>
 #include <sstream>
@@ -92,6 +93,80 @@ std::vector<Move> playableMoves(const std::vector<Move>& path) {
     out.reserve(path.size());
     for (const auto& m : path) {
         if (m == Move::NORMAL || m == Move::PASS) out.push_back(m);
+    }
+    return out;
+}
+
+glm::vec4 moveQualityColor(double winrateLoss) {
+    // Three stops, linear between them. The numbers are a Go judgement rather
+    // than a computed thing: a point and a half of win rate is where a move
+    // stops being an alternative and starts being a concession, and ten points
+    // is a blunder in anyone's book. Expect to tune these by eye against a lit
+    // wooden board — they are the most likely thing here to look wrong.
+    constexpr double kSlightly = 0.015;
+    constexpr double kBlunder  = 0.10;
+    const glm::vec4 best   {0.20f, 0.80f, 0.30f, 1.0f};   // green
+    const glm::vec4 middle {0.95f, 0.80f, 0.20f, 1.0f};   // amber
+    const glm::vec4 worst  {0.90f, 0.25f, 0.20f, 1.0f};   // red
+
+    const double loss = std::max(0.0, winrateLoss);
+    if (loss <= kSlightly) {
+        const float t = static_cast<float>(loss / kSlightly);
+        return best + (middle - best) * t;
+    }
+    if (loss >= kBlunder) return worst;
+    const float t = static_cast<float>((loss - kSlightly) / (kBlunder - kSlightly));
+    return middle + (worst - middle) * t;
+}
+
+std::vector<EvalLabel> evaluationLabels(const AnalysisReport& report,
+                                        const std::set<std::pair<int, int>>& labelled,
+                                        const std::set<std::pair<int, int>>& markup,
+                                        size_t maxLabels) {
+    std::vector<EvalLabel> out;
+    if (report.moves.empty() || maxLabels == 0) return out;
+
+    // Ranked as the engine ranked them. `order` is authoritative where the
+    // engine supplies it; visits are the fallback, exactly as the report's own
+    // summary value is chosen.
+    std::vector<const AnalysisMove*> ranked;
+    ranked.reserve(report.moves.size());
+    for (const auto& m : report.moves) {
+        if (m.visits > 0 && m.move == Move::NORMAL) ranked.push_back(&m);
+    }
+    if (ranked.empty()) return out;
+    std::stable_sort(ranked.begin(), ranked.end(),
+                     [](const AnalysisMove* a, const AnalysisMove* b) {
+                         if ((a->order < 0) != (b->order < 0)) return a->order >= 0;
+                         if (a->order != b->order && a->order >= 0) return a->order < b->order;
+                         return a->visits > b->visits;
+                     });
+
+    // Both win rates are in Black's frame, and the best move is by definition
+    // the least bad for whoever is to move — so the absolute difference is the
+    // loss whichever colour that is, and it can never come out negative.
+    const double bestWinrate = ranked.front()->winrateBlack;
+
+    char letter = 'A';
+    for (const AnalysisMove* m : ranked) {
+        if (out.size() >= maxLabels) break;
+        const std::pair<int, int> key{m->move.pos.col(), m->move.pos.row()};
+        if (markup.count(key)) continue;   // the user's own annotation wins
+
+        EvalLabel label;
+        label.pos = m->move.pos;
+        label.color = moveQualityColor(std::abs(bestWinrate - m->winrateBlack));
+        if (labelled.count(key)) {
+            // Tint only: the variation keeps its own "3a", and the colour still
+            // says what the engine thinks of it.
+            out.push_back(label);
+            continue;
+        }
+        // Letters do not skip. If the engine's first choice was tint-only, the
+        // next move it labels is 'A' — a board showing B and C with no A reads
+        // as broken, and the true rank is in the colour anyway.
+        label.text = std::string(1, letter++);
+        out.push_back(label);
     }
     return out;
 }

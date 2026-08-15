@@ -42,6 +42,26 @@ wait_until eval_winrate 60
 expect eval_has_score true
 expect eval_stale false
 
+# The board stays clean. This is the case most worth pinning: the panel is on
+# and reporting, and the engine's suggestions are *not* drawn, because the two
+# are separate features and this one is off by default. The numbers are read
+# after a move so a player can invent their own and judge it; stars on the board
+# are read before, and would take that choice away from the first move.
+expect eval_moves_shown false
+expect eval_labels 0
+
+# Asked for explicitly, the suggestions appear. The mock proposes the first two
+# empty points in scan order, so the count is deterministic.
+toggle_evaluation_moves on
+expect eval_moves_shown true
+wait_until eval_labels 2
+
+expect eval_tints 0
+
+toggle_evaluation_moves off
+wait_until eval_labels 0
+expect eval_moves_shown false
+
 # A move makes it White's turn, so the same engine report must now display as
 # Black 40%. This is also the first position change, so it exercises the
 # incremental sync: one `play`, not a replay.
@@ -70,6 +90,34 @@ navigate_end
 wait_idle
 expect at_end true
 wait_until eval_winrate 60
+
+# The combine rule, which needs a suggestion and a recorded move on the same
+# point. The mock always proposes the first two empty points in scan order — A1
+# and B1 — so the game has to be played *there* for them to meet; the moves
+# above are at other points on purpose, to cover the ordinary no-collision case.
+new_game 9
+wait_idle
+switch_player white Human
+wait_idle
+toggle_evaluation_moves on
+
+click 0 0
+click 0 0
+wait_until move_count >= 1
+
+# Back at the root, A1 is now both the recorded continuation and the engine's
+# first choice. It must be tinted, not relabelled: the record's own "1" stays and
+# only takes on colour. B1 has no label of its own, so it gets one.
+navigate_start
+wait_idle
+expect view_position 0
+expect variations 1
+wait_until eval_tints 1
+expect eval_labels 1
+
+toggle_evaluation_moves off
+wait_until eval_labels 0
+expect eval_tints 0
 
 # Switching it off stops the process and takes the numbers away entirely. Absent
 # rather than a placeholder: eval_winrate reads -1, because a bar resting at 50%

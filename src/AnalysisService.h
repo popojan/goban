@@ -25,9 +25,13 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -205,6 +209,42 @@ struct AnalysisSyncPlan {
 /// every arrow key" cost was an artefact of reusing `syncEngineToPosition()`.
 AnalysisSyncPlan planIncrementalSync(const std::vector<Move>& sent,
                                      const std::vector<Move>& target);
+
+/// One board-level annotation the evaluation overlay wants drawn.
+struct EvalLabel {
+    Position pos;
+    /// The label to write, or empty to tint a label that is already there
+    /// without disturbing it. Colour means move quality everywhere on the
+    /// board; text keeps whatever meaning it already had.
+    std::string text;
+    glm::vec4 color{0.0f, 0.0f, 0.0f, 1.0f};
+};
+
+/// Win-rate loss against the best move — 0 for the best move itself — mapped
+/// onto the quality ramp.
+///
+/// Relative rather than absolute on purpose: in a game that is already decided
+/// every move's absolute win rate is pinned near 100% or 0%, and a ramp over
+/// that distinguishes nothing. Loss stays informative to the last move.
+glm::vec4 moveQualityColor(double winrateLoss);
+
+/// What the analysis report wants drawn, given what the board already carries.
+///
+/// `labelled` are points that already show a label (the navigation overlay's
+/// next-move markers); those are tinted rather than replaced, so the record's
+/// own labelling survives and colour still means quality. `markup` are points
+/// carrying explicit SGF annotation, which is the user's own and is left
+/// entirely alone.
+///
+/// Pure over plain data, for the reason `availableActions()` is: it tests
+/// without a board, a GL context or a thread.
+std::vector<EvalLabel> evaluationLabels(const AnalysisReport& report,
+                                        const std::set<std::pair<int, int>>& labelled,
+                                        const std::set<std::pair<int, int>>& markup,
+                                        size_t maxLabels);
+
+/// How many suggestions the board shows at once.
+constexpr size_t DEFAULT_EVAL_LABELS = 5;
 
 /// The moves that can actually be sent as `play`. Filtering happens once,
 /// before the diff, because the `undo` count is counted against what was sent —

@@ -235,20 +235,24 @@ void Board::removeOverlay(const Position& p) {
     auto& overlay = (*this)[p].overlay;
     overlay.text = std::string("");
     overlay.layer = -1u;
+    overlay.color.reset();
 }
 
 void Board::setOverlay(const Position& p, const std::string& text, const Color& c) {
     auto& overlay = (*this)[p].overlay;
     overlay.text = text;
     overlay.layer = c == Color::BLACK ? 1 : 2;
+    overlay.color.reset();   // stone-level labels take the layer's colour
 }
 
-void Board::setBoardOverlay(const Position& p, const std::string& text) {
+void Board::setBoardOverlay(const Position& p, const std::string& text,
+                            const std::optional<glm::vec4>& color) {
     // Board-level overlay for empty points (e.g., ko capture position)
     // Uses layer 0 and sets material to mAnnotation for grid hiding
     auto& overlay = (*this)[p].overlay;
     overlay.text = text;
     overlay.layer = 0;  // Board level (rendered before stones)
+    overlay.color = color;
 
     // Set material to annotation to render board patch that hides grid
     int i = p.row();
@@ -264,6 +268,12 @@ void Board::setBoardOverlay(const Position& p, const std::string& text) {
     }
 }
 
+void Board::setOverlayTint(const Position& p, const std::optional<glm::vec4>& color) {
+    auto& overlay = (*this)[p].overlay;
+    if (overlay.text.empty()) return;
+    overlay.color = color;
+}
+
 void Board::removeBoardOverlay(const Position& p) {
     auto& overlay = (*this)[p].overlay;
 
@@ -275,6 +285,7 @@ void Board::removeBoardOverlay(const Position& p) {
 
     overlay.text = std::string("");
     overlay.layer = -1u;
+    overlay.color.reset();
 
     // Reset material to empty if it was annotation
     int i = p.row();

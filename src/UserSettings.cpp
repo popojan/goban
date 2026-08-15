@@ -40,6 +40,10 @@ void UserSettings::load() {
             evaluationEnabled = user["evaluation_enabled"].get<bool>();
         }
 
+        if (user.contains("evaluation_moves")) {
+            evaluationMoves = user["evaluation_moves"].get<bool>();
+        }
+
         if (user.contains("last_sgf_path")) {
             lastSgfPath = user["last_sgf_path"].get<std::string>();
         }
@@ -189,6 +193,7 @@ std::string UserSettings::serialize() const {
     user["fullscreen"] = fullscreen;
     user["sound_enabled"] = soundEnabled;
     user["evaluation_enabled"] = evaluationEnabled;
+    user["evaluation_moves"] = evaluationMoves;
     if (!lastSgfPath.empty()) {
         user["last_sgf_path"] = lastSgfPath;
     }
@@ -267,6 +272,12 @@ void UserSettings::setSoundEnabled(bool value) {
 void UserSettings::setEvaluationEnabled(bool value) {
     std::lock_guard<std::mutex> lock(mutex);
     evaluationEnabled = value;
+    saveLocked();
+}
+
+void UserSettings::setEvaluationMoves(bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    evaluationMoves = value;
     saveLocked();
 }
 

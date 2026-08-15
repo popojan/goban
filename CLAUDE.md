@@ -389,6 +389,34 @@ of its decisions, and `tests/test_analysis.cpp` plus
   the next ordinary command read the tail of the stream as its reply — silently
   wrong results rather than an error. Bounded, on the `scoringTimeout()`
   precedent.
+- **The panel and the board suggestions are two features, and the board one is
+  off by default.** Not for clutter — for judgement. The numbers are read *after*
+  a move, so a player can invent their own and evaluate it post-hoc; stars on the
+  board are read *before*, and once the engine has pointed at a point you cannot
+  un-see it. Turning the panel on must never silently start pointing at the
+  board. `toggle_evaluation` and `toggle_evaluation_moves` are separate, both
+  sticky, and the second lives in View → Overlay with its siblings Last Move and
+  Next Move.
+- **Colour means move quality, text keeps its old meaning.** Where a suggestion
+  lands on a point the navigation overlay already labelled, the `3a` stays and is
+  only tinted; only suggestions with no label of their own get one. Explicit SGF
+  markup is left alone entirely — it is the user's own annotation, and it already
+  outranks variation labels. Rank letters do not skip: if the engine's first
+  choice was tint-only, the next labelled move is `A`, because a board showing
+  `B` and `C` with no `A` reads as broken.
+- **The ramp is win-rate loss against the best move, never absolute win rate.**
+  In a decided game every move's absolute win rate is pinned near 100% or 0%, so
+  a ramp over that distinguishes nothing exactly when review matters most.
+  `|best.winrateBlack − move.winrateBlack|` — both are in Black's frame and the
+  best move is the least bad for whoever is to move, so the absolute difference
+  is the loss whichever colour it is and can never come out negative.
+- **A report for another position is not drawn.** `updateAnalysisOverlay()`
+  compares `report->positionId` against the snapshot's; drawing a stale one would
+  put the engine's opinion of one position onto the stones of another.
+- **Waking the renderer for a suggestion needs `UPDATE_STONES` too.** A label
+  sets the annotation material, and that has to reach the stone upload or the
+  grid stays drawn under it. This is why the publish gate does not ask for a
+  bare repaint.
 - **The overlay is not part of `isIdle()`.** An analysis stream never finishes on
   its own, so treating it as work-in-flight would make quiescence unreachable —
   the same trap as waiting on `EngineSync::Unsynced`.

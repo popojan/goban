@@ -50,6 +50,14 @@ public:
     bool getEvaluationEnabled() const { std::lock_guard<std::mutex> lock(mutex); return evaluationEnabled; }
     void setEvaluationEnabled(bool value);
 
+    /// The engine's move suggestions drawn on the board. Separate from the
+    /// panel above, and off by default, because the two are read at different
+    /// times: the numbers *after* a move, so a player can invent their own and
+    /// judge it; the stars *before*, at which point the choice is no longer
+    /// theirs. Turning the panel on must not silently take that away.
+    bool getEvaluationMoves() const { std::lock_guard<std::mutex> lock(mutex); return evaluationMoves; }
+    void setEvaluationMoves(bool value);
+
     // Last SGF (for resuming after restart)
     std::string getLastSgfPath() const { std::lock_guard<std::mutex> lock(mutex); return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
@@ -179,6 +187,7 @@ private:
 
     // Live evaluation overlay
     bool evaluationEnabled = false;
+    bool evaluationMoves = false;
 
     // Last SGF
     std::string lastSgfPath;

@@ -27,6 +27,7 @@
 #include "GameState.h"
 #include "Configuration.h"
 #include "AudioPlayer.hpp"
+#include "AnalysisService.h"
 
 
 extern std::shared_ptr<Configuration> config;
@@ -164,6 +165,33 @@ public:
     void updateLastMoveOverlay();
     void updateNavigationOverlay();  // Show next move annotation during SGF navigation
 
+    /// Draws the engine's top moves, coloured by how much win rate they give up
+    /// against its best (ADR-0007 phase 2). Runs immediately after
+    /// updateNavigationOverlay() so it can tint the labels that pass just wrote:
+    /// where a suggestion is a move already in the record, the record's own
+    /// "3a" stays and only takes on colour.
+    void updateAnalysisOverlay();
+
+    /// Off by default, and that is the point. The panel's numbers are read
+    /// *after* a move, so a player can invent their own and judge it. Stars on
+    /// the board are read *before*, and once the engine has pointed at a point
+    /// you cannot un-see it — the freedom to choose your own is gone from the
+    /// first move. Two different features, separately switchable.
+    bool toggleAnalysisOverlay();
+    [[nodiscard]] bool isAnalysisOverlayShown() const { return showAnalysisOverlay; }
+    void setAnalysisOverlay(bool shown);
+
+    /// Where the suggestions come from. Set once by ElementGame; the view reads
+    /// the published report exactly as it reads GobanModel::snapshot(), so
+    /// goban_core stays unaware of the renderer.
+    void setAnalysisService(const AnalysisService* service) { analysis = service; }
+
+    /// Suggestions this overlay drew a label for, and suggestions that landed on
+    /// a label somebody else wrote and were only tinted. Counted separately for
+    /// `dumpState()`, because the difference between them *is* the combine rule.
+    [[nodiscard]] size_t analysisLabelCount() const { return analysisLabels.size(); }
+    [[nodiscard]] size_t analysisTintCount() const { return analysisTints.size(); }
+
 public:
     GobanShader gobanShader;
     GobanOverlay gobanOverlay;
@@ -208,6 +236,13 @@ public:
     Position lastMove;
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
+    bool showAnalysisOverlay = false;
+    const AnalysisService* analysis = nullptr;
+    /// Kept apart because they are undone differently: a label this overlay
+    /// added is removed, whereas a point it merely tinted belongs to somebody
+    /// else and only has its colour reset.
+    std::vector<Position> analysisLabels;
+    std::vector<Position> analysisTints;
     AudioPlayer player;
     std::string pendingScreenshot;  // see requestScreenshot()
 

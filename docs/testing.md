@@ -281,6 +281,13 @@ Plus the live evaluation overlay: `eval_enabled` (the toggle), `eval_state`
 (`disabled`/`starting`/`unavailable`/`yielded`/`running`), `eval_winrate` (an
 integer percentage **for Black**, or `-1` when there is no report),
 `eval_has_score`, `eval_score`, `eval_moves`, `eval_stale` and `can_evaluation`.
+For the board suggestions: `eval_moves_shown` (the toggle, off by default),
+`eval_labels` (suggestions this overlay labelled) and `eval_tints` (suggestions
+that landed on a move already in the record and were only coloured). The split
+between the last two *is* the combine rule, which is why they are separate keys.
+Note that the mock always proposes the first two empty points in scan order, so a
+scenario testing a collision has to play *there* — A1 and B1 — for a suggestion
+and a recorded move to meet.
 **Wait on `eval_state`, not `eval_enabled`**: the toggle flips the instant it is
 pressed, long before a process has started or a number has arrived. And
 `eval_winrate` is `-1` rather than `50` when nothing has been computed, for the

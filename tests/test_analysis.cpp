@@ -240,3 +240,116 @@ TEST_CASE("changing komi republishes the snapshot") {
     model.onKomiChange(0.5f);
     CHECK(model.snapshot()->komi == doctest::Approx(7.5f));
 }
+
+// --- What the board draws -----------------------------------------------------
+
+namespace {
+
+/// A report of `n` suggestions, ranked, each losing `lossStep` more win rate
+/// than the one before. Positions run along the first row.
+AnalysisReport rankedReport(int n, double lossStep = 0.0,
+                            Color::Value toMove = Color::BLACK) {
+    AnalysisReport report;
+    for (int i = 0; i < n; ++i) {
+        AnalysisMove m;
+        m.move = {Position(i, 0), Color(toMove)};
+        m.order = i;
+        m.visits = 100 - i;
+        // In Black's frame throughout, as the parser leaves them. For White to
+        // move the better move is the *lower* number for Black.
+        m.winrateBlack = toMove == Color::BLACK ? 0.60 - lossStep * i
+                                                : 0.40 + lossStep * i;
+        report.moves.push_back(m);
+    }
+    return report;
+}
+
+std::pair<int, int> key(int col, int row) { return {col, row}; }
+
+}  // namespace
+
+TEST_CASE("the quality ramp runs from the best move to a blunder") {
+    const glm::vec4 best = moveQualityColor(0.0);
+    const glm::vec4 mid  = moveQualityColor(0.03);
+    const glm::vec4 bad  = moveQualityColor(0.20);
+
+    // Green through amber to red: red rises, green falls.
+    CHECK(best.g > best.r);
+    CHECK(bad.r > bad.g);
+    CHECK(mid.r > best.r);
+    CHECK(mid.g > bad.g);
+
+    // Clamped at both ends, so a negative loss cannot escape the ramp and an
+    // enormous one cannot run past red.
+    CHECK(moveQualityColor(-1.0).g == doctest::Approx(best.g));
+    CHECK(moveQualityColor(99.0).r == doctest::Approx(bad.r));
+}
+
+TEST_CASE("suggestions with no label of their own get rank letters") {
+    const auto labels = evaluationLabels(rankedReport(3), {}, {}, DEFAULT_EVAL_LABELS);
+    REQUIRE(labels.size() == 3);
+    CHECK(labels[0].text == "A");
+    CHECK(labels[1].text == "B");
+    CHECK(labels[2].text == "C");
+    CHECK(labels[0].pos == Position(0, 0));
+}
+
+TEST_CASE("a suggestion on a recorded variation is tinted, not relabelled") {
+    // The engine's best move is very often a move already in the record. The
+    // variation keeps its own "3a" and simply takes on the colour, so nothing
+    // is lost and colour means quality everywhere on the board.
+    const auto labels = evaluationLabels(rankedReport(3), {key(0, 0)}, {},
+                                         DEFAULT_EVAL_LABELS);
+    REQUIRE(labels.size() == 3);
+    CHECK(labels[0].text.empty());        // tint only
+    CHECK(labels[0].pos == Position(0, 0));
+
+    // Letters do not skip: the first move that actually gets a label is 'A'.
+    // B and C with no A on the board reads as broken.
+    CHECK(labels[1].text == "A");
+    CHECK(labels[2].text == "B");
+}
+
+TEST_CASE("explicit SGF markup is left entirely alone") {
+    // The user's own annotation outranks both the engine and the variation
+    // labels, as it already outranks variations today.
+    const auto labels = evaluationLabels(rankedReport(3), {}, {key(1, 0)},
+                                         DEFAULT_EVAL_LABELS);
+    REQUIRE(labels.size() == 2);
+    CHECK(labels[0].pos == Position(0, 0));
+    CHECK(labels[1].pos == Position(2, 0));   // the marked point is skipped
+    CHECK(labels[0].text == "A");
+    CHECK(labels[1].text == "B");
+}
+
+TEST_CASE("the board shows at most maxLabels suggestions") {
+    CHECK(evaluationLabels(rankedReport(9), {}, {}, 5).size() == 5);
+    CHECK(evaluationLabels(rankedReport(9), {}, {}, 1).size() == 1);
+    CHECK(evaluationLabels(rankedReport(9), {}, {}, 0).empty());
+}
+
+TEST_CASE("loss is never negative, whichever colour is to move") {
+    // Both win rates are in Black's frame, so for White the better move is the
+    // lower number. Subtracting the wrong way round would colour the engine's
+    // own best move as a blunder on every White turn.
+    for (const auto toMove : {Color::BLACK, Color::WHITE}) {
+        const auto labels = evaluationLabels(rankedReport(3, 0.05, toMove), {}, {},
+                                             DEFAULT_EVAL_LABELS);
+        REQUIRE(labels.size() == 3);
+        const glm::vec4 bestColor = moveQualityColor(0.0);
+        CHECK(labels[0].color.g == doctest::Approx(bestColor.g));
+        CHECK(labels[0].color.r == doctest::Approx(bestColor.r));
+        // ...and the ones behind it get progressively worse, not better.
+        CHECK(labels[1].color.r > labels[0].color.r);
+        CHECK(labels[2].color.g < labels[1].color.g);
+    }
+}
+
+TEST_CASE("moves the engine never searched are not drawn") {
+    AnalysisReport report = rankedReport(3);
+    report.moves[1].visits = 0;
+    const auto labels = evaluationLabels(report, {}, {}, DEFAULT_EVAL_LABELS);
+    REQUIRE(labels.size() == 2);
+    CHECK(labels[0].pos == Position(0, 0));
+    CHECK(labels[1].pos == Position(2, 0));
+}
