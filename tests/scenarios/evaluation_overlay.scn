@@ -155,6 +155,17 @@ evaluation_align left
 expect eval_align left
 evaluation_align center
 
+# Once the game is scored the readout stands down: the result is a fact, the
+# message line already states it, and an estimate beside it contradicts it — the
+# engine's scoreLead and the coach's final_score disagreed by a tenth of a point
+# on screen. The engine keeps running; only the display steps aside.
+pass
+wait_idle
+pass
+wait_until has_result true
+expect eval_state running
+wait_until eval_board_text ""
+
 toggle_evaluation_board off
 expect eval_on_board false
 # wait_until, not expect: this key reports what was last *drawn*, so it needs a

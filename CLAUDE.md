@@ -441,6 +441,15 @@ of its decisions, and `tests/test_analysis.cpp` plus
   middle of its intersection — and takes a `TextAlign` to place the point at the
   left or right edge of the text instead. The alignment is applied after the
   measuring pass, which is the only moment the text width is known.
+- **The readout stands down at a scored end.** `GameSnapshot::scoredEnd` — the
+  result is a fact there, `#lblMessage` already states it, and the estimate
+  contradicts it: KataGo's `scoreLead` and GNU Go's `final_score` differed by a
+  tenth of a point on screen, which reads as a bug. A **resignation** scores
+  nothing and keeps the readout, and navigating back off the end brings it back,
+  because `scoredEnd` follows the cursor.
+- **Stale is a second colour, not a factor.** `annotations.readout_stale_color`
+  defaults to `readout_color`, so the guard is invisible until someone opts in.
+  Multiplying an alpha the user has already tuned down has no defensible default.
 - **A shipped default goes in `config/base.json`, a user's choice in `user.json`,
   and an unmade choice is written nowhere.** `annotations.readout_color` ships the
   readout's ink; `evaluation_color` overrides it. `UserSettings` writes

@@ -61,9 +61,22 @@ GobanView::GobanView(GobanModel& m)
         if (!configured.empty()) {
             if (const auto parsed = parseHexColor(configured)) {
                 readoutInk = *parsed;
+                readoutStaleInk = *parsed;
             } else {
                 spdlog::warn("annotations.readout_color: '{}' is not #rgb, #rrggbb "
                              "or #rrggbbaa", configured);
+            }
+        }
+        const std::string staleConfigured = config->data
+                .value("annotations", nlohmann::json::object())
+                .value("readout_stale_color", std::string());
+        if (!staleConfigured.empty()) {
+            if (const auto parsed = parseHexColor(staleConfigured)) {
+                readoutStaleInk = *parsed;
+                haveStaleInk = true;
+            } else {
+                spdlog::warn("annotations.readout_stale_color: '{}' is not #rgb, "
+                             "#rrggbb or #rrggbbaa", staleConfigured);
             }
         }
     }
@@ -884,7 +897,14 @@ void GobanView::updateEvaluationReadout() {
 	std::vector<FloatingLabel> labels;
 	readoutText.clear();
 
-	if (showEvaluationOnBoard && analysis) {
+	const auto snap = model.snapshot();
+	// A scored game has a *result*, and it is already on the message line. An
+	// estimate beside it is contradictory — KataGo's scoreLead and GNU Go's
+	// final_score disagreed by a tenth of a point on screen — redundant, and in
+	// the way of the territory patches that fill the board there. A resignation
+	// scores nothing, so it keeps the readout, and navigating back off the end
+	// brings it back because scoredEnd follows the cursor.
+	if (showEvaluationOnBoard && analysis && !snap->scoredEnd) {
 		if (const auto report = analysis->report()) {
 			// The margin runs from row -0.85 to row 0 — 0.85 grid spacings of
 			// wood on every board size, because the constant in Metrics::calc()
@@ -923,9 +943,15 @@ void GobanView::updateEvaluationReadout() {
 
 			// add_text centres on the point, so this is the middle of the board
 			// edge. Black on wood, like every other board-level label.
+			// Describing a position that has been navigated away from. The panel
+			// dims in that case; here the ink is a second setting rather than a
+			// factor over the first, because scaling an alpha the user has
+			// already tuned has no defensible default. It equals readoutInk
+			// unless someone says otherwise, so this changes nothing by itself.
+			const bool stale = report->positionId != snap->positionId;
 			readoutText = text.str();
 			labels.push_back({glm::vec2(anchorCol, MARGIN_ROW), readoutText, size,
-			                  readoutInk, 0u, readoutAlign});
+			                  stale ? readoutStaleInk : readoutInk, 0u, readoutAlign});
 		}
 	}
 	gobanOverlay.setFloatingLabels(std::move(labels));
@@ -934,6 +960,16 @@ void GobanView::updateEvaluationReadout() {
 void GobanView::setReadoutColor(const glm::vec4& color) {
 	if (readoutInk == color) return;
 	readoutInk = color;
+	// The stale ink shadows it until it is set explicitly — otherwise changing
+	// the colour would silently leave the stale one at the old value.
+	if (!haveStaleInk) readoutStaleInk = color;
+	requestRepaint(UPDATE_OVERLAY);
+}
+
+void GobanView::setReadoutStaleColor(const glm::vec4& color) {
+	haveStaleInk = true;
+	if (readoutStaleInk == color) return;
+	readoutStaleInk = color;
 	requestRepaint(UPDATE_OVERLAY);
 }
 

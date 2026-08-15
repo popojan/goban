@@ -208,6 +208,7 @@ public:
     /// application never writes; a user's own choice lives in `user.json`. Same
     /// two-level arrangement as the camera, and for the same reason.
     void setReadoutColor(const glm::vec4& color);
+    void setReadoutStaleColor(const glm::vec4& color);
     [[nodiscard]] const glm::vec4& readoutColor() const { return readoutInk; }
 
     /// Off by default, and that is the point. The panel's numbers are read
@@ -278,6 +279,11 @@ public:
     bool showEvaluationOnBoard = false;
     TextAlign readoutAlign = TextAlign::Center;
     glm::vec4 readoutInk{0.0f, 0.0f, 0.0f, 1.0f};
+    /// Ink for a readout describing a position that has been left. Follows
+    /// readoutInk unless the config names one, so the feature is invisible until
+    /// somebody asks for it.
+    glm::vec4 readoutStaleInk{0.0f, 0.0f, 0.0f, 1.0f};
+    bool haveStaleInk = false;
     std::string readoutText;
     const AnalysisService* analysis = nullptr;
     /// Kept apart because they are undone differently: a label this overlay
