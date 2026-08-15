@@ -50,6 +50,14 @@ struct UiInputs {
     /// Engines have finished loading and no programmatic widget sync is running.
     bool uiReady           = false;
     bool engineThinking    = false;
+    /// The game thread is replaying the record into the engines — after a board
+    /// size change, a clear, a handicap or an SGF load. Distinct from
+    /// `engineThinking`, which is a genmove in flight: no engine is thinking
+    /// during a resync, so every guard phrased over that term alone was open.
+    /// It has to be here because the resync is *slow* — KataGo rebuilding for a
+    /// new board size takes seconds on a CPU backend, and the UI is fully live
+    /// throughout: board drawn, overlay running, toolbar lit.
+    bool enginesSyncing    = false;
     bool humanToMove       = false;
     bool engineToMove      = false;
     /// A bot-versus-bot match outside analysis mode: the human is a spectator.
@@ -80,6 +88,10 @@ struct UiActions {
     bool pass      = false;
     bool resign    = false;
     bool undo      = false;  ///< navigateBack under another name.
+    /// Place a stone at the cursor. The same question `pass` asks — both are a
+    /// move at the cursor, and CLAUDE.md requires them to agree — so it is
+    /// defined as `pass` rather than restated.
+    bool play      = false;
     bool kibitz    = false;  ///< Ask the kibitz engine for one move.
     bool navigate  = false;  ///< All four navigation buttons share one answer.
     bool territory = false;

@@ -17,6 +17,8 @@
 // no engine and no graphics context, which is why they can be exhaustive.
 #include <doctest/doctest.h>
 
+#include <initializer_list>
+
 #include "UiActions.h"
 
 namespace {
@@ -307,4 +309,59 @@ TEST_CASE("kibitz stays available while reviewing mid-tree") {
     CHECK_FALSE(availableActions(thinking).kibitz);
     CHECK_FALSE(availableActions(over).kibitz);
     CHECK_FALSE(availableActions(locked).kibitz);
+}
+
+TEST_CASE("a resync locks the same things a genmove does") {
+    // The gap that let four clicks produce one stone. A board size change, a
+    // clear or an SGF load sends the game thread off to replay the record into
+    // every engine, and on a CPU KataGo that is seconds — with the whole UI
+    // live, the board drawn and the overlay running. No engine is *thinking*
+    // there, so every guard phrased over engineThinking alone was open, and a
+    // click went into queuedMove: a single slot, overwritten by the next one.
+    UiInputs in = playing();
+    in.enginesSyncing = true;
+
+    CHECK_FALSE(availableActions(in).play);
+    CHECK_FALSE(availableActions(in).pass);
+    CHECK_FALSE(availableActions(in).kibitz);
+    CHECK_FALSE(availableActions(in).resign);
+    CHECK_FALSE(availableActions(in).navigate);
+    CHECK_FALSE(availableActions(in).undo);
+
+    // A display is not a move: the evaluation overlay never touches the game
+    // thread, so it is as available mid-resync as it is mid-genmove.
+    UiInputs evalReady = in;  evalReady.evaluationAvailable = true;
+    CHECK(availableActions(evalReady).evaluation);
+
+    // And it lifts. This is what distinguishes it from a stuck flag.
+    in.enginesSyncing = false;
+    CHECK(availableActions(in).play);
+}
+
+TEST_CASE("a click and a pass are the same question") {
+    // CLAUDE.md requires them to agree — a move at the cursor is a move at the
+    // cursor. Defined rather than restated, so this holds by construction; the
+    // case is here to fail loudly if somebody splits them again.
+    for (bool midTree : {false, true}) {
+        for (bool syncing : {false, true}) {
+            for (bool thinking : {false, true}) {
+                for (bool human : {false, true}) {
+                    UiInputs in = playing();
+                    in.atEndOfNavigation = !midTree;
+                    in.enginesSyncing    = syncing;
+                    in.engineThinking    = thinking;
+                    in.humanToMove       = human;
+                    const UiActions a = availableActions(in);
+                    CHECK(a.play == a.pass);
+                }
+            }
+        }
+    }
+
+    // Including on a finished game, where both are false — a click there means
+    // "clear", which boardClick() resolves before it asks.
+    UiInputs over = playing();
+    over.phase = GamePhase::Finished;
+    CHECK_FALSE(availableActions(over).play);
+    CHECK_FALSE(availableActions(over).pass);
 }

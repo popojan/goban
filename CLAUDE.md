@@ -227,7 +227,8 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **Block navigation while engine thinking**: `isThinking()` returns true only for ENGINE types (not human players). Navigation keys are blocked when engine is processing.
 - **Navigation in bot-bot matches**: Requires switching to Analysis mode first (pauses genmove loop).
 - **Engine sync invariant**: All enabled engines stay in sync at the same position. After load/new game, `EngineSync::Unsynced` triggers initial sync on the game thread: coach syncs first (enables scoring), then remaining engines. After initial sync, every move is sent to ALL engines via `syncOtherEngines`. No special cases for coach/player/kibitz roles.
-- **`Unsynced` is not "busy", `Syncing` is**: after a new game the engines are `Unsynced` while the game loop is *stopped*, and stay that way until the user's first move restarts it. Only `Syncing` — held while the game thread is actually replaying — may make `isIdle()` false; waiting on `Unsynced` would never return. The replay always leaves `Syncing`, failure included.
+- **`Unsynced` is not "busy", `Syncing` is**: only `Syncing` — held while the game thread is actually replaying — may make `isIdle()` false. Waiting on `Unsynced` would never return, since nothing guarantees anyone will act on it. The replay always leaves `Syncing`, failure included.
+- **The sync starts when the board changes, not when the player moves.** `clearGame()` ends with `run()`, so a new game, a board size change and a handicap all begin the replay immediately — while the user is still looking at an empty board. It used to leave the engines `Unsynced` with the loop *stopped* until a click called `start()` + `run()`, which billed a several-second KataGo rebuild to the first move: stone stuck in hand, nothing on screen. The SGF load path had always started the thread early (`loadSGF`, "start game thread early"); the two paths had simply grown apart. Ordering matters twice — after `setFixedHandicap()`, because the replay carries its setup stones, and behind `if (!isRunning())`, because `clearGame()` also runs *on* the game thread when a discarding action was deferred, where `run()` would take a mutex that path may hold. Pinned by `tests/scenarios/sync_before_first_move.scn`, whose every assertion is "without a move having been played".
 - **All GTP from game thread**: Engine commands during active game must go through the game thread (navigation queue, initial sync). Direct GTP from UI thread is only safe when game thread is stopped (after `interrupt()`).
 
 ### SGF Game Record Consistency
@@ -294,6 +295,33 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   with KataGo on a CPU backend the silence lasts tens of seconds, and two bug
   reports called it "nothing happened". The flag is not only a display — ADR-0001's
   refusals and the analysis overlay's yield both read it.
+- **A resync is engine-busy too, and it is the slow one.** `EngineSync::Syncing`
+  covers the replay into every engine after a board size change, a clear, a
+  handicap or an SGF load — seconds while KataGo rebuilds for the new size, with
+  the UI fully live: board drawn, overlay running, toolbar lit. `isIdle()` has
+  always counted it; `uiInputs()` did not, and `isThinking()` is false there
+  because no genmove is in flight. So a board click was accepted, `playLocalMove()`
+  found `playerToMove` null and fell through to `queuedMove` — **a single slot,
+  not a queue** — and each further click overwrote it. Four clicks, one stone.
+  `availableActions()` now folds both into one `engineBusy` term.
+- **The move that *starts* the sync cannot be refused, only the ones during it.**
+  After a board size change the engines are `Unsynced` with the loop stopped;
+  it is `model.start()` + `run()` on that first click that begins the replay. So
+  `a.play` is true for `Unsynced` and false only for `Syncing`: the first move is
+  accepted and queued, every click during the wait is refused, and the stone
+  staying in hand is then truthful — the move is pending, not lost.
+- **A wait the user cannot see is a frozen program.** Two things were missing and
+  either one alone fixes nothing: `getIdleTimeout()` did not cover
+  `isSyncingEngines()`, so the loop blocked in `glfwWaitEvents()` and drew no
+  frame at all during the sync — and there was no message to draw. Both are
+  there now (`tplStatusSyncing`, in all five languages, with an English
+  fallback). Same trap as the exit hang: no input event arrives, so nothing
+  repaints, so nothing can be reported.
+- **A board click asks `a.play`, which *is* `a.pass`.** Not an equal-looking
+  copy — assigned, so they cannot drift. They are one act at one point, and the
+  review branch used to test `isThinking()` while the branch that starts a game
+  tested nothing at all. `Finished` is exempt at the call site because a click
+  there means `clear`, not a move.
 - **`isThinking()` is not "the engine is busy".** The game loop clears `playerToMove` *before* its 500 ms inter-move sleep, so `isThinking()` is false for that window on every move. Guards written as a bare `isThinking()` test therefore have a hole once per move — that is how navigation keys were accepted in a locked bot-versus-bot match the toolbar had greyed out, and how a kibitz request could be dropped on the floor. Ask `actions()`, which carries the `aiVsAiLocked` term as well.
 - **Away from the end of the line, a move is a variation, not a turn.** `pass` and a board click must agree about this: `boardClick`'s review branch has never consulted turn ownership, so `a.pass` reads `(humanToMove || reviewingMidTree)`. The engine-thinking lock stays outside that disjunction — passing is a *preserving* action in ADR-0001's sense, and a click refuses there too.
 - **Territory needs a score, not just an ending.** `a.territory` is `finished && scoredEnd`; a resignation counted nothing, so it has no territory. `scoredEnd` is `GameRecord::shouldShowTerritory()` **published by the game thread** into `GobanModel::scoredEndPosition`, never recomputed by the reader — see the threading note below.

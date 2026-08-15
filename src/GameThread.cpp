@@ -276,10 +276,8 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
     model.setupBlackStones.clear();
     model.setupWhiteStones.clear();
 
-    // Non-coach engines will be synced on the game thread before genmove.
-    // Note the loop is stopped at this point (newGameNow interrupts it), so
-    // this can sit Unsynced indefinitely — until the user's first move starts
-    // it. That is why Unsynced is not a "busy" state.
+    // Non-coach engines are synced on the game thread, by the loop started at
+    // the end of this function.
     engineSync = EngineSync::Unsynced;
 
     // Notify observers of board size (renders board immediately)
@@ -292,6 +290,28 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
     setKomi(komi);
     setFixedHandicap(handicap);
+
+    // Sync now, while the user is still looking at an empty board, rather than
+    // billing it to their first move.
+    //
+    // This path used to leave the engines Unsynced with the loop stopped, so
+    // the replay began only when a click called start() + run() — and on a CPU
+    // KataGo, rebuilding for a new board size is seconds. The player changed
+    // the board size, sat thinking, reached for a stone, and *then* paid. The
+    // SGF load path has always done it this way instead (see loadSGF: "start
+    // game thread early"), and there was never a principle behind the
+    // difference, only the two paths growing apart.
+    //
+    // After setFixedHandicap(), never before: the sync replays the setup stones
+    // it places, so starting the loop above would race the handicap onto the
+    // board behind the replay's back.
+    //
+    // isRunning() first, not run() alone: clearGame() also runs *on* the game
+    // thread when a discarding action was deferred past a genmove, and run()
+    // takes playerMutex, which that path may already hold.
+    if (!isRunning()) {
+        run();
+    }
     return true;
 
 }

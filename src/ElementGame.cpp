@@ -297,6 +297,16 @@ double ElementGame::getIdleTimeout() const {
         return 0.05;
     }
 
+    // Nor does a resync, and it is the longer wait of the two: the board size
+    // change is the deferred half, but the replay into the engines happens
+    // afterwards, when the first move restarts the game loop. Without a timeout
+    // here the status line below cannot appear at all — no input arrives, so no
+    // frame is drawn, so the one explanation of a several-second freeze is
+    // never painted. Fixing the message without this fixes nothing.
+    if (engine.isSyncingEngines()) {
+        return 0.05;
+    }
+
     // If we displayed non-zero FPS, we need one more wake-up to show "0 fps"
     if (s_fpsLastDisplayed > 0) {
         float currentTime = static_cast<float>(glfwGetTime());
@@ -629,6 +639,15 @@ void ElementGame::syncStatusIndicator() {
     } else if (!loading.empty()) {
         text = Rml::CreateString(getTemplateText(context, "tplStatusLoading").c_str(),
                                  loading.c_str()).c_str();
+        severityClass = "loading";
+    } else if (engine.isSyncingEngines()) {
+        // The replay into the engines after a board size change, a clear or an
+        // SGF load. Not "loading" — the process is up; it is being brought to a
+        // position, which on a CPU KataGo is seconds of a live-looking UI with
+        // nothing thinking. Without this the first move after resizing the board
+        // simply sat there: the stone stayed in hand, the toolbar was greyed by
+        // a rule the user could not see, and it read as a dead program.
+        text = templateText("tplStatusSyncing", "Synchronising engines…");
         severityClass = "loading";
     } else if (log.hasUnseen()) {
         // Messages since the panel was last opened, not the size of the buffer.

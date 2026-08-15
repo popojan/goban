@@ -10,8 +10,20 @@ UiActions availableActions(const UiInputs& in) {
 
     const bool finished = in.phase == GamePhase::Finished;
     const bool playing  = in.phase == GamePhase::Playing;
+
+    // "An engine has the game thread", which is the question every guard below
+    // meant to ask and only half of which it was asking. A genmove in flight is
+    // one way; the initial sync after a board size change, a clear or an SGF
+    // load is the other, and it is the slower of the two — seconds of KataGo
+    // rebuilding, with the whole UI live and nothing thinking.
+    //
+    // Nothing reached the loop during that window: playLocalMove() found
+    // playerToMove null, fell through to `queuedMove`, and each further click
+    // overwrote the single slot. Four clicks produced one stone, which is what
+    // it took to notice.
+    const bool engineBusy = in.engineThinking || in.enginesSyncing;
     // isThinking() is true only for engines, so this is "a human may act now".
-    const bool humanTurn = in.humanToMove && !in.engineThinking;
+    const bool humanTurn = in.humanToMove && !engineBusy;
 
     // Start hands the turn to an engine, so it needs one to be to move — and
     // there is nothing to start if the game is already running or over.
@@ -30,9 +42,14 @@ UiActions availableActions(const UiInputs& in) {
     // letting the review term through would put pass and click back at odds in
     // the one case that actually corrupts engine state.
     const bool reviewingMidTree = !in.atEndOfNavigation;
-    a.pass   = !in.engineThinking && (in.humanToMove || reviewingMidTree)
+    a.pass   = !engineBusy && (in.humanToMove || reviewingMidTree)
                && !finished && !in.aiVsAiLocked;
-    a.kibitz = !in.engineThinking && !finished && !in.aiVsAiLocked;
+    // Defined as pass, not restated as an equal-looking expression: they are one
+    // act at one point, and the two drifting apart is the failure this whole
+    // file exists to prevent. A click on a *finished* game is not a play — it
+    // means "clear" — and boardClick() handles that before asking.
+    a.play   = a.pass;
+    a.kibitz = !engineBusy && !finished && !in.aiVsAiLocked;
 
     // Resigning writes the result onto the record's root and adds no node, so
     // unlike a stone or a pass it cannot describe a branch: applied anywhere
@@ -52,7 +69,7 @@ UiActions availableActions(const UiInputs& in) {
     // Undo is navigateBack under another name, so it follows the navigation
     // buttons rather than whose turn it is. Reviewing a finished game is
     // precisely when it is wanted.
-    a.navigate = !in.engineThinking && !in.aiVsAiLocked;
+    a.navigate = !engineBusy && !in.aiVsAiLocked;
     a.undo     = a.navigate;
 
     // Territory is what a scored ending produced, so a resignation has none to

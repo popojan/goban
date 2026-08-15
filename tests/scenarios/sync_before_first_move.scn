@@ -1,0 +1,68 @@
+# config: mock.json
+#
+# The engines sync while the board is empty and the player is idle, not when
+# they finally reach for a stone.
+#
+# This path used to leave them Unsynced with the game loop stopped, so the
+# replay began only when a click called start() + run(). On a CPU KataGo,
+# rebuilding for a new board size is seconds: you changed the size, thought
+# about your opening, played — and *then* waited, with the stone stuck in hand
+# and nothing on screen to say why. The SGF load path has always started the
+# thread early instead; there was never a principle behind the difference.
+#
+# Every assertion here is "without having played a move", which is the whole
+# claim. Before the change these waits could not terminate at all.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/sync_before_first_move.scn
+
+new_game 9
+wait_until engine_sync synced
+expect move_count 0
+expect phase setup
+
+# A board size change is the case that was reported, and it is a different
+# entry point — the dropdown's, which discards the game and rebuilds it.
+board_size 13
+wait_until engine_sync synced
+expect board_size 13
+expect move_count 0
+
+# Still idle in every sense the rest of the UI cares about: the sync is over,
+# so quiescence holds and the actions are offered again.
+wait_idle
+expect can_play true
+expect can_pass true
+
+# Handicap takes the same route and must leave the engines synced too — its
+# setup stones are placed before the replay, not behind it, which is why the
+# sync is started after setFixedHandicap() rather than alongside it.
+handicap 4
+wait_until engine_sync synced
+expect handicap 4
+expect move_count 0
+expect black_stones 4
+
+# And the board is now White's to move, so the human cannot click — a.play and
+# a.pass agree about that, which is the point of defining one as the other.
+expect color_to_move W
+expect can_play false
+expect can_pass false
+expect can_start true
+
+# Back to an even game, still without a move having been played. Explicitly,
+# because new_game carries the handicap setting over rather than clearing it.
+handicap 0
+wait_until engine_sync synced
+expect handicap 0
+expect black_stones 0
+expect can_play true
+
+# And the first move is then immediate, rather than being the moment the bill
+# for the resync arrives. Two clicks, as everywhere: one takes the stone out of
+# the bowl, one puts it down.
+click 3 3
+expect holds_stone true
+click 3 3
+wait_until move_count >= 1
+wait_idle
+expect engine_sync synced

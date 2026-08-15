@@ -198,13 +198,21 @@ void GobanControl::boardClick(const Position& coord) {
     // below. See ADR-0006 stage 2.
     const auto snap = model.snapshot();
 
+    // One policy question for the whole path (ADR-0005). A click is a move at
+    // the cursor and `pass` is the same act, so they read the same answer rather
+    // than each carrying their own condition — which is how the review branch
+    // below came to test `isThinking()` while the branch that starts a game
+    // tested nothing at all.
+    //
+    // Finished is exempt because a click there is not a play: it means "clear",
+    // and it is handled further down.
+    if (model.phase() != GamePhase::Finished && !actions().play) {
+        spdlog::debug("board click refused by availableActions()");
+        return;
+    }
+
     // During navigation (not at end), handle clicks specially
     if (snap->navigating && !snap->atEnd) {
-        // Block navigation while engine is thinking - would corrupt state
-        if (engine.isThinking()) {
-            spdlog::debug("Navigation click blocked - engine is thinking");
-            return;
-        }
         // Stone-in-hand: first click picks up, second click places
         if (!model.state.holdsStone) {
             // First click: pick up stone
@@ -1657,6 +1665,10 @@ UiInputs GobanControl::uiInputs() const {
 
     in.phase             = model.phase();
     in.engineThinking    = engine.isThinking();
+    // The same term isIdle() has had all along. It was never gathered here, so
+    // the policy could not see the seconds-long resync after a board size
+    // change — the toolbar stayed lit and a click went into queuedMove.
+    in.enginesSyncing    = engine.isSyncingEngines();
     in.humanToMove       = engine.humanToMove();
     in.engineToMove      = engine.isCurrentPlayerEngine();
     // Bot-bot detection: the explicit toggle, or simply both sides being
@@ -1800,6 +1812,7 @@ nlohmann::json GobanControl::dumpState() const {
     const UiActions a = actions();
     s["can_start"]     = a.start;
     s["can_pass"]      = a.pass;
+    s["can_play"]      = a.play;
     s["can_resign"]    = a.resign;
     s["can_undo"]      = a.undo;
     s["can_kibitz"]    = a.kibitz;
