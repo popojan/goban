@@ -338,6 +338,13 @@ void GobanModel::onKomiChange(float newKomi) {
     if (phase() == GamePhase::Setup || phase() == GamePhase::Paused) {
         spdlog::debug("setting komi {}", newKomi);
         state.komi = newKomi;
+        // Komi is not a position change, so nothing else republishes it — and
+        // the snapshot is where the analysis thread reads it from. Without this
+        // the analysis engine keeps the komi it was told at its last *board*
+        // change, and a game whose komi was set before the first move is scored
+        // by the overlay against the wrong one. Same obligation as
+        // onBoardSized(): whoever changes what a reader sees must publish it.
+        publishSnapshot();
     }
 }
 

@@ -217,3 +217,26 @@ TEST_CASE("only playable moves are counted against the engine") {
     CHECK(playable[1] == Move::PASS);
     CHECK(playable[2] == Move::NORMAL);
 }
+
+// --- What the analysis thread is given ----------------------------------------
+
+#include "GobanModel.h"
+
+TEST_CASE("changing komi republishes the snapshot") {
+    // Komi is not a position change, so nothing on the ordinary publish path
+    // covers it — and the snapshot is where the analysis thread reads it from.
+    // Without this, setting komi before the first move left the overlay scoring
+    // the game against whatever komi was current at the last *board* change,
+    // silently and by exactly the difference.
+    GobanModel model(13);
+    REQUIRE(model.snapshot()->komi != doctest::Approx(7.5f));
+
+    model.onKomiChange(7.5f);
+    CHECK(model.snapshot()->komi == doctest::Approx(7.5f));
+
+    // And it is refused once play has begun, as it always has been — so the
+    // published value cannot drift away from the record's either.
+    model.start();
+    model.onKomiChange(0.5f);
+    CHECK(model.snapshot()->komi == doctest::Approx(7.5f));
+}
