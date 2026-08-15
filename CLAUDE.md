@@ -428,6 +428,12 @@ of its decisions, and `tests/test_analysis.cpp` plus
   middle of its intersection — and takes a `TextAlign` to place the point at the
   left or right edge of the text instead. The alignment is applied after the
   measuring pass, which is the only moment the text width is known.
+- **A shipped default goes in `config/base.json`, a user's choice in `user.json`,
+  and an unmade choice is written nowhere.** `annotations.readout_color` ships the
+  readout's ink; `evaluation_color` overrides it. `UserSettings` writes
+  `evaluation_color` only when it is non-empty — writing it unconditionally would
+  pin today's default into every `user.json` and quietly defeat any later change
+  to it. Same two-level arrangement as the camera.
 - **Every character drawn must be in the atlas string** (`GobanOverlay.cpp:59`).
   The font is not the gate; that string is. A glyph absent from it simply does
   not appear, silently.

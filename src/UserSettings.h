@@ -69,6 +69,13 @@ public:
     std::string getEvaluationAlign() const { std::lock_guard<std::mutex> lock(mutex); return evaluationAlign; }
     void setEvaluationAlign(const std::string& value);
 
+    /// The readout's ink, as a hex string. Empty means "whatever the application
+    /// config ships" — the distinction matters, because writing it unconditionally
+    /// would pin today's default into every user.json and quietly defeat any
+    /// future change to it.
+    std::string getEvaluationColor() const { std::lock_guard<std::mutex> lock(mutex); return evaluationColor; }
+    void setEvaluationColor(const std::string& value);
+
     // Last SGF (for resuming after restart)
     std::string getLastSgfPath() const { std::lock_guard<std::mutex> lock(mutex); return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
@@ -201,6 +208,7 @@ private:
     bool evaluationMoves = false;
     bool evaluationOnBoard = false;
     std::string evaluationAlign = "center";
+    std::string evaluationColor;
 
     // Last SGF
     std::string lastSgfPath;

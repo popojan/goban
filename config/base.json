@@ -300,6 +300,10 @@
       "height": 0.85
     }
   ],
+  "_comment_annotations": "Ink for text drawn on the board itself. readout_color is the evaluation readout on the near edge: #rgb, #rrggbb or #rrggbbaa. Alpha is the interesting part - a dark, part-transparent ink reads as part of the wood rather than printed on top of it. Overridden per user by the evaluation_color command.",
+  "annotations": {
+    "readout_color": "#000000ff"
+  },
   "overlay_shaders": {
     "vertex": "./config/shaders/overlay/overlay-vertex.glsl",
     "fragment": "./config/shaders/overlay/overlay-fragment.glsl",

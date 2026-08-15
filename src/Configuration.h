@@ -9,8 +9,22 @@
 
 #include <RmlUi/Core/Input.h>
 #include <unordered_map>
+#include <optional>
 #include <string>
 #include <nlohmann/json.hpp>
+#include <glm/glm.hpp>
+
+/// Parses `#rgb`, `#rrggbb` or `#rrggbbaa` — the hash optional — into RGBA in
+/// [0,1]. Nullopt for anything else, deliberately: a malformed colour reported
+/// is a typo the user can fix, whereas one silently defaulted is a setting that
+/// mysteriously does nothing.
+///
+/// Here rather than beside its caller because it is a pure function over a
+/// config value, and `goban_core` is what the tests can link.
+std::optional<glm::vec4> parseHexColor(const std::string& text);
+
+/// The inverse, always in the eight-digit form so a round trip is stable.
+std::string hexFromColor(const glm::vec4& color);
 
 /// Modifier flags for a keybinding. A bitmask rather than a set of bools so a
 /// binding is one hashable value.

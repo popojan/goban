@@ -564,6 +564,13 @@ void ElementGame::performDeferredInitialization() {
     if (auto align = GobanView::parseAlign(UserSettings::instance().getEvaluationAlign())) {
         view.setEvaluationAlign(*align);
     }
+    // Over the config default the view already read, and only if chosen.
+    const std::string ink = UserSettings::instance().getEvaluationColor();
+    if (!ink.empty()) {
+        if (auto parsed = parseHexColor(ink)) {
+            view.setReadoutColor(*parsed);
+        }
+    }
 
     // Invalidate view state to force OnUpdate to sync all dropdowns
     // (model and view start with identical defaults, so diffs won't fire otherwise)

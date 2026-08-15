@@ -581,6 +581,35 @@ void GobanControl::buildRegistry() {
         UserSettings::instance().setEvaluationAlign(GobanView::alignName(next));
     });
 
+    add("evaluation_color", 0, 1,
+        "[#rrggbb|#rrggbbaa|reset] — the ink of the board readout; alpha is what "
+        "makes it read as part of the wood",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            // No argument reports the current ink, so it can be read off before
+            // being changed.
+            parent->showMessage(hexFromColor(view.readoutColor()));
+            return;
+        }
+        const std::string arg = toLower(ctx.args[0]);
+        if (arg == "reset" || arg == "default") {
+            // Back to whatever the application config ships, by forgetting the
+            // choice rather than by writing the current default down.
+            UserSettings::instance().setEvaluationColor("");
+            parent->showMessage("Evaluation colour reset — restart to reload the "
+                                "configured default");
+            return;
+        }
+        const auto parsed = parseHexColor(arg);
+        if (!parsed) {
+            spdlog::warn("evaluation_color: '{}' is not #rgb, #rrggbb or #rrggbbaa",
+                         ctx.args[0]);
+            return;
+        }
+        view.setReadoutColor(*parsed);
+        UserSettings::instance().setEvaluationColor(hexFromColor(*parsed));
+    });
+
     add("genmove", 0, 0, "reserved for a future \"resume match from here\" feature (no-op)",
         [](CommandContext&) {
     });
@@ -1709,6 +1738,7 @@ nlohmann::json GobanControl::dumpState() const {
         s["eval_on_board"] = view.isEvaluationOnBoard();
         s["eval_board_text"] = view.evaluationReadoutText();
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());
+        s["eval_color"] = hexFromColor(view.readoutColor());
         s["eval_labels"]  = static_cast<int>(view.analysisLabelCount());
         // Suggestions that landed on a move already in the record: the label
         // stays and only takes on colour. The split between these two keys is

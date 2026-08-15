@@ -200,6 +200,16 @@ public:
     /// tell a typo from a choice.
     static std::optional<TextAlign> parseAlign(const std::string& name);
 
+    /// The readout's ink. Alpha included, because half-opacity dark is what makes
+    /// text read as *part of* a wooden board rather than printed on top of it —
+    /// and that is the whole claim the diegetic version is making.
+    ///
+    /// Shipped default in `config/base.json` (`overlay.readout_color`), which the
+    /// application never writes; a user's own choice lives in `user.json`. Same
+    /// two-level arrangement as the camera, and for the same reason.
+    void setReadoutColor(const glm::vec4& color);
+    [[nodiscard]] const glm::vec4& readoutColor() const { return readoutInk; }
+
     /// Off by default, and that is the point. The panel's numbers are read
     /// *after* a move, so a player can invent their own and judge it. Stars on
     /// the board are read *before*, and once the engine has pointed at a point
@@ -267,6 +277,7 @@ public:
     bool showAnalysisOverlay = false;
     bool showEvaluationOnBoard = false;
     TextAlign readoutAlign = TextAlign::Center;
+    glm::vec4 readoutInk{0.0f, 0.0f, 0.0f, 1.0f};
     std::string readoutText;
     const AnalysisService* analysis = nullptr;
     /// Kept apart because they are undone differently: a label this overlay

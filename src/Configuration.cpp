@@ -1,7 +1,12 @@
 #include "Configuration.h"
 
+#include <algorithm>
+#include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <spdlog/spdlog.h>
 
 bool Configuration::load(const std::string& fileName) {
@@ -76,4 +81,33 @@ std::string Configuration::getCommand(Rml::Input::KeyIdentifier key, unsigned mo
         return it->second;
     }
     return {};
+}
+
+std::optional<glm::vec4> parseHexColor(const std::string& text) {
+    std::string hex = text;
+    if (!hex.empty() && hex.front() == '#') hex.erase(0, 1);
+    if (hex.size() != 3 && hex.size() != 6 && hex.size() != 8) return std::nullopt;
+    for (char c : hex) {
+        if (!std::isxdigit(static_cast<unsigned char>(c))) return std::nullopt;
+    }
+    auto component = [&hex](size_t index, size_t width) {
+        const std::string part = hex.substr(index * width, width);
+        // A short-form digit means both nibbles: #48c is #4488cc.
+        const int value = std::stoi(width == 1 ? part + part : part, nullptr, 16);
+        return static_cast<float>(value) / 255.0f;
+    };
+    const size_t width = hex.size() == 3 ? 1 : 2;
+    const float alpha = hex.size() == 8 ? component(3, 2) : 1.0f;
+    return glm::vec4(component(0, width), component(1, width), component(2, width), alpha);
+}
+
+std::string hexFromColor(const glm::vec4& color) {
+    auto byte = [](float v) {
+        return static_cast<int>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
+    };
+    std::ostringstream out;
+    out << '#' << std::hex << std::setfill('0')
+        << std::setw(2) << byte(color.r) << std::setw(2) << byte(color.g)
+        << std::setw(2) << byte(color.b) << std::setw(2) << byte(color.a);
+    return out.str();
 }

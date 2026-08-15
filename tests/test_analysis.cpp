@@ -353,3 +353,45 @@ TEST_CASE("moves the engine never searched are not drawn") {
     CHECK(labels[0].pos == Position(0, 0));
     CHECK(labels[1].pos == Position(2, 0));
 }
+
+// --- The readout's ink --------------------------------------------------------
+
+#include "Configuration.h"
+
+TEST_CASE("readout colours parse from hex, with or without alpha") {
+    const auto opaque = parseHexColor("#204080");
+    REQUIRE(opaque.has_value());
+    CHECK(opaque->r == doctest::Approx(0x20 / 255.0f));
+    CHECK(opaque->g == doctest::Approx(0x40 / 255.0f));
+    CHECK(opaque->b == doctest::Approx(0x80 / 255.0f));
+    CHECK(opaque->a == doctest::Approx(1.0f));   // absent alpha means opaque
+
+    // Alpha is the interesting one: a part-transparent dark ink is what makes
+    // the readout read as part of the wood rather than printed on top of it.
+    const auto translucent = parseHexColor("#20408080");
+    REQUIRE(translucent.has_value());
+    CHECK(translucent->a == doctest::Approx(0x80 / 255.0f));
+
+    // Short form, and the hash is optional.
+    const auto shortForm = parseHexColor("#48c");
+    REQUIRE(shortForm.has_value());
+    CHECK(shortForm->r == doctest::Approx(0x44 / 255.0f));
+    CHECK(parseHexColor("204080").has_value());
+}
+
+TEST_CASE("a malformed colour is refused rather than silently drawn black") {
+    // Returning a default here would paint the readout black and leave the user
+    // wondering why their setting did nothing.
+    CHECK_FALSE(parseHexColor("").has_value());
+    CHECK_FALSE(parseHexColor("#12345").has_value());
+    CHECK_FALSE(parseHexColor("#gggggg").has_value());
+    CHECK_FALSE(parseHexColor("dark brown").has_value());
+}
+
+TEST_CASE("a colour survives the round trip to hex and back") {
+    for (const char* hex : {"#000000ff", "#204080c0", "#ffffff00"}) {
+        const auto parsed = parseHexColor(hex);
+        REQUIRE(parsed.has_value());
+        CHECK(hexFromColor(*parsed) == hex);
+    }
+}

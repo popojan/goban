@@ -51,6 +51,23 @@ GobanView::GobanView(GobanModel& m)
         baseCameraDistance = cameraDistance;
     }
 
+    // The shipped default for the board readout's ink. base.json is where a
+    // default that ships belongs; user.json is the runtime scratchpad, and
+    // ElementGame applies the user's own choice over this if they made one.
+    if (config) {
+        const std::string configured = config->data
+                .value("annotations", nlohmann::json::object())
+                .value("readout_color", std::string());
+        if (!configured.empty()) {
+            if (const auto parsed = parseHexColor(configured)) {
+                readoutInk = *parsed;
+            } else {
+                spdlog::warn("annotations.readout_color: '{}' is not #rgb, #rrggbb "
+                             "or #rrggbbaa", configured);
+            }
+        }
+    }
+
     // Load shader settings (separate from camera)
     if (settings.hasShaderSettings()) {
         gobanShader.setEof(settings.getShaderEof());
@@ -908,10 +925,16 @@ void GobanView::updateEvaluationReadout() {
 			// edge. Black on wood, like every other board-level label.
 			readoutText = text.str();
 			labels.push_back({glm::vec2(anchorCol, MARGIN_ROW), readoutText, size,
-			                  glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 0u, readoutAlign});
+			                  readoutInk, 0u, readoutAlign});
 		}
 	}
 	gobanOverlay.setFloatingLabels(std::move(labels));
+}
+
+void GobanView::setReadoutColor(const glm::vec4& color) {
+	if (readoutInk == color) return;
+	readoutInk = color;
+	requestRepaint(UPDATE_OVERLAY);
 }
 
 const char* GobanView::alignName(TextAlign align) {
