@@ -165,7 +165,7 @@ assert on pixels, so a committed screenshot scenario guards nothing.
 | `wait_idle [ms]` | wait until no engine is thinking and no navigation is queued |
 | `wait_until <key> [op] <value>` | wait for a state key to reach a value |
 | `wait <ms>` | unconditional delay — prefer `wait_idle` |
-| `key <name>` | press a key, down then up |
+| `key [mod+]<name>` | press a key, down then up |
 | `dump_state [label]` | log the whole state; use this when authoring |
 | `fail_fast on\|off` | stop at the first failure (default on) |
 
@@ -175,6 +175,14 @@ unfinished branch, which falls through to kibitz while Right does not**. Names:
 `space`, `left`, `right`, `up`, `down`, `home`, `end`, `backspace`, `enter`,
 `escape`, a single letter `a`–`z`, or a raw RmlUi key code. See
 `tests/scenarios/navigation_keys.scn`.
+
+A name may carry `ctrl+`, `shift+` and `alt+` prefixes in any order —
+`key ctrl+space`. Without them the press is unmodified, which is what the
+directive used to be able to express and *only* that, so every accelerator added
+since keybindings gained modifiers was unscriptable. The distinction is not
+cosmetic: `keyPress()` handles the navigation keys before the binding table and
+only when unmodified, so `space` and `ctrl+space` reach different code — the
+first navigates forward mid-tree, the second reaches `play once`.
 
 A value of `$otherKey` compares two pieces of state, e.g.
 `expect view_position $main_line_moves`.

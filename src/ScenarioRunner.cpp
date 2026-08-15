@@ -26,6 +26,25 @@ constexpr double DEFAULT_WAIT_SECONDS = 10.0;
 ///
 /// The numeric values are RmlUi's, documented in docs/keyboard-shortcuts.md;
 /// a bare number is accepted too, for keys with no name here.
+/// Splits `ctrl+shift+x` into the modifier mask and the bare key name. A
+/// binding is a chord, and until this existed the `key` directive could only
+/// press unmodified keys — so every accelerator added since keybindings gained
+/// modifiers was unscriptable, including the Ctrl+Space that reaches `play once`
+/// past the navigation handler.
+bool keyMods(std::string& name, unsigned& mods) {
+    mods = KeyMod::NONE;
+    for (size_t plus = name.find('+'); plus != std::string::npos; plus = name.find('+')) {
+        std::string prefix = name.substr(0, plus);
+        for (auto& c : prefix) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if      (prefix == "ctrl")  mods |= KeyMod::CTRL;
+        else if (prefix == "shift") mods |= KeyMod::SHIFT;
+        else if (prefix == "alt")   mods |= KeyMod::ALT;
+        else return false;
+        name.erase(0, plus + 1);
+    }
+    return true;
+}
+
 bool keyCode(std::string name, int& out) {
     for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
@@ -228,14 +247,20 @@ bool ScenarioRunner::execute(const Step& step, GobanControl& control) {
             return true;
         }
         int code = 0;
-        if (!keyCode(step.args[0], code)) {
+        std::string name = step.args[0];
+        unsigned mods = KeyMod::NONE;
+        if (!keyMods(name, mods)) {
+            recordFailure(step, "unknown modifier in '" + step.args[0] + "'", control.dumpState());
+            return true;
+        }
+        if (!keyCode(name, code)) {
             recordFailure(step, "unknown key '" + step.args[0] + "'", control.dumpState());
             return true;
         }
         // Down then up, as a real press arrives. The adjustment commands act on
         // the down edge to allow key repeat; everything else acts on the up.
-        control.keyPress(code, KeyMod::NONE, true);
-        control.keyPress(code, KeyMod::NONE, false);
+        control.keyPress(code, mods, true);
+        control.keyPress(code, mods, false);
         return true;
     }
 

@@ -99,6 +99,12 @@
       "command": "play once"
     },
     {
+      "_comment": "Space is a navigation key first: keyPress() handles it before this table and only lets it through at the end of an unfinished branch. Ctrl+Space is not intercepted, so it reaches play once at any cursor position.",
+      "key": 1,
+      "ctrl": true,
+      "command": "play once"
+    },
+    {
       "key": 81,
       "command": "quit"
     },

@@ -71,3 +71,43 @@ wait_until main_line_moves >= 5
 wait_idle
 expect main_line_moves 5
 expect view_position 5
+
+# --- Ctrl+Space asks for a move anywhere ------------------------------------
+# Space is bound to `play once` in base.json, but keyPress() claims it for
+# navigation first and only lets it through at the end of an unfinished branch,
+# so away from the end that binding is a promise it does not keep. The
+# navigation block is gated on `mods == KeyMod::NONE`, which is exactly what
+# reserves the chord: Ctrl+Space is not intercepted and reaches the table.
+navigate_back
+navigate_back
+wait_idle
+expect view_position 3
+expect at_end false
+
+# Plain Space here just steps forward down the main line — the reason a chord
+# was needed at all. Move 5 is still ahead of the cursor afterwards.
+key space
+wait_idle
+expect view_position 4
+expect at_end false
+
+navigate_back
+wait_idle
+expect view_position 3
+
+# Ctrl+Space asks the engine instead. The move itself cannot tell the two apart
+# — the mock plays the first legal point, which is why the press at the end of
+# the line above simply re-made the move already recorded there — so the
+# discriminator is the shape of the tree: away from the end a kibitz is a
+# *variation*, and the cursor lands on a node with nothing ahead of it, where
+# navigating forward would still have had move 5 in front.
+key ctrl+space
+wait_until at_end true
+wait_idle
+expect view_position 4
+
+# And it is promoted, exactly as a board click while reviewing is — see
+# variation_promotes_main_line.scn. The main line is now dd/pp/dp plus the
+# engine's answer, so it is four moves rather than the five it held a moment
+# ago, with the recorded W[pd] demoted to a second child.
+expect main_line_moves 4
