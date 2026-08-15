@@ -610,6 +610,30 @@ void GobanControl::buildRegistry() {
         UserSettings::instance().setEvaluationColor(hexFromColor(*parsed));
     });
 
+    add("coordinate_color", 0, 1,
+        "[#rrggbb|#rrggbbaa|reset] — the ink of the board's coordinate labels",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->showMessage(hexFromColor(view.coordinateColor()));
+            return;
+        }
+        const std::string arg = toLower(ctx.args[0]);
+        if (arg == "reset" || arg == "default") {
+            UserSettings::instance().setCoordinateColor("");
+            parent->showMessage("Coordinate colour reset — restart to reload the "
+                                "configured default");
+            return;
+        }
+        const auto parsed = parseHexColor(arg);
+        if (!parsed) {
+            spdlog::warn("coordinate_color: '{}' is not #rgb, #rrggbb or #rrggbbaa",
+                         ctx.args[0]);
+            return;
+        }
+        view.setCoordinateColor(*parsed);
+        UserSettings::instance().setCoordinateColor(hexFromColor(*parsed));
+    });
+
     add("toggle_coordinates", 0, 1,
         "[on|off] — column letters and row numbers on the board's margins",
         [this](CommandContext& ctx) {
@@ -1761,6 +1785,7 @@ nlohmann::json GobanControl::dumpState() const {
         s["eval_board_text"] = view.evaluationReadoutText();
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());
         s["coordinates_shown"] = view.areCoordinatesShown();
+        s["coord_color"] = hexFromColor(view.coordinateColor());
         s["eval_color"] = hexFromColor(view.readoutColor());
         s["eval_labels"]  = static_cast<int>(view.analysisLabelCount());
         // Suggestions that landed on a move already in the record: the label

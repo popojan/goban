@@ -60,6 +60,10 @@ void UserSettings::load() {
             evaluationColor = user["evaluation_color"].get<std::string>();
         }
 
+        if (user.contains("coordinate_color")) {
+            coordinateColor = user["coordinate_color"].get<std::string>();
+        }
+
         if (user.contains("last_sgf_path")) {
             lastSgfPath = user["last_sgf_path"].get<std::string>();
         }
@@ -216,6 +220,9 @@ std::string UserSettings::serialize() const {
     if (!evaluationColor.empty()) {
         user["evaluation_color"] = evaluationColor;
     }
+    if (!coordinateColor.empty()) {
+        user["coordinate_color"] = coordinateColor;
+    }
     if (!lastSgfPath.empty()) {
         user["last_sgf_path"] = lastSgfPath;
     }
@@ -312,6 +319,12 @@ void UserSettings::setEvaluationOnBoard(bool value) {
 void UserSettings::setEvaluationAlign(const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex);
     evaluationAlign = value;
+    saveLocked();
+}
+
+void UserSettings::setCoordinateColor(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    coordinateColor = value;
     saveLocked();
 }
 

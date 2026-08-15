@@ -76,6 +76,11 @@ public:
     std::string getEvaluationColor() const { std::lock_guard<std::mutex> lock(mutex); return evaluationColor; }
     void setEvaluationColor(const std::string& value);
 
+    /// The coordinate labels' ink. Empty means "whatever the config ships", for
+    /// the same reason the readout's does.
+    std::string getCoordinateColor() const { std::lock_guard<std::mutex> lock(mutex); return coordinateColor; }
+    void setCoordinateColor(const std::string& value);
+
     /// Column letters and row numbers printed on the board's margins. Off by
     /// default: this board is unusually pretty and the labels are a study aid,
     /// not part of the object.
@@ -216,6 +221,7 @@ private:
     bool coordinates = false;
     std::string evaluationAlign = "center";
     std::string evaluationColor;
+    std::string coordinateColor;
 
     // Last SGF
     std::string lastSgfPath;

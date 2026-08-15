@@ -186,6 +186,10 @@ comment could not be asserted at all. `""` means the empty string, since a value
 is required and an absent one cannot be told from a typo: `expect comment ""`.
 Runs of whitespace cannot be expressed, though: the value is re-joined from the
 split tokens with single spaces, so `a  b` and `a b` are the same expectation.
+Neither can `#`, anywhere on a line: everything from the first one is stripped as
+a comment. Hex colours therefore go in hash-less — `coordinate_color 202020c0`,
+which the parser accepts — and cannot be asserted at all, since the state keys
+report the canonical `#rrggbbaa` form. Unit tests cover that round trip instead.
 
 Confirmation prompts are scriptable: `board_size <n>` and `handicap <n>` take
 the same route as the dropdowns, so they ask before replacing a game worth
@@ -310,8 +314,8 @@ For the diegetic readout: `eval_on_board` (the toggle), `eval_align`
 composed string. The glyphs are never drawn in a headless run, so that string is
 the only way to check the readout's *content* — which colour leads, how the score
 is written. Both report what was last **drawn**, so they need `wait_until` rather
-than `expect` right after a toggle. `coordinates_shown` covers the board's
-coordinate labels, which are independent of any engine.
+than `expect` right after a toggle. `coordinates_shown` and `coord_color` cover the
+board's coordinate labels, which are independent of any engine.
 Note that the mock always proposes the first two empty points in scan order, so a
 scenario testing a collision has to play *there* — A1 and B1 — for a suggestion
 and a recorded move to meet.

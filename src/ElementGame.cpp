@@ -572,6 +572,12 @@ void ElementGame::performDeferredInitialization() {
             view.setReadoutColor(*parsed);
         }
     }
+    const std::string coordInk = UserSettings::instance().getCoordinateColor();
+    if (!coordInk.empty()) {
+        if (auto parsed = parseHexColor(coordInk)) {
+            view.setCoordinateColor(*parsed);
+        }
+    }
 
     // Invalidate view state to force OnUpdate to sync all dropdowns
     // (model and view start with identical defaults, so diffs won't fire otherwise)

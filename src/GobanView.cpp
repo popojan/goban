@@ -939,10 +939,13 @@ void GobanView::updateFloatingLabels() {
 			if (readoutAlign == TextAlign::Right) anchorCol = lastCol;
 
 			std::ostringstream text;
-			text << (report->winrateBlack >= 0.5 ? "B " : "W ")
-			     << static_cast<int>(std::lround(
-			            (report->winrateBlack >= 0.5 ? report->winrateBlack
-			                                         : 1.0 - report->winrateBlack) * 100.0))
+			// Anchored to Black, always — the same convention the panel uses,
+			// and chess's for the same reason: a figure that keeps its side is
+			// comparable across moves, so "62% then 48%" reads as the swing your
+			// move caused. Naming whoever leads instead never drops below 50%
+			// and hides exactly that. The score below keeps Go's own convention
+			// of naming the leader, because that is how a result is written.
+			text << "B " << static_cast<int>(std::lround(report->winrateBlack * 100.0))
 			     << "%";
 			if (report->scoreLeadBlack) {
 				const double lead = *report->scoreLeadBlack;
@@ -1008,6 +1011,12 @@ void GobanView::setReadoutColor(const glm::vec4& color) {
 	// The stale ink shadows it until it is set explicitly — otherwise changing
 	// the colour would silently leave the stale one at the old value.
 	if (!haveStaleInk) readoutStaleInk = color;
+	requestRepaint(UPDATE_OVERLAY);
+}
+
+void GobanView::setCoordinateColor(const glm::vec4& color) {
+	if (coordinateInk == color) return;
+	coordinateInk = color;
 	requestRepaint(UPDATE_OVERLAY);
 }
 

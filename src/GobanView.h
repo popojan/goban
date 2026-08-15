@@ -212,6 +212,10 @@ public:
     /// two-level arrangement as the camera, and for the same reason.
     void setReadoutColor(const glm::vec4& color);
     void setReadoutStaleColor(const glm::vec4& color);
+    /// The coordinate labels' ink, same two-level arrangement as the readout's:
+    /// `annotations.coordinate_color` ships it, `coordinate_color` overrides it.
+    void setCoordinateColor(const glm::vec4& color);
+    [[nodiscard]] const glm::vec4& coordinateColor() const { return coordinateInk; }
     [[nodiscard]] const glm::vec4& readoutColor() const { return readoutInk; }
 
     /// Column letters along the top margin and row numbers down the left, in

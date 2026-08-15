@@ -385,6 +385,12 @@ of its decisions, and `tests/test_analysis.cpp` plus
   numbers were true for a position no longer shown — and is dimmed rather than
   blanked, because blanking would flicker once per move. Same distinction as
   `Engine::final_score()`'s `std::optional`.
+- **The win rate is anchored to Black on both surfaces; the score names the
+  leader on both.** Anchoring is chess's convention and it is what makes a figure
+  comparable across moves — "62% then 48%" reads as the swing your move caused,
+  where naming whoever leads never drops below 50% and hides exactly that. The
+  score keeps Go's own convention because that is how a result is written, and it
+  matches `RE` and the message line.
 - **Everything is converted to Black's frame of reference at parse time.**
   Engines report for the side to move, so raw numbers flip every move and read as
   noise. Same shape as the prisoner counts that shipped swapped.
