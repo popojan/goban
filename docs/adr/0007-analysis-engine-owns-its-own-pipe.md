@@ -416,49 +416,20 @@ now in the narrow way decision 13's scope allows — `availableActions()` refuse
 the toggle while `tsumegoMode` is set, since an overlay that stars the correct
 move solves the puzzle.
 
-### Correction, 2026-08-15: the board annotations need no rendering work
+### Correction, 2026-08-15
 
-Decision 13's aside — that "the half that remains, the two-layer glyphy overlay,
-gates only the on-board move labels" — is **wrong**, and so is the
-`backlog/issue-49-realtime-analysis.md` section it came from. Both halves of that
-document's "Prerequisites: Rendering Infrastructure" were already implemented
-before this ADR was written; the aside was taken from the backlog on trust
-instead of from the code. The decision itself is unaffected: numbers first is
-still right, for the independent reason that they are the risky part to get in
-front of real use.
+Decision 13's aside — that a "two-layer glyphy overlay" refactor still gates the
+on-board labels — is wrong, and so is the `backlog/issue-49` section it was
+copied from without checking. Both halves were built before this ADR:
+`Board::setBoardOverlay()` writes text onto an empty point and hides the grid
+under it, and `GobanOverlay::draw(model, cam, which)` is already the two-pass
+split (`GobanView.cpp:411`, `:422`). `updateNavigationOverlay()` uses both today.
+The decision itself — numbers first — is unaffected.
 
-What exists today:
-
-- `Board::setBoardOverlay(pos, text)` / `removeBoardOverlay(pos)` put text on an
-  **empty** point at layer 0, set the material to `mAnnotation`, and re-centre
-  the patch on the intersection. `updateStone()` restores it when a stone is
-  lifted.
-- The shader draws `cidAnnotation` as a board-coloured patch of radius 0.4 —
-  larger than territory's 0.25 precisely so it covers the grid cross — shaded
-  identically to the board (`mm0 = idBoard`, `ipp.a = vec2(0.0)`).
-- `GobanOverlay::draw(model, cam, which)` is **already the two-pass split**.
-  `which == 0` draws layer 0 alone at depth 0.6 and is called before
-  `glUseProgram(0)`; `which == 1` draws layers 1–2 at depth 0.4 and is called
-  after (`GobanView.cpp:411`, `:422`).
-- `GobanView::updateNavigationOverlay()` already writes multi-character labels
-  (`3a`, `3b`) onto empty points for every variation, already yields to explicit
-  SGF markup, and already tracks what it wrote so it can clear it.
-
-So Stage 2 is a writer, not a redesign. What it actually needs:
-
-1. **A third claimant rule.** Analysis labels, next-move labels and SGF markup
-   compete for the same empty points, and the best move is very often already a
-   recorded variation. Markup already beats variations; where analysis sits is a
-   decision, not a rendering problem.
-2. **A label that fits.** One or two characters sit inside the 0.4 patch. Note
-   that the glyph atlas is preloaded with a fixed string (`GobanOverlay.cpp:59`)
-   that contains no `%`, so a visit percentage needs that string extended.
-3. **Colour, which is the one real limitation.** `layers[0]` is a single opaque
-   black, so every board-level label is black and quality cannot be colour-coded.
-   Two routes: a fourth layer and another pass, or a fractional offset on the
-   material channel in the manner of `mDeltaCaptured`, tinting the patch. The
-   second is the same mechanism open question 1 needs for ownership, so the two
-   should be decided together rather than separately.
+Also: open question 1 says the board carries "one float per point". It carries
+four; `iStones` is a `vec4` whose `.w` (stone rotation) is unread wherever there
+is no stone. That does not help on occupied points, which is where an ownership
+map matters most.
 
 ## What this does not change
 
