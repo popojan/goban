@@ -170,11 +170,35 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
             spdlog::info("Setting [{}] engine as trusted kibitz.", players[id]->getName());
         }
 
+        // The analysis role is configuration, not an index — see analysisConfig().
+        if (botConfig.value("analysis", 0) && !analysisBotSet) {
+            analysisBot = botConfig;
+            analysisBotSet = true;
+        }
+        if (botConfig.value("kibitz", 0) && !kibitzBotSet) {
+            kibitzBot = botConfig;
+            kibitzBotSet = true;
+        }
+
         return engine;
     } catch (const std::exception& e) {
         spdlog::error("Failed to load engine '{}': {}", name.empty() ? command : name, e.what());
         return nullptr;
     }
+}
+
+std::optional<nlohmann::json> PlayerManager::analysisConfig() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!analysisBotSet && !kibitzBotSet) return std::nullopt;
+
+    nlohmann::json bot = analysisBotSet ? analysisBot : kibitzBot;
+    if (bot.contains("analysis_command")) {
+        bot["command"] = bot["analysis_command"];
+    }
+    if (bot.contains("analysis_parameters")) {
+        bot["parameters"] = bot["analysis_parameters"];
+    }
+    return bot;
 }
 
 void PlayerManager::beginLoading(const std::string& name) {

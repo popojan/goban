@@ -66,6 +66,11 @@ struct UiInputs {
     bool scoredEnd         = false;
     bool hasMoves          = false;
     bool hasUnsavedChanges = false;
+    /// An engine nominated itself for the analysis role and has not been found
+    /// incapable. False means the evaluation overlay is not offered at all —
+    /// which is the stock configuration, where nothing carries "kibitz" and the
+    /// only engine is a GNU Go that cannot analyse (ADR-0007 decision 3).
+    bool evaluationAvailable = false;
 };
 
 /// Phrased as "enabled when", deliberately: the call sites and the tests then
@@ -80,6 +85,7 @@ struct UiActions {
     bool territory = false;
     bool clear     = false;
     bool save      = false;
+    bool evaluation = false;  ///< Toggle the live evaluation overlay.
 };
 
 UiActions availableActions(const UiInputs& in);

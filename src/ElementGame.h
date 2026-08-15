@@ -14,6 +14,7 @@
 #ifndef ROCKETINVADERSELEMENTGAME_H
 #define ROCKETINVADERSELEMENTGAME_H
 
+#include "AnalysisService.h"
 #include "GobanControl.h"
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/EventListener.h>
@@ -75,6 +76,10 @@ public:
     // Game settings dropdowns (board/komi/handicap) are synced automatically in OnUpdate
     GobanControl& getController() { return control; }
     GameThread& getGameThread() { return engine; }
+    /// The live evaluation overlay's engine and thread. Owned here because this
+    /// object owns the graph; declared after `engine` so it is destroyed first
+    /// and cannot outlive the predicate it reads. See ADR-0007.
+    AnalysisService& getAnalysis() { return analysis; }
     /// Async engine loading has finished. Scenario scripts must not issue game
     /// commands before this, since players are not yet assigned.
     [[nodiscard]] bool areEnginesLoaded() const { return enginesLoaded; }
@@ -121,6 +126,7 @@ private:
     GobanModel model;
     GobanView view;
     GameThread engine;
+    AnalysisService analysis;
     GobanControl control;
     std::mutex mutex;
 
@@ -159,6 +165,13 @@ private:
     /// The four prisoner labels, written from one place so the two callers
     /// cannot disagree about which colour took which stones — they did.
     void syncPrisonerLabels();
+
+    /// The evaluation panel — a third display surface, and the first one that
+    /// carries *state* rather than events. `#lblMessage` shows things that
+    /// happened once; this shows a value that is continuously true, which is why
+    /// it could not go there. See ADR-0007 decision 11.
+    void syncEvaluationPanel();
+
     bool logPanelOpen{false};
     uint64_t logVersionShown{0};
     std::string statusTextShown;

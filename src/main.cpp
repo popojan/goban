@@ -720,9 +720,22 @@ int main(int argc, char** argv)
                 // instead — long enough not to spin, short enough to keep the
                 // run brisk.
                 glfwWaitEventsTimeout(0.005);
-            } else {
+            } else if (!AppState::ExitRequested() && !glfwWindowShouldClose(window)) {
                 // Nothing to render - wait for next event instead of busy-polling
                 // Use timeout if FPS display needs one more update to show "0"
+                //
+                // The exit check is not redundant with the loop condition above.
+                // RequestExit() is set from *inside* this iteration — by a
+                // finished scenario a few lines up, or by the quit command — and
+                // the condition is not re-evaluated until we come back round. So
+                // an unconditional wait here blocks for an event that will never
+                // arrive, and the process hangs on the way out.
+                //
+                // It stayed latent because the thing that ends a run normally
+                // dirties the view, making needsRender() true. A scenario that
+                // ends on a clean frame does not, and the live evaluation overlay
+                // produces exactly that: its publish gate deliberately requests no
+                // repaint when the displayed values have not changed.
                 double timeout = gameElement ? gameElement->getIdleTimeout() : -1.0;
                 if (timeout > 0) {
                     glfwWaitEventsTimeout(timeout);

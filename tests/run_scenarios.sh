@@ -71,6 +71,26 @@ for scn in "${scenarios[@]}"; do
     # Every scenario starts from an empty games folder — see above.
     rm -rf "$SCENARIO_GAMES"
 
+    # A scenario may ask for a different bot list with a `# config: <file>` line
+    # in its first few lines, resolved relative to tests/scenarios. Without this
+    # the suite has one config for the whole run, so anything needing a
+    # differently configured engine could only be run by hand with
+    # GOBAN_SCENARIO_CONFIG — which means the documented one-command suite would
+    # silently not cover it. An explicit override on the command line still wins.
+    scn_config="$CONFIG"
+    if [ -z "${GOBAN_SCENARIO_CONFIG:-}" ]; then
+        want="$(sed -n 's/^# *config: *//p' "$scn" | head -1)"
+        if [ -n "$want" ]; then
+            scn_config="$ROOT/tests/scenarios/$want"
+            if [ ! -f "$scn_config" ]; then
+                echo "FAIL (missing config $want)"
+                fail=$((fail + 1))
+                failed_names+=("$name")
+                continue
+            fi
+        fi
+    fi
+
     # Seed the throwaway settings with sound off. Stone sounds are pointless in
     # an automated run, and a CI box has no audio device — Pa_Initialize()'s
     # return value is not checked, so it is better not to open a stream at all.
@@ -79,7 +99,7 @@ for scn in "${scenarios[@]}"; do
     # --script implies a throwaway user.json, but pass one explicitly so
     # concurrent runs cannot collide.
     timeout 120 "$GOBAN" \
-        --config "$CONFIG" \
+        --config "$scn_config" \
         --script "$scn" \
         --user-settings "$WORK/${name}.user.json" \
         --verbosity info \

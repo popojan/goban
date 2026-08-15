@@ -133,7 +133,6 @@ private:
 
     // Tree traversal helpers (SGF as single source of truth)
     [[nodiscard]] size_t getTreeDepth() const;  // Depth from root to currentNode
-    [[nodiscard]] std::vector<Move> getPathFromRoot() const;  // All moves from root to currentNode
     [[nodiscard]] bool isAtRoot() const;  // currentNode is root or setup-only ancestor
 
     // FF[3] compat: find the effective root (skip empty/setup-only nodes from root)
@@ -203,6 +202,15 @@ public:
 
     // Remove RE (result) property from root node
     void removeGameResult() const;
+
+    /// Every move from the root to the cursor, in order.
+    ///
+    /// Public for one caller: `GobanModel::publishSnapshot()`, which copies it
+    /// into `GameSnapshot::pathMoves` so the analysis thread can reach the
+    /// position on screen without walking this tree (ADR-0006, ADR-0007). It is
+    /// a tree read like every other const accessor here, and carries the same
+    /// obligation — only whoever owns the record may call it.
+    [[nodiscard]] std::vector<Move> getPathFromRoot() const;
 
     // Multi-variation support
     [[nodiscard]] std::vector<Move> getVariations() const;

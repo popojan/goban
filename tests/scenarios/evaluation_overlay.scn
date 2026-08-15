@@ -1,0 +1,80 @@
+# config: mock-eval.json
+#
+# The live evaluation overlay (ADR-0007), end to end: it starts lazily, it
+# follows the *review cursor* rather than the game position, and its numbers are
+# in Black's frame of reference whoever is to move.
+#
+# The bot list is the shape the ADR is about: one engine entry carrying both
+# "main" and "kibitz", whose playing instance is started with --no-analyze and
+# whose analysis instance inherits the same command with analysis_parameters
+# applied. Two processes from one configuration — which is the decision.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/evaluation_overlay.scn
+
+new_game 9
+wait_idle
+expect board_size 9
+
+# Both sides human. The default assignment puts the mock on White, and an engine
+# that answers every move would advance the position past the one being asserted
+# on — the colour to move is the whole point here.
+switch_player white Human
+wait_idle
+expect white_player Human
+
+# Off by default, and nothing has been spawned. `can_evaluation` says an engine
+# nominated itself; `eval_state` says nothing is running yet.
+expect can_evaluation true
+expect eval_enabled false
+expect eval_state disabled
+
+# Enabling is what starts the process — the second set of weights is never
+# loaded during startup, which is the one window where the renderer and an
+# engine reliably contend.
+toggle_evaluation on
+expect eval_enabled true
+wait_until eval_state running
+
+# Black is to move on an empty board, and the mock reports 0.6 for the side to
+# move. Asserting 60 here and 40 below is the whole frame-of-reference rule:
+# raw numbers would read 60 both times and flip the bar every move.
+wait_until eval_winrate 60
+expect eval_has_score true
+expect eval_stale false
+
+# A move makes it White's turn, so the same engine report must now display as
+# Black 40%. This is also the first position change, so it exercises the
+# incremental sync: one `play`, not a replay.
+click 2 2
+click 2 2
+wait_idle
+wait_until eval_winrate 40
+expect move_count 1
+
+click 4 4
+click 4 4
+wait_idle
+wait_until eval_winrate 60
+expect move_count 2
+
+# The point of a separate process: navigating back re-analyses the position
+# under the cursor, rather than leaving the overlay describing the end of the
+# game. After one step back it is White to move again.
+navigate_back
+wait_idle
+expect view_position 1
+wait_until eval_winrate 40
+expect eval_stale false
+
+navigate_end
+wait_idle
+expect at_end true
+wait_until eval_winrate 60
+
+# Switching it off stops the process and takes the numbers away entirely. Absent
+# rather than a placeholder: eval_winrate reads -1, because a bar resting at 50%
+# cannot be told from a genuine even game.
+toggle_evaluation off
+wait_until eval_state disabled
+expect eval_enabled false
+expect eval_winrate -1

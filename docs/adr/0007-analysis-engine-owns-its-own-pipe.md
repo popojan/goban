@@ -1,11 +1,11 @@
 # ADR-0007: Continuous analysis runs in a process of its own, configured from the kibitz engine
 
-**Status:** Proposed
+**Status:** Accepted — Stage 1 implemented 2026-08-15
 **Date:** 2026-08-14
 **Revised:** 2026-08-14 — the six open questions are resolved into decisions
-7–15; three narrower ones are left open. Revising in place is allowed only
-because this ADR is still `Proposed`; once it is `Accepted` the append-only rule
-in [README](README.md) applies.
+7–15; three narrower ones are left open. That was the last edit: from `Accepted`
+onwards the append-only rule in [README](README.md) applies, and the
+implementation log below is additive.
 
 ## Context
 
@@ -355,6 +355,66 @@ remain, and none of them blocks the numbers-only first stage.
    *redraw* rate; the engine-side `maxVisits` and report interval that keep a
    live search from saturating a device are a measurement question on real
    hardware, not an argument. Settle them with numbers.
+
+## Implementation log — Stage 1, 2026-08-15
+
+Win rate and score, no board annotations, as decision 13 scoped it. The feature
+is called **Evaluation** in the interface, deliberately not "analysis": that word
+was already spent on `GameMode::ANALYSIS`, which changes who plays.
+
+`src/AnalysisService.{h,cpp}` in `goban_core`, owned by `ElementGame` and
+declared after `engine` so it is torn down first. `GtpClient` gained
+`streamCommand()`, `stopStreaming()` and `setQuiet()`; `GameSnapshot` gained
+`positionId`, `pathMoves`, `komi` and the setup stones; `GameThread` gained
+`analysisMayRun()`; `PlayerManager` records the analysis bot's configuration.
+
+**Where the plan was wrong, and what was done instead:**
+
+- **The position is polled, not observed.** The plan had the service subscribe to
+  the position-change signal. `GobanModel::onBoardChange()` both publishes the
+  snapshot *and* fans out to observers, so an observer's position in that list
+  decides whether it sees the new snapshot or the old one — a correctness
+  question answered by a registration order nothing else depends on. Polling
+  `snapshot()` on the loop's 100 ms tick makes latest-wins automatic and the
+  ordering irrelevant, and 100 ms is invisible next to the 200 ms debounce.
+
+- **`scoreLead` had to move into the per-move block, and `order` had to default
+  to -1.** Both were found by the first run of `tests/test_analysis.cpp`, and
+  both are the same underlying mistake — assuming a key's position in the line.
+  KataGo emits `scoreLead` *before* `order`, so a report-level "keep the one from
+  the best block" test reads `order` while it is still at its default and the
+  last block parsed wins. And defaulting `order` to 0 makes "the engine did not
+  say" indistinguishable from "this is the best move", so the most-visited
+  fallback could never fire. This is why the parser tests assert on a line with
+  the extension keys interleaved rather than on a tidy one.
+
+- **A pre-existing hang in the main loop, made reachable here.** `main()` sets
+  `AppState::RequestExit()` from inside a loop iteration and then, with nothing
+  to render, blocks in `glfwWaitEvents()` for an event that will never arrive;
+  the loop condition is not re-evaluated until the next iteration. Latent for as
+  long as it has existed, because whatever ends a run normally dirties the view.
+  Decision 14's publish gate requests *no* repaint when the displayed values have
+  not changed, which is precisely a clean frame — so a scenario ending while the
+  overlay was running hung for the full 120 s harness timeout. Fixed in
+  `main.cpp` by not entering the blocking wait once an exit is requested. Found
+  by `evaluation_overlay.scn`, diagnosed from a thread dump.
+
+- **A third status branch was needed, and a fourth string was not.** The existing
+  loading indicator is gated on `enginesLoaded`, which is long true by the time
+  the user enables this, so the analysis engine could not reuse that branch. It
+  does reuse the *template*: "Loading <engine>…" is exactly what is happening, and
+  it costs no new string in five languages.
+
+- **`run_scenarios.sh` learned a `# config:` directive.** The harness had one bot
+  list per run, so the two-processes-from-one-configuration case could only have
+  been run by hand — meaning the documented one-command suite would silently not
+  cover the feature.
+
+Not done, and unchanged from the three open questions above: on-board move
+labels, ownership shading, and the visit-budget numbers. Tsumego is settled for
+now in the narrow way decision 13's scope allows — `availableActions()` refuses
+the toggle while `tsumegoMode` is set, since an overlay that stars the correct
+move solves the puzzle.
 
 ## What this does not change
 

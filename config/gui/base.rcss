@@ -270,6 +270,58 @@ div.template {
   padding-top: 0.25rem;
 }
 
+/* Live evaluation (ADR-0007)
+ *
+ * The third display surface, and the first that carries *state* — a value that
+ * is continuously true — rather than *events*. #lblMessage is full-width along
+ * the bottom and carries results, comments and prompts; this sits above its
+ * right end, in the last corner nothing else claims. As with #grpStatus,
+ * everything about where it lives is this one rule.
+ *
+ * It is hidden whenever there is nothing truthful to show. There is deliberately
+ * no empty state: a bar resting at the middle cannot be told from a genuine
+ * even game.
+ */
+#grpAnalysis {
+  position: absolute;
+  bottom: 2.2rem;    /* clears .message-container along the bottom edge */
+  right: 0px;
+  width: 22%;
+  z-index: 2;
+  display: none;
+  padding: 0.3rem 0.5rem;
+  background-color: #000000b0;
+}
+#grpAnalysis.show { display: block; }
+/* Stale: the numbers were true for a position that is no longer on screen, or
+   the search has yielded the device to a playing engine. Dimming says so
+   without blanking — blanking would flicker once per move. */
+#grpAnalysis.stale { opacity: 0.45; }
+
+/* The bar reads left to right as Black's share of the win rate. Its own
+   background is White's, so the split needs no legend and no second element to
+   keep in step. */
+#barEval {
+  display: block;
+  height: 0.5rem;
+  background-color: #e8e8e8d0;
+}
+#barEvalFill {
+  display: block;
+  height: 0.5rem;
+  background-color: #181818e0;
+  width: 50%;        /* replaced every update; the value here is never shown */
+}
+#lblEvalWinrate, #lblEvalScore {
+  display: block;
+  /* The 25pt body size is for menu labels read at a glance; these are read
+     deliberately, like the log. */
+  font-size: 11pt;
+  line-height: 1.4;
+  text-align: center;
+  color: #ffffffd0;
+}
+
 /* Positioning utilities */
 .bottom { position: absolute; bottom: 0px; left: 0px; right: 0px; }
 

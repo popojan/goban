@@ -20,6 +20,7 @@
 #include <array>
 #include <mutex>
 #include <memory>
+#include <optional>
 #include <functional>
 #include "player.h"
 #include "GameObserver.h"
@@ -95,6 +96,21 @@ public:
     // Load a single engine from JSON config entry, returns engine or nullptr on failure
     Engine* loadSingleEngine(const nlohmann::json& botConfig);
 
+    /// The bot configuration a dedicated analysis process should be built from,
+    /// or nullopt when no enabled engine nominated itself (ADR-0007 decision 2).
+    ///
+    /// Resolution is `"analysis": 1`, else `"kibitz": 1`, else nothing — and
+    /// deliberately *not* a fallback to the coach, which on a stock config is
+    /// GNU Go and cannot analyse anyway. There is no index here because there is
+    /// no `Player`: the analysis engine is a second process built from the same
+    /// configuration, never registered with `addEngine()`, so it cannot reach the
+    /// player dropdowns or `syncOtherEngines()`.
+    ///
+    /// `analysis_command` and `analysis_parameters` are substituted over
+    /// `command` and `parameters` when present, which is what lets the analysis
+    /// instance run a CPU backend while the playing engine keeps the GPU.
+    [[nodiscard]] std::optional<nlohmann::json> analysisConfig() const;
+
     // Special indices
     size_t getHumanIndex() const { return human; }
     size_t getCoachIndex() const { return coach; }
@@ -125,6 +141,15 @@ private:
     /// since some engine is better than none.
     bool coachConfigured{false};
     bool kibitzConfigured{false};
+    /// The two candidates for the analysis role, kept as configuration rather
+    /// than as an index. Both are recorded because engines load in parallel and
+    /// in arbitrary order, so the kibitz engine may well be seen before the one
+    /// carrying "analysis" — deciding on first sight would make the winner
+    /// depend on which process started faster.
+    nlohmann::json analysisBot;
+    nlohmann::json kibitzBot;
+    bool analysisBotSet{false};
+    bool kibitzBotSet{false};
     size_t numPlayers{0};
     std::array<size_t, 2> activePlayer{0, 0};
 

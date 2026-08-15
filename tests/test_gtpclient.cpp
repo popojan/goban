@@ -228,3 +228,72 @@ TEST_CASE("stderr output is captured and passed through the filters") {
     // before the client is torn down.
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
+
+TEST_CASE("an analysis stream delivers lines and stops cleanly") {
+    // The failure this guards against is not "the stream does not work" but
+    // "the stream leaves the pipe out of step". issueCommand() reads to the
+    // blank line that ends a response; an analysis command does not send one
+    // until it is stopped, so anything left unread would be delivered as the
+    // *next* command's reply — silently wrong results rather than an error.
+    quietLogging();
+    auto client = makeClient("--analyze-interval-ms 20");
+    REQUIRE(GtpClient::success(client->issueCommand("boardsize 9")));
+
+    std::vector<std::string> lines;
+    const bool ok = client->streamCommand("kata-analyze B 2", [&](const std::string& line) {
+        lines.push_back(line);
+        return lines.size() < 3;   // three reports is enough to prove it streams
+    }, 5000);
+
+    CHECK(ok);
+    REQUIRE(lines.size() == 3);
+    CHECK(lines.front().rfind("info move", 0) == 0);
+
+    CHECK(client->stopStreaming(5000));
+
+    // The point of the whole exercise: an ordinary command afterwards gets its
+    // own answer, not the tail of the stream.
+    CHECK(body(client->issueCommand("name")) == "MockGtp");
+    CHECK(body(client->issueCommand("protocol_version")) == "2");
+}
+
+TEST_CASE("an engine that cannot analyse refuses the stream without wedging") {
+    quietLogging();
+    auto client = makeClient("--no-analyze");
+    REQUIRE(GtpClient::success(client->issueCommand("boardsize 9")));
+
+    bool called = false;
+    const bool ok = client->streamCommand("kata-analyze B 2", [&](const std::string&) {
+        called = true;
+        return false;
+    }, 2000);
+
+    CHECK_FALSE(ok);
+    CHECK_FALSE(called);
+    // Refused, not broken: the client is still usable.
+    CHECK(client->stopStreaming(5000));
+    CHECK(body(client->issueCommand("name")) == "MockGtp");
+}
+
+TEST_CASE("list_commands is how analysis capability is discovered") {
+    // Not the engine's name. `GtpEngine::supportsKataAnalyze()` substring-matches
+    // "kata" in the reported name, which is wrong in both directions: a KataGo
+    // fork named otherwise, and a mock called "kata-something" that cannot.
+    quietLogging();
+    auto capable = makeClient("--name NotAKataGo");
+    const auto commands = capable->issueCommand("list_commands");
+    REQUIRE(GtpClient::success(commands));
+    bool found = false;
+    for (const auto& line : commands) {
+        if (line == "kata-analyze") found = true;
+    }
+    CHECK(found);
+
+    auto incapable = makeClient("--name katago-lookalike --no-analyze");
+    const auto fewer = incapable->issueCommand("list_commands");
+    REQUIRE(GtpClient::success(fewer));
+    for (const auto& line : fewer) {
+        CHECK(line != "kata-analyze");
+        CHECK(line != "lz-analyze");
+    }
+}

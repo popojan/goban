@@ -99,6 +99,17 @@ printf 'boardsize 9\ngenmove B\nquit\n' | ./cmake-build-release/mock_gtp_engine 
 | `--unknown <cmd>` | Report `<cmd>` as an unknown command, to exercise graceful degradation |
 | `--log <file>` | Record every command received, to assert what the app sent |
 | `--stderr-file <p>` | Emit a file's contents on stderr before each `genmove`, to test the `config/*.json` regex filters |
+| `--no-analyze` | Drop `lz-analyze` / `kata-analyze` from `list_commands` and refuse them, to exercise the degrade-to-absent path |
+| `--analyze-interval-ms <n>` | How often the analysis stream reports when the command does not say (default 100) |
+| `--analyze-winrate <f>` / `--analyze-score <f>` | The fixed values the stream reports, **from the side to move's point of view** |
+
+The analysis stream is the one place the mock is not request/response: it writes
+the success header with *no* terminating blank line, reports until any input
+line arrives, and only then closes the response. That is the shape a real
+analysis engine has, and the reason `GtpClient` needs `streamCommand()` rather
+than `issueCommand()`. The fixed win rate is reported for the side to move, so a
+test asserting 60 with Black to move and 40 with White to move is checking the
+client's conversion to Black's frame of reference.
 
 `GtpClient` splits its configured parameter string on whitespace, so a
 multi-word option value cannot survive as a single argument. `--script` absorbs
@@ -259,6 +270,21 @@ refusal apart from an action that legitimately had nothing to do.
 
 Add a key there and every scenario can assert on it.
 
+Plus the live evaluation overlay: `eval_enabled` (the toggle), `eval_state`
+(`disabled`/`starting`/`unavailable`/`yielded`/`running`), `eval_winrate` (an
+integer percentage **for Black**, or `-1` when there is no report),
+`eval_has_score`, `eval_score`, `eval_moves`, `eval_stale` and `can_evaluation`.
+**Wait on `eval_state`, not `eval_enabled`**: the toggle flips the instant it is
+pressed, long before a process has started or a number has arrived. And
+`eval_winrate` is `-1` rather than `50` when nothing has been computed, for the
+same reason `Engine::final_score()` returns an optional — a bar resting at the
+midpoint cannot be told from a genuine even game.
+
+The overlay is deliberately **not** part of `isIdle()`, so `wait_idle` says
+nothing about it. An analysis stream never finishes on its own; treating it as
+work-in-flight would make quiescence unreachable, exactly as `EngineSync::Unsynced`
+would.
+
 Plus the message log: `log_count`, `log_unseen`, `log_open`, `log_badge`
 (`none`/`warning`/`error`) and `engine_loading` (the engine the status indicator is naming, empty
 once loading is done). **Assert `log_badge`, not `log_count`** when you mean "the
@@ -289,6 +315,25 @@ engine carrying the flag, `currentCoach()` falls back to `players[0]` — under
 parallel loading, whichever of the two mock engines finished first. The suite ran
 that way for months; the coach being the fast mock rather than the slow one was
 luck, not design.
+
+A scenario that needs a different bot list declares it with a `# config: <file>`
+line, resolved relative to `tests/scenarios`:
+
+```
+# config: mock-eval.json
+```
+
+`tests/scenarios/mock-eval.json` configures one engine carrying both `main` and
+`kibitz` whose playing instance cannot analyse and whose analysis instance can —
+the two-processes-from-one-configuration shape ADR-0007 is about.
+`mock-noeval.json` is the same engine with no `analysis_parameters`, so the
+analysis instance inherits `--no-analyze` and the overlay degrades to absent.
+Without this directive the suite would have one config for the whole run, and
+anything needing a differently configured engine could only be run by hand — so
+`./tests/run_scenarios.sh` would silently not cover it.
+
+An explicit `GOBAN_SCENARIO_CONFIG` still overrides the directive, which is what
+makes the language sweep below work on every scenario.
 
 To run a scenario against another language's interface — worth doing after
 touching any `.rml`, since a missing element degrades silently to no display:

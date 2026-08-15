@@ -130,6 +130,27 @@ public:
     // Check if genmove is in progress (engine is thinking)
     bool isThinking() const;
 
+    /// Whether the continuous analysis stream may run right now (ADR-0007
+    /// decision 6). Read from the analysis thread; it touches no pipe.
+    ///
+    /// Written as more than `!isThinking()` on purpose. The game loop clears
+    /// `playerToMove` *before* its 500 ms inter-move sleep, so `isThinking()` is
+    /// false for that window on every move — a bare test would switch the stream
+    /// on and off once per move in a bot-versus-bot match, which is the
+    /// two-searches-at-once case this decision exists to prevent. Asking whether
+    /// an *engine is on move in a running loop* covers the sleep as well.
+    ///
+    /// The loop check matters in the other direction too: a loaded game paused
+    /// with an engine to move has nobody searching, and review is exactly when
+    /// the numbers are worth most.
+    [[nodiscard]] bool analysisMayRun() const;
+
+    /// Configuration for the dedicated analysis process, or nullopt when no
+    /// engine nominated itself. Forwarded from PlayerManager; see ADR-0007.
+    [[nodiscard]] std::optional<nlohmann::json> analysisConfig() const {
+        return playerManager->analysisConfig();
+    }
+
     /// Runs an action that *discards or replaces the current game* (new game,
     /// clear, load, switch game) as soon as no engine is mid-genmove.
     ///

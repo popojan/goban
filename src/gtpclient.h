@@ -142,6 +142,38 @@ public:
 
     CommandOutput issueCommand(const std::string &command);
 
+    /// Issues a command whose output streams indefinitely, delivering each line
+    /// to `onLine`. Returns false if the engine refused the command, the stream
+    /// went silent for `idleTimeoutMs`, or the pipe closed.
+    ///
+    /// `issueCommand()` cannot do this: it reads to the blank line that
+    /// terminates a GTP response, and an analysis stream does not send one until
+    /// it is told to stop. Returning false from `onLine` ends delivery; the
+    /// caller must then call `stopStreaming()` before issuing any ordinary
+    /// command. See ADR-0007 decision 15.
+    bool streamCommand(const std::string &command,
+                       const std::function<bool(const std::string &)> &onLine,
+                       int idleTimeoutMs);
+
+    /// Ends an in-flight stream and drains the pipe back to quiescence.
+    ///
+    /// There is no `stop` command in the lz/kata-analyze extension — *any* input
+    /// line terminates the stream — so this sends `name` and reads through both
+    /// the stream's closing blank line and that command's own response. Without
+    /// the drain, the next ordinary command would read the tail of the stream as
+    /// its own reply. Returns false if the engine never came back, which the
+    /// caller must treat the way a scoring timeout is treated: kill it.
+    bool stopStreaming(int timeoutMs);
+
+    /// Log this client's command traffic at debug rather than info.
+    ///
+    /// `last_run.log` at default verbosity is what a user attaches to a bug
+    /// report, and the per-command GTP trace is the most diagnostic thing in it.
+    /// A continuous analysis stream — plus a full position replay on every
+    /// navigation jump — would bury it, so the analysis client is quiet while the
+    /// playing engines stay loud.
+    void setQuiet(bool quiet) { quiet_ = quiet; }
+
     static bool success(const CommandOutput &ret);
 
     /// Kill the engine process immediately (unblocks any blocking readLine).
@@ -201,6 +233,8 @@ public:
 private:
     int commandTimeoutMs_ = DEFAULT_COMMAND_TIMEOUT_MS;
     int scoringTimeoutMs_ = DEFAULT_SCORING_TIMEOUT_MS;
+    /// Not atomic: set once at construction, before the owning thread starts.
+    bool quiet_ = false;
 };
 
 #endif // GTPCLIENT_H

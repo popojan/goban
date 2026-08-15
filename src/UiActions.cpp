@@ -65,5 +65,13 @@ UiActions availableActions(const UiInputs& in) {
     a.clear     = in.hasMoves;
     a.save      = in.hasUnsavedChanges;
 
+    // Deliberately free of every term above. The evaluation overlay is a
+    // display, not a move: it follows the review cursor, it is worth most on a
+    // finished game being reviewed, and it never touches a playing engine's
+    // pipe. The only question is whether there is an engine that can answer.
+    // Tsumego is the one exception — an overlay that stars the correct move
+    // solves the puzzle for the reader.
+    a.evaluation = in.evaluationAvailable && !in.tsumego;
+
     return a;
 }

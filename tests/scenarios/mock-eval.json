@@ -1,0 +1,22 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "Bot list for the evaluation-overlay scenarios. Two mocks with the same binary and different roles, which is the shape ADR-0007 is about: the analysis engine is configured from an engine that also plays, and is nevertheless a separate process. The analysis instance reports a fixed 0.6 win rate and a 2.5 point lead from the side to move's point of view, so a scenario can assert the client's conversion to Black's frame.",
+  "bots": [
+    {
+      "name": "mock",
+      "path": "./cmake-build-release",
+      "command": "mock_gtp_engine",
+      "parameters": "--no-analyze",
+      "enabled": 1,
+      "main": 1,
+      "kibitz": 1,
+      "analysis_parameters": "--analyze-interval-ms 50"
+    }
+  ],
+  "humans": [
+    "Human"
+  ],
+  "sgf_dialog": {
+    "games_path": "./tests/scenarios/.games"
+  }
+}

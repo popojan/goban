@@ -313,6 +313,14 @@ void GobanModel::publishSnapshot() {
         next->lastStoneMove       = lastStone;
         next->lastStoneMoveNumber = lastStoneNumber;
     }
+    // The analysis thread's share (ADR-0007). getPathFromRoot() walks the same
+    // cursor-to-root chain moveCount() already does, so this costs one more
+    // traversal per position change and nothing per frame.
+    next->positionId = ++positionCounter;
+    next->pathMoves  = game.getPathFromRoot();
+    next->komi       = state.komi;
+    next->setupBlack = setupBlackStones;
+    next->setupWhite = setupWhiteStones;
 
     std::lock_guard<std::mutex> lock(snapshotMutex);
     gameSnapshot = std::move(next);

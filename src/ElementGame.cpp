@@ -41,12 +41,17 @@ static std::string getTemplateText(Rml::Context* context, const std::string& tem
 ElementGame::ElementGame(const Rml::String& tag)
         : Rml::Element(tag),
           model(determineInitialBoardSize()),
-          view(model), engine(model),
+          view(model), engine(model), analysis(model, engine),
           control(this, model, view, engine)
 {
     // Register observers (doesn't require engines)
     engine.addGameObserver(&model);
     engine.addGameObserver(&view);
+
+    // The analysis thread publishes from its own thread and must not touch
+    // RmlUi; waking the renderer is all it is allowed to ask for, and it only
+    // asks when a displayed value actually changed (ADR-0007 decision 14).
+    analysis.setOnUpdate([this] { view.requestRepaint(); });
 
     // Game record creation deferred to loadEnginesParallel (after board size/komi/handicap known)
     // Engine loading is deferred to async thread - board renders immediately
@@ -295,6 +300,11 @@ double ElementGame::getIdleTimeout() const {
 }
 
 ElementGame::~ElementGame() {
+    // Before anything else: the analysis thread reads `model` and `engine` on
+    // every tick, so it has to be joined while both still exist. Member
+    // destruction order would do it, but only by accident of declaration order.
+    analysis.stop();
+
     // Wait for async engine loading to complete before destruction
     if (engineLoadFuture.valid()) {
         spdlog::debug("Waiting for engine loading to complete before destruction");
@@ -534,6 +544,12 @@ void ElementGame::performDeferredInitialization() {
 
     control.finishInitialization();
 
+    // Only now: the analysis role is resolved from the bot list, and nothing has
+    // claimed it until the loader threads have finished. The thread starts here;
+    // the *process* does not, and will not until the user asks for it.
+    analysis.start();
+    analysis.setEnabled(UserSettings::instance().getEvaluationEnabled());
+
     // Invalidate view state to force OnUpdate to sync all dropdowns
     // (model and view start with identical defaults, so diffs won't fire otherwise)
     view.state.komi = -1.0f;
@@ -563,7 +579,14 @@ void ElementGame::syncStatusIndicator() {
     if (!status) return;   // a translated .rml without the element degrades to silence
 
     auto& log = MessageLog::instance();
-    const std::string loading = enginesLoaded ? std::string() : engine.engineLoadingSummary();
+    std::string loading = enginesLoaded ? std::string() : engine.engineLoadingSummary();
+    // The analysis engine cannot use the branch above: it starts lazily, long
+    // after `enginesLoaded` has flipped, and loading a second set of network
+    // weights takes just as long. Same template — "Loading <engine>…" is exactly
+    // what is happening, and it needs no new string in five languages.
+    if (loading.empty()) {
+        loading = analysis.startingEngineName();
+    }
 
     std::string text;
     const char* severityClass = nullptr;
@@ -740,6 +763,60 @@ void ElementGame::syncPrisonerLabels() {
     for (const char* id : {"cntBlack", "lblPrisonersBlack"}) {
         if (auto* el = doc->GetElementById(id)) {
             el->SetInnerRML(Rml::CreateString(blackTpl.c_str(), blackHasTaken).c_str());
+        }
+    }
+}
+
+/// Writes the evaluation panel from the analysis thread's last report.
+///
+/// Two rules from ADR-0007 live here. **Never a placeholder** (decision 12): no
+/// report means the panel is hidden outright, because a bar resting in the
+/// middle because nothing has been computed cannot be told from a genuine even
+/// game — the same mistake as reading a failed score as zero. And the one case
+/// that is *stale* rather than absent — the numbers were true for a position
+/// that has since been left, or the search has yielded to a playing engine — is
+/// dimmed rather than blanked, since blanking would flicker once per move.
+void ElementGame::syncEvaluationPanel() {
+    auto context = GetContext();
+    if (!context) return;
+    auto doc = context->GetDocument("game_window");
+    if (!doc) return;
+    auto* panel = doc->GetElementById("grpAnalysis");
+    if (!panel) return;   // a translated .rml without the element degrades to silence
+
+    const auto report = analysis.report();
+    const bool show = report != nullptr;
+    if (panel->IsClassSet("show") != show) {
+        panel->SetClass("show", show);
+        panel->SetClass("hide", !show);
+    }
+    if (!show) return;
+
+    const bool stale = analysis.state() != AnalysisState::Running
+                       || report->positionId != model.snapshot()->positionId;
+    if (panel->IsClassSet("stale") != stale) {
+        panel->SetClass("stale", stale);
+    }
+
+    const int percent = static_cast<int>(std::lround(report->winrateBlack * 100.0));
+    if (auto* fill = doc->GetElementById("barEvalFill")) {
+        fill->SetProperty("width", Rml::CreateString("%d%%", percent).c_str());
+    }
+    if (auto* label = doc->GetElementById("lblEvalWinrate")) {
+        label->SetInnerRML(Rml::CreateString(
+            templateText("tplEvalWinrate", "B %d%%").c_str(), percent).c_str());
+    }
+    if (auto* label = doc->GetElementById("lblEvalScore")) {
+        // Absent rather than zero: `lz-analyze` has no score at all, and 0.0 is
+        // a legitimate result. Same distinction Engine::final_score() draws.
+        if (report->scoreLeadBlack) {
+            const double lead = *report->scoreLeadBlack;
+            const char* id = lead >= 0.0 ? "tplEvalScoreBlack" : "tplEvalScoreWhite";
+            const char* fallback = lead >= 0.0 ? "B+%.1f" : "W+%.1f";
+            label->SetInnerRML(Rml::CreateString(
+                templateText(id, fallback).c_str(), std::fabs(lead)).c_str());
+        } else {
+            label->SetInnerRML("");
         }
     }
 }
@@ -994,6 +1071,7 @@ void ElementGame::syncActionAvailability() {
     setElementDisabled("cmdTerritory",  !a.territory);
     setElementDisabled("cmdClear",      !a.clear);
     setElementDisabled("cmdSave",       !a.save);
+    setElementDisabled("cmdEvaluation", !a.evaluation);
 }
 
 void ElementGame::OnUpdate()
@@ -1030,6 +1108,18 @@ void ElementGame::OnUpdate()
             OnMenuToggle("toggle_territory", model.board.showTerritory);
         }
     }
+    // Sync the evaluation toggle. It can move without the menu being touched:
+    // the setting is restored at startup, and the service switches itself off
+    // when an engine turns out to be incapable.
+    {
+        auto* cmdEl = context->GetDocument("game_window")->GetElementById("cmdEvaluation");
+        const bool checked = analysis.isEnabled();
+        if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
+            OnMenuToggle("toggle_evaluation", checked);
+        }
+    }
+    syncEvaluationPanel();
+
     // Sync game mode menu toggle with engine state (analysis or tsumego)
     {
         auto doc = context->GetDocument("game_window");

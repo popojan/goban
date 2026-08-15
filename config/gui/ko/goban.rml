@@ -158,6 +158,7 @@
                         <div class="grp">
                             <div class="hr">점수</div>
                             <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">집</div>
+                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">형세</div>
                         </div>
                         <div class="grp">
                             <div class="hr">따낸 돌</div>
@@ -213,6 +214,16 @@
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
+        <!-- Live evaluation (ADR-0007). A third display surface on purpose: it
+             carries a value that is continuously *true*, where #lblMessage
+             carries things that *happened once*. Placement is one rule in
+             base.rcss (#grpAnalysis). -->
+        <div id="grpAnalysis" class="hide">
+            <div id="barEval"><div id="barEvalFill"></div></div>
+            <div id="lblEvalWinrate"></div>
+            <div id="lblEvalScore"></div>
+        </div>
+
         <!-- Status indicator and the log behind it. Placement is one rule in
              base.rcss (#grpStatus); nothing here depends on where it sits. -->
         <div id="grpStatus" class="top left">
@@ -237,6 +248,13 @@
     <div class="template" id="tplStatusMessages">× 메시지</div>
     <div class="template" id="tplStatusWarning">⚠ 메시지 (%d)</div>
     <div class="template" id="tplStatusError">⚠ 메시지 (%d)</div>
+
+    <!-- Live evaluation. Everything is in Black's frame of reference:
+         engines report for the side to move, so raw numbers flip every
+         move and read as noise. -->
+    <div class="template" id="tplEvalWinrate">흑 %d%%</div>
+    <div class="template" id="tplEvalScoreBlack">흑+%.1f</div>
+    <div class="template" id="tplEvalScoreWhite">백+%.1f</div>
 
     <!-- Status and command feedback -->
     <div class="template" id="templateKomi">덤: %.1f</div>

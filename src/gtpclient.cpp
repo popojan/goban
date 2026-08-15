@@ -815,6 +815,11 @@ GtpClient::CommandOutput GtpClient::version() {
     return issueCommand("version");
 }
 
+/// Where a client's ordinary command traffic is logged. See setQuiet().
+static spdlog::level::level_enum trafficLevel(bool quiet) {
+    return quiet ? spdlog::level::debug : spdlog::level::info;
+}
+
 GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
     CommandOutput ret;
     // Order matters: a timed-out engine must keep failing, whereas one shut
@@ -822,14 +827,14 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
     if (failed_) return {};
     if (terminated_) return {"= "};
 
-    spdlog::info("{1} << {0}", command, exe);
+    spdlog::log(trafficLevel(quiet_), "{1} << {0}", command, exe);
 
     if (!proc_->write(command + "\n")) {
         if (!terminated_) spdlog::error("Failed to write command");
         return terminated_ ? CommandOutput{"= "} : ret;
     }
 
-    spdlog::info("getting response...");
+    spdlog::log(trafficLevel(quiet_), "getting response...");
     bool error = true;
 
     std::string line;
@@ -861,7 +866,7 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
             }
         }
         if(!error) {
-            spdlog::info("{1} >> {0}", line, exe);
+            spdlog::log(trafficLevel(quiet_), "{1} >> {0}", line, exe);
         } else {
             spdlog::error("{} >> {} (command: {})", exe, line, command);
         }
@@ -870,6 +875,80 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
     }
     if (terminated_) return {"= "};
     return ret;
+}
+
+bool GtpClient::streamCommand(const std::string& command,
+                              const std::function<bool(const std::string&)>& onLine,
+                              int idleTimeoutMs) {
+    if (failed_ || terminated_) return false;
+
+    spdlog::log(trafficLevel(quiet_), "{1} << {0} (stream)", command, exe);
+    if (!proc_->write(command + "\n")) {
+        if (!terminated_) spdlog::error("{}: failed to write stream command", exe);
+        return false;
+    }
+
+    // The acknowledgement. An analysis stream opens with the ordinary GTP
+    // success header and only then starts reporting, so a '?' here means the
+    // engine does not know the command and there is nothing to drain.
+    std::string line;
+    if (proc_->readLine(line, idleTimeoutMs) != Process::ReadStatus::Ok) {
+        spdlog::warn("{}: no acknowledgement for '{}'", exe, command);
+        return false;
+    }
+    line.erase(line.find_last_not_of(" \n\r\t") + 1);
+    if (line.empty() || line[0] != '=') {
+        spdlog::warn("{} >> {} (stream command refused: {})", exe, line, command);
+        return false;
+    }
+
+    while (true) {
+        const Process::ReadStatus status = proc_->readLine(line, idleTimeoutMs);
+        if (status == Process::ReadStatus::Timeout) {
+            if (terminated_) return false;
+            spdlog::error("{}: analysis stream silent for {} ms", exe, idleTimeoutMs);
+            return false;
+        }
+        if (status == Process::ReadStatus::Eof) return false;
+
+        line.erase(line.find_last_not_of(" \n\r\t") + 1);
+        // The blank line closes the response, which only happens once something
+        // has stopped the stream from the other side.
+        if (line.empty()) return true;
+
+        spdlog::trace("{1} >> {0}", line, exe);
+        if (!onLine(line)) return true;
+    }
+}
+
+bool GtpClient::stopStreaming(int timeoutMs) {
+    if (failed_ || terminated_) return true;
+
+    if (!proc_->write("name\n")) {
+        if (!terminated_) spdlog::error("{}: failed to write stream stop", exe);
+        return false;
+    }
+
+    // Anything still in flight from the stream, then its closing blank line,
+    // then `name`'s own response and *its* blank line. Only the second blank
+    // means the pipe is quiescent, which is why a response has to be seen first.
+    bool sawResponse = false;
+    std::string line;
+    while (true) {
+        const Process::ReadStatus status = proc_->readLine(line, timeoutMs);
+        if (status != Process::ReadStatus::Ok) {
+            if (terminated_) return true;
+            spdlog::error("{}: did not answer within {} ms after stopping the "
+                          "analysis stream", exe, timeoutMs);
+            return false;
+        }
+        line.erase(line.find_last_not_of(" \n\r\t") + 1);
+        if (!line.empty() && (line[0] == '=' || line[0] == '?')) {
+            sawResponse = true;
+        } else if (line.empty() && sawResponse) {
+            return true;
+        }
+    }
 }
 
 bool GtpClient::success(const CommandOutput& ret) {

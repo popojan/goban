@@ -284,12 +284,18 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   buttons that disagreed with their commands before ADR-0005.
 
 ### Telling the User Something
-- **Two surfaces, and they do not overlap.** `#lblStatus` / `#pnlLog` (top left)
+- **Three surfaces, and they do not overlap.** `#lblStatus` / `#pnlLog` (top left)
   carry *application* status: which engine is still loading, and a badge for
   warnings and errors. `#lblMessage` (bottom, centre) carries *game* content —
-  results, SGF comments — plus command feedback and confirmation prompts. Loading
+  results, SGF comments — plus command feedback and confirmation prompts.
+  `#grpAnalysis` (bottom right) carries the live evaluation. Loading
   text used to live in `lblMessage`; it was unnamed, English in every language,
   and competing with four other claimants.
+- **The first two split on ownership; the third splits on tense.** `#lblMessage`
+  carries **events** — things that happened once, that scroll past.
+  `#grpAnalysis` carries **state** — a value that is continuously true and
+  repaints twice a second. That is why the evaluation could not join the message
+  box as a fifth claimant, and it is the rule any further surface has to answer.
 - **Diagnostics reach the user through a spdlog sink, not through call sites.**
   `installMessageLogSink()` feeds `MessageLog`, so every existing
   `spdlog::warn`/`error` surfaces without being touched, and a new one surfaces
@@ -331,6 +337,67 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   mutex covers the readers too — a writers-only lock is the partial-locking shape
   this codebase has produced three times, and the camera accessors return by
   value because a reference handed out under a lock is not protected by it.
+
+### Live Evaluation
+See `docs/adr/0007-analysis-engine-owns-its-own-pipe.md`; every rule here is one
+of its decisions, and `tests/test_analysis.cpp` plus
+`tests/scenarios/evaluation_*.scn` enforce them.
+- **The analysis engine is a separate process, always.** Never the coach's and
+  never the kibitz engine's, even when all three are the same binary with the
+  same command line. An analysis stream is a GTP command that deliberately never
+  replies until told to stop, and ADR-0001 gives the game thread exclusive
+  ownership of the playing engines' pipes. Only the *configuration* is inherited
+  (`"analysis": 1`, else `"kibitz": 1`, else nothing) — never the process, and
+  never a `Player`: it is not registered with `addEngine()`, so it cannot reach
+  the player dropdowns or `syncOtherEngines()`.
+- **It follows the review cursor, not the game position.** That is what makes the
+  separate process necessary rather than merely tidy — the coach already holds
+  the game position. The cost that argues against it is an artefact of reusing
+  `syncEngineToPosition()`: `planIncrementalSync()` diffs against the path last
+  sent, so an arrow key is one `undo` or one `play`. Replaying moves rather than
+  setting up stones is also what KataGo's history planes need.
+- **`playableMoves()` runs before the diff, never at the point of sending.** The
+  `undo` count is counted against what was actually sent; skipping an unsendable
+  move later would leave the two out of step by one for the rest of the game, and
+  the engine would then be undoing somebody else's move.
+- **Yield with `analysisMayRun()`, not `isThinking()`.** The loop clears
+  `playerToMove` *before* its 500 ms inter-move sleep, so a bare test flaps the
+  stream on and off once per move in a bot-versus-bot match — the
+  two-searches-at-once case decision 6 exists to prevent. The predicate also asks
+  whether the *loop is running*, because a loaded game paused with an engine to
+  move has nobody searching, and review is when the numbers are worth most.
+- **Absent is not zero, and stale is not absent.** No report hides the panel
+  outright; a bar resting at 50% because nothing has been computed cannot be told
+  from a genuine even game. The yield window is the one *stale* case — the
+  numbers were true for a position no longer shown — and is dimmed rather than
+  blanked, because blanking would flicker once per move. Same distinction as
+  `Engine::final_score()`'s `std::optional`.
+- **Everything is converted to Black's frame of reference at parse time.**
+  Engines report for the side to move, so raw numbers flip every move and read as
+  noise. Same shape as the prisoner counts that shipped swapped.
+- **`order` defaults to -1, not 0.** Otherwise "the engine did not say" is
+  indistinguishable from "this is the best move", and the first block of a report
+  that omits `order` wins on a technicality. `scoreLead` is stored per block
+  because it arrives *before* `order` in KataGo's output.
+- **The analysis client is quiet.** `GtpClient::setQuiet()` demotes its command
+  traffic to `debug`. `last_run.log` at default verbosity is what a bug report is
+  read from, and a continuous stream plus a replay per navigation jump would bury
+  it — the same reason the message-log sink takes `warn` and above.
+- **There is no `stop` command.** Any input line terminates an lz/kata-analyze
+  stream; `stopStreaming()` sends `name` and drains through *both* the stream's
+  closing blank line and that command's own response. Skipping the drain makes
+  the next ordinary command read the tail of the stream as its reply — silently
+  wrong results rather than an error. Bounded, on the `scoringTimeout()`
+  precedent.
+- **The overlay is not part of `isIdle()`.** An analysis stream never finishes on
+  its own, so treating it as work-in-flight would make quiescence unreachable —
+  the same trap as waiting on `EngineSync::Unsynced`.
+- **Do not block the main loop once an exit is requested.** `AppState::
+  RequestExit()` is set from *inside* a loop iteration, and the condition is not
+  re-evaluated until the next one, so an unconditional `glfwWaitEvents()` waits
+  for an event that will never arrive. It stayed latent because whatever ends a
+  run normally dirties the view; the publish gate deliberately requests no repaint
+  when nothing changed, which is a clean frame, which hung the process on exit.
 
 ### Keybindings
 - **A binding is a chord**: key plus a `KeyMod` bitmask from optional
@@ -378,8 +445,10 @@ Areas covered since (each found at least one real defect): board clicking and
 the stone-in-hand model (`board_click_stone_in_hand.scn`), tsumego mode
 (`tsumego_mode.scn`), territory after a resignation
 (`territory_needs_a_score.scn`), multi-game collections
-(`multi_game_collection.scn`), and the Clear/Quit confirmations
-(`discard_prompts.scn`).
+(`multi_game_collection.scn`), the Clear/Quit confirmations
+(`discard_prompts.scn`), and the live evaluation overlay
+(`evaluation_overlay.scn`, `evaluation_unavailable.scn` — which found the
+exit-while-idle hang above).
 
 Converting a prose sequence is a good way to pin a bug you have just fixed.
 

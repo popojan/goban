@@ -247,3 +247,40 @@ TEST_CASE("clear and save follow the record, not the turn") {
     in.hasUnsavedChanges = true;
     CHECK(availableActions(in).save);
 }
+
+TEST_CASE("the evaluation overlay asks only whether an engine can answer") {
+    // Deliberately free of every other term. It is a display, not a move: it
+    // follows the review cursor rather than the turn, it is worth most on a
+    // finished game being reviewed, and it never touches a playing engine's
+    // pipe (ADR-0007 decisions 4 and 7). So none of the conditions that gate
+    // Pass, Resign or Undo apply to it.
+    UiInputs in = playing();
+    in.evaluationAvailable = true;
+    CHECK(availableActions(in).evaluation);
+
+    UiInputs thinking = in;  thinking.engineThinking = true;
+    UiInputs locked   = in;  locked.aiVsAiLocked = true;
+    UiInputs over     = in;  over.phase = GamePhase::Finished;
+    UiInputs midTree  = in;  midTree.atEndOfNavigation = false;
+    UiInputs notHuman = in;  notHuman.humanToMove = false;
+
+    CHECK(availableActions(thinking).evaluation);
+    CHECK(availableActions(locked).evaluation);
+    CHECK(availableActions(over).evaluation);
+    CHECK(availableActions(midTree).evaluation);
+    CHECK(availableActions(notHuman).evaluation);
+
+    // Three things do refuse it. No engine nominated itself — the stock
+    // configuration, where nothing carries "kibitz" and the only engine is a
+    // GNU Go that cannot analyse.
+    UiInputs none = in;      none.evaluationAvailable = false;
+    CHECK_FALSE(availableActions(none).evaluation);
+
+    // A tsumego: an overlay that stars the correct move solves the puzzle.
+    UiInputs puzzle = in;    puzzle.tsumego = true;
+    CHECK_FALSE(availableActions(puzzle).evaluation);
+
+    // And startup, like everything else.
+    UiInputs notReady = in;  notReady.uiReady = false;
+    CHECK_FALSE(availableActions(notReady).evaluation);
+}

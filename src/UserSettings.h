@@ -43,6 +43,13 @@ public:
     bool getSoundEnabled() const { std::lock_guard<std::mutex> lock(mutex); return soundEnabled; }
     void setSoundEnabled(bool value);
 
+    /// The live evaluation overlay (ADR-0007). Off by default and sticky: a
+    /// second engine's network weights are a real cost on the machines issue #45
+    /// is about, so nobody pays it without asking — but a user who configured
+    /// KataGo asks once, not once per session.
+    bool getEvaluationEnabled() const { std::lock_guard<std::mutex> lock(mutex); return evaluationEnabled; }
+    void setEvaluationEnabled(bool value);
+
     // Last SGF (for resuming after restart)
     std::string getLastSgfPath() const { std::lock_guard<std::mutex> lock(mutex); return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
@@ -169,6 +176,9 @@ private:
 
     // Sound
     bool soundEnabled = true;
+
+    // Live evaluation overlay
+    bool evaluationEnabled = false;
 
     // Last SGF
     std::string lastSgfPath;

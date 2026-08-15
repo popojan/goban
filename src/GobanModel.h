@@ -217,6 +217,12 @@ private:
     mutable std::mutex snapshotMutex;
     std::shared_ptr<const GameSnapshot> gameSnapshot{std::make_shared<const GameSnapshot>()};
 
+    /// Source of GameSnapshot::positionId. Only ever incremented inside
+    /// publishSnapshot(), which by contract runs on whoever owns the record, so
+    /// it needs no synchronisation of its own — the snapshot pointer swap is
+    /// what publishes it.
+    unsigned long long positionCounter{0};
+
     /// Authoritative lifecycle state. Atomic because the game thread ends games
     /// while the UI thread reads the phase every frame.
     std::atomic<GamePhase> gamePhase{GamePhase::Setup};

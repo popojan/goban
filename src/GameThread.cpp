@@ -384,6 +384,11 @@ bool GameThread::isThinking() const {
     return p != nullptr && p->isTypeOf(Player::ENGINE);
 }
 
+bool GameThread::analysisMayRun() const {
+    if (isThinking() || isSyncingEngines() || hasPendingNavigation()) return false;
+    return !(isRunning() && isCurrentPlayerEngine());
+}
+
 bool GameThread::hasPendingNavigation() const {
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);

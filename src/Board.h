@@ -143,6 +143,15 @@ public:
 
     bool operator== (const Position& p) const { return pos == p; }
 
+    /// Full identity, vertex included. The overloads above each compare one
+    /// field, which is what their call sites want; diffing two move *paths*
+    /// needs all of them at once — see AnalysisService.
+    bool operator== (const Move& b) const {
+        return spec == b.spec && col == b.col && (spec != NORMAL || pos == b.pos);
+    }
+
+    bool operator!= (const Move& b) const { return !(*this == b); }
+
     static Move parseGtp(const std::string& s, const Color& col) {
         std::istringstream ss(s); Move m(Move::INVALID, col); ss >> m; return m;
     }

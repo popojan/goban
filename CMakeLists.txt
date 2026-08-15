@@ -370,6 +370,7 @@ else()
     )
 
     set(GOBAN_CORE_SRC_FILES
+        src/AnalysisService.cpp
         src/Board.cpp
         src/Camera.cpp
         src/Configuration.cpp

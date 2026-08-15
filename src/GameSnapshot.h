@@ -123,6 +123,32 @@ struct GameSnapshot {
     /// stone's index, not the tree depth.
     Move lastStoneMove{Move::INVALID, Color::EMPTY};
     size_t lastStoneMoveNumber = 0;
+
+    // --- Stage 5: what the analysis thread reads (ADR-0007) ------------------
+    // Continuous analysis follows the review cursor, so it needs the position
+    // itself and not merely facts about it. Published here for the same reason
+    // as everything above — the analysis thread is a third reader that must
+    // never walk the tree — and consumed by AnalysisService, which compares
+    // `positionId` and diffs `pathMoves` against what it last sent to its
+    // engine.
+
+    /// Bumped on every publish. The analysis thread compares only this, so a
+    /// position change is one integer comparison rather than a vector compare.
+    /// Wrapping is not a concern at one increment per board change.
+    unsigned long long positionId = 0;
+
+    /// Every move from the root to the cursor, in order — `GameRecord::
+    /// getPathFromRoot()`. This is what makes the analysis engine reachable in
+    /// one `undo` or one `play` when the user presses an arrow key: the service
+    /// takes the common prefix with the path it last sent.
+    std::vector<Move> pathMoves;
+
+    /// The rest of what putting an engine at this position needs, mirroring
+    /// `GameThread::syncEngineToPosition()`. A change in any of these forces a
+    /// full reset rather than an incremental diff.
+    float komi = 0.0f;
+    std::vector<Position> setupBlack;
+    std::vector<Position> setupWhite;
 };
 
 #endif // GOBAN_GAMESNAPSHOT_H

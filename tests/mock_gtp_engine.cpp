@@ -47,9 +47,11 @@
 // in a fixed scan order (bottom-left to top-right), passing when none exists.
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <mutex>
 #include <iostream>
 #include <optional>
 #include <set>
@@ -78,6 +80,14 @@ struct Options {
     std::string logFile;
     std::string stderrFile;
     int thinkMs = 0;
+    // Analysis streaming. The values are fixed so a scenario can assert an exact
+    // number; they are reported from the *side to move*'s point of view, exactly
+    // as KataGo does, which is what makes the client's conversion to Black's
+    // frame testable at all.
+    bool analyze = true;
+    int analyzeIntervalMs = 100;
+    double analyzeWinrate = 0.6;
+    double analyzeScoreLead = 2.5;
 };
 
 class Position {
@@ -371,6 +381,12 @@ public:
             std::string arg;
             while (ss >> arg) args.push_back(arg);
 
+            // Any input line terminates an analysis stream. That is the whole
+            // protocol — there is no `stop` command — so it happens here, before
+            // the line is looked at, and the closing blank line goes out before
+            // whatever response this command produces.
+            stopAnalysis();
+
             logCommand(line);
 
             if (!opts_.hangOn.empty() && command == opts_.hangOn) {
@@ -415,10 +431,88 @@ private:
     }
 
     void respond(const std::string& id, bool ok, const std::string& body) {
+        std::lock_guard<std::mutex> lock(outMutex_);
         std::cout << (ok ? "=" : "?") << id;
         if (!body.empty()) std::cout << " " << body;
         // GTP responses terminate with a blank line.
         std::cout << "\n\n" << std::flush;
+    }
+
+    /// Starts an lz/kata-analyze stream: the ordinary success header with **no**
+    /// terminating blank line, then a report every interval until something
+    /// arrives on stdin. The blank line that closes the response is written by
+    /// stopAnalysis(), which is the shape a real analysis engine has and the
+    /// reason GtpClient needs a streaming reader at all.
+    void startAnalysis(const std::string& id, const std::string& cmd,
+                       const std::vector<std::string>& args) {
+        // The colour is parsed only to reject a malformed request. The reported
+        // values are deliberately fixed and always from the *side to move*'s
+        // point of view, exactly as a real engine reports them — which is what
+        // makes the client's conversion to Black's frame testable.
+        if (!args.empty() && colorFrom(args[0]) == 0) {
+            return respond(id, false, "syntax error");
+        }
+        int intervalMs = opts_.analyzeIntervalMs;
+        // Second argument is the report interval in centiseconds, as both
+        // kata-analyze and lz-analyze define it.
+        if (args.size() > 1) {
+            int centiseconds = 0;
+            if (std::istringstream(args[1]) >> centiseconds) {
+                if (centiseconds > 0) intervalMs = centiseconds * 10;
+            }
+        }
+        const bool kata = cmd == "kata-analyze";
+
+        {
+            std::lock_guard<std::mutex> lock(outMutex_);
+            std::cout << "=" << id << "\n" << std::flush;
+        }
+
+        analyzing_ = true;
+        analysisThread_ = std::thread([this, intervalMs, kata] {
+            // The first two empty points in scan order, so the report is
+            // deterministic and follows the position the client synced us to.
+            std::vector<std::string> candidates;
+            for (int row = 0; row < pos_.size() && candidates.size() < 2; ++row) {
+                for (int col = 0; col < pos_.size() && candidates.size() < 2; ++col) {
+                    if (pos_.at(col, row) == kEmpty) candidates.push_back(formatVertex(col, row));
+                }
+            }
+            if (candidates.empty()) candidates.push_back("pass");
+
+            while (analyzing_.load()) {
+                std::ostringstream report;
+                for (size_t i = 0; i < candidates.size(); ++i) {
+                    if (i) report << " ";
+                    report << "info move " << candidates[i]
+                           << " visits " << (100 - 40 * static_cast<int>(i))
+                           << " utility 0.1"
+                           << " winrate " << (opts_.analyzeWinrate - 0.05 * static_cast<double>(i));
+                    if (kata) {
+                        report << " scoreMean " << opts_.analyzeScoreLead
+                               << " scoreLead " << opts_.analyzeScoreLead;
+                    }
+                    report << " order " << i
+                           << " pv " << candidates[i];
+                    if (candidates.size() > 1) report << " " << candidates[1 - i];
+                }
+                {
+                    std::lock_guard<std::mutex> lock(outMutex_);
+                    if (!analyzing_.load()) break;
+                    std::cout << report.str() << "\n" << std::flush;
+                }
+                for (int slept = 0; slept < intervalMs && analyzing_.load(); slept += 10) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+        });
+    }
+
+    void stopAnalysis() {
+        if (!analyzing_.exchange(false)) return;
+        if (analysisThread_.joinable()) analysisThread_.join();
+        std::lock_guard<std::mutex> lock(outMutex_);
+        std::cout << "\n" << std::flush;   // closes the analyze response
     }
 
     void dispatch(const std::string& id, const std::string& cmd,
@@ -428,10 +522,15 @@ private:
         if (cmd == "version") return respond(id, true, opts_.version);
 
         if (cmd == "list_commands") {
-            return respond(id, true,
-                           "protocol_version\nname\nversion\nknown_command\nlist_commands\n"
-                           "boardsize\nclear_board\nkomi\nplay\ngenmove\nundo\n"
-                           "fixed_handicap\nfinal_score\nfinal_status_list\nshowboard\nquit");
+            std::string commands =
+                "protocol_version\nname\nversion\nknown_command\nlist_commands\n"
+                "boardsize\nclear_board\nkomi\nplay\ngenmove\nundo\n"
+                "fixed_handicap\nfinal_score\nfinal_status_list\nshowboard\nquit";
+            // Capability is advertised here and nowhere else — a client that
+            // decides what an engine can do from its *name* is the thing this
+            // exists to test against.
+            if (opts_.analyze) commands += "\nlz-analyze\nkata-analyze";
+            return respond(id, true, commands);
         }
 
         if (cmd == "known_command") {
@@ -440,8 +539,15 @@ private:
                 "protocol_version", "name", "version", "known_command", "list_commands",
                 "boardsize", "clear_board", "komi", "play", "genmove", "undo",
                 "fixed_handicap", "final_score", "final_status_list", "showboard", "quit"};
-            const bool isKnown = known.count(args[0]) > 0 && args[0] != opts_.unknownCmd;
+            const bool analyzeCmd = args[0] == "lz-analyze" || args[0] == "kata-analyze";
+            const bool isKnown = (known.count(args[0]) > 0 || (analyzeCmd && opts_.analyze))
+                                 && args[0] != opts_.unknownCmd;
             return respond(id, true, isKnown ? "true" : "false");
+        }
+
+        if (cmd == "lz-analyze" || cmd == "kata-analyze") {
+            if (!opts_.analyze) return respond(id, false, "unknown command");
+            return startAnalysis(id, cmd, args);
         }
 
         if (cmd == "boardsize") {
@@ -648,6 +754,14 @@ private:
     Position pos_;
     float komi_ = 0.0f;
     size_t scriptIndex_ = 0;
+
+    // Analysis streaming. The reporting thread is the only thing that writes to
+    // stdout while the main thread is blocked in getline, and stopAnalysis()
+    // joins it before any response goes out, so outMutex_ guards a window that
+    // is narrow but real: the two do overlap while a stop is being processed.
+    std::atomic<bool> analyzing_{false};
+    std::thread analysisThread_;
+    std::mutex outMutex_;
 };
 
 // Splits on whitespace and commas, so a vertex list can arrive as one quoted
@@ -691,6 +805,10 @@ int main(int argc, char** argv) {
         else if (flag == "--unknown") opts.unknownCmd = next();
         else if (flag == "--log") opts.logFile = next();
         else if (flag == "--stderr-file") opts.stderrFile = next();
+        else if (flag == "--no-analyze") opts.analyze = false;
+        else if (flag == "--analyze-interval-ms") opts.analyzeIntervalMs = std::atoi(next().c_str());
+        else if (flag == "--analyze-winrate") opts.analyzeWinrate = std::atof(next().c_str());
+        else if (flag == "--analyze-score") opts.analyzeScoreLead = std::atof(next().c_str());
         else {
             std::cerr << "mock_gtp_engine: unknown option " << flag << "\n";
             return 2;

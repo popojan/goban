@@ -10,6 +10,7 @@
 #include "ScenarioRecorder.h"
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <ctime>
 #include <sstream>
 #include <iomanip>
@@ -467,6 +468,36 @@ void GobanControl::buildRegistry() {
                 ctx.checked = false;
             }
         }
+        view.requestRepaint();
+    });
+
+    add("toggle_evaluation", 0, 1, "[on|off] — show or hide the live evaluation overlay",
+        [this](CommandContext& ctx) {
+        auto& analysis = parent->getAnalysis();
+        if (!actions().evaluation) {
+            // No engine can answer, or this is a tsumego. Leave the menu alone
+            // rather than lighting up a toggle that does nothing.
+            spdlog::debug("toggle_evaluation refused by availableActions()");
+            ctx.notifyMenu = false;
+            return;
+        }
+        // The explicit form exists for the same reason toggle_log's does: a bare
+        // toggle asserts nothing about where it started, so a scenario that
+        // toggles twice by mistake reads as passing while testing the opposite.
+        bool next = !analysis.isEnabled();
+        if (!ctx.args.empty()) {
+            const std::string arg = toLower(ctx.args[0]);
+            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
+                && arg != "1" && arg != "0") {
+                spdlog::warn("toggle_evaluation: expected on or off, got '{}'", ctx.args[0]);
+                ctx.notifyMenu = false;
+                return;
+            }
+            next = (arg == "on" || arg == "true" || arg == "1");
+        }
+        analysis.setEnabled(next);
+        UserSettings::instance().setEvaluationEnabled(next);
+        ctx.checked = next;
         view.requestRepaint();
     });
 
@@ -1452,6 +1483,10 @@ UiInputs GobanControl::uiInputs() const {
                            || !model.setupWhiteStones.empty()
                            || snap->mainLineMoves > 0;
     in.hasUnsavedChanges = model.game.hasUnsavedChanges();
+    // "Is there an engine that could answer", not "is it answering now". The
+    // overlay's own state — starting, yielded, unavailable — belongs to the
+    // panel, not to whether the toggle may be pressed.
+    in.evaluationAvailable = parent->getAnalysis().isConfigured();
     return in;
 }
 
@@ -1577,6 +1612,30 @@ nlohmann::json GobanControl::dumpState() const {
     s["can_territory"] = a.territory;
     s["can_clear"]     = a.clear;
     s["can_save"]      = a.save;
+    s["can_evaluation"] = a.evaluation;
+
+    // The evaluation overlay. `eval_state` is the one to wait on — `eval_enabled`
+    // flips the instant the toggle is pressed, long before a process has started
+    // or a number has arrived. The numbers are absent rather than zero when
+    // there is no report, for the reason ADR-0007 decision 12 gives.
+    {
+        const auto& analysis = parent->getAnalysis();
+        s["eval_enabled"] = analysis.isEnabled();
+        s["eval_state"]   = analysisStateName(analysis.state());
+        if (const auto rep = analysis.report()) {
+            s["eval_winrate"] = static_cast<int>(std::lround(rep->winrateBlack * 100.0));
+            s["eval_score"]   = rep->scoreLeadBlack ? *rep->scoreLeadBlack : 0.0;
+            s["eval_has_score"] = rep->scoreLeadBlack.has_value();
+            s["eval_moves"]   = static_cast<int>(rep->moves.size());
+            // Whether what is displayed still describes the position on screen.
+            s["eval_stale"]   = rep->positionId != snap->positionId;
+        } else {
+            s["eval_winrate"] = -1;
+            s["eval_has_score"] = false;
+            s["eval_moves"]   = 0;
+            s["eval_stale"]   = true;
+        }
+    }
 
     // Where the position came from — needed to reconstruct a starting point
     // when replaying a recorded session.

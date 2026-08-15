@@ -34,7 +34,7 @@ GLFW plus the small [`AppState`](../src/AppState.h) namespace.
 
 ## 2. Threads
 
-Five kinds of thread exist. Only the first two matter for most work.
+Six kinds of thread exist. Only the first two matter for most work.
 
 ```mermaid
 flowchart LR
@@ -42,14 +42,23 @@ flowchart LR
     GT["<b>Game thread</b><br/>GameThread::gameLoop()<br/>owns GameRecord · speaks GTP"]
     LD["<i>Engine loader</i><br/>startup only<br/>1 std::async + 1 thread per bot"]
     SE["<i>Stderr readers</i><br/>1 per engine process"]
+    AN["<b>Analysis thread</b><br/>AnalysisService::loop()<br/>own engine · own pipe"]
     AU["<i>PortAudio callback</i>"]
 
     UI -->|"nav queue · deferred task<br/>suggestMove()"| GT
     GT -->|"GameSnapshot · atomics<br/>deferredDone flag"| UI
     LD -.->|"hands over, then joins"| GT
     SE -.->|"line callback"| GT
+    UI -->|"setEnabled()"| AN
+    AN -->|"AnalysisReport<br/>requestRepaint()"| UI
     UI -.-> AU
 ```
+
+The analysis thread is the newest and the most isolated: it shares no pipe and no
+engine object with the game thread, reads the position through the same published
+snapshot the UI does, and touches nothing the game loop owns. Its only question
+for the game thread is `analysisMayRun()`, and the answer is only ever *no, wait*.
+See [ADR-0007](adr/0007-analysis-engine-owns-its-own-pipe.md).
 
 ### Thread ownership
 
@@ -57,6 +66,7 @@ flowchart LR
 |---|---|---|
 | **Game thread** | `GameRecord` (the SGF tree) | **Never directly.** Via `GobanModel::snapshot()` — [ADR-0006](adr/0006-publish-a-game-snapshot.md) |
 | **Game thread** | Engine pipes, all GTP traffic during a game | Not at all; UI actions are refused or deferred — [ADR-0001](adr/0001-engine-exclusive-ui-actions.md) |
+| **Analysis thread** | The analysis engine's pipe, and only that one | Not at all. It is a *different process* from the coach even when the same binary — [ADR-0007](adr/0007-analysis-engine-owns-its-own-pipe.md) |
 | **UI thread** | RmlUi documents, all widgets | Not at all; the game thread signals via `takeDeferredTaskDone()` |
 | **UI thread** | OpenGL context, `GobanView`, `GobanShader` | Not at all |
 | **Either, one at a time** | `GobanModel::board`, `GobanModel::state` | `GobanModel::mutex` for the board update; `GameState` fields are mostly written by the game thread and read per-frame |
@@ -551,12 +561,20 @@ SGF tree from that thread (ADR-0006 stage 4).
 
 ## 10a. Saying something to the user
 
-Two surfaces, deliberately disjoint:
+Three surfaces, deliberately disjoint:
 
 | Surface | Carries | Fed by |
 |---|---|---|
 | `#lblStatus` + `#pnlLog` (top left) | Which engine is loading; a badge for warnings and errors | `MessageLog`, via a **spdlog sink** |
 | `#lblMessage` (bottom centre) | Game results, SGF comments, command feedback, confirmation prompts | `ElementGame::showMessage()` |
+| `#grpAnalysis` (bottom right) | The live evaluation: win rate and score estimate | `AnalysisService::report()`, read per frame |
+
+The first two split on *ownership* — application status versus game content. The
+third splits on a different axis, which is why it could not join either:
+`#lblMessage` carries **events**, things that happened once and scroll past;
+`#grpAnalysis` carries **state**, a value that is continuously true and repaints
+twice a second. See [ADR-0007](adr/0007-analysis-engine-owns-its-own-pipe.md)
+decision 11.
 
 The sink is the important part: `installMessageLogSink()` means every
 `spdlog::warn`/`error` already in the codebase reaches the interface without its
@@ -597,6 +615,7 @@ See [docs/testing.md](testing.md).
 | What is the game doing? | `src/GamePhase.h`, `GobanModel::phase()` |
 | Is the loop running? Are engines synced? | `LoopState` / `EngineSync` in `src/GameThread.h` |
 | What does the UI know about the record? | `src/GameSnapshot.h` |
+| Where does the evaluation overlay come from? | `src/AnalysisService.h`, `ADR-0007` |
 | How does a key become an action? | `GobanControl::buildRegistry()` |
 | How is a position rebuilt? | `GameRecord::buildBoardFromMoves()` |
 | How is an engine spoken to? | `src/gtpclient.h`, `GtpEngine` in `src/player.h` |
