@@ -88,6 +88,11 @@ struct Options {
     int analyzeIntervalMs = 100;
     double analyzeWinrate = 0.6;
     double analyzeScoreLead = 2.5;
+    /// Report `pass` as the best candidate, ahead of the board moves. This is
+    /// the settled endgame — a real engine recommends passing there long before
+    /// the board is full, which is the one case the scan-order candidates below
+    /// can never produce on their own.
+    bool analyzePass = false;
 };
 
 class Position {
@@ -479,6 +484,9 @@ private:
                 }
             }
             if (candidates.empty()) candidates.push_back("pass");
+            // Best of the lot: it takes order 0 and the highest win rate, so the
+            // board moves that follow are measured against it.
+            if (opts_.analyzePass) candidates.insert(candidates.begin(), "pass");
 
             while (analyzing_.load()) {
                 std::ostringstream report;
@@ -809,6 +817,7 @@ int main(int argc, char** argv) {
         else if (flag == "--analyze-interval-ms") opts.analyzeIntervalMs = std::atoi(next().c_str());
         else if (flag == "--analyze-winrate") opts.analyzeWinrate = std::atof(next().c_str());
         else if (flag == "--analyze-score") opts.analyzeScoreLead = std::atof(next().c_str());
+        else if (flag == "--analyze-pass") opts.analyzePass = true;
         else {
             std::cerr << "mock_gtp_engine: unknown option " << flag << "\n";
             return 2;

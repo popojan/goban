@@ -567,7 +567,7 @@ Three surfaces, deliberately disjoint:
 |---|---|---|
 | `#lblStatus` + `#pnlLog` (top left) | Which engine is loading; a badge for warnings and errors | `MessageLog`, via a **spdlog sink** |
 | `#lblMessage` (bottom centre) | Game results, SGF comments, command feedback, confirmation prompts | `ElementGame::showMessage()` |
-| `#grpAnalysis` (bottom right) **or** the board's near margin | The live evaluation: win rate and score estimate. One surface with two forms, never both at once — the diegetic one is a View → Overlay toggle | `AnalysisService::report()`, read per frame |
+| `#grpAnalysis` (bottom right) **or** the board's near margin | The live evaluation (issue #49): win rate and score estimate. One surface with two forms, never both at once — the diegetic one is a View → Overlay toggle. Silent in tsumego mode, where the best move is the solution | `AnalysisService::report()`, read per frame |
 
 The first two split on *ownership* — application status versus game content. The
 third splits on a different axis, which is why it could not join either:

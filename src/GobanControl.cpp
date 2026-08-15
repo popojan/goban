@@ -1833,6 +1833,9 @@ nlohmann::json GobanControl::dumpState() const {
         // stays and only takes on colour. The split between these two keys is
         // the combine rule.
         s["eval_tints"]   = static_cast<int>(view.analysisTintCount());
+        // A recommended pass has no point to sit on, so it is neither a label
+        // nor a tint — it is the word in the margin, and needs a key of its own.
+        s["eval_pass"]    = view.analysisPassText();
         if (const auto rep = analysis.report()) {
             s["eval_winrate"] = static_cast<int>(std::lround(rep->winrateBlack * 100.0));
             s["eval_score"]   = rep->scoreLeadBlack ? *rep->scoreLeadBlack : 0.0;

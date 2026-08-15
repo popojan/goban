@@ -354,6 +354,81 @@ TEST_CASE("moves the engine never searched are not drawn") {
     CHECK(labels[1].pos == Position(2, 0));
 }
 
+TEST_CASE("a suggested pass sets the baseline it cannot be drawn on") {
+    // The settled endgame: KataGo reports `move pass` as its first choice, and
+    // every remaining board move throws away 20% of the win rate. This is when
+    // the overlay is read most carefully, and it used to be at its most wrong —
+    // pass was filtered out before the baseline was taken, so the best board
+    // move was measured against itself, came out at zero loss, and was drawn in
+    // the best-move colour. The advice on screen was to fill your own territory.
+    AnalysisReport report;
+    AnalysisMove pass;
+    pass.move = {Move::PASS, Color::BLACK};
+    pass.order = 0;
+    pass.visits = 500;
+    pass.winrateBlack = 0.80;
+    report.moves.push_back(pass);
+
+    for (int i = 0; i < 2; ++i) {
+        AnalysisMove m;
+        m.move = {Position(i, 0), Color::BLACK};
+        m.order = i + 1;
+        m.visits = 100 - i;
+        m.winrateBlack = 0.60 - 0.05 * i;
+        report.moves.push_back(m);
+    }
+
+    const auto labels = evaluationLabels(report, {}, {}, DEFAULT_EVAL_LABELS);
+    REQUIRE(labels.size() == 3);
+
+    // The pass comes back for the margin to draw, carrying no position...
+    CHECK(labels[0].pass);
+    CHECK(labels[0].text == "pass");
+    CHECK_FALSE(labels[0].pos);
+    // ...and it does not eat the letter A.
+    CHECK_FALSE(labels[1].pass);
+    CHECK(labels[1].text == "A");
+    CHECK(labels[1].pos == Position(0, 0));
+    CHECK(labels[2].text == "B");
+
+    // It is best, so it is drawn as such — and the board moves are measured
+    // against it: a 20% loss, not the 0% they used to report.
+    const glm::vec4 best = moveQualityColor(0.0);
+    const glm::vec4 real = moveQualityColor(0.20);
+    CHECK(labels[0].color.g == doctest::Approx(best.g));
+    CHECK(labels[1].color.r == doctest::Approx(real.r));
+    CHECK(labels[1].color.g == doctest::Approx(real.g));
+    CHECK(labels[1].color.r > best.r);
+    CHECK(labels[1].color.g < best.g);
+}
+
+TEST_CASE("a pass among the also-rans changes nothing") {
+    // The other half: while the game is live the engine still reports a pass,
+    // ranked far down. It must not become the baseline then — the best move is
+    // the best move, and A stays green.
+    AnalysisReport report = rankedReport(3, 0.05);
+    AnalysisMove pass;
+    pass.move = {Move::PASS, Color::BLACK};
+    pass.order = 3;
+    pass.visits = 5;
+    pass.winrateBlack = 0.10;
+    report.moves.push_back(pass);
+
+    const auto labels = evaluationLabels(report, {}, {}, DEFAULT_EVAL_LABELS);
+    REQUIRE(labels.size() == 4);
+    CHECK(labels[0].text == "A");
+    CHECK_FALSE(labels[0].pass);
+    const glm::vec4 best = moveQualityColor(0.0);
+    CHECK(labels[0].color.g == doctest::Approx(best.g));
+    CHECK(labels[0].color.r == doctest::Approx(best.r));
+
+    // The pass is last, drawn as the blunder it would be, and still not a letter.
+    CHECK(labels[3].pass);
+    CHECK(labels[3].text == "pass");
+    CHECK(labels[2].text == "C");
+    CHECK(labels[3].color.r > labels[0].color.r);
+}
+
 // --- The readout's ink --------------------------------------------------------
 
 #include "Configuration.h"

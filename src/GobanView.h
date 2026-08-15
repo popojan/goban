@@ -254,6 +254,8 @@ public:
     /// `dumpState()`, because the difference between them *is* the combine rule.
     [[nodiscard]] size_t analysisLabelCount() const { return analysisLabels.size(); }
     [[nodiscard]] size_t analysisTintCount() const { return analysisTints.size(); }
+    /// The margin's "pass", or empty when the engine is not recommending one.
+    [[nodiscard]] const std::string& analysisPassText() const { return passSuggestion; }
 
 public:
     GobanShader gobanShader;
@@ -318,6 +320,12 @@ public:
     /// else and only has its colour reset.
     std::vector<Position> analysisLabels;
     std::vector<Position> analysisTints;
+    /// A suggested pass, handed from updateAnalysisOverlay() — which is where
+    /// the report is read — to updateFloatingLabels(), which owns the margin.
+    /// The two already run in that order, and the labels list is replaced
+    /// wholesale, so it cannot be written from both.
+    std::string passSuggestion;
+    glm::vec4 passSuggestionInk{0.0f, 0.0f, 0.0f, 1.0f};
     AudioPlayer player;
     std::string pendingScreenshot;  // see requestScreenshot()
 

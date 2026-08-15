@@ -1,0 +1,54 @@
+# config: mock-evalpass.json
+#
+# The engine recommends passing. KataGo reports `move pass` like any other
+# candidate, and does so routinely once the endgame is settled — which is when
+# this overlay is read most carefully.
+#
+# It used to be dropped before the quality baseline was taken, with two
+# consequences. The recommendation itself was invisible: nothing on screen could
+# tell "the engine wants to pass" from "the engine has no opinion". And the
+# board moves were then measured against the best of themselves, so the top one
+# came out at zero loss, in the best-move colour, wearing an A — the overlay was
+# recommending that you fill your own territory.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/evaluation_pass.scn
+
+new_game 9
+wait_idle
+switch_player white Human
+wait_idle
+
+toggle_evaluation on
+toggle_evaluation_moves on
+wait_until eval_state running
+
+# The pass is named, in the margin, where it has no point to sit on.
+wait_until eval_pass pass
+
+# The board moves keep their letters — a board showing B with no A reads as
+# broken, and the true ranking is in the colour. Two of them, as ever; the pass
+# is neither a label nor a tint, which is why it needed a key of its own.
+expect eval_labels 2
+expect eval_tints 0
+
+# It belongs to the suggestions, not to the readout: it appears with the board
+# labels and goes with them. This is the same separation the two toggles exist
+# for — the panel reports numbers you read *after* a move, the suggestions point
+# at moves *before* one.
+toggle_evaluation_moves off
+wait_until eval_labels 0
+expect eval_pass ""
+
+toggle_evaluation_moves on
+wait_until eval_pass pass
+
+# And it goes away with the feature entirely, rather than lingering as the last
+# thing the engine happened to say.
+#
+# wait_until, not expect: stopping the service publishes the empty report and
+# *asks* for a repaint, so `eval_state` reaches disabled a frame before anything
+# is rubbed off the board. Asserting immediately reads the previous frame.
+toggle_evaluation off
+wait_until eval_state disabled
+wait_until eval_pass ""
+expect eval_labels 0

@@ -875,6 +875,9 @@ void GobanView::updateAnalysisOverlay() {
 		if (pos) board.setOverlayTint(pos, std::nullopt);
 	}
 	analysisTints.clear();
+	// Cleared here rather than at each of the four early returns below, so a
+	// stale "pass" cannot outlive the report that produced it.
+	passSuggestion.clear();
 
 	if (!showAnalysisOverlay || !analysis) return;
 	const auto report = analysis->report();
@@ -885,6 +888,22 @@ void GobanView::updateAnalysisOverlay() {
 	// engine's opinion of one position onto the stones of another.
 	const auto snap = model.snapshot();
 	if (report->positionId != snap->positionId) return;
+
+	// A scored end has already made a claim about every point, and it made it in
+	// the same place these labels write to: setBoardOverlay() puts mAnnotation
+	// into glStones[idx], which is the float updateArea() fills with mBlackArea
+	// or mWhiteArea. The damage is not a redraw away either — updateArea() only
+	// writes when a point's influence *changes*, so the shading never comes
+	// back, and removeBoardOverlay() then resets the point to mEmpty. Turning
+	// the suggestions on erased the territory for good.
+	//
+	// Standing down is the answer rather than sharing the channel, for the
+	// reason the readout stands down here (ADR-0007 decision 13): the game is
+	// over and counted, and what to play next is not a question the board is
+	// being asked. A resignation counted nothing, has no territory, and keeps
+	// its suggestions — scoredEnd follows the cursor, so navigating back off the
+	// end brings them back too.
+	if (snap->scoredEnd) return;
 
 	// The two claims already on the board. Markup is the user's own annotation
 	// and is left alone entirely; a variation label is kept and tinted.
@@ -899,6 +918,13 @@ void GobanView::updateAnalysisOverlay() {
 
 	for (const auto& label : evaluationLabels(*report, labelledPositions,
 	                                          markupPositions, DEFAULT_EVAL_LABELS)) {
+		// No point to sit on, so it goes to the margin. updateFloatingLabels()
+		// runs immediately after this and picks it up.
+		if (label.pass) {
+			passSuggestion = label.text;
+			passSuggestionInk = label.color;
+			continue;
+		}
 		// A suggestion can only land on an empty point — the engine proposes
 		// legal moves — but the board is a frame behind the model during a
 		// capture, so check rather than assume.
@@ -978,6 +1004,24 @@ void GobanView::updateFloatingLabels() {
 			labels.push_back({glm::vec2(anchorCol, MARGIN_ROW), readoutText, size,
 			                  stale ? readoutStaleInk : readoutInk, 0u, readoutAlign});
 		}
+	}
+	// The engine's advice is to stop playing. It belongs to the *suggestions*
+	// feature, not the readout — it is a judgement about a move, read before you
+	// play, which is why the two toggles are separate — so it appears with the
+	// board labels and disappears with them, whatever the readout is doing.
+	if (!passSuggestion.empty()) {
+		constexpr float MARGIN_ROW = -0.425f;
+		const float size = 0.8f / static_cast<float>(model.getBoardSize());
+		const float lastCol = static_cast<float>(model.getBoardSize()) - 1.0f;
+		// The end of the margin the readout is not using. Right by default,
+		// because the readout is centred by default and the eye finds the end of
+		// a line there; left when the user has pushed the readout right, since
+		// two right-aligned strings share one anchor and would overprint.
+		const bool readoutOnTheRight = showEvaluationOnBoard && !readoutText.empty()
+		                               && readoutAlign == TextAlign::Right;
+		labels.push_back({glm::vec2(readoutOnTheRight ? 0.0f : lastCol, MARGIN_ROW),
+		                  passSuggestion, size, passSuggestionInk, 0u,
+		                  readoutOnTheRight ? TextAlign::Left : TextAlign::Right});
 	}
 	if (showCoordinates) {
 		const int N = static_cast<int>(model.getBoardSize());

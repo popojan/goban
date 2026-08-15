@@ -129,10 +129,19 @@ std::vector<EvalLabel> evaluationLabels(const AnalysisReport& report,
     // Ranked as the engine ranked them. `order` is authoritative where the
     // engine supplies it; visits are the fallback, exactly as the report's own
     // summary value is chosen.
+    // A pass is ranked with the rest even though it can never be drawn: it has
+    // no point on the board, but it is a legal candidate and KataGo does report
+    // `move pass` — routinely once the endgame is settled, which is exactly when
+    // this overlay is read most carefully. Dropping it here left the baseline
+    // below anchored on the best *drawable* move, so with pass genuinely best
+    // every board move was measured against the least bad of a bad set: the top
+    // one came out at zero loss, in the best-move colour, labelled A. The
+    // overlay was recommending that you fill your own territory.
     std::vector<const AnalysisMove*> ranked;
     ranked.reserve(report.moves.size());
     for (const auto& m : report.moves) {
-        if (m.visits > 0 && m.move == Move::NORMAL) ranked.push_back(&m);
+        if (m.visits <= 0) continue;
+        if (m.move == Move::NORMAL || m.move == Move::PASS) ranked.push_back(&m);
     }
     if (ranked.empty()) return out;
     std::stable_sort(ranked.begin(), ranked.end(),
@@ -150,6 +159,22 @@ std::vector<EvalLabel> evaluationLabels(const AnalysisReport& report,
     char letter = 'A';
     for (const AnalysisMove* m : ranked) {
         if (out.size() >= maxLabels) break;
+        // It counted towards the baseline; it cannot go on a point. It goes to
+        // the margin instead, and takes no letter — the same reason a tint-only
+        // move takes none: a board showing B and C with no A reads as broken.
+        // The word carries it, and the colour says how good it is.
+        if (m->move == Move::PASS) {
+            EvalLabel label;
+            label.pass = true;
+            // Explicitly off the board. A default Position is (0, 0) — a real
+            // point — so leaving it would hand a caller that forgot to check
+            // `pass` a plausible A1 to draw on.
+            label.pos = Position(-1, -1);
+            label.text = "pass";
+            label.color = moveQualityColor(std::abs(bestWinrate - m->winrateBlack));
+            out.push_back(label);
+            continue;
+        }
         const std::pair<int, int> key{m->move.pos.col(), m->move.pos.row()};
         if (markup.count(key)) continue;   // the user's own annotation wins
 
@@ -360,6 +385,35 @@ void AnalysisService::loop() {
         if (!enabled.load()) {
             if (client) stopEngine();
             setState(AnalysisState::Disabled);
+            havePending = false;
+            continue;
+        }
+        // A tsumego is a puzzle, and the engine's first suggestion *is* the
+        // answer. availableActions() already refuses both toggles here
+        // (UiActions.cpp), but a rule the commands honour and the renderer does
+        // not is the disabled-button-that-guards-nothing shape all over again:
+        // whoever switched the overlay on before loading the problem kept it,
+        // and could not switch it off, because the menu item was greyed.
+        //
+        // Suppressed, not stopped. Dropping the report silences all three
+        // surfaces at once — they each key off report() — while leaving the
+        // process alive, because respawning KataGo costs a weights load every
+        // time a problem is opened or closed.
+        if (model.tsumegoMode.load()) {
+            // Unconditionally, and before the report check below: leaving the
+            // state at Running while nothing streams would be a lie the scenario
+            // suite reads as success. setState is idempotent.
+            setState(AnalysisState::Disabled);
+            bool had = false;
+            {
+                std::lock_guard<std::mutex> lock(reportMutex);
+                if (lastReport) { lastReport.reset(); had = true; }
+            }
+            if (had) {
+                shownWinratePercent = -1;
+                shownHasScore = false;
+                if (onUpdate) onUpdate();
+            }
             havePending = false;
             continue;
         }

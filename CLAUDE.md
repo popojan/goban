@@ -376,9 +376,20 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   value because a reference handed out under a lock is not protected by it.
 
 ### Live Evaluation
-See `docs/adr/0007-analysis-engine-owns-its-own-pipe.md`; every rule here is one
+The feature issue #49 asks for. See
+`docs/adr/0007-analysis-engine-owns-its-own-pipe.md`; every rule here is one
 of its decisions, and `tests/test_analysis.cpp` plus
 `tests/scenarios/evaluation_*.scn` enforce them.
+- **A tsumego shows no evaluation at all.** The engine's first suggestion *is*
+  the answer to the problem. `availableActions()` refuses both toggles there,
+  but that is only half of it: the rule has to be enforced where the display is
+  produced, or whoever switched the overlay on before opening a problem keeps
+  it — and cannot switch it off, because the menu item is greyed by the very
+  rule meant to hide it. `AnalysisService::loop()` therefore drops the report
+  while `tsumegoMode` holds, which silences all three surfaces at once since
+  each keys off `report()`. Suppressed, not disabled: the process stays alive
+  (respawning KataGo costs a weights load per problem) and the user's toggles
+  are untouched, so closing the problem restores exactly what was on.
 - **The analysis engine is a separate process, always.** Never the coach's and
   never the kibitz engine's, even when all three are the same binary with the
   same command line. An analysis stream is a GTP command that deliberately never
@@ -456,6 +467,24 @@ of its decisions, and `tests/test_analysis.cpp` plus
 - **A report for another position is not drawn.** `updateAnalysisOverlay()`
   compares `report->positionId` against the snapshot's; drawing a stale one would
   put the engine's opinion of one position onto the stones of another.
+- **A recommended pass sets the baseline but takes no point.** KataGo reports
+  `move pass` like any other candidate, routinely once the endgame is settled.
+  Filtering it out before the baseline was taken left every board move measured
+  against the best of themselves, so the top one came out at zero loss, green,
+  wearing an `A` — the overlay recommended filling your own territory. It is
+  ranked with the rest, drawn in the margin as the word `pass`, and consumes no
+  letter, for the same reason a tint-only move consumes none. Its `pos` is set
+  to `(-1, -1)` explicitly: a default `Position` is `(0, 0)`, a real point, so a
+  caller that forgot to check `pass` would have annotated A1.
+- **The suggestions stand down at a scored end, like the readout.** Not merely
+  for tidiness — they shared a channel and did not survive it. `setBoardOverlay()`
+  writes `mAnnotation` into the same `glStones` float that `updateArea()` fills
+  with `mBlackArea`/`mWhiteArea`, and `updateArea()` writes only when a point's
+  *influence* changes, so the shading never came back; `removeBoardOverlay()`
+  then reset the point to `mEmpty`. Switching Best Moves on at a counted ending
+  erased the territory permanently. `scoredEnd` is the predicate, so a
+  resignation — which counted nothing — keeps its suggestions, and navigating
+  back off the end brings them back.
 - **Waking the renderer for a suggestion needs `UPDATE_STONES` too.** A label
   sets the annotation material, and that has to reach the stone upload or the
   grid stays drawn under it. This is why the publish gate does not ask for a

@@ -473,6 +473,52 @@ scored end it read `B+10.6` directly above the result line's `B+10.5`. The
 readout now stands down at `scoredEnd` — the result there is a fact, not an
 estimate. This is decision 13's exclusivity principle applied to the number.
 
+### Correction, 2026-08-15: the tsumego refusal was only half built
+
+The Stage 2 note above says tsumego is "settled … `availableActions()` refuses
+the toggle while `tsumegoMode` is set". It was not settled. Refusing the
+*command* leaves the *display* untouched, so switching the overlay on in an
+ordinary game and then opening a problem kept the stars on the answer — and the
+greyed menu item meant they could not be switched off again. A rule enforced
+only where it is asked about, and not where it takes effect, is the
+disabled-button-that-guards-nothing shape ADR-0005 was written about; this is
+the same mistake inside the feature that cites it.
+
+`AnalysisService::loop()` now drops the report while `tsumegoMode` holds. One
+place, because all three surfaces — panel, board labels, diegetic readout — key
+off `report()`. Suppressed rather than disabled: the process stays alive, since
+respawning KataGo costs a weights load each time a problem is opened or closed,
+and the user's two toggles are left exactly as they were, so closing the problem
+restores what was on. `tests/scenarios/evaluation_tsumego.scn` runs the order
+that produced the bug — evaluation on *first*, problem loaded second — and
+asserts the flags survive, which is what stops a future fix from "solving" it by
+clearing them.
+
+### Correction, 2026-08-15: what the board suggestions did to the endgame
+
+Two defects, both at the end of a game and both found by playing one.
+
+**A recommended pass was dropped before the quality baseline was taken.** KataGo
+reports `move pass` like any other candidate, and does so routinely once the
+endgame is settled — which is when this overlay is read most carefully. Skipping
+it left the board moves measured against the best of *themselves*, so the top
+one came out at zero loss, drawn in the best-move colour and labelled `A`. The
+overlay recommended filling your own territory. It now ranks with the rest and
+is drawn in the margin as the word `pass`, taking no letter — the same reason a
+tint-only move takes none. It belongs to the *suggestions* toggle rather than
+the readout, because naming a move is a judgement read before you play, which is
+the distinction decision 14 draws between the two toggles.
+
+**Switching the suggestions on at a scored end erased the territory.** Not
+covered it — erased it. `setBoardOverlay()` writes `mAnnotation` into the same
+`glStones` float that `updateArea()` fills with `mBlackArea`/`mWhiteArea`, and
+`updateArea()` only writes when a point's influence *changes*, so the shading
+never returned; `removeBoardOverlay()` then reset the point to `mEmpty`. The
+fix is the one decision 13 already made for the readout: at a scored end the
+board has finished making its claim, and what to play next is not a question it
+is being asked. `scoredEnd` is the predicate for both, so a resignation keeps
+its suggestions and navigating back off the end brings them back.
+
 ## What this does not change
 
 The coach, the kibitz engine, and the sync invariant are untouched. Space still

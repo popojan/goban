@@ -218,6 +218,11 @@ struct EvalLabel {
     /// board; text keeps whatever meaning it already had.
     std::string text;
     glm::vec4 color{0.0f, 0.0f, 0.0f, 1.0f};
+    /// A suggestion to *pass*, which has no `pos` and so belongs in the margin
+    /// rather than on a point. The caller draws it as a floating label; the
+    /// colour still comes off the same quality ramp, so a pass that is clearly
+    /// best is as green as a board move would be.
+    bool pass = false;
 };
 
 /// Win-rate loss against the best move — 0 for the best move itself — mapped
@@ -235,6 +240,13 @@ glm::vec4 moveQualityColor(double winrateLoss);
 /// own labelling survives and colour still means quality. `markup` are points
 /// carrying explicit SGF annotation, which is the user's own and is left
 /// entirely alone.
+///
+/// A suggested **pass** sets the quality baseline but produces no label, having
+/// no point to sit on. That is deliberate rather than an omission: it is what
+/// makes the board moves show their true loss once passing is best, which is the
+/// settled endgame — where the engine's advice is "stop playing", and where
+/// measuring the board moves against each other instead paints the least bad of
+/// them as correct.
 ///
 /// Pure over plain data, for the reason `availableActions()` is: it tests
 /// without a board, a GL context or a thread.

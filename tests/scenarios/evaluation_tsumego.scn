@@ -1,0 +1,60 @@
+# config: mock-eval.json
+#
+# A tsumego is a puzzle, and the engine's first suggestion *is* the answer, so
+# the live evaluation stands down there entirely.
+#
+# availableActions() has said so since the feature landed, but only the *toggle
+# commands* asked. The renderer did not: whoever switched the overlay on before
+# opening a problem kept it, stars and all — and could not switch it off, since
+# the menu item was greyed by the very rule that was supposed to hide it. Same
+# shape as every disabled button this codebase has found that guarded nothing.
+#
+# The order below is the bug: evaluation is turned on *first*, in an ordinary
+# game, and the problem is loaded afterwards.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/evaluation_tsumego.scn
+
+new_game 9
+wait_idle
+switch_player white Human
+wait_idle
+expect can_evaluation true
+
+toggle_evaluation on
+toggle_evaluation_moves on
+wait_until eval_state running
+wait_until eval_labels 2
+expect eval_moves_shown true
+
+# Load the problem with all of that still on.
+load_tsumego tests/data/tsumego.sgf
+wait_idle
+expect tsumego true
+
+# The policy already refused the toggles; now the display agrees with it.
+expect can_evaluation false
+wait_until eval_state disabled
+expect eval_labels 0
+expect eval_tints 0
+expect eval_board_text ""
+
+# Suppressed, not switched off: the user's choice is untouched, so it is still
+# there to restore. Asserting this is what stops a future fix from "solving" the
+# problem by clearing the flags — that would silently lose the setting every
+# time a problem is opened.
+expect eval_enabled true
+expect eval_moves_shown true
+
+# And the refusal is real, not merely a greyed menu item.
+toggle_evaluation off
+expect eval_enabled true
+toggle_evaluation_moves off
+expect eval_moves_shown true
+
+# Leaving the puzzle brings it back, unchanged.
+new_game 9
+wait_idle
+expect tsumego false
+expect can_evaluation true
+wait_until eval_state running
+wait_until eval_labels 2

@@ -1,0 +1,61 @@
+# config: mock-eval.json
+#
+# The suggestions stand down at a scored end, where the territory patches are.
+#
+# They shared a channel and did not survive it: setBoardOverlay() writes
+# mAnnotation into the same float of glStones that updateArea() fills with
+# mBlackArea/mWhiteArea, and updateArea() only writes when a point's influence
+# *changes* — so once a label had been laid over a counted point the shading
+# never returned, and removing the label reset the point to empty. Switching
+# Best Moves on at the end of a counted game erased the territory for good.
+#
+# The rule is the readout's (ADR-0007 decision 13): the game is over and
+# counted, so what to play next is not a question the board is being asked.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/evaluation_scored_end.scn
+
+new_game 9
+wait_idle
+switch_player white Human
+wait_idle
+
+toggle_evaluation on
+toggle_evaluation_moves on
+wait_until eval_state running
+
+# Mid-game the suggestions are drawn, which is what makes the silence below a
+# result rather than a feature that never worked.
+wait_until eval_labels 2
+
+# Two passes end and score the game. RE lags the phase, and wait_idle does not
+# cover scoring, so the result is what to wait on.
+pass
+wait_until move_count >= 1
+wait_idle
+pass
+wait_until phase finished
+wait_until has_result true
+wait_idle
+wait_until show_territory true
+
+# Counted. The engine is still running and still has opinions — it is the
+# *drawing* that stops, not the analysis.
+wait_until eval_labels 0
+expect eval_tints 0
+expect eval_state running
+
+# And switching them on again here does nothing, which is the actual bug: this
+# is the press that used to wipe the board.
+toggle_evaluation_moves off
+wait_idle
+toggle_evaluation_moves on
+wait_idle
+expect eval_labels 0
+expect show_territory true
+
+# Off the end of the game the position is no longer a scored one, so they come
+# back — scoredEnd follows the cursor.
+navigate_back
+wait_idle
+expect show_territory false
+wait_until eval_labels 2
