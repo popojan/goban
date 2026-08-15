@@ -39,8 +39,13 @@ expect log_badge warning
 
 # The game itself is untouched — the analysis engine never shared a pipe with
 # the playing one, so its failure cannot reach the board.
+#
+# `wait_until`, not `wait_idle` then `expect`: a click hands the move to a
+# LocalHumanPlayer blocked in genmove(), and until the game loop wakes and picks
+# it up nothing is thinking, queued or deferred — so isIdle() is momentarily true
+# with the move not yet in the record. And White is the mock here, so the count
+# does not stop at 1 either.
 click 2 2
 click 2 2
-wait_idle
-expect move_count 1
+wait_until move_count >= 1
 expect phase playing

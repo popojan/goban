@@ -203,6 +203,13 @@ Four rules learned the hard way:
   Use `>=`, or compare against another key.
 - **`wait_idle`, not `wait <ms>`.** Navigation is queued onto the game thread,
   so a fixed sleep is both slower and less reliable.
+- **But `wait_idle` does not cover a click.** A click hands the move to a
+  `LocalHumanPlayer` blocked in `genmove()`; until the game loop wakes and takes
+  it, nothing is thinking, queued, syncing or deferred, so `isIdle()` is briefly
+  true with the move not yet in the record. Observed as `move_count 0` alongside
+  `color_to_move` already flipped and `unsaved_changes true` — roughly one run in
+  eight. After a click use `wait_until move_count >= n`, not `wait_idle` followed
+  by `expect`.
 - **Board coordinates are not SGF coordinates.** `click <col> <row>` takes board
   columns and rows, and board rows run opposite to SGF rows: board row N is SGF
   row `size-1-N`. `B[bh]` on a 9×9 is `click 1 1`. Getting it backwards is

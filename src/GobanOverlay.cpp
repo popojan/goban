@@ -56,7 +56,11 @@ bool GobanOverlay::init() {
         glyphy_point_t p = {.0, .0};
         b->move_to(&p);
         spdlog::debug("Adding text glyphs[{0}]", i);
-	    b->add_text("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#^O", font, 12.0);
+        // Warms the atlas; the geometry is cleared before anything is drawn, so
+        // the colour is irrelevant here.
+        static const GLfloat white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+	    b->add_text("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#^O",
+	                font, 12.0, white);
 		buffer[i] = b;
 	}
 
@@ -95,7 +99,12 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 				}
                 glyphy_point_t pos = { model.metrics.squareSizeX * posX, -model.metrics.squareSizeY * posY };
 				buffer[layer]->move_to(&pos);
-				buffer[layer]->add_text(point.overlay.text.c_str(), font, font_size);
+				// The layer's colour, carried per glyph. Identical output to the
+				// uniform it replaces, but the buffer is no longer limited to
+				// one colour — which is what lets a future caller tint a single
+				// label without a layer of its own.
+				buffer[layer]->add_text(point.overlay.text.c_str(), font, font_size,
+				                        glm::value_ptr(layers[layer].color));
 				cnt += 1;
 			}
 			idx++;
@@ -134,7 +143,10 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 
 		glm::mat4 m(cam.setView());
 
-		st->set_color(glm::value_ptr(layers[layer].color));
+		// White: the colour now travels with each glyph, and u_color is a global
+		// multiplier over it. Leaving the layer colour here would square it.
+		static const float noTint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+		st->set_color(const_cast<float*>(noTint));
 		st->fast_setup();
 
 		using namespace glm;

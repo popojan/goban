@@ -73,7 +73,8 @@ void GlyphyBuffer::current_point (
 void GlyphyBuffer::add_text (
     const char *utf8,
     std::shared_ptr<GlyphyFont> font,
-    double font_size)
+    double font_size,
+    const GLfloat *color)
 {
     FT_Face face = font->get_face ();
     glyphy_point_t top_left = cursor;
@@ -122,7 +123,8 @@ void GlyphyBuffer::add_text (
             /* Update ink extents */
             glyphy_extents_t ink_extents;
 
-            demo_shader_add_glyph_vertices(cursor, font_size, &gi, vertices, &ink_extents, extents_only);
+            demo_shader_add_glyph_vertices(cursor, font_size, &gi, vertices, &ink_extents,
+                                           extents_only, color);
             max_y = std::max(max_y, font_size*(gi.extents.max_y - gi.extents.min_y));
             glyphy_extents_extend(&ink_extents, &ink_extents);
             glyphy_point_t corner;
@@ -145,6 +147,7 @@ void GlyphyBuffer::draw ()
     GLint program;
     glGetIntegerv (GL_CURRENT_PROGRAM, &program);
     GLuint a_glyph_vertex_loc = glGetAttribLocation (program, "a_glyph_vertex");
+    GLint a_glyph_color_loc = glGetAttribLocation (program, "a_glyph_color");
     glBindBuffer (GL_ARRAY_BUFFER, buf_name);
     if (dirty) {
         glBufferData (GL_ARRAY_BUFFER,  sizeof (glyph_vertex_t) * vertices->size (),
@@ -153,6 +156,18 @@ void GlyphyBuffer::draw ()
     }
     glEnableVertexAttribArray (a_glyph_vertex_loc);
     glVertexAttribPointer (a_glyph_vertex_loc, 4, GL_FLOAT, GL_FALSE, sizeof (glyph_vertex_t), 0);
+    /* A replaced overlay shader need not declare it; the location is then -1 and
+     * every glyph falls back to u_color, which is what upstream glyphy does.
+     * demo_shader_create_program() warns about that once, at link time. */
+    if (a_glyph_color_loc >= 0) {
+        glEnableVertexAttribArray (a_glyph_color_loc);
+        glVertexAttribPointer (a_glyph_color_loc, 4, GL_FLOAT, GL_FALSE,
+                               sizeof (glyph_vertex_t),
+                               (const GLvoid *) offsetof (glyph_vertex_t, r));
+    }
     glDrawArrays (GL_TRIANGLES, 0, vertices->size ());
+    if (a_glyph_color_loc >= 0) {
+        glDisableVertexAttribArray (a_glyph_color_loc);
+    }
     glDisableVertexAttribArray (a_glyph_vertex_loc);
 }
