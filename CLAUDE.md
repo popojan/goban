@@ -424,6 +424,10 @@ of its decisions, and `tests/test_analysis.cpp` plus
   grid units. So a margin coordinate needs no per-size arithmetic. Unlike a point
   overlay it touches no material — there is no grid out there to erase — and
   nothing clears it when a stone lands. `add_text` centres on the point given.
+- **`add_text` centres on its point** — that is what puts a move number over the
+  middle of its intersection — and takes a `TextAlign` to place the point at the
+  left or right edge of the text instead. The alignment is applied after the
+  measuring pass, which is the only moment the text width is known.
 - **Every character drawn must be in the atlas string** (`GobanOverlay.cpp:59`).
   The font is not the gate; that string is. A glyph absent from it simply does
   not appear, silently.

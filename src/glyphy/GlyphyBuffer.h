@@ -27,6 +27,9 @@
 #include "GlyphyShader.h"
 
 
+/// Where the point passed to `move_to()` sits relative to the text.
+enum class TextAlign { Center, Left, Right };
+
 class GlyphyBuffer {
 public:
 	GlyphyBuffer();
@@ -52,7 +55,8 @@ public:
 			const char *utf8,
 			std::shared_ptr<GlyphyFont> font,
 			double font_size,
-			const GLfloat *color
+			const GLfloat *color,
+			TextAlign align = TextAlign::Center
 	);
 
 	void draw ();

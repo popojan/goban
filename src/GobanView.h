@@ -18,6 +18,7 @@
 
 #include <string>
 #include <atomic>
+#include <optional>
 #include "GobanOverlay.h"
 #include <RmlUi/Core/Types.h>
 #include "GobanShader.h"
@@ -189,6 +190,16 @@ public:
     /// which colour leads, and how the score is written.
     [[nodiscard]] const std::string& evaluationReadoutText() const { return readoutText; }
 
+    /// Where the readout sits along the board edge. An aesthetic choice, so it
+    /// is offered rather than decided: centred under the board, or tucked
+    /// against the left or right grid line.
+    void setEvaluationAlign(TextAlign align);
+    [[nodiscard]] TextAlign evaluationAlign() const { return readoutAlign; }
+    static const char* alignName(TextAlign align);
+    /// Parses a name back, returning nullopt for anything else so a caller can
+    /// tell a typo from a choice.
+    static std::optional<TextAlign> parseAlign(const std::string& name);
+
     /// Off by default, and that is the point. The panel's numbers are read
     /// *after* a move, so a player can invent their own and judge it. Stars on
     /// the board are read *before*, and once the engine has pointed at a point
@@ -255,6 +266,7 @@ public:
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
     bool showAnalysisOverlay = false;
     bool showEvaluationOnBoard = false;
+    TextAlign readoutAlign = TextAlign::Center;
     std::string readoutText;
     const AnalysisService* analysis = nullptr;
     /// Kept apart because they are undone differently: a label this overlay

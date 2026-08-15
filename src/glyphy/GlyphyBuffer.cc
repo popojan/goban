@@ -74,7 +74,8 @@ void GlyphyBuffer::add_text (
     const char *utf8,
     std::shared_ptr<GlyphyFont> font,
     double font_size,
-    const GLfloat *color)
+    const GLfloat *color,
+    TextAlign align)
 {
     FT_Face face = font->get_face ();
     glyphy_point_t top_left = cursor;
@@ -136,8 +137,19 @@ void GlyphyBuffer::add_text (
             glyphy_extents_add(&logical_extents, &corner);
             cursor.x += font_size * gi.advance;
         }
-        cursor.x = origin.x + (origin.x - cursor.x) / 2;
-        cursor.y = origin.y + (origin.y - cursor.y + max_y) / 2;
+        // The measuring pass has just walked the whole string, so the cursor is
+        // now one text-width past the origin. Put it back where the emitting
+        // pass should start. Centring is the historical behaviour and stays the
+        // default: a move number belongs over the middle of its intersection.
+        if (extents_only) {
+            const double width = cursor.x - origin.x;
+            switch (align) {
+                case TextAlign::Left:   cursor.x = origin.x; break;
+                case TextAlign::Right:  cursor.x = origin.x - width; break;
+                case TextAlign::Center: cursor.x = origin.x - 0.5 * width; break;
+            }
+            cursor.y = origin.y + (origin.y - cursor.y + max_y) / 2;
+        }
     }
     dirty = true;
 }

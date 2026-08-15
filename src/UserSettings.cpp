@@ -48,6 +48,10 @@ void UserSettings::load() {
             evaluationOnBoard = user["evaluation_on_board"].get<bool>();
         }
 
+        if (user.contains("evaluation_align")) {
+            evaluationAlign = user["evaluation_align"].get<std::string>();
+        }
+
         if (user.contains("last_sgf_path")) {
             lastSgfPath = user["last_sgf_path"].get<std::string>();
         }
@@ -199,6 +203,7 @@ std::string UserSettings::serialize() const {
     user["evaluation_enabled"] = evaluationEnabled;
     user["evaluation_moves"] = evaluationMoves;
     user["evaluation_on_board"] = evaluationOnBoard;
+    user["evaluation_align"] = evaluationAlign;
     if (!lastSgfPath.empty()) {
         user["last_sgf_path"] = lastSgfPath;
     }
@@ -289,6 +294,12 @@ void UserSettings::setEvaluationMoves(bool value) {
 void UserSettings::setEvaluationOnBoard(bool value) {
     std::lock_guard<std::mutex> lock(mutex);
     evaluationOnBoard = value;
+    saveLocked();
+}
+
+void UserSettings::setEvaluationAlign(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    evaluationAlign = value;
     saveLocked();
 }
 

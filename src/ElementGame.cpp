@@ -561,6 +561,9 @@ void ElementGame::performDeferredInitialization() {
     // pointing at the board.
     view.setAnalysisOverlay(UserSettings::instance().getEvaluationMoves());
     view.setEvaluationOnBoard(UserSettings::instance().getEvaluationOnBoard());
+    if (auto align = GobanView::parseAlign(UserSettings::instance().getEvaluationAlign())) {
+        view.setEvaluationAlign(*align);
+    }
 
     // Invalidate view state to force OnUpdate to sync all dropdowns
     // (model and view start with identical defaults, so diffs won't fire otherwise)

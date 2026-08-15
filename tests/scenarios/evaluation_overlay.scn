@@ -144,6 +144,17 @@ expect eval_winrate 60
 # and the mock reports a 2.5 point lead for the side to move, who is Black.
 wait_until eval_board_text B 60% B+2.5
 
+# Alignment is the user's choice, not ours. Centred by default; the bare command
+# cycles, which is how it gets judged by eye.
+expect eval_align center
+evaluation_align right
+expect eval_align right
+evaluation_align
+expect eval_align center
+evaluation_align left
+expect eval_align left
+evaluation_align center
+
 toggle_evaluation_board off
 expect eval_on_board false
 # wait_until, not expect: this key reports what was last *drawn*, so it needs a

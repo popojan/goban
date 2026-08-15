@@ -873,10 +873,20 @@ void GobanView::updateEvaluationReadout() {
 			// wood on every board size, because the constant in Metrics::calc()
 			// is in grid units. Centre of that strip is -0.425.
 			constexpr float MARGIN_ROW = -0.425f;
-			// Around 1.5x a move number, which is 0.42 spacings. Leaves room
-			// inside the 0.85 strip for the descenders and a little air.
-			const float size = 0.60f * model.metrics.squareSizeY;
-			const float halfN = 0.5f * static_cast<float>(model.getBoardSize()) - 0.5f;
+			// The same size as a move number. Larger read as shouting; matching
+			// the annotations already on the board makes it belong to the same
+			// object rather than sit on top of one.
+			const float size = 0.8f / static_cast<float>(model.getBoardSize());
+			const float lastCol = static_cast<float>(model.getBoardSize()) - 1.0f;
+			const float halfN = 0.5f * lastCol;
+
+			// Alignment is an aesthetic choice, so it is the user's. The anchor
+			// moves with it: right-aligned text hanging off the middle of the
+			// board would look like a mistake, so each alignment anchors to the
+			// grid line it belongs against.
+			float anchorCol = halfN;
+			if (readoutAlign == TextAlign::Left)  anchorCol = 0.0f;
+			if (readoutAlign == TextAlign::Right) anchorCol = lastCol;
 
 			std::ostringstream text;
 			text << (report->winrateBlack >= 0.5 ? "B " : "W ")
@@ -897,11 +907,33 @@ void GobanView::updateEvaluationReadout() {
 			// add_text centres on the point, so this is the middle of the board
 			// edge. Black on wood, like every other board-level label.
 			readoutText = text.str();
-			labels.push_back({glm::vec2(halfN, MARGIN_ROW), readoutText, size,
-			                  glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 0u});
+			labels.push_back({glm::vec2(anchorCol, MARGIN_ROW), readoutText, size,
+			                  glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 0u, readoutAlign});
 		}
 	}
 	gobanOverlay.setFloatingLabels(std::move(labels));
+}
+
+const char* GobanView::alignName(TextAlign align) {
+	switch (align) {
+		case TextAlign::Left:   return "left";
+		case TextAlign::Right:  return "right";
+		case TextAlign::Center: return "center";
+	}
+	return "center";
+}
+
+std::optional<TextAlign> GobanView::parseAlign(const std::string& name) {
+	if (name == "center" || name == "centre") return TextAlign::Center;
+	if (name == "left")  return TextAlign::Left;
+	if (name == "right") return TextAlign::Right;
+	return std::nullopt;
+}
+
+void GobanView::setEvaluationAlign(TextAlign align) {
+	if (readoutAlign == align) return;
+	readoutAlign = align;
+	requestRepaint(UPDATE_OVERLAY);
 }
 
 bool GobanView::toggleEvaluationOnBoard() {

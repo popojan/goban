@@ -1,6 +1,7 @@
 #ifndef GOBAN_GOBANOVERLAY_H
 #define GOBAN_GOBANOVERLAY_H
 
+#include  "glyphy/GlyphyBuffer.h"
 #include  "glyphy/GlyphyFont.h"
 #include "GobanModel.h"
 #include "Camera.h"
@@ -35,6 +36,7 @@ struct FloatingLabel {
 	float size;           ///< Em size in world units, as add_text takes it.
 	glm::vec4 color;
 	unsigned layer;       ///< Which pass and height. 0 is the board surface.
+	TextAlign align = TextAlign::Center;  ///< Where boardPos sits in the text.
 };
 
 class GobanOverlay {

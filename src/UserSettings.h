@@ -64,6 +64,11 @@ public:
     bool getEvaluationOnBoard() const { std::lock_guard<std::mutex> lock(mutex); return evaluationOnBoard; }
     void setEvaluationOnBoard(bool value);
 
+    /// Where the board readout sits along the edge: "center", "left", "right".
+    /// A taste question, so it is stored rather than decided.
+    std::string getEvaluationAlign() const { std::lock_guard<std::mutex> lock(mutex); return evaluationAlign; }
+    void setEvaluationAlign(const std::string& value);
+
     // Last SGF (for resuming after restart)
     std::string getLastSgfPath() const { std::lock_guard<std::mutex> lock(mutex); return lastSgfPath; }
     void setLastSgfPath(const std::string& value);
@@ -195,6 +200,7 @@ private:
     bool evaluationEnabled = false;
     bool evaluationMoves = false;
     bool evaluationOnBoard = false;
+    std::string evaluationAlign = "center";
 
     // Last SGF
     std::string lastSgfPath;

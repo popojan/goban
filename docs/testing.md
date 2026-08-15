@@ -287,8 +287,8 @@ For the board suggestions: `eval_moves_shown` (the toggle, off by default),
 `eval_labels` (suggestions this overlay labelled) and `eval_tints` (suggestions
 that landed on a move already in the record and were only coloured). The split
 between the last two *is* the combine rule, which is why they are separate keys.
-For the diegetic readout: `eval_on_board` (the toggle) and `eval_board_text`, the
-composed string. The glyphs are never drawn in a headless run, so that string is
+For the diegetic readout: `eval_on_board` (the toggle), `eval_align`
+(`center`/`left`/`right`) and `eval_board_text`, the composed string. The glyphs are never drawn in a headless run, so that string is
 the only way to check the readout's *content* — which colour leads, how the score
 is written. Both report what was last **drawn**, so they need `wait_until` rather
 than `expect` right after a toggle.

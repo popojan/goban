@@ -130,7 +130,7 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 			};
 			buffer[layer]->move_to(&pos);
 			buffer[layer]->add_text(label.text.c_str(), font, label.size,
-			                        glm::value_ptr(label.color));
+			                        glm::value_ptr(label.color), label.align);
 			cnt += 1;
 		}
 

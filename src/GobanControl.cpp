@@ -555,6 +555,32 @@ void GobanControl::buildRegistry() {
         ctx.checked = next;
     });
 
+    add("evaluation_align", 0, 1,
+        "[left|center|right] — where the board readout sits along the edge; "
+        "with no argument, cycles through them",
+        [this](CommandContext& ctx) {
+        TextAlign next;
+        if (ctx.args.empty()) {
+            // Cycling is for judging it by eye, which is the only way this
+            // choice can be made.
+            switch (view.evaluationAlign()) {
+                case TextAlign::Center: next = TextAlign::Left;   break;
+                case TextAlign::Left:   next = TextAlign::Right;  break;
+                case TextAlign::Right:  next = TextAlign::Center; break;
+            }
+        } else {
+            const auto parsed = GobanView::parseAlign(toLower(ctx.args[0]));
+            if (!parsed) {
+                spdlog::warn("evaluation_align: expected left, center or right, got '{}'",
+                             ctx.args[0]);
+                return;
+            }
+            next = *parsed;
+        }
+        view.setEvaluationAlign(next);
+        UserSettings::instance().setEvaluationAlign(GobanView::alignName(next));
+    });
+
     add("genmove", 0, 0, "reserved for a future \"resume match from here\" feature (no-op)",
         [](CommandContext&) {
     });
@@ -1682,6 +1708,7 @@ nlohmann::json GobanControl::dumpState() const {
         s["eval_moves_shown"] = view.isAnalysisOverlayShown();
         s["eval_on_board"] = view.isEvaluationOnBoard();
         s["eval_board_text"] = view.evaluationReadoutText();
+        s["eval_align"] = GobanView::alignName(view.evaluationAlign());
         s["eval_labels"]  = static_cast<int>(view.analysisLabelCount());
         // Suggestions that landed on a move already in the record: the label
         // stays and only takes on colour. The split between these two keys is
