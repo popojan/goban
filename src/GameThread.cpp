@@ -1050,8 +1050,27 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             }
 
             const Color responseColor = model.state.colorToMove;
-            spdlog::debug("kibitz: asking [{}] for a {} move at the cursor",
-                          kibitz->getName(), responseColor.toString());
+            spdlog::info("kibitz: asking [{}] for a {} move at the cursor",
+                         kibitz->getName(), responseColor.toString());
+
+            // Announce it the way an ordinary genmove is announced. A kibitz
+            // asked from the navigation queue never set this, so `isThinking()`
+            // stayed false for its whole duration: the toolbar did not grey, no
+            // engine was named, navigation was not blocked, and nothing on
+            // screen distinguished "KataGo is thinking" from "the button did
+            // nothing". On a CPU backend that silence lasts tens of seconds, and
+            // it is the whole of what a bug report described as "nothing
+            // happened" — twice.
+            //
+            // Setting it is also correct beyond the display: an engine is in
+            // fact busy, so ADR-0001's refusals and the analysis overlay's yield
+            // both want to know.
+            struct ThinkingScope {
+                std::atomic<Player*>& slot;
+                ~ThinkingScope() { slot = nullptr; }
+            } scope{playerToMove};
+            playerToMove = kibitz;
+
             Move response = kibitz->genmove(responseColor);
             if (!response || response == Move::RESIGN) {
                 spdlog::warn("kibitz: [{}] offered no move for {} — it answered {}",

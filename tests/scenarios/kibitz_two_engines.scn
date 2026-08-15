@@ -31,7 +31,18 @@ wait_idle
 expect at_end false
 expect phase paused
 
+# The kibitz engine thinks for 2 s here, which is the point: a real one on a CPU
+# backend takes far longer, and a nav-queue genmove used not to set
+# `playerToMove` at all. `isThinking()` therefore stayed false for the whole
+# search — the toolbar did not grey, no engine was named, navigation was not
+# blocked, and a bug report described the silence as "nothing happened".
 play once
+wait 400
+expect thinking true
+expect can_navigate false
+expect can_kibitz false
+
 wait_until move_count >= 3
 expect at_end true
 expect phase paused
+expect thinking false

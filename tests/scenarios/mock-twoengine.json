@@ -5,7 +5,7 @@
     { "name": "coachmock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
       "parameters": "", "enabled": 1, "main": 1 },
     { "name": "kibitzmock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
-      "parameters": "", "enabled": 1, "kibitz": 1 }
+      "parameters": "--think-ms 2000", "enabled": 1, "kibitz": 1 }
   ],
   "humans": [ "Human" ],
   "sgf_dialog": { "games_path": "./tests/scenarios/.games" }
