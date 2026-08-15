@@ -300,9 +300,12 @@
       "height": 0.85
     }
   ],
-  "_comment_annotations": "Ink for text drawn on the board itself. readout_color is the evaluation readout on the near edge: #rgb, #rrggbb or #rrggbbaa. Alpha is the interesting part - a dark, part-transparent ink reads as part of the wood rather than printed on top of it. Overridden per user by the evaluation_color command.",
+  "_comment_annotations": "Text drawn on the board itself. Colours are #rgb, #rrggbb or #rrggbbaa; alpha is the interesting part, since a dark part-transparent ink reads as part of the wood rather than printed on top of it. readout_color is the evaluation readout on the near margin and readout_stale_color is the same while it describes a position you have navigated away from - equal to readout_color means no marking at all. coordinate_color is the column letters and row numbers. coordinate_offset is how far out into the margin they sit, in grid spacings from the outermost line: the wood extends 0.85, so 0.425 centres them in it and about 0.7 is as far as they go before hanging off the edge. Live overrides: evaluation_color, coordinate_color, coordinate_offset. These sit here rather than in a shader entry because every shader currently draws the same wood, so per-shader ink would be six copies of one value; the day a shader redefines the board dark, add an annotations block to that shader entry and let it override this one - the fallback is already the right shape for that and needs no migration.",
   "annotations": {
-    "readout_color": "#00000040"
+    "readout_color": "#00000040",
+    "readout_stale_color": "#00000040",
+    "coordinate_color": "#00000040",
+    "coordinate_offset": 0.5
   },
   "overlay_shaders": {
     "vertex": "./config/shaders/overlay/overlay-vertex.glsl",

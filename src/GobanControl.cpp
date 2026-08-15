@@ -610,6 +610,26 @@ void GobanControl::buildRegistry() {
         UserSettings::instance().setEvaluationColor(hexFromColor(*parsed));
     });
 
+    add("coordinate_offset", 0, 1,
+        "[spacings] — how far the coordinate labels sit into the margin; 0.425 "
+        "centres them, past ~0.7 they hang off the wood",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->showMessage(std::to_string(view.coordinateOffset()));
+            return;
+        }
+        try {
+            const float offset = std::stof(ctx.args[0]);
+            if (offset > GobanView::MAX_SAFE_COORD_OFFSET) {
+                parent->showMessage("Past the edge of the wood — the margin is "
+                                    "0.85 spacings");
+            }
+            view.setCoordinateOffset(offset);
+        } catch (const std::exception&) {
+            spdlog::warn("coordinate_offset: '{}' is not a number", ctx.args[0]);
+        }
+    });
+
     add("coordinate_color", 0, 1,
         "[#rrggbb|#rrggbbaa|reset] — the ink of the board's coordinate labels",
         [this](CommandContext& ctx) {
@@ -1786,6 +1806,7 @@ nlohmann::json GobanControl::dumpState() const {
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());
         s["coordinates_shown"] = view.areCoordinatesShown();
         s["coord_color"] = hexFromColor(view.coordinateColor());
+        s["coord_offset"] = view.coordinateOffset();
         s["eval_color"] = hexFromColor(view.readoutColor());
         s["eval_labels"]  = static_cast<int>(view.analysisLabelCount());
         // Suggestions that landed on a move already in the record: the label

@@ -216,6 +216,15 @@ public:
     /// `annotations.coordinate_color` ships it, `coordinate_color` overrides it.
     void setCoordinateColor(const glm::vec4& color);
     [[nodiscard]] const glm::vec4& coordinateColor() const { return coordinateInk; }
+
+    /// How far the coordinate labels sit out into the margin, in grid spacings
+    /// from the outermost line. The wood extends 0.85, so 0.425 centres them in
+    /// it; past about 0.7 the glyphs start to hang off the edge, and a full 1.0
+    /// — where the next grid line would fall — needs a wider margin than the
+    /// board has (`Metrics::calc()`'s 0.85).
+    void setCoordinateOffset(float spacings);
+    [[nodiscard]] float coordinateOffset() const { return coordOffset; }
+    static constexpr float MAX_SAFE_COORD_OFFSET = 0.7f;
     [[nodiscard]] const glm::vec4& readoutColor() const { return readoutInk; }
 
     /// Column letters along the top margin and row numbers down the left, in
@@ -294,6 +303,7 @@ public:
     bool showEvaluationOnBoard = false;
     bool showCoordinates = false;
     glm::vec4 coordinateInk{0.0f, 0.0f, 0.0f, 1.0f};
+    float coordOffset = 0.425f;
     TextAlign readoutAlign = TextAlign::Center;
     glm::vec4 readoutInk{0.0f, 0.0f, 0.0f, 1.0f};
     /// Ink for a readout describing a position that has been left. Follows

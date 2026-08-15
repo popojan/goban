@@ -456,6 +456,12 @@ of its decisions, and `tests/test_analysis.cpp` plus
 - **Stale is a second colour, not a factor.** `annotations.readout_stale_color`
   defaults to `readout_color`, so the guard is invisible until someone opts in.
   Multiplying an alpha the user has already tuned down has no defensible default.
+- **Annotation ink is global, not per shader — for now.** It arguably belongs to
+  the shader, which is what decides the board is wood-coloured; but all six
+  shaders draw the same board today, so per-shader ink would be six copies of one
+  value. `annotations` in `config/base.json` is the default, and a shader entry
+  gaining its own `annotations` block to override it is a pure addition whenever
+  a dark-board shader makes it stop being duplication.
 - **A shipped default goes in `config/base.json`, a user's choice in `user.json`,
   and an unmade choice is written nowhere.** `annotations.readout_color` ships the
   readout's ink; `evaluation_color` overrides it. `UserSettings` writes

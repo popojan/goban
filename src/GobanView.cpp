@@ -78,6 +78,15 @@ GobanView::GobanView(GobanModel& m)
                              "#rrggbb or #rrggbbaa", coordConfigured);
             }
         }
+        const auto annotations = config->data.value("annotations", nlohmann::json::object());
+        if (annotations.contains("coordinate_offset")) {
+            const float offset = annotations.value("coordinate_offset", 0.425f);
+            if (offset > MAX_SAFE_COORD_OFFSET) {
+                spdlog::warn("annotations.coordinate_offset {} puts the labels off "
+                             "the wood; the margin is 0.85 spacings wide", offset);
+            }
+            coordOffset = offset;
+        }
         const std::string staleConfigured = config->data
                 .value("annotations", nlohmann::json::object())
                 .value("readout_stale_color", std::string());
@@ -973,11 +982,11 @@ void GobanView::updateFloatingLabels() {
 	if (showCoordinates) {
 		const int N = static_cast<int>(model.getBoardSize());
 		const float size = 0.8f / static_cast<float>(N);
-		// The margin centres: 0.85 grid spacings of wood past the outermost
-		// line, on every board size. Top and left, always — fixed whether or not
-		// the readout is on, so nothing ever moves and the bottom edge stays
-		// free for it by construction.
-		constexpr float MARGIN = 0.425f;
+		// Out into the margin by `coordOffset` spacings. The wood runs 0.85
+		// past the outermost line on every board size, so 0.425 sits in the
+		// middle of it. Top and left, always — fixed whether or not the readout
+		// is on, so nothing ever moves and the bottom edge stays free for it.
+		const float MARGIN = coordOffset;
 		for (int col = 0; col < N; ++col) {
 			labels.push_back({glm::vec2(static_cast<float>(col),
 			                            static_cast<float>(N - 1) + MARGIN),
@@ -1011,6 +1020,12 @@ void GobanView::setReadoutColor(const glm::vec4& color) {
 	// The stale ink shadows it until it is set explicitly — otherwise changing
 	// the colour would silently leave the stale one at the old value.
 	if (!haveStaleInk) readoutStaleInk = color;
+	requestRepaint(UPDATE_OVERLAY);
+}
+
+void GobanView::setCoordinateOffset(float spacings) {
+	if (coordOffset == spacings) return;
+	coordOffset = spacings;
 	requestRepaint(UPDATE_OVERLAY);
 }
 
