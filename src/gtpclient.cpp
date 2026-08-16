@@ -230,20 +230,6 @@ void Process::closeStdin() {
     }
 }
 
-void Process::closeStdout() {
-    if (hStdoutRead_ != INVALID_HANDLE_VALUE) {
-        CloseHandle(hStdoutRead_);
-        hStdoutRead_ = INVALID_HANDLE_VALUE;
-    }
-}
-
-void Process::closeStderr() {
-    if (hStderrRead_ != INVALID_HANDLE_VALUE) {
-        CloseHandle(hStderrRead_);
-        hStderrRead_ = INVALID_HANDLE_VALUE;
-    }
-}
-
 int Process::wait() const {
     if (hProcess_ == INVALID_HANDLE_VALUE) return -1;
     WaitForSingleObject(hProcess_, INFINITE);
@@ -265,12 +251,6 @@ void Process::terminate() {
     // Don't close pipe handles here — the StderrReaderThread may still
     // have a pending ReadFile. Handles are closed by ~Process after the
     // reader thread is joined.
-}
-
-bool Process::running() const {
-    if (hProcess_ == INVALID_HANDLE_VALUE) return false;
-    DWORD exitCode;
-    return GetExitCodeProcess(hProcess_, &exitCode) && exitCode == STILL_ACTIVE;
 }
 
 #else
@@ -517,20 +497,6 @@ void Process::closeStdin() {
     }
 }
 
-void Process::closeStdout() {
-    if (stdoutFd_ >= 0) {
-        close(stdoutFd_);
-        stdoutFd_ = -1;
-    }
-}
-
-void Process::closeStderr() {
-    if (stderrFd_ >= 0) {
-        close(stderrFd_);
-        stderrFd_ = -1;
-    }
-}
-
 int Process::wait() const {
     if (pid_ < 0) return -1;
     int status;
@@ -555,11 +521,6 @@ void Process::terminate() {
     if (pid_ > 0) kill(pid_, SIGKILL);
 }
 
-bool Process::running() const {
-    if (pid_ < 0) return false;
-    int status;
-    return waitpid(pid_, &status, WNOHANG) == 0;
-}
 #endif
 
 // StderrReaderThread implementation

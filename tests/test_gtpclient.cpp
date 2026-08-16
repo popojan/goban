@@ -321,9 +321,11 @@ TEST_CASE("an engine that cannot analyse refuses the stream without wedging") {
 }
 
 TEST_CASE("list_commands is how analysis capability is discovered") {
-    // Not the engine's name. `GtpEngine::supportsKataAnalyze()` substring-matches
-    // "kata" in the reported name, which is wrong in both directions: a KataGo
-    // fork named otherwise, and a mock called "kata-something" that cannot.
+    // Not the engine's name. An earlier `GtpEngine::supportsKataAnalyze()`
+    // substring-matched "kata" in the reported name, which is wrong in both
+    // directions: a KataGo fork named otherwise, and a mock called
+    // "kata-something" that cannot analyse. It has since been deleted; this
+    // pins the replacement.
     quietLogging();
     auto capable = makeClient("--name NotAKataGo");
     const auto commands = capable->issueCommand("list_commands");

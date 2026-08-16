@@ -59,12 +59,9 @@ public:
     bool readLine(std::string& line) { return readLine(line, -1) == ReadStatus::Ok; }
     bool readLineStderr(std::string& line);
     void closeStdin();
-    void closeStdout();
-    void closeStderr();
     int wait() const;
     bool waitFor(int timeoutMs) const;
     void terminate();
-    bool running() const;
 
 private:
 #ifdef _WIN32

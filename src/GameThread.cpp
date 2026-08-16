@@ -1492,15 +1492,6 @@ bool GameThread::autoPlayTsumegoSetup() {
     return true;
 }
 
-bool GameThread::syncCoachToCurrentPosition() {
-    Engine* coach = currentCoach();
-    if (!coach) {
-        spdlog::warn("syncCoachToCurrentPosition: no coach engine available");
-        return false;
-    }
-    return syncEngineToPosition(coach);
-}
-
 bool GameThread::syncEngineToPosition(Engine* engine, int* syncedMoves) {
     // Core method: sync one engine to current game position
     if (!engine || stopRequested()) return false;
@@ -1747,51 +1738,3 @@ void GameThread::finalizeGameLoad(Engine* alreadySynced, bool matchPlayers) {
     spdlog::info("SGF viewing ready (engines will sync on game thread)");
 }
 
-void GameThread::applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const {
-    int boardSize = model.getBoardSize();
-    // Sync handicap stones to active players (if they're engines and not the coach)
-    for (int which = 0; which < 2; which++) {
-        Player* player = playerManager->getPlayers()[playerManager->getActivePlayer(which)];
-        if (player != coach && player->isTypeOf(Player::ENGINE)) {
-            player->boardsize(boardSize);
-            player->clear();
-            for (const auto& stone : stones) {
-                player->play(Move(stone, Color::BLACK));
-            }
-        }
-    }
-    model.state.colorToMove = Color::WHITE;
-}
-
-void GameThread::setHandicapStones(const std::vector<Position>& stones) {
-    if (stones.empty()) {
-        return;
-    }
-
-    Engine* coach = currentCoach();
-    if (!coach) {
-        return;
-    }
-
-    // Play stones to coach
-    int boardSize = model.getBoardSize();
-    coach->boardsize(boardSize);
-    coach->clear();
-    for (const auto& stone : stones) {
-        coach->play(Move(stone, Color::BLACK));
-    }
-
-    // Sync to other engines
-    applyHandicapStonesToEngines(stones, coach);
-
-    // Notify observers - build board locally from handicap stones
-    Board result(model.getBoardSize());
-    for (const auto& pos : stones) {
-        result.updateStone(pos, Color::BLACK);
-    }
-    std::for_each(gameObservers.begin(), gameObservers.end(),
-        [&result](GameObserver* observer) { observer->onBoardChange(result); });
-
-    std::for_each(gameObservers.begin(), gameObservers.end(),
-        [&stones](GameObserver* observer) { observer->onHandicapChange(stones); });
-}

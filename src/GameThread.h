@@ -298,14 +298,11 @@ public:
     bool switchGame(int gameIndex, bool startAtRoot = false);  // Switch game within loaded SGF doc
     bool autoPlayTsumegoSetup();  // Auto-play first move if it contradicts PL (non-standard tsumego convention)
     bool syncEngineToPosition(Engine* engine, int* syncedMoves = nullptr);  // Sync one engine to current game state (returns false on failure)
-    bool syncCoachToCurrentPosition();  // Sync coach engine to current game tree position (for session restoration)
     void finalizeGameLoad(Engine* alreadySynced = nullptr, bool matchPlayers = true);  // Mark engines for lazy sync, match players, start game thread
 
 private:
     void syncOtherEngines(const Move& move, const Player* player, const Engine* coach, const Engine* kibitzEngine, bool kibitzed) const;
     void notifyMoveComplete(Engine* coach, const Move& move, Engine* kibitzEngine, bool kibitzed, const std::string& engineComments);
-    void setHandicapStones(const std::vector<Position>& stones);
-    void applyHandicapStonesToEngines(const std::vector<Position>& stones, const Engine* coach) const;
 
     // Helper methods for game loop
     Move handleKibitzRequest(Move move, Engine* kibitzEngine, const Color& colorToMove, bool& wasKibitz);

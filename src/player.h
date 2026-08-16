@@ -116,45 +116,12 @@ protected:
     Board board;
 };
 
-class SGFPlayer : public Player {
-public:
-    explicit SGFPlayer(const std::string& name = "SGF Player") : Player(name, LOCAL | SGF_PLAYER), currentMoveIndex(0) {}
-    
-    void setMoves(const std::vector<Move>& moves) {
-        sgfMoves = moves;
-        currentMoveIndex = 0;
-    }
-    
-    Move genmove(const Color& colorToMove) override {
-        if (currentMoveIndex >= sgfMoves.size()) {
-            return Move(Move::INVALID, colorToMove);
-        }
-        
-        Move move = sgfMoves[currentMoveIndex];
-        if (move.col == colorToMove) {
-            currentMoveIndex++;
-            return move;
-        }
-        
-        return Move(Move::INVALID, colorToMove);
-    }
-    
-    bool hasMoreMoves() const {
-        return currentMoveIndex < sgfMoves.size();
-    }
-    
-    void reset() {
-        currentMoveIndex = 0;
-    }
-    
-    size_t getCurrentMoveIndex() const {
-        return currentMoveIndex;
-    }
-    
-private:
-    std::vector<Move> sgfMoves;
-    size_t currentMoveIndex;
-};
+// There is no SGFPlayer class. `Player::SGF_PLAYER` is a *type flag*, and the
+// players it marks are plain LocalHumanPlayers created by
+// GameThread::matchSgfPlayers() for names an SGF mentions that no configured
+// player matches — a loaded game's moves come from the record, not from a
+// player that replays them. A separate class that walked a move list existed and
+// was never instantiated by anything.
 
 class GtpEngine : public Engine, public GtpClient {
 public:
@@ -177,9 +144,13 @@ public:
     std::optional<float> final_score() override;
     bool applyTerritory(Board& targetBoard) override;
 
-    // KataGo-specific scoring via kata-analyze (returns 0.0 if not supported)
-    float kataAnalyzeScore(const Color& colorToMove);
-    bool supportsKataAnalyze();
+    // No kata-analyze here. An earlier attempt at a score estimate issued
+    // `kata-analyze` and then a second command to stop it, reading whatever had
+    // accumulated — on the game thread, down the playing engine's own pipe. That
+    // is the thing ADR-0007 says must not happen, and AnalysisService now does
+    // it properly: its own process, its own thread, streamCommand/stopStreaming
+    // with a drain so the next command cannot read the stream's tail. It was
+    // never called by anything.
 };
 
 #endif // PLAYER_H
