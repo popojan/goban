@@ -545,8 +545,22 @@ int Board::placeCursor(const Position& coord, const Color& col) {
     return updateStone(pos, col);
 }
 
-void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones) {
+void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones,
+                                             const std::vector<Position>& sekiStones) {
     clearTerritory();
+
+    // Points occupied by a group the engine called alive-in-seki. An empty
+    // region that touches one of these is nobody's territory: the fill cannot
+    // distinguish a seki's eye from an ordinary one, since both are reached from
+    // the same stones, so it has to be told.
+    std::array<bool, BOARD_SIZE> inSeki{};
+    inSeki.fill(false);
+    for (const auto& pos : sekiStones) {
+        if (pos.col() >= 0 && pos.col() < boardSize &&
+            pos.row() >= 0 && pos.row() < boardSize) {
+            inSeki[ord(pos)] = true;
+        }
+    }
 
     // Create a working copy of stone colors, treating dead stones as empty
     std::array<Color::Value, BOARD_SIZE> stoneState;
@@ -592,6 +606,7 @@ void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadSt
             std::vector<Position> stack;
             bool touchesBlack = false;
             bool touchesWhite = false;
+            bool touchesSeki = false;
 
             stack.push_back(startPos);
 
@@ -622,8 +637,10 @@ void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadSt
                                 stack.push_back(neighbor);
                             } else if (stoneState[nIdx] == Color::BLACK) {
                                 touchesBlack = true;
+                                if (inSeki[nIdx]) touchesSeki = true;
                             } else if (stoneState[nIdx] == Color::WHITE) {
                                 touchesWhite = true;
+                                if (inSeki[nIdx]) touchesSeki = true;
                             }
                         }
                     }
@@ -632,7 +649,10 @@ void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadSt
 
             // Determine territory ownership
             Color territoryColor;
-            if (touchesBlack && !touchesWhite) {
+            if (touchesSeki) {
+                // Alive, but its eyes count for nobody.
+                territoryColor = Color::EMPTY;
+            } else if (touchesBlack && !touchesWhite) {
                 territoryColor = Color::BLACK;
             } else if (touchesWhite && !touchesBlack) {
                 territoryColor = Color::WHITE;
@@ -648,7 +668,8 @@ void Board::calculateTerritoryFromDeadStones(const std::vector<Position>& deadSt
         }
     }
 
-    spdlog::debug("Territory calculated from {} dead stones", deadStones.size());
+    spdlog::debug("Territory calculated from {} dead stones, {} in seki",
+                  deadStones.size(), sekiStones.size());
 }
 
 // Find all stones connected to the given position (same color flood-fill)

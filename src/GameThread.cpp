@@ -1016,7 +1016,16 @@ void GameThread::processScoring() {
     // stuck inside the sync block and the UI showing "Calculating score…" the
     // whole time. Skipping it here costs nothing — the loop calls us again once
     // engineSync reaches Synced, and then the fallback is both safe and useful.
-    if (!scored && result.showTerritory && engineSync.load() == EngineSync::Synced) {
+    //
+    // `result.showTerritory` used to be a third condition here, and it made the
+    // fallback unreachable in the case it exists for. applyTerritory() sets that
+    // flag only *after* `final_status_list dead` has succeeded, so an engine
+    // that cannot produce a dead list at all — GNU Go timing out on a sparse
+    // board, or an engine without the command — failed the test and no second
+    // opinion was ever sought. The one thing worth having then is exactly a
+    // number from an engine that can give one; the board stays unshaded, which
+    // is truthful, because nobody could compute the shading.
+    if (!scored && engineSync.load() == EngineSync::Synced) {
         for (auto* player : playerManager->getPlayers()) {
             if (stopRequested()) return;
             if (player == coach || !player->isTypeOf(Player::ENGINE)) continue;

@@ -982,6 +982,41 @@ TEST_CASE("calculateTerritoryFromDeadStones") {
         CHECK(countInfluence(board, Color::BLACK) == 0);
         CHECK(countInfluence(board, Color::WHITE) == 0);
     }
+
+    SUBCASE("a wall alive in seki encloses nothing") {
+        // The fill cannot tell a seki's eye from an ordinary one — it is reached
+        // from exactly the same stones — so the engine has to say. Marking the
+        // black wall as seki must take all 36 points behind it out of the count
+        // and leave White's, which is not in seki, untouched.
+        std::vector<Position> blackWall;
+        for (int col = 0; col < 9; ++col) blackWall.emplace_back(col, 4);
+
+        board.calculateTerritoryFromDeadStones({}, blackWall);
+
+        CHECK(countInfluence(board, Color::BLACK) == 0);
+        CHECK(countInfluence(board, Color::WHITE) == 18);
+    }
+
+    SUBCASE("seki is not the same as dead") {
+        // A dead wall gives the region away; a seki wall gives it to nobody.
+        std::vector<Position> blackWall;
+        for (int col = 0; col < 9; ++col) blackWall.emplace_back(col, 4);
+
+        board.calculateTerritoryFromDeadStones(blackWall, {});
+        const int asDead = countInfluence(board, Color::WHITE);
+
+        board.calculateTerritoryFromDeadStones({}, blackWall);
+        const int asSeki = countInfluence(board, Color::WHITE);
+
+        CHECK(asDead > asSeki);
+        CHECK(countInfluence(board, Color::BLACK) == 0);
+    }
+
+    SUBCASE("an empty seki list is the old behaviour exactly") {
+        board.calculateTerritoryFromDeadStones({}, {});
+        CHECK(countInfluence(board, Color::BLACK) == 36);
+        CHECK(countInfluence(board, Color::WHITE) == 18);
+    }
 }
 
 TEST_CASE("territory on an empty board belongs to nobody") {

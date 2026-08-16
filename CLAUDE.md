@@ -298,6 +298,24 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 ### Scoring
 See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 - **A failed score is not a score of zero.** `Engine::final_score()` returns `std::optional<float>` because 0.0 is a legitimate result (jigo) and a bare float cannot tell the two apart. Reading failure as zero is what made `applyTerritory()` claim a drawn game, which tripped the "suspiciously zero, ask someone else" fallback and took the whole chain down. Same for `applyTerritory()`, which returns whether a *score* was obtained: shading can be valid when the number is not, and it signals that with `showTerritory` set but `territoryReady` clear.
+- **Seki is not territory, and only the engine knows where it is.** The flood
+  fill cannot tell a seki's eye from an ordinary one — both are reached from the
+  same stones — so `applyTerritory()` asks `final_status_list seki` as well as
+  `dead` and passes both to `calculateTerritoryFromDeadStones()`. Asking only for
+  `dead`, which is what it did, hands a seki's eyes to whoever surrounds them.
+  All three statuses (`alive`, `seki`, `dead`) are GTP 2 standard — only GNU Go's
+  `dame` / `black_territory` / `white_territory` are extensions — but support is
+  uneven, so a refusal is read as "no seki here" rather than as an error, the
+  same degradation the dead list itself gets. It costs nothing where it works:
+  GNU Go computes the status once, so `seki` returns instantly after `dead`
+  (measured: 10.3 s for `dead` on a sparse 9×9, then microseconds).
+- **The cross-engine fallback must not depend on the coach having shaded
+  anything.** `applyTerritory()` sets `showTerritory` only *after*
+  `final_status_list dead` succeeds, so gating the fallback on that flag made it
+  unreachable in the one case it exists for — an engine that cannot produce a
+  dead list at all. The gate is now `engineSync == Synced` alone: another engine
+  is asked for `final_score`, and the board stays unshaded, which is truthful
+  because nobody could compute the shading.
 - **Only ask a synced engine to score.** The initial sync runs coach → score → everyone else, so the other engines are at whatever position they still held when `processScoring()` runs inside it. Asking one there is not merely wrong, it blocks: a CPU KataGo asked to score the empty 19×19 board it was never told about does not answer for minutes, with the game thread inside the sync block and the UI stuck on "Calculating score…". The cross-engine fallback is gated on `engineSync == Synced`; the loop calls scoring again once that holds, so nothing is lost by deferring.
 - **A position that failed to score must not be retried.** `territoryReady == false` alone would re-enter `processScoring()` on every loop iteration, ten times a second, hammering the engines. `Board::territoryFailed` latches it — and clears *itself*, because every position change builds a fresh `Board` and `updateStones()` copies the flag in. Never clear it by hand.
 - **Scoring is bounded more tightly than a genmove.** `GtpClient::scoringTimeout()` (30s, `scoring_timeout_ms` per engine) applies for the duration of `applyTerritory()` via `ScopedTimeout`. It never *raises* a stricter `timeout_ms`, and it does override a negative one — a wedged engine must not be able to freeze scoring for the full five-minute command timeout.

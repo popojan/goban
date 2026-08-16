@@ -263,9 +263,22 @@ public:
         }
     };
 
-    // Calculate territory using flood-fill from dead stones
-    // This is GTP-standard compliant (only needs 'dead' status, not gnugo extensions)
-    void calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones);
+    /// Shade territory by flood fill, given the engine's life-and-death verdict.
+    ///
+    /// Both lists come from `final_status_list`, which is GTP 2 standard — and so
+    /// are all three of its statuses (`alive`, `seki`, `dead`). Only GNU Go's
+    /// `dame` / `black_territory` / `white_territory` are extensions, and none is
+    /// used here.
+    ///
+    /// **Seki is not territory.** An empty region enclosed by a group that is
+    /// alive-in-seki belongs to nobody, in every ruleset that has the concept —
+    /// and a flood fill cannot tell it from an ordinary eye, because it reaches
+    /// exactly the same stones. Passing an empty `sekiStones` therefore *over*
+    /// counts, which is what this did for as long as it only asked for `dead`.
+    /// An engine that will not answer the seki query is no worse off than before,
+    /// so the caller treats a refusal as "no seki here" rather than as an error.
+    void calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones,
+                                          const std::vector<Position>& sekiStones = {});
 
     // Go rule implementation - apply move with capture processing
     // Returns number of opponent stones captured (0 if none)

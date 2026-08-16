@@ -79,6 +79,26 @@ bool GtpEngine::undo() {
     return GtpClient::success(GtpClient::issueCommand("undo"));
 }
 
+namespace {
+
+/// Appends the vertices in a `final_status_list` reply to `out`.
+///
+/// Shared by the `dead` and `seki` queries so the two cannot drift: the reply is
+/// one or more lines, the first carrying the `=` GTP prefix, each holding
+/// whitespace-separated vertices.
+void parseVertexList(const GtpClient::CommandOutput& reply, std::vector<Position>& out) {
+    for (const auto& line : reply) {
+        std::istringstream ss(line);
+        if (ss.peek() == '=') ss.get();
+        Position pos;
+        while (ss >> pos) {
+            if (pos.col() >= 0 && pos.row() >= 0) out.push_back(pos);
+        }
+    }
+}
+
+}  // namespace
+
 bool GtpEngine::applyTerritory(Board& targetBoard) {
     // Apply territory calculation to an existing board built locally from the
     // SGF replay, rather than asking the engine for the board state.
@@ -103,23 +123,31 @@ bool GtpEngine::applyTerritory(Board& targetBoard) {
 
     // Parse dead stone positions
     std::vector<Position> deadStones;
-    if (!deadResult.empty()) {
-        for (const auto& line : deadResult) {
-            std::istringstream ss(line);
-            char c = ss.peek();
-            if (c == '=') ss.get();
-            Position pos;
-            while (ss >> pos) {
-                if (pos.col() >= 0 && pos.row() >= 0) {
-                    deadStones.push_back(pos);
-                }
-            }
-        }
+    parseVertexList(deadResult, deadStones);
+    // Seki as well, and it is not optional detail: a group alive in seki has
+    // eyes that belong to nobody, and the flood fill reaches them from exactly
+    // the stones an ordinary eye is reached from. Asking only for `dead` — which
+    // is all this did — hands those points to whoever surrounds them.
+    //
+    // `seki` is one of GTP 2's three standard statuses, alongside `alive` and
+    // `dead`; GNU Go answers it (an invalid status comes back as
+    // "? invalid status", so a refusal is distinguishable). Support is uneven in
+    // practice, though, so a refusal is read as "no seki here" and costs nothing
+    // — the same graceful degradation the dead list itself gets, one level down.
+    std::vector<Position> sekiStones;
+    const auto sekiResult = GtpClient::issueCommand("final_status_list seki");
+    if (GtpClient::success(sekiResult)) {
+        parseVertexList(sekiResult, sekiStones);
+    } else {
+        spdlog::debug("Engine [{}] did not answer final_status_list seki; "
+                      "assuming no seki", getName());
     }
-    spdlog::debug("applyTerritory: {} dead stones from engine", deadStones.size());
+
+    spdlog::debug("applyTerritory: {} dead stones, {} seki stones from engine",
+                  deadStones.size(), sekiStones.size());
 
     // Calculate territory using flood-fill
-    targetBoard.calculateTerritoryFromDeadStones(deadStones);
+    targetBoard.calculateTerritoryFromDeadStones(deadStones, sekiStones);
 
     // The shading is valid from here on, whatever happens to the score.
     targetBoard.showTerritory = true;
