@@ -129,6 +129,19 @@ private:
     void listCommands() const;
     // Left click on an on-board intersection; shared by mouseClick and "click".
     void boardClick(const Position& coord);
+    /// Add `m` at the cursor as a variation. The one place that decides what a
+    /// move away from the end of the line *means*, for all three ways of making
+    /// one: a click on a fresh point, a click on a point already explored, and
+    /// a pass. In a tsumego it means annotating a puzzle — never promoting the
+    /// answer out of the main line, and never starting the game.
+    void playVariationAt(const Move& m) const;
+    /// Take the held stone and put it on the board — if the rules allow it.
+    /// False leaves the stone in hand and nothing else changed, which is what a
+    /// click on an occupied, ko-banned or self-capturing point now does instead
+    /// of asking an engine and reporting its refusal as an error.
+    [[nodiscard]] bool placeStone(const Move& m) const;
+    /// The held stone is gone from the hand; the reservoir gets it back.
+    void releaseStone() const;
 
     ElementGame* parent;
     GobanModel& model;

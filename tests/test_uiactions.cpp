@@ -210,6 +210,35 @@ TEST_CASE("a tsumego is a puzzle, not a game to concede") {
     CHECK(a.pass);        // passing a problem is merely wrong, not corrupting
 }
 
+TEST_CASE("a solved puzzle has nothing left to ask an engine") {
+    // The Kibitz item — "Nápověda", Hint, in Czech — was offered at a position
+    // where the board click is refused outright, and it played the engine's
+    // move on past the recorded answer. The click and the button now agree.
+    UiInputs solved = playing();
+    solved.tsumego = true;
+    solved.atEndOfNavigation = true;
+    solved.onBadMovePath = false;
+    CHECK_FALSE(availableActions(solved).kibitz);
+
+    // Inside a branch that has already gone wrong it is exactly what is wanted:
+    // show me how this is punished. That is the reason a wrong move may be
+    // played out at all.
+    UiInputs wrong = solved;
+    wrong.onBadMovePath = true;
+    CHECK(availableActions(wrong).kibitz);
+
+    // And at the root of an unsolved problem, where the answer is still ahead
+    // of the cursor, it is a hint — which is what the menu item calls itself.
+    UiInputs unsolved = solved;
+    unsolved.atEndOfNavigation = false;
+    CHECK(availableActions(unsolved).kibitz);
+
+    // Outside a puzzle the end of a line is the ordinary case for asking.
+    UiInputs game = solved;
+    game.tsumego = false;
+    CHECK(availableActions(game).kibitz);
+}
+
 TEST_CASE("resign agrees with the conditions the resign command applies") {
     // The drift this step exists to prevent: GobanControl::canResign() now
     // reads this same field rather than restating the rules. Pin all four

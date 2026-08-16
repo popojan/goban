@@ -885,12 +885,17 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
                 error = false;
             }
         }
+        // The blank line terminating every GTP response is not content, and
+        // logging it before the break made each refusal two entries — the
+        // second one an error reading `gnugo >>  (command: ...)`, with nothing
+        // in it. The message log counts entries, so an empty one costs the user
+        // a badge as much as a real one does.
+        if (line.empty()) break;
         if(!error) {
             spdlog::log(trafficLevel(quiet_), "{1} >> {0}", line, exe);
         } else {
             spdlog::error("{} >> {} (command: {})", exe, line, command);
         }
-        if (line.empty()) break;
         ret.push_back(line);
     }
     if (terminated_) return {"= "};

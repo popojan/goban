@@ -49,7 +49,15 @@ UiActions availableActions(const UiInputs& in) {
     // file exists to prevent. A click on a *finished* game is not a play — it
     // means "clear" — and boardClick() handles that before asking.
     a.play   = a.pass;
-    a.kibitz = !engineBusy && !finished && !in.aiVsAiLocked;
+    // A solved puzzle has nothing left to ask. The board click is already
+    // refused there — "Solved — stay blocked" — and the button that says
+    // *Hint* in Czech was not, so it played the engine's move on past the
+    // answer and started the game while it was at it. Anywhere else in a
+    // tsumego it stands: at the root it is a hint, and inside a branch that has
+    // gone wrong it is "show me how this is punished", which is the reason a
+    // wrong move may be played out at all.
+    const bool solvedEnd = in.tsumego && in.atEndOfNavigation && !in.onBadMovePath;
+    a.kibitz = !engineBusy && !finished && !in.aiVsAiLocked && !solvedEnd;
 
     // Resigning writes the result onto the record's root and adds no node, so
     // unlike a stone or a pass it cannot describe a branch: applied anywhere

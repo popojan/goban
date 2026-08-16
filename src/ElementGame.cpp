@@ -307,6 +307,16 @@ double ElementGame::getIdleTimeout() const {
         return 0.05;
     }
 
+    // And nor does a genmove. Measured on the stock configuration: a kibitz
+    // asked of the 9x9 KataGo took 30.9 seconds on a CPU backend, during which
+    // no input event arrives, so no frame is drawn, so the status line below
+    // cannot say who is thinking however well it is written. The greyed toolbar
+    // was the only clue, and it is indistinguishable from a program that
+    // ignored the click. Same trap as the resync above, one rung lower.
+    if (engine.isThinking()) {
+        return 0.05;
+    }
+
     // If we displayed non-zero FPS, we need one more wake-up to show "0 fps"
     if (s_fpsLastDisplayed > 0) {
         float currentTime = static_cast<float>(glfwGetTime());
@@ -647,6 +657,21 @@ void ElementGame::syncStatusIndicator() {
         // simply sat there: the stone stayed in hand, the toolbar was greyed by
         // a rule the user could not see, and it read as a dead program.
         text = templateText("tplStatusSyncing", "Synchronising engines…");
+        severityClass = "loading";
+    } else if (engine.isThinking()) {
+        // The third silent wait, and the longest: 30.9 seconds measured for one
+        // kibitz from the stock 9x9 KataGo on a CPU backend. Nothing in the UI
+        // read isThinking() at all, so the whole of that was a greyed toolbar
+        // and a board that did not move — reported, reasonably, as "nothing
+        // happens". It names the engine for the same reason the loading line
+        // does: with two configured, "thinking" does not say which.
+        //
+        // Below the badge would be wrong: this is transient and current, and
+        // the badge is a count of things already past.
+        const std::string who = engine.thinkingEngineName();
+        text = Rml::CreateString(
+            templateText("tplStatusThinking", "%s is thinking…").c_str(),
+            who.c_str()).c_str();
         severityClass = "loading";
     } else if (log.hasUnseen()) {
         // Messages since the panel was last opened, not the size of the buffer.

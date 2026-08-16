@@ -42,7 +42,22 @@ expect thinking true
 expect can_navigate false
 expect can_kibitz false
 
+# And the wait is *visible*. Greying the toolbar was the whole of what the user
+# got: nothing in the UI read isThinking(), so a genmove was the third silent
+# wait in this program after engine loading and the post-resize resync, and by
+# far the longest — 30.9 seconds measured for one kibitz from the stock 9x9
+# KataGo on a CPU backend, which was duly reported as "nothing happens".
+#
+# Two things are needed and neither works alone: getIdleTimeout() has to keep
+# waking the main loop, or no frame is drawn and no message can appear however
+# well it is written — and there has to be a message. It names the engine for
+# the same reason the loading line does; with two configured, "thinking" does
+# not say which, and the one that matters is the slow one.
+expect status_text kibitzmock is thinking…
+
 wait_until move_count >= 3
 expect at_end true
 expect phase paused
 expect thinking false
+# It stands down again. A status line that stayed would be worse than none.
+expect status_text ""

@@ -1,0 +1,83 @@
+# Switching off both move markers must not blank every other overlay.
+#
+# All text in the program shares one glyph pass: move numbers, variation labels,
+# SGF markup, the coordinate margin, the evaluation's A/B/C and its board
+# readout. GobanView::Render() ran that pass only when one of the two
+# move-marker toggles was on — true when it was written, since back then the
+# markers *were* the overlay. Everything added since joined the same buffers
+# without revisiting the gate, so Last Move off + Next Move off took the
+# coordinates, the markup and the whole evaluation display with them.
+#
+# `overlay_glyphs` is the assertion, and it exists because of this bug: every
+# other key describing an overlay — `coordinates_shown`, `markup_count`,
+# `eval_labels` — reported it perfectly while nothing at all was drawn. It
+# counts what the glyph pass put on screen, the way `sounds_played` counts what
+# was heard rather than what was asked for.
+#
+# The waits are `wait <ms>` rather than `wait_idle`, which is the one place in
+# the suite where that is right: what is being waited for is a *frame*, and
+# idleness is about engines and navigation. Every toggle below requests a
+# repaint, so the wait only has to outlast one.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+# The glyph pass does not run while the intro animation is still going, and it
+# is the only thing that writes the count.
+wait_until camera_animating false
+
+# Nothing is labelled on an empty board with no cursor ahead of it, so the
+# count starts at nothing. Asserting this first is what makes the numbers below
+# mean something.
+wait 250
+expect overlay_glyphs 0
+
+# Coordinates are the plainest thing in that pass: no game state behind them,
+# and they belong to the board rather than to any move. Nine columns and nine
+# rows.
+toggle_coordinates on
+wait 250
+expect coordinates_shown true
+expect overlay_glyphs 18
+
+# A move, so the markers have something of their own to draw.
+click 4 4
+click 4 4
+wait_until move_count >= 1
+wait 250
+expect overlay_glyphs >= 19       # the coordinates plus the move number
+
+# Both markers off. This is the reported case.
+toggle_last_move_overlay
+wait 250
+toggle_next_move_overlay
+wait 250
+
+# The markers are gone — that much was always right, because
+# updateLastMoveOverlay() and updateNavigationOverlay() simply do not place
+# their labels — and the coordinates are still there, which is the fix. This
+# read 0 before it.
+expect coordinates_shown true
+expect overlay_glyphs 18
+
+# Switching the coordinates off as well leaves nothing to draw, which is the
+# other half of the claim: the count follows the screen rather than reporting a
+# constant, so the assertion above cannot pass by accident.
+toggle_coordinates off
+wait 250
+expect coordinates_shown false
+expect overlay_glyphs 0
+
+# And back, with the markers still off.
+toggle_coordinates on
+wait 250
+expect overlay_glyphs 18
+
+# The markers come back independently of the rest.
+toggle_last_move_overlay
+wait 250
+toggle_next_move_overlay
+wait 250
+expect overlay_glyphs >= 19

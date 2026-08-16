@@ -261,6 +261,7 @@
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">Načítání %s…</div>
     <div class="template" id="tplStatusSyncing">Synchronizace enginů…</div>
+    <div class="template" id="tplStatusThinking">%s přemýšlí…</div>
     <div class="template" id="tplStatusMessages">× Zprávy</div>
     <div class="template" id="tplStatusWarning">⚠ Zprávy (%d)</div>
     <div class="template" id="tplStatusError">⚠ Zprávy (%d)</div>

@@ -36,6 +36,7 @@ public:
     void setTime(float) const;
     void setCameraPan(glm::vec2) const;
     void setCameraDistance(float) const;
+    void setStereoBase(float) const;
     void setRotation(glm::mat4x4) const;
     void setResolution(float, float);
     void setGamma(float);
@@ -47,6 +48,12 @@ public:
     [[nodiscard]] float getGamma() const { return gamma;}
     [[nodiscard]] float getContrast() const { return contrast;}
     [[nodiscard]] bool isReady() const { return shadersReady;}
+    /// Whether the selected shader renders an anaglyph, from the shader's own
+    /// `"stereo"` entry in the config rather than from its file name: it is a
+    /// property of the shader, and everything that has to follow it — the eye
+    /// offset the overlay draws with, the greyscale its ink collapses to — is
+    /// out here rather than in GLSL.
+    [[nodiscard]] bool isStereo() const { return currentProgramStereo; }
     [[nodiscard]] float getStoneHeight() const { return currentProgramH; }
     void setReady() { shadersReady = true; }
     [[nodiscard]] int getCurrentProgram() const {return currentProgram;}
@@ -116,6 +123,7 @@ private:
 
     int currentProgram;
     float currentProgramH{};
+    bool currentProgramStereo{false};
 
     float width, height;
     float gamma, contrast;

@@ -261,6 +261,7 @@
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">正在加载 %s…</div>
     <div class="template" id="tplStatusSyncing">正在同步引擎…</div>
+    <div class="template" id="tplStatusThinking">%s 正在思考…</div>
     <div class="template" id="tplStatusMessages">× 消息</div>
     <div class="template" id="tplStatusWarning">⚠ 消息 (%d)</div>
     <div class="template" id="tplStatusError">⚠ 消息 (%d)</div>

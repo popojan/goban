@@ -123,6 +123,27 @@ public:
     [[nodiscard]] Position getBoardCoordinate(float x, float y)const ;
     [[nodiscard]] glm::vec2 boardCoordinate(float x, float y) const;
 
+    /// Depth of the nearest thing in frame, along the view axis. The board is a
+    /// fixed-size box and the table runs under it toward the viewer, so both are
+    /// asked: the board binds at ordinary zoom, the table's bottom edge binds
+    /// once the camera pulls back — "the blades of grass at the bottom edge" the
+    /// stereo literature warns about (see Stereo.h).
+    [[nodiscard]] float stereoNearPoint() const;
+
+    /// The deviation the current camera actually produces — the near-to-far
+    /// separation, as a fraction of image width. This is the number the stereo
+    /// literature bounds at 1/30 (Stereo.h), and it is in dumpState() so a
+    /// scenario can sweep the zoom range and assert it stays there: the old
+    /// rule passed at one zoom and failed at another, which is precisely what
+    /// an eyeball check does not catch.
+    [[nodiscard]] float stereoDeviation() const;
+
+    /// Half the stereo base, in world units, for the current camera. The one
+    /// implementation: uploaded to the vertex shader as `eof` and used by
+    /// GobanOverlay to place the same two eyes. Splitting it would let the text
+    /// drift off the wood it is supposed to be lying on.
+    [[nodiscard]] float stereoHalfBase() const;
+
     void resetView();
     void saveView();          // Save current camera to preset (user-triggered)
     void saveCurrentView();   // Save current camera for session restore (auto on exit)
@@ -155,6 +176,11 @@ public:
     void playSound(const std::string& id, double volume = 1.0) { player.play(id, volume); }
     /// Sounds actually mixed to their end, for dumpState() and scenarios.
     [[nodiscard]] unsigned long long soundsPlayed() const { return player.completedPlaybacks(); }
+    /// Text items the glyph pass put on screen in the last frame that ran it.
+    /// Every other overlay key — `coordinates_shown`, `eval_labels`,
+    /// `markup_count` — describes what was *built*, and all of them stayed true
+    /// through a bug that drew none of it. Same distinction as soundsPlayed().
+    [[nodiscard]] unsigned overlayGlyphs() const { return overlayGlyphsDrawn.load(); }
     bool toggleLastMoveOverlay();
     bool toggleNextMoveOverlay();
     void setTsumegoMode(bool enabled);
@@ -275,6 +301,9 @@ public:
     glm::vec2 resolution;
     float lastTime, startTime;
     bool animationRunning;
+    /// Written by Render() on the UI thread, read by dumpState() — which the
+    /// scenario runner may call from anywhere between frames, hence atomic.
+    std::atomic<unsigned> overlayGlyphsDrawn{0};
     bool isPanning, isZooming, isRotating;
     DDG::Camera cam;
     float startX, startY, lastX, lastY;

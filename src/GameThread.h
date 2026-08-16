@@ -128,6 +128,12 @@ public:
 
     // Check if genmove is in progress (engine is thinking)
     bool isThinking() const;
+    /// The engine currently in genmove, or empty. For the status line: a wait
+    /// of half a minute has to say whose it is, and with several engines
+    /// configured "thinking" alone does not. Reads the same `playerToMove`
+    /// pointer isThinking() already dereferences from the UI thread, and only
+    /// while it names an engine — engines outlive the loop that sets it.
+    std::string thinkingEngineName() const;
 
     /// Whether the continuous analysis stream may run right now (ADR-0007
     /// decision 6). Read from the analysis thread; it touches no pipe.

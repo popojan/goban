@@ -285,6 +285,29 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 ### Go Rules
 - **Simple ko requires the capturing stone to be in atari**: `koPosition` is set only when exactly one stone was captured **and** the capturing stone is a lone stone with exactly one liberty. Testing only "one stone captured" also flags **snapback**, where the capturing group is larger and the recapture is legal in every ruleset — that false positive made `replayMoves()` abort and silently truncate board reconstruction. After any other single-stone capture, retaking the point is already rejected as suicide, so no ko ban is needed there.
 - **`koPosition` is legality-only**: it feeds `isValidMove()` and `replayMoves()`. The out-parameter of `buildBoardFromMoves()` is not used for display, so narrowing ko detection cannot affect rendering.
+- **We are the referee, not the engine.** `GobanModel::isLegalMove()` decides
+  whether a click becomes a move, and it is asked *before* anybody sends
+  anything: `GobanControl::placeStone()` for all three ways of putting a stone
+  down, and `GobanView::updateCursor()` for the ghost stone that shows where one
+  would go. There used to be no check at all on that path — every click left as
+  `play <colour> <point>` and whatever GNU Go answered decided it. So an endgame
+  misclick onto a stone ten moves old came back as `? illegal move`, which the
+  message-log sink takes at **error** level and turns into a red badge, and
+  which was the entire contents of `last_run.log` for that session (2026-08-16,
+  `play B M10`). The renderer already knew better and drew no ghost stone there,
+  so the display and the click disagreed about the same point — the same shape
+  as a button that disagrees with its command. A refusal now leaves the stone in
+  hand and says nothing, which is what a real board does; **an engine refusal
+  after this one means the engine has drifted out of sync**, and that is worth
+  an error. It also keeps an illegal move out of the record: `GameRecord::move()`
+  appends whatever it is handed, so an engine with other rules — or one already
+  desynchronised — could write a move `replayMoves()` then refuses, silently
+  truncating every later reconstruction of the position. This is *not* policy
+  and does not belong in `availableActions()`, which is per-action and knows
+  nothing about points: `a.play` stays true while an individual point is closed.
+  Pinned by `tests/scenarios/illegal_click_is_refused_locally.scn` (which asserts
+  `log_badge none` — the record does not move either way, so `move_count` alone
+  would pass with the engine still being asked) and `tests/test_board_rules.cpp`.
 
 ### Game State
 - **isGameFinished()**: True only for resign or double-pass (two consecutive passes).
@@ -376,6 +399,16 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   there now (`tplStatusSyncing`, in all five languages, with an English
   fallback). Same trap as the exit hang: no input event arrives, so nothing
   repaints, so nothing can be reported.
+  **And the same hole was open for a genmove — the longest wait of the three.**
+  Nothing in the UI read `isThinking()` at all, so an engine searching was a
+  greyed toolbar and a board that did not move: 30.9 s measured for one kibitz
+  from the stock 9x9 KataGo on a CPU backend, reported as "nothing happens".
+  Both halves again — `getIdleTimeout()` now covers `isThinking()`, and
+  `tplStatusThinking` names the engine, because with several configured
+  "thinking" does not say which. Pinned by `kibitz_two_engines.scn`, which
+  asserts `status_text` rather than the condition behind it: what was painted is
+  the thing that was missing. *The status bar itself is provisional — see the
+  diegetic-HUD direction; replace the surface, keep both halves.*
 - **A click that cannot place a stone can still mean Start.** When it is an
   engine's turn, `boardClick()` dispatches the `start` command — by asking
   `availableActions()` a *different* question (`a.start`), never by going round
@@ -395,6 +428,66 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   there means `clear`, not a move.
 - **`isThinking()` is not "the engine is busy".** The game loop clears `playerToMove` *before* its 500 ms inter-move sleep, so `isThinking()` is false for that window on every move. Guards written as a bare `isThinking()` test therefore have a hole once per move — that is how navigation keys were accepted in a locked bot-versus-bot match the toolbar had greyed out, and how a kibitz request could be dropped on the floor. Ask `actions()`, which carries the `aiVsAiLocked` term as well.
 - **Away from the end of the line, a move is a variation, not a turn.** `pass` and a board click must agree about this: `boardClick`'s review branch has never consulted turn ownership, so `a.pass` reads `(humanToMove || reviewingMidTree)`. The engine-thinking lock stays outside that disjunction — passing is a *preserving* action in ADR-0001's sense, and a click refuses there too.
+- **Every way of *making* one goes through `GobanControl::playVariationAt()`.**
+  A click on a fresh point, a click on a point already explored, and a pass were
+  one act; agreeing about `a.pass` and then each carrying its own promotion rule
+  is the same drift in a second place. The tsumego half — `promote=false`, and
+  no `model.start()` — had been written at the fresh-point call site *only*, so
+  a pass in a puzzle, and a second click on a wrong move already explored, both
+  promoted themselves over the recorded solution (`main_line_moves` 2 → 1) and
+  the pass flipped the phase to Playing as well. A puzzle's answer is what
+  defines "correct" for every later verdict; nothing the solver tries may
+  displace it, and trying does not start a match. Pinned by
+  `tests/scenarios/tsumego_mode.scn`.
+- **But a click on a move the record already has *follows* it, and following is
+  not making.** That case left the funnel above, which is the one thing about it
+  that is not drift: it is the Right arrow with a mouse. `engine.
+  navigateToVariation(move, false)` — no `model.start()`, no promotion (clicking
+  a branch is not a vote for it), and no rules check, since the position was
+  legal when it was recorded. Through `playVariationAt()` it started the match
+  at a mid-tree cursor instead, so the game loop asked the engine for the next
+  move and `GameRecord::move()` appended the answer even though the node already
+  had that move as a child. GNU Go answers deterministically, so the recorded
+  move got an identical twin drawn on top of itself and the main line acquired a
+  letter it never had — `16`, then `16b`, then `16c` for the same point, one per
+  visit. Resuming from a reviewed position is Start's job; same division as
+  `play once`. Pinned by `tests/scenarios/click_follows_recorded_variation.scn`.
+  **The duplicate child is still reachable deliberately**: Start at a mid-tree
+  cursor has the engine play there, and `GameRecord::move()` appends rather than
+  matching an identical existing child. That is the "resume from here" case and
+  it is not addressed — if it should be, the fix is in `move()`, not at a call
+  site.
+- **A solved puzzle is not asked for a move, and a puzzle is never asked through
+  `playKibitzMove()`.** `a.kibitz` carries a `tsumego && atEnd && !onBadMovePath`
+  term, so the Kibitz item — *Nápověda*, Hint, in Czech — greys exactly where the
+  board click is already refused; it used to play the engine's move on past the
+  recorded answer and start the game doing it. And in a tsumego `play once`
+  routes to `requestKibitzNav()` from *anywhere*, end of the line included: the
+  end-of-line branch reaches the engine only through `playKibitzMove()`, which
+  hands the move to a player already blocked in `genmove()` and otherwise leaves
+  it in `queuedMove` without waking anything — so on a real configuration the
+  menu item asked no engine at all while `model.start()` quietly turned the
+  puzzle into a game. **It passed against the mock**, whose timing let the loop
+  collect the queued move; only a run with real engines showed it. The Space
+  handler dispatches the command rather than calling `requestKibitzNav()` itself,
+  which is how the key and the menu item came to disagree in the first place.
+  *What the engine answers is a separate, open problem: a genmove is a
+  whole-board answer, and both stock engines abandon the corner rather than
+  punish the mistake — measured, KataGo `F7` and GNU Go `B6` where the kill was
+  `B2`. Needs an ADR; do not assume asking works because the plumbing does.*
+- **A snapshot field written *after* the position change must be republished.**
+  `notifyBoardChangeWithMove()` publishes from inside `navigateToVariation()`,
+  but the tsumego verdict — `markBadMove()` — runs after it returns, in
+  `executeNavCommand()`. So `GameSnapshot::onBadMovePath` described the move one
+  instant before it was condemned, and both readers fail closed on that: no
+  stone could be taken out of the bowl to play the refutation out
+  (`GobanControl.cpp`), and Space never reached `requestKibitzNav()`, so no
+  engine ever punished a wrong move. The whole dead-branch feature was inert and
+  nothing showed it, because the "Wrong!" verdict is read from `model.state`
+  rather than from the snapshot — the display was right and the policy was
+  stale. `executeNavCommand()` calls `publishSnapshot()` once the verdict is
+  settled. This is the ADR-0006 publish rule applied to a *write ordered after*
+  the funnel rather than to one that bypasses it.
 - **Territory needs a score, not just an ending.** `a.territory` is `finished && scoredEnd`; a resignation counted nothing, so it has no territory. `scoredEnd` is `GameRecord::shouldShowTerritory()` **published by the game thread** into `GobanModel::scoredEndPosition`, never recomputed by the reader — see the threading note below.
 - **Keep `availableActions()` pure over plain data.** It must not take a `GobanModel` or `GameThread`: `isThinking()` reads a member only the game loop sets, so the engine-thinking cases would stop being testable — and they are half of what it decides.
 - **The UI thread must not read the SGF tree *or* `GameState`'s strings — it reads `GobanModel::snapshot()`.** The game thread owns that tree and mutates it freely; `GameRecord`'s const accessors take no lock, and its own mutex covers neither the readers nor half the mutators. `uiInputs()` and `dumpState()` take every record fact from the published `GameSnapshot` (ADR-0006). **Whoever changes what the UI displays must publish it**: `onBoardChange()` is the funnel that covers moves, navigation, load, switch, scoring and handicap; `createNewRecord()` and `onBoardSized()` publish for themselves because the new-game path bypasses it. A missed publish shows up as stale UI and the scenario suite catches it — both misses in the original change were caught on the first run. A plain scalar that changes off the position-change path becomes atomic instead, as `GameRecord::unsavedChanges` did; saving is not a position change. **ADR-0006 is complete through stage 5**: `comment`, `markup`, `scoringError` and `passVariationLabel` are all published, so nothing on a per-frame or per-keystroke path reads the record *or* copies a `GameState` string. The player dropdowns compare `getActivePlayer()` — a `size_t` handed out under `PlayerManager::mutex` — rather than `state.black`/`state.white`, because the index is what the widget holds and the string was a race for no information. `GobanModel::onBoardSized()` does `state = GameState()`, reassigning every one of those strings at once, which is the sharpest version of the hazard. What remains by design is listed in the ADR — `hasGameWorthKeeping()`, save/archive, and the dialog seed — all on explicit user actions. Note that `ElementGame`'s old `positionNumber` guard was not wrong, only insufficient: an atomic edge makes a write *visible* but grants no exclusion, so copying a `std::string` or walking a `std::vector` across it is still a use-after-free. The same partial-locking shape has now been found three times — `GameRecord`, `PlayerManager` (writers unlocked while readers locked), and the process pipes — so when a reader crosses this boundary, check the writers before assuming a mutex means anything.
@@ -468,6 +561,11 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   `MessageLog::size()`, which saturates at the buffer capacity and so cannot tell
   "nothing new" from "the buffer is full". Opening the panel is what marks them
   seen.
+- **A blank line is not a message.** `GtpClient::issueCommand()` used to log the
+  blank line that terminates every GTP response *before* breaking out of the
+  read loop, so an engine refusal arrived as two entries — the second an error
+  reading `gnugo >>  (command: ...)` with nothing in it. The log counts entries,
+  and an empty one costs the user a badge exactly as a real one does.
 - **While the panel is open, the status line must stay visible.** It is the only
   close affordance; when it hid itself (because opening cleared the badge) the
   panel could not be dismissed except from a menu.
@@ -678,6 +776,20 @@ of its decisions, and `tests/test_analysis.cpp` plus
 - **Every character drawn must be in the atlas string** (`GobanOverlay.cpp:59`).
   The font is not the gate; that string is. A glyph absent from it simply does
   not appear, silently.
+- **One glyph pass draws all the text, so nothing may gate the pass but the pass
+  itself.** Move numbers, variation labels, SGF markup, the coordinate margin,
+  the evaluation's `A`/`B`/`C` and its board readout are built into the same
+  buffers by `GobanOverlay::Update()`. `GobanView::Render()` ran the draw only
+  `if (showLastMoveOverlay || showNextMoveOverlay)` — correct the day it was
+  written, when the two markers *were* the overlay, and silently outgrown by
+  everything added since. Switching both markers off therefore took the
+  coordinates, the markup and the entire evaluation display down with them. A
+  toggle belongs where its own labels are **placed** — `updateLastMoveOverlay()`
+  and `updateNavigationOverlay()` already check theirs — never around the draw.
+  Pinned by `tests/scenarios/overlays_outlive_the_move_markers.scn` through
+  `overlay_glyphs`, which counts what the pass actually drew: `coordinates_shown`,
+  `markup_count` and `eval_labels` all stayed true throughout, which is exactly
+  why the suite could not see this. Same distinction as `sounds_played`.
 - **The overlay is not part of `isIdle()`.** An analysis stream never finishes on
   its own, so treating it as work-in-flight would make quiescence unreachable —
   the same trap as waiting on `EngineSync::Unsynced`.
@@ -732,12 +844,20 @@ syntax. They are kept here as an index; the scenario file is the specification.
 
 Areas covered since (each found at least one real defect): board clicking and
 the stone-in-hand model (`board_click_stone_in_hand.scn`), tsumego mode
-(`tsumego_mode.scn`), territory after a resignation
+(`tsumego_mode.scn`, `tsumego_collection.scn`), territory after a resignation
 (`territory_needs_a_score.scn`), multi-game collections
 (`multi_game_collection.scn`), the Clear/Quit confirmations
-(`discard_prompts.scn`), and the live evaluation overlay
+(`discard_prompts.scn`), the live evaluation overlay
 (`evaluation_overlay.scn`, `evaluation_unavailable.scn` — which found the
-exit-while-idle hang above).
+exit-while-idle hang above), a click the rules refuse
+(`illegal_click_is_refused_locally.scn`), a click on a move the record already
+has (`click_follows_recorded_variation.scn`), and the glyph pass every overlay
+shares (`overlays_outlive_the_move_markers.scn`).
+
+Tsumego is the worked example of coverage that looks complete and is not: the
+mode had a scenario and five unit tests, and every path the scenario did *not*
+walk — the dead branch, a second visit to a wrong move, a pass — turned out to
+hold a defect. What the suite covers is what it executes, not what it is about.
 
 Converting a prose sequence is a good way to pin a bug you have just fixed.
 
@@ -784,12 +904,83 @@ Same `cameraPan`/`cameraDistance` uniforms. Eye positions are lateral offsets fr
 
 ### Stereoscopic Deviation Theory
 
-**On-screen deviation formula:**
+The sources are in `res/stereo.zip` — Matěj Boháč, *Less is More! Keeping the
+Deviation Under Control* and *Výpočet maximální deviace* (klub stereoskopické
+fotografie). `src/Stereo.h` is the one implementation; `tests/test_stereo.cpp`
+and `tests/scenarios/stereo_depth_budget.scn` hold it to this.
+
+**Deviation** is the horizontal separation of the two images of a point, as a
+fraction of the image width, and what must be bounded is the *difference*
+between the nearest and the furthest point in frame:
+
 ```
-deviation = stereo_base * focal_length / object_distance
+deviation = base * focal_length * (1/near - 1/far)      // far = infinity: base * f / near
 ```
 
-**Maximum comfortable deviation:** 1/30th (3.3%) of screen width
+**Ceiling: 1/30th (3.3%) of the image width.** Projection is the demanding case
+and this is its number; being more conservative costs nothing, which is the
+article's own advice, so `Stereo::DEFAULT_DEVIATION` asks for 1/40.
+
+**It is set by the near point, not by the camera distance.** This is the whole
+of it, and getting it wrong is not a matter of taste: the board is a fixed-size
+object, so the nearest point in frame shrinks *far faster* than the camera
+distance as you zoom in. The base used to be `eof * cameraDistance / f`, which
+measured 1/20 of the image width at the default zoom and 1/12 zoomed in, on a
+1/30 ceiling — an error that grows as you approach, so a check at one zoom
+says nothing about another. `GobanView::stereoNearPoint()` asks the board box
+*and* the table's near edge, because "the nearest point is often not the
+subject, but the blades of grass at the bottom edge": the board binds at
+ordinary zoom, the table once the camera pulls back.
+
+**The window (`dof`) is not part of the deviation.** The horizontal image shift
+slides the whole depth range through the screen plane; it cancels in
+near-minus-far. It decides where the scene sits relative to the glass, not how
+much depth the eyes must accept.
+
+**One implementation, used by both layers.** `GobanView::stereoHalfBase()` is
+uploaded to the vertex shader (as the `eof` uniform, which therefore carries a
+*computed half-base in world units*, not the preference) **on every frame, from
+`shadeIt()`** — it lived in `setMetrics()` for one afternoon, which runs only on
+a board or shader change, so the board's base froze at whatever the camera was
+when the shader was last switched while the overlay's followed the camera. The
+same value places the glyph overlay's two eyes. Two implementations would let
+the labels drift off the wood they are lying on, which is exactly what a
+mismatched pair looks like.
+
+**Do not normalize a ray direction in a vertex shader.** `rdbl`/`rdbr` are
+varyings, so the fragment gets the interpolation of the four corner values, and
+interpolating unit vectors is not interpolating directions — it is only correct
+when the corners have equal length. The mono shader gets away with it, since
+`(±ratio, ±1, f)` all have the same length; `dof` breaks that symmetry, so
+pre-normalizing warped each eye and shrank the stereoscopic window to **85%** of
+the configured value (0.849 predicted, 0.853 measured at 4:3, `dof` 0.0925) —
+and the attenuation varies across the screen, which no constant can correct.
+The fragment shader normalizes anyway; that is where it belongs.
+
+**Anaglyph is greyscale, so annotation colour does not survive it.**
+`partial/stereo/on.glsl` writes `vec3(luma_left, 0.1, luma_right)`;
+`GobanOverlay::eyeInk()` reduces every label to its own brightness for the same
+reason, or text tinted green would vanish from the red eye. The evaluation's
+move-quality ramp therefore reads as brightness under a stereo shader — the
+`A`/`B`/`C` letters survive, the colour meaning does not. The ink is baked into
+the glyph buffers, so `GobanView::Update()` asks for an overlay rebuild whenever
+the selected shader changes.
+
+**Both eyes draw at the same depth**, so the overlay pass turns depth writes off
+— with them on, the first eye rejects the second and the right eye's text is
+simply missing.
+
+**One depth buffer, two eyes: take the nearer.** Depth here is a *layer* rather
+than a distance — `partial/algorithm/render.glsl` classifies a pixel as 0.25
+(board from below), 0.5 (a stone) or 0.75 (everything else), and the overlay
+draws at 0.4 (a label on a stone, in front) or 0.6 (a label on the board,
+behind). That is what hides an annotation under a stone. The stereo shader calls
+`render()` twice into one buffer, so writing `gl_FragDepth` inside it meant the
+second eye won outright: wherever the two eyes disagreed about a stone — most of
+the stone, once the window is wide — the best-move letter showed straight
+through it, which is what a stone carried in hand over a suggestion looked like.
+`render()` reports into `sceneDepth` and the caller decides; `stereo/on.glsl`
+takes `min(dl, dr)`, so a pixel either eye sees as a stone counts as one.
 
 **Why parallel cameras (not toe-in):**
 - Toe-in convergence causes keystone distortion and eye strain
@@ -798,7 +989,11 @@ deviation = stereo_base * focal_length / object_distance
 - Stereo effect naturally decreases with distance (correct for depth perception)
 
 **Parameters:**
-- `eof` (default 0.025): Eye offset factor. Stereo base = 2 × eof.
-  - 0.025 gives ~1/40 screen deviation at default zoom (conservative, comfortable)
-  - 0.017 would give exactly 1/30 (maximum recommended)
-  - Adjust to taste based on display and viewing distance
+- `eof`: the deviation asked for, as a fraction of the image width, **clamped to
+  `Stereo::MAX_DEVIATION` (1/30)**. It used to be a bare eye-offset factor that
+  the shader scaled by the camera distance; the clamp is what makes a value left
+  over from those days — `user.json` ships whatever was last set, typically
+  0.0725 — safe rather than three times the ceiling. Lower is calmer; 1/40 is
+  the shipped default.
+- `dof`: the stereoscopic window, in `q0` units — where the scene sits relative
+  to the screen plane. Independent of the deviation above.

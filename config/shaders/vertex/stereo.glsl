@@ -40,9 +40,16 @@ void main() {
     vec3 cu = normalize(cross(up, cw));
     vec3 cv = cross(cw, cu);
 
-    // Scale stereo base with distance
-    float scaleFactor = (cameraDistance + introZoom) / focalLength;
-    vec3 scaledEye = scaleFactor * eoff.xyz;
+    // `eof` arrives as half the stereo base in world units, already sized for
+    // this camera by GobanView::stereoHalfBase() — see src/Stereo.h. It used to
+    // be a bare preference scaled here by the camera distance, which is the
+    // wrong quantity: the depth budget is set by the nearest point in frame,
+    // and the board is a fixed-size object, so zooming in shrank the near point
+    // far faster than the distance and the deviation ran away (1/20 of the
+    // image width at the default zoom, 1/12 zoomed in, against a 1/30 ceiling).
+    // Computing it out there is also what lets the glyph overlay draw the same
+    // two eyes.
+    vec3 scaledEye = eoff.xyz;
 
     // Left eye at negative X, right eye at positive X in camera space
     rool = center - (m * vec4(scaledEye, 0.0)).xyz;
@@ -51,7 +58,21 @@ void main() {
     vec2 ratio = vec2(iResolution.x/iResolution.y, 1.0);
     vec2 q0 = (vertex.xy + (vec2(0.5,0.5))/iResolution) * ratio;
 
-    // Parallel cameras with horizontal image shift (HIT) for convergence control
-    rdbl = normalize((q0.x + dof)*cu + q0.y*cv + focalLength*cw);
-    rdbr = normalize((q0.x - dof)*cu + q0.y*cv + focalLength*cw);
+    // Parallel cameras with horizontal image shift (HIT) for convergence control.
+    //
+    // Deliberately *not* normalized here. These are varyings, so what reaches a
+    // fragment is the interpolation of the four corner values, and interpolating
+    // unit vectors is not the same as interpolating directions: the result is
+    // only correct when all four corners have equal length. The mono shader gets
+    // away with it — (±ratio, ±1, F) all have the same length — but `dof` breaks
+    // that symmetry, so pre-normalizing warped each eye's image and shrank the
+    // stereoscopic window to about 85% of the value asked for (measured 0.849
+    // at 4:3 with dof 0.0925, and position-dependent across the screen, which is
+    // the part that cannot be compensated by a constant). Unnormalized, the
+    // interpolation is exact, because a ray direction *is* linear in q0.
+    //
+    // Nothing is lost: partial/stereo/on.glsl normalizes per fragment anyway,
+    // which is where it has to happen.
+    rdbl = (q0.x + dof)*cu + q0.y*cv + focalLength*cw;
+    rdbr = (q0.x - dof)*cu + q0.y*cv + focalLength*cw;
 }

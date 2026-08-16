@@ -338,6 +338,36 @@ nothing about it. An analysis stream never finishes on its own; treating it as
 work-in-flight would make quiescence unreachable, exactly as `EngineSync::Unsynced`
 would.
 
+Plus `overlay_glyphs`: how many pieces of text the glyph pass actually put on
+screen in the last frame that ran it — move numbers, variation labels, markup,
+the coordinate margin, the evaluation's letters and its readout, all of which
+share one pass. Every *other* overlay key above describes what was **built**, and
+all of them read perfectly true through a bug that drew none of it: `Render()`
+ran the pass only while one of the two move-marker toggles was on, so switching
+both off blanked the coordinates and the whole evaluation display as well. Same
+distinction as `sounds_played`, and the same reason for existing. It is written
+by a frame, not by a command, so give it a `wait` — `wait_idle` is about engines
+and navigation and says nothing about repaints — and note that it stays at 0
+until the intro animation ends (`wait_until camera_animating false`).
+
+Plus the stereo depth budget, reported whatever shader is selected because what
+it describes is the camera rather than the shader: `stereo` (is an anaglyph
+shader active), `stereo_near` (nearest point in frame, along the view axis),
+`stereo_base` (half the stereo base, world units) and `stereo_deviation` — the
+near-to-far separation as a fraction of image width, which `src/Stereo.h` bounds
+at 1/30. **Assert `stereo_deviation` at more than one zoom**: the rule this
+replaced tied the base to the camera distance, which passes at one zoom and
+fails at another, and `zoom stones` is the cheap way to get a second one.
+`overlay_glyphs` doubles under a stereo shader, since every label is drawn once
+per eye.
+
+Plus `status_text`: the line `#lblStatus` is actually showing, as last written.
+Assert it rather than the condition behind it when you mean "the user was told
+why the program is busy" — a genmove was silent for 30.9 s against a CPU KataGo
+with every button correctly greyed, and a greyed button cannot be told from a
+click that did nothing. It needs `getIdleTimeout()` to keep waking the loop, or
+the frame that would carry it is never drawn.
+
 Plus the message log: `log_count`, `log_unseen`, `log_open`, `log_badge`
 (`none`/`warning`/`error`) and `engine_loading` (the engine the status indicator is naming, empty
 once loading is done). **Assert `log_badge`, not `log_count`** when you mean "the

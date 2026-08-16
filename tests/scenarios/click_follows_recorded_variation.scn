@@ -1,0 +1,121 @@
+# A click on one of the marked moves follows it. It does not play it.
+#
+# The next-move overlay labels the continuations recorded at the cursor — `3`
+# when there is one, `3a` / `3b` / `3c` when there are several. Clicking one is
+# the Right arrow with a mouse: the move is already in the tree.
+#
+# It used to route through playVariationAt(), which starts the match. So
+# following the marked move left the phase Playing at a mid-tree cursor, the
+# game loop asked the engine for the next move, and GameRecord::move() appended
+# the answer as a new child — even though the node already had that move. GNU
+# Go being deterministic, the answer *was* the recorded move, so the node ended
+# up with two identical children drawn on top of each other and the main line
+# acquired a letter it never had: 16, then 16b, then 16c for the same point,
+# one per visit. Reported from a real review as "clicking the main variation
+# plays it instead of following it".
+#
+# Black is human and White is the engine, which is the configuration the bug was
+# found in: only then is there anybody to answer.
+
+# --- 1. The main line's continuation ------------------------------------------
+# simple.sgf is 19x19, B[dd] W[pp] B[dp] W[pd], no result.
+load_sgf tests/data/simple.sgf
+wait_idle
+switch_player black human
+switch_player white mock
+wait_idle
+expect main_line_moves 4
+expect at_end true
+
+navigate_back
+navigate_back
+wait_idle
+expect view_position 2
+expect at_end false
+expect variations 1          # the recorded B[dp], drawn as "3"
+
+# Two clicks, as everywhere: one to take the stone out of the bowl, one to put
+# it down — on the marked point this time.
+click 3 3
+wait_idle
+expect holds_stone true
+click 3 3
+wait_idle
+
+# Followed: the cursor moved and nothing else did.
+expect view_position 3
+expect move_count 3
+expect main_line_moves 4
+expect at_end false
+expect variations 1          # W[pd] is still ahead, and still the only one
+expect holds_stone false
+# The regression. This used to be `playing`, and that is the whole bug: nothing
+# was played, so nothing may start.
+expect phase paused
+# Navigation does not edit the SGF, so there is nothing new to save.
+expect unsaved_changes false
+
+# Which means the engine has no reason to answer. Waited out rather than
+# asserted immediately: a genmove that was going to happen would land here.
+wait 1200
+wait_idle
+expect move_count 3
+expect main_line_moves 4
+expect phase paused
+
+# And the node we came from still has exactly one child. Two would be the
+# duplicate — the same move recorded twice, which is what put a letter on the
+# main line.
+navigate_back
+wait_idle
+expect view_position 2
+expect variations 1
+
+# Resuming play from a reviewed position is Start's job, and Start is offered:
+# White is an engine, it is White's turn, and the game is not over. Same
+# division as `play once`, which asks the engine one question without turning
+# the review back into a game.
+navigate_forward
+wait_idle
+expect view_position 3
+expect phase paused
+expect can_start true
+
+# --- 2. A branch that is not the main line ------------------------------------
+# variations.sgf has three continuations at move 2: B[dp] (with W[pd] after it),
+# B[pd], and a bare B[jj]. Following one must not reorder them either — clicking
+# a branch is not a vote for it.
+load_sgf tests/data/variations.sgf
+wait_idle
+switch_player black human
+switch_player white mock
+wait_idle
+navigate_back
+navigate_back
+wait_idle
+expect view_position 2
+expect variations 3          # drawn as 3a, 3b, 3c
+
+# The third one, B[jj] at 9,9. It is the one with no continuation, which is what
+# makes the check below tell branches apart.
+click 9 9
+wait_idle
+click 9 9
+wait_idle
+expect view_position 3
+expect at_end true           # B[jj] is the end of its line
+expect variations 0
+expect phase paused
+expect unsaved_changes false
+
+# Back out and step forward the ordinary way. Forward always takes the first
+# child, so landing on B[dp] — which has a continuation — proves the click left
+# the order alone. Had it promoted B[jj], this would be the end of the line.
+navigate_back
+wait_idle
+expect variations 3
+navigate_forward
+wait_idle
+expect view_position 3
+expect at_end false
+expect variations 1

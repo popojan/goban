@@ -161,6 +161,21 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     glUseProgram(0);
 }
 
+// Half the stereo base, in world units, computed on the CPU (Stereo.h) — not
+// the raw `eof` preference. The shader used to scale that preference by the
+// camera distance itself, which is the wrong quantity: the depth budget is set
+// by the *near point*, and the board is a fixed-size object, so zooming in
+// shrinks the near point far faster than the distance does.
+//
+// Uploaded from shadeIt() on every frame, beside the camera it depends on. It
+// spent one afternoon in setMetrics(), which runs only on a board or shader
+// change: the board's stereo base then froze at whatever the camera was when
+// the shader was last switched, while the overlay's followed the camera — so
+// the two agreed until the first zoom and never again.
+void GobanShader::setStereoBase(float halfBase) const {
+    glUniform1f(vsu_eof, halfBase);
+}
+
 void GobanShader::setGamma(float value) {
     spdlog::debug("setting gamma = {0}", value);
     this->gamma = value;
@@ -235,7 +250,6 @@ void GobanShader::setMetrics(const Metrics &m) const {
     glUniform1f(fsu_bowlRadius2, br2);
     glUniform3fv(fsu_cc, 4, m.bowlsCenters);
     glUniform1f(vsu_dof, dof);
-    glUniform1f(vsu_eof, eof);
 }
 
 void GobanShader::destroy() const {
@@ -341,6 +355,10 @@ int GobanShader::choose(int idx) {
     std::string fragmentFile(shader.value("fragment", ""));
 
     currentProgramH = shader.value("height", 0.0f);
+    // Declared by the shader rather than inferred from its vertex file: the
+    // overlay has to draw the same two eyes, and a path comparison is not a
+    // fact about the shader.
+    currentProgramStereo = shader.value("stereo", 0) != 0;
     if(!vertexFile.empty() && !fragmentFile.empty()) {
         initProgram(vertexFile, fragmentFile);
         currentProgram = newProgram;

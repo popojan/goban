@@ -140,6 +140,33 @@ public:
         return game.moveCount() > 0 || game.getLoadedMovesCount() > 0;
     }
 
+    /// Do the rules of Go accept this stone at this point? Asked of our own
+    /// board, and asked *before* anybody sends the move to an engine.
+    ///
+    /// The engine used to be the only referee. Every click left as
+    /// `play <colour> <point>` and whatever GNU Go answered decided it, so an
+    /// ordinary misclick onto an occupied point came back as `? illegal move` —
+    /// which the message-log sink takes at error level, raising a red badge for
+    /// a fat-fingered endgame click, and which in one recorded session was the
+    /// entire contents of `last_run.log` (2026-08-16, `play B M10` onto White's
+    /// stone from ten moves earlier). We know the rules; there is nothing to ask.
+    ///
+    /// It is also what keeps an illegal move out of the record: `GameRecord::
+    /// move()` appends whatever it is handed, so an engine with different rules
+    /// — or one that has drifted out of sync — could write a move that
+    /// `Board::replayMoves()` then refuses, silently truncating every later
+    /// reconstruction of the position.
+    ///
+    /// Only a placed stone has a point to test; a pass, a resignation and the
+    /// internal sentinels are legal by construction. Locked, because the game
+    /// thread rebuilds `board` in onBoardChange(); a click is a user event
+    /// rather than a frame, so the cost does not matter.
+    [[nodiscard]] bool isLegalMove(const Move& m) const {
+        if (m != Move::NORMAL) return true;
+        std::lock_guard<std::mutex> lock(mutex);
+        return board.isValidMove(m.pos, m.col);
+    }
+
     void setCursor(const Position& p) { cursor = p;}
 
 public:
@@ -175,7 +202,10 @@ public:
 
     Metrics metrics;
 
-	std::mutex mutex;
+	/// Guards `board` and `state` against the game thread's onGameMove() /
+	/// onBoardChange() rebuilds. Mutable so that the const questions the UI
+	/// thread asks about the position — isLegalMove() — can take it.
+	mutable std::mutex mutex;
 
     Position cursor;
     std::vector<Position> setupBlackStones;

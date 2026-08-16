@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "Board.h"
+#include "GobanModel.h"
 
 namespace {
 
@@ -1221,4 +1222,55 @@ TEST_CASE("the column letter I is skipped, as Go requires") {
     // Rows number from 1 at the bottom, which is board row 0.
     CHECK(Position::rowLabel(0) == 1);
     CHECK(Position::rowLabel(18) == 19);
+}
+
+// ---------------------------------------------------------------------------
+// GobanModel::isLegalMove — the question the click path asks before anyone
+// talks to an engine.
+//
+// The application had no rules check of its own on the way out: a click left as
+// `play <colour> <point>` and whatever the engine answered decided it, so a
+// misclick came back as `? illegal move` at error level and put a badge in
+// front of the user (2026-08-16, `play B M10` onto a stone ten moves old). What
+// is pinned here is the shape of the predicate rather than the rules behind it,
+// which the cases above already cover: it delegates to the board, and it says
+// yes to everything that has no point to test.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("GobanModel::isLegalMove asks the board, and only about placed stones") {
+    GobanModel model(9);
+
+    setup(model.board, {
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        "X........",
+        ".X.......",
+    });
+
+    // An empty point takes a stone.
+    CHECK(model.isLegalMove(Move(Position(4, 4), Color::BLACK)));
+
+    // An occupied one does not — whichever colour asks. This is the case the
+    // engine used to answer, loudly.
+    CHECK_FALSE(model.isLegalMove(Move(Position(0, 1), Color::WHITE)));
+    CHECK_FALSE(model.isLegalMove(Move(Position(0, 1), Color::BLACK)));
+
+    // Neither does a point with no liberties and nothing to capture: the corner
+    // A1, sealed off by the two black stones above.
+    CHECK_FALSE(model.isLegalMove(Move(Position(0, 0), Color::WHITE)));
+    // Black may fill it — it joins a group that has room.
+    CHECK(model.isLegalMove(Move(Position(0, 0), Color::BLACK)));
+
+    // A pass, a resignation and the internal sentinels carry no point, so there
+    // is nothing to refuse. Answering "illegal" here would silently swallow a
+    // pass, which is how a game ends.
+    CHECK(model.isLegalMove(Move(Move::PASS, Color::BLACK)));
+    CHECK(model.isLegalMove(Move(Move::RESIGN, Color::WHITE)));
+    CHECK(model.isLegalMove(Move(Move::INTERRUPT, Color::BLACK)));
+    CHECK(model.isLegalMove(Move(Move::KIBITZED, Color::BLACK)));
 }

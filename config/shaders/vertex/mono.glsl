@@ -35,5 +35,10 @@ void main() {
 
     vec2 ratio = vec2(iResolution.x/iResolution.y, 1.0);
     vec2 q0 = (vertex.xy + vec2(0.5,0.5)/iResolution) * ratio;
-	rdb = normalize(q0.x*cu + q0.y*cv + focalLength*cw);
+	// Unnormalized, like the stereo shader beside it: a varying must carry the
+	// direction, not the unit vector, or interpolation bends the rays. Here the
+	// four corners happen to have equal length so it made no difference — which
+	// is exactly why the same line in stereo.glsl went unnoticed. The fragment
+	// shader normalizes.
+	rdb = q0.x*cu + q0.y*cv + focalLength*cw;
 }

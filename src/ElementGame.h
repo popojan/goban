@@ -114,6 +114,10 @@ public:
     void setLogPanelOpen(bool open);
     void clearLog();
     [[nodiscard]] bool isLogPanelOpen() const { return logPanelOpen; }
+    /// What #lblStatus is showing, as last written. Exposed so a scenario can
+    /// assert that a wait was *explained* rather than merely survived — the
+    /// distinction the thinking and syncing lines exist for.
+    [[nodiscard]] const std::string& statusText() const { return statusTextShown; }
 
 protected:
     void OnUpdate() override;

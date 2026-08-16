@@ -13,6 +13,10 @@ struct Layer {
 	float height;
 	glm::vec4 color;
 	bool empty;
+	/// How many text items Update() put in this layer's buffer. `empty` is the
+	/// same fact as a boolean; the count is what draw() reports back, so that a
+	/// scenario can assert what was *drawn* rather than what was built.
+	int count = 0;
 };
 
 /** \brief Text placed by board coordinate rather than by board point.
@@ -51,10 +55,19 @@ public:
 	static void use();
 
 	static void unuse();
-    void draw(const GobanModel&, const DDG::Camera&, unsigned) const;
+	/// Draws one pass — layer 0, or layers 1 and up — and returns how many text
+	/// items went out. The count is the only evidence there is that the glyph
+	/// pass ran at all: every overlay in the program is built into these same
+	/// buffers, so `eval_labels` or `coordinates_shown` can be perfectly true
+	/// with nothing on screen. Same argument as `sounds_played`.
+	unsigned draw(const GobanModel&, const DDG::Camera&, unsigned) const;
     ~GobanOverlay();
     void setReady() { overlayReady = true; }
 	void Update(const Board& board, const GobanModel& model);
+
+	/// The ink a label is built with: itself in mono, its own brightness under
+	/// an anaglyph shader, where the two eyes live in separate colour channels.
+	[[nodiscard]] glm::vec4 eyeInk(const glm::vec4& color) const;
 
 	/// Replaces the free-positioned labels drawn on top of the point overlays.
 	/// Cheap to call every frame: it is a small vector and Update() rebuilds

@@ -4,10 +4,12 @@
 #include "ElementGame.h"
 
 #include <cmath>
+#include <limits>
 #include <cstdio>
 #include <iomanip>
 #include <set>
 #include <sstream>
+#include "Stereo.h"
 #include "UserSettings.h"
 
 GobanView::GobanView(GobanModel& m)
@@ -382,6 +384,9 @@ void GobanView::shadeIt(float time, const GobanShader& shader, int flags) const 
 	shader.setRotation(cam.setView());
 	shader.setCameraPan(cameraPan);
 	shader.setCameraDistance(cameraDistance);
+	// Every frame, with the camera: the base is a function of where the camera
+	// is, and the overlay recomputes it every frame too. See setStereoBase().
+	shader.setStereoBase(stereoHalfBase());
 
 	if (flags & UPDATE_SHADER) {
 		spdlog::debug("setMetrics");
@@ -480,24 +485,36 @@ void GobanView::Render(int w, int h)
         gobanOverlay.Update(board, model);
 	}
 
+	// Every piece of text in the program shares this pass: move numbers, the
+	// variation labels, SGF markup, the coordinate margin, the evaluation's
+	// A/B/C and its board readout. It used to run only when one of the two
+	// move-marker toggles was on, which was true when it was written — back then
+	// the markers *were* the overlay. Everything since joined the same buffers
+	// without revisiting the gate, so turning both markers off took the
+	// coordinates, the markup and the whole evaluation display down with them.
+	// The two toggles are honoured where they belong: updateLastMoveOverlay()
+	// and updateNavigationOverlay() simply do not place their labels.
+	unsigned glyphs = 0;
 	if (time - startTime >= gobanShader.animT) {
-		if (showLastMoveOverlay || showNextMoveOverlay) {
-			gobanOverlay.use();
-			gobanOverlay.draw(model, cam, 0);
-			gobanOverlay.unuse();
-		}
+		gobanOverlay.use();
+		glyphs += gobanOverlay.draw(model, cam, 0);
+		gobanOverlay.unuse();
 		animationRunning = false;
     }
 
     glUseProgram(0);
 
 	if (time - startTime >= gobanShader.animT) {
-		if (showLastMoveOverlay || showNextMoveOverlay) {
-			gobanOverlay.use();
-			gobanOverlay.draw(model, cam, 1);
-			gobanOverlay.unuse();
-		}
+		gobanOverlay.use();
+		glyphs += gobanOverlay.draw(model, cam, 1);
+		gobanOverlay.unuse();
 		animationRunning = false;
+		// What actually went to the screen, for the same reason sounds_played
+		// counts what was heard: every state key describing an overlay stayed
+		// true while nothing was drawn, so the suite could not see this at all.
+		// Only stored on a frame that ran the pass — a frame skipped for the
+		// intro animation says nothing about the overlay either way.
+		overlayGlyphsDrawn.store(glyphs);
 	}
 
 	glEnable(GL_BLEND);
@@ -692,6 +709,65 @@ glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     return {ip.x, ip.z};
 }
 
+float GobanView::stereoNearPoint() const {
+    using namespace glm;
+    // Same camera model as boardCoordinate() above and as the vertex shaders.
+    const mat4 m = cam.setView();
+    const vec3 ta(cameraPan.x, 0.0f, cameraPan.y);
+    const vec3 cw = normalize(vec3(m * vec4(0, 0, 1, 0)));
+    const vec3 roo = ta - cameraDistance * cw;
+    const vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
+    const vec3 cu = normalize(cross(up, cw));
+    const vec3 cv = cross(cw, cu);
+    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
+
+    float nearest = std::numeric_limits<float>::max();
+
+    // The board box, as the scene shaders build it: half-extents (1, 0.25,
+    // squareSizeY/squareSizeX) about the origin.
+    const float halfZ = model.metrics.squareSizeX > 0.0f
+                      ? model.metrics.squareSizeY / model.metrics.squareSizeX : 1.0f;
+    const vec3 half(1.0f, 0.25f, halfZ);
+    for (int i = 0; i < 8; ++i) {
+        const vec3 corner((i & 1) ? half.x : -half.x,
+                          (i & 2) ? half.y : -half.y,
+                          (i & 4) ? half.z : -half.z);
+        const float z = dot(corner - roo, cw);
+        if (z > 0.0f) nearest = std::min(nearest, z);
+    }
+
+    // ...and the table, which passes under the board and continues toward the
+    // viewer. Its nearest visible point is where the bottom edge of the frame
+    // meets it, which is what binds once the camera pulls back. The shallower
+    // of the two table heights the shaders use, because a shallower plane is
+    // met sooner and so is the conservative one.
+    constexpr float TABLE_Y = -0.2f;
+    for (const float qx : {-aspect, 0.0f, aspect}) {
+        const vec3 rd = normalize(qx * cu - cv + FOCAL_LENGTH * cw);
+        if (rd.y < -1e-6f) {
+            const float t = (TABLE_Y - roo.y) / rd.y;
+            if (t > 0.0f) nearest = std::min(nearest, dot(t * rd, cw));
+        }
+    }
+
+    // A camera inside the board has no honest answer; keep it finite rather
+    // than letting the base run away.
+    return std::max(nearest, 0.05f);
+}
+
+float GobanView::stereoDeviation() const {
+    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
+    // Far point at infinity: the table runs to the horizon, and it is the
+    // reading that cannot flatter us.
+    return Stereo::deviation(stereoHalfBase(), aspect, stereoNearPoint(),
+                             std::numeric_limits<float>::infinity(), FOCAL_LENGTH);
+}
+
+float GobanView::stereoHalfBase() const {
+    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
+    return Stereo::halfBase(gobanShader.getEof(), aspect, stereoNearPoint(), FOCAL_LENGTH);
+}
+
 void GobanView::animateIntro() {
     lastTime = 0.0;
     startTime = static_cast<float>(glfwGetTime());
@@ -706,7 +782,10 @@ void GobanView::Update() {
 
 	int newProgram = gobanShader.getCurrentProgram();
 	if (currentProgram != newProgram) {
-		updateFlag |= UPDATE_SHADER;
+		// UPDATE_OVERLAY too: switching to or from an anaglyph shader changes
+		// the ink every label is built with (GobanOverlay::eyeInk), and that
+		// colour lives in the glyph buffers rather than in a uniform.
+		updateFlag |= UPDATE_SHADER | UPDATE_OVERLAY;
 		currentProgram = newProgram;
 	}
 	if (board.getSize() != model.board.getSize()) {
@@ -735,9 +814,13 @@ void GobanView::updateCursor(){
         board.setRandomStoneRotation();
         state.holdsStone = model.state.holdsStone;
     }
+    // The ghost stone appears exactly where a click would place one, and
+    // nowhere else. It used to ask only whether the point was empty, which is
+    // most of the rule but not the rule: a ko ban or a self-capture drew a
+    // stone the click then sent to the engine anyway, to be refused. Both ends
+    // ask GobanModel::isLegalMove() now — see GobanControl::placeStone().
     if(model.state.holdsStone && model.isPointOnBoard(cursor)){
-        auto& np = model.board[cursor];
-        if(np.stone == Color::EMPTY)
+        if(model.isLegalMove(Move(cursor, state.colorToMove)))
             board.placeCursor(cursor, state.colorToMove);
     }
 }

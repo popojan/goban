@@ -19,14 +19,15 @@
       "path": "./engine/gnugo",
       "command": "gnugo",
       "parameters": "--mode gtp --japanese-rules",
-      "main": 1
+      "main": 1,
+      "kibitz": 1
     },
     {
       "name": "Pachi 12.60",
       "path": "./engine/Pachi",
       "command": "pachi-12.60-amd64",
       "parameters": "-r japanese --smart-pass",
-      "enabled": 1
+      "enabled": 0
     },
     {
       "name": "Katago #kata1 b28",
@@ -57,7 +58,8 @@
       "command": "katago",
       "parameters": "gtp -model ./models/kata9x9-b18c384nbt-20231025.bin.gz -config ./default_gtp.cfg",
       "enabled": 1,
-      "kibitz": 1,
+      "kibitz": 0,
+      "analysis": 1,
       "messages": [
         {
           "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
@@ -295,12 +297,14 @@
     },
     {
       "name": "[stereo] Red Carpet",
+      "stereo": 1,
       "vertex": "./config/shaders/vertex/stereo.glsl",
       "fragment": "./config/shaders/fragment/red_carpet_stereo.glsl",
       "height": 0.85
     },
     {
       "name": "[stereo] Minimal Thin",
+      "stereo": 1,
       "vertex": "./config/shaders/vertex/stereo.glsl",
       "fragment": "./config/shaders/fragment/thin_stereo.glsl",
       "height": 0.85

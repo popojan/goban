@@ -63,6 +63,12 @@ struct UiInputs {
     /// A bot-versus-bot match outside analysis mode: the human is a spectator.
     bool aiVsAiLocked      = false;
     bool tsumego           = false;
+    /// Some node between the root and the cursor is marked BM — in a tsumego,
+    /// the solver is inside a branch that has already gone wrong. Only `kibitz`
+    /// reads it, and only in a puzzle: it is what separates "show me how this
+    /// is punished", which is the whole point of being allowed to play a wrong
+    /// move out, from asking for a move at a position that is already solved.
+    bool onBadMovePath     = false;
     /// The cursor is at the end of the line being played, with no continuation
     /// ahead of it. Resignation writes the record's result and adds no node, so
     /// it is only truthful here. Its negation is "reviewing mid-tree", where a

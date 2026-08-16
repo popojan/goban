@@ -451,6 +451,12 @@ bool GameThread::isThinking() const {
     return p != nullptr && p->isTypeOf(Player::ENGINE);
 }
 
+std::string GameThread::thinkingEngineName() const {
+    Player* p = playerToMove.load();
+    if (!p || !p->isTypeOf(Player::ENGINE)) return {};
+    return p->getName();
+}
+
 bool GameThread::analysisMayRun() const {
     if (isThinking() || isSyncingEngines() || hasPendingNavigation()) return false;
     return !(isRunning() && isCurrentPlayerEngine());
@@ -1175,6 +1181,18 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                         model.state.msg = GameState::TSUMEGO_SOLVED;
                     }
                 }
+
+                // markBadMove() writes the record *after* navigateToVariation()
+                // has already published, so the snapshot described the node as
+                // it was one instant before it was condemned: onBadMovePath
+                // false for exactly the move just marked, and nothing else on
+                // the way to republish it. Both readers fail closed on that —
+                // boardClick() refuses to take a stone out of the bowl and
+                // Space never reaches requestKibitzNav() — so a wrong move left
+                // the board as inert as a solved one and no engine ever
+                // refuted it. Invisible, because the "Wrong!" verdict is read
+                // from model.state rather than from the snapshot.
+                model.publishSnapshot();
             }
 
             // In Analysis mode, auto-respond with kibitz engine after human variation

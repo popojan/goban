@@ -1,0 +1,86 @@
+# The stereoscopic depth budget, and the overlay that has to share it.
+#
+# Two claims, both of which used to be false:
+#
+#  1. The deviation — the near-to-far separation, as a fraction of the image
+#     width — stays inside the 1/30 the stereo literature allows *at every
+#     zoom*. The old rule scaled the stereo base with the camera distance, which
+#     is the wrong quantity: the board is a fixed-size object, so coming closer
+#     shrinks the nearest point in frame far faster than it shrinks the
+#     distance. Measured with the shipped configuration, that gave 1/20 of the
+#     image width at the default zoom and 1/12 zoomed in. See src/Stereo.h and
+#     the articles in res/stereo.zip.
+#
+#  2. The glyph overlay draws both eyes. It used to draw one, flat, at the
+#     screen plane, while the board had parallax — the move numbers and
+#     coordinates hovered in front of the wood they are supposed to be lying on.
+#
+# `overlay_glyphs` counts text items actually drawn, so under an anaglyph shader
+# it must exactly double: the same labels, once per eye.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+wait_until camera_animating false
+
+toggle_coordinates on
+click 2 2
+click 2 2
+wait_until move_count >= 1
+click 6 6
+click 6 6
+wait_until move_count >= 2
+wait 300
+
+# Mono to begin with: eighteen coordinate labels on a 9x9, plus the move number
+# on the last stone.
+expect stereo false
+expect overlay_glyphs 19
+
+# The budget is a property of the camera, not of the shader, so it is reported
+# and bounded even here.
+expect stereo_deviation <= 0.0334
+
+# --- The anaglyph shaders ----------------------------------------------------
+# Four steps along the list reaches [stereo] Red Carpet. Asserted rather than
+# assumed: if the shader list is ever reordered this says so instead of quietly
+# testing the wrong thing.
+cycle shaders
+cycle shaders
+cycle shaders
+cycle shaders
+wait 600
+expect stereo true
+
+# Every label, once per eye. Nineteen items, thirty-eight draws.
+expect overlay_glyphs 38
+expect stereo_deviation <= 0.0334
+
+# --- The zoom that used to break it ------------------------------------------
+# `zoom stones` frames the two stones, which is a much closer camera: the near
+# point roughly halves. Under the old rule the deviation would have grown with
+# it; under the near-point rule the base shrinks to match and the deviation is
+# unchanged.
+zoom stones
+wait_until camera_animating false
+wait 400
+
+expect stereo_near <= 2.0          # the camera really did come in
+expect stereo_base <= 0.03         # ...and the base came in with it
+expect stereo_deviation <= 0.0334  # which is the whole point
+
+# The overlay is still drawing both eyes at the new camera — the base it uses is
+# the same value the shader is handed, so there is nothing to drift.
+expect overlay_glyphs 38
+
+# --- And back to mono --------------------------------------------------------
+# Two more steps returns to the head of the list. The count halves again, which
+# is what says the doubling above was the eyes and not something else.
+cycle shaders
+cycle shaders
+wait 600
+expect stereo false
+expect overlay_glyphs 19
+expect stereo_deviation <= 0.0334

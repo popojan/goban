@@ -249,6 +249,7 @@
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">%s 불러오는 중…</div>
     <div class="template" id="tplStatusSyncing">엔진 동기화 중…</div>
+    <div class="template" id="tplStatusThinking">%s 생각 중…</div>
     <div class="template" id="tplStatusMessages">× 메시지</div>
     <div class="template" id="tplStatusWarning">⚠ 메시지 (%d)</div>
     <div class="template" id="tplStatusError">⚠ 메시지 (%d)</div>

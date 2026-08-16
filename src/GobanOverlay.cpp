@@ -75,6 +75,21 @@ bool GobanOverlay::init() {
 void GobanOverlay::use() { }
 void GobanOverlay::unuse() { }
 
+// The ink a label is actually built with. Under an anaglyph shader the two eyes
+// go into separate colour channels, so a label keeps only its brightness —
+// `partial/stereo/on.glsl` reduces the board to `(r+g+b)/3` per eye for exactly
+// the same reason, and text tinted green would otherwise vanish from the red
+// eye entirely. The alpha is left alone: it is the glyph's antialiasing.
+//
+// Baked in here rather than applied at draw time because glyphy carries the
+// colour in the vertex buffer. GobanView::Update() therefore asks for an
+// overlay rebuild whenever the selected shader changes.
+glm::vec4 GobanOverlay::eyeInk(const glm::vec4& color) const {
+	if (!view.gobanShader.isStereo()) return color;
+	const float luma = (color.r + color.g + color.b) / 3.0f;
+	return {luma, luma, luma, color.a};
+}
+
 void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 	font_size = 0.8 / model.getBoardSize();
 
@@ -108,9 +123,9 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 				// from; an explicit colour is how the evaluation overlay tints a
 				// single label — including one the navigation overlay wrote —
 				// without needing a layer of its own.
-				const glm::vec4& color = point.overlay.color
+				const glm::vec4 color = eyeInk(point.overlay.color
 				                       ? *point.overlay.color
-				                       : layers[layer].color;
+				                       : layers[layer].color);
 				buffer[layer]->add_text(point.overlay.text.c_str(), font, font_size,
 				                        glm::value_ptr(color));
 				cnt += 1;
@@ -129,19 +144,23 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 				-model.metrics.squareSizeY * (label.boardPos.y - halfN)
 			};
 			buffer[layer]->move_to(&pos);
+			const glm::vec4 ink = eyeInk(label.color);
 			buffer[layer]->add_text(label.text.c_str(), font, label.size,
-			                        glm::value_ptr(label.color), label.align);
+			                        glm::value_ptr(ink), label.align);
 			cnt += 1;
 		}
 
+		layers[layer].count = cnt;
 		layers[layer].empty = cnt == 0;
 	}
 
 }
-void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigned which) const {
+unsigned GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigned which) const {
 	if (!overlayReady
 		|| std::all_of(layers.begin(), layers.end(), [](const Layer& x){return x.empty; }))
-			return;
+			return 0;
+
+	unsigned drawn = 0;
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
 
@@ -160,6 +179,23 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 	GLint height = viewport[3];
 
 	st->set_depth(which < 1 ? 0.6 : 0.4);
+
+	// One pass in mono; one per eye under an anaglyph shader. The two terms
+	// that differ are exactly the two the stereo vertex shader applies to the
+	// board — the eye offset and the horizontal image shift — and the offset
+	// comes from GobanView::stereoHalfBase(), the same value the shader is
+	// handed. Two implementations would let the labels drift off the wood they
+	// are supposed to be lying on.
+	const bool stereo = view.gobanShader.isStereo();
+	const float eye = stereo ? view.stereoHalfBase() : 0.0f;
+	const float hit = stereo ? view.gobanShader.getDof() : 0.0f;
+	const int passes = stereo ? 2 : 1;
+
+	// Both eyes draw at the same depth, so with depth writes on the first would
+	// reject the second outright and the right eye's text would simply be
+	// missing. The pass has no reason to write depth at all: it runs last, over
+	// a board that is already resolved.
+	glDepthMask(GL_FALSE);
 
 	for (size_t layer = which; layer < (which == 0 ? 1 : layers.size()); ++layer) {
 
@@ -188,11 +224,29 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 		buffer[layer]->extents(nullptr, &extents);
 		float content_scale = std::min(static_cast<float>(height) / 2.0f, 10000.0f);
 		float text_scale = content_scale;
+
+		for (int pass = 0; pass < passes; ++pass) {
+		// Left eye first. It sits at -eye along the camera's right axis, so the
+		// target's camera-space X grows by that much; the image shift goes the
+		// same way, the shader's `q0.x + dof`.
+		const float side = (pass == 0) ? 1.0f : -1.0f;
+		if (stereo) {
+			// Left into red, right into blue — the channels the fragment
+			// shader's own composite writes, `vec3(left, 0.1, right)`.
+			glColorMask(pass == 0 ? GL_TRUE : GL_FALSE, GL_FALSE,
+			            pass == 0 ? GL_FALSE : GL_TRUE, GL_FALSE);
+		}
 		{
 			float F = GobanView::FOCAL_LENGTH;
 			float cs = content_scale;
 
-			float x = -cs * ta_cam.x;
+			// Minus, because this frame's x runs opposite to the camera's: the
+			// layer origin is placed at -cs*ta_cam.x. Getting it backwards adds
+			// the eye offset to the window shift instead of subtracting it, and
+			// the labels then separate by the sum of the two — measured 9.5% of
+			// the image width where the stone under them separated by 3.5%,
+			// which is what "the number floats miles off the stone" looks like.
+			float x = -cs * (ta_cam.x - side * eye);
 			float y = -cs * ta_cam.y;
 			float z = cs * ta_cam.z;
 
@@ -201,7 +255,13 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 			float farPlane = 11.0f * height;
 			float halfH = nearPlane / F;
 			float halfW = halfH * static_cast<float>(width) / static_cast<float>(height);
-			mat = frustum(-halfW, halfW, -halfH, halfH, nearPlane, farPlane);
+			// An off-axis window is the horizontal image shift: moving it by s
+			// slides the image by -s/halfH in q0 units, and the shader wants
+			// -dof for the left eye. That is the stereoscopic window, and it
+			// deliberately plays no part in the deviation — it moves the whole
+			// depth range through the screen plane rather than stretching it.
+			const float shift = side * halfH * hit;
+			mat = frustum(-halfW + shift, halfW + shift, -halfH, halfH, nearPlane, farPlane);
 
 			// Position overlay at focal plane: F/2 * height from near plane
 			float baseZ = -(F / 2.0f) * static_cast<float>(height);
@@ -228,8 +288,10 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
 
 		st->set_matrix(value_ptr(mat));
 		buffer[layer]->draw();
+		drawn += static_cast<unsigned>(layers[layer].count);
 
 		glPopMatrix();
+		}
 	}
 
     glUseProgram(0);
@@ -244,6 +306,7 @@ void GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigne
     glUseProgram(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+    return drawn;
 }
 
 GobanOverlay::~GobanOverlay() {

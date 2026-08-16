@@ -50,6 +50,66 @@ wait_idle
 expect view_position 0
 expect msg none
 
+# --- Going back into it must not promote it over the solution ---------------
+# The wrong move is now an existing variation, so the click takes boardClick's
+# *variation* branch rather than its new-move branch — and only the new-move
+# branch carried `promote=false`. The second visit therefore promoted the wrong
+# move to the main line and the recorded solution was displaced by it
+# (main_line_moves 2 → 1). Both branches ask playVariationAt() now, which is the
+# one place that knows a puzzle's answer is not a line to be overwritten.
+click 0 1
+wait_idle
+click 0 1
+wait_until msg tsumego_wrong
+wait_idle
+expect view_position 1
+expect main_line_moves 2
+
+# --- A dead branch can be explored, and the engine will punish it -----------
+# Both halves of this were inert. GameSnapshot::onBadMovePath is published by
+# navigateToVariation(), but markBadMove() runs *after* it returns — so the
+# snapshot described the move one instant before it was condemned, and the two
+# readers that ask about it both fail closed: no stone could be taken out of the
+# bowl here, and Space never reached the engine. Nothing showed, because the
+# "Wrong!" verdict is read from model.state rather than from the snapshot.
+expect at_end true
+click 4 4
+wait_idle
+expect holds_stone true
+click 4 4
+wait_idle
+expect view_position 2
+expect msg tsumego_wrong
+expect main_line_moves 2
+
+# Space at the end of a dead branch asks the engine to refute it — the whole
+# point of being allowed to play it out. Silence here read as "the key does
+# nothing"; the log said nothing either, since the request was never queued.
+expect can_kibitz true
+key space
+wait_idle
+expect view_position 3
+expect main_line_moves 2
+expect phase paused
+
+# The menu item is the same act and must reach the same engine. It did not: it
+# took `play once`'s end-of-line branch, whose playKibitzMove() only hands the
+# move to a player already blocked in genmove() and otherwise drops it into a
+# slot nobody wakes for — so on a real configuration nothing was asked at all,
+# while model.start() quietly turned the puzzle into a game. Against the mock it
+# appeared to work, which is why only a run with real engines found it. Asserted
+# through the command, since that is the half that was broken.
+play once
+wait_idle
+expect view_position 4
+expect main_line_moves 2
+expect phase paused
+
+navigate_start
+wait_idle
+expect view_position 0
+expect msg none
+
 # --- The solution plays the answer for you ----------------------------------
 click 1 1
 wait_idle
@@ -68,6 +128,42 @@ wait_idle
 expect holds_stone false
 expect view_position 2
 expect msg tsumego_solved
+
+# And neither may the Kibitz item, which is named "Hint" in Czech and was the
+# one way left to play on past the answer: it appended the engine's move and
+# started the game, at a position where the click above is refused outright.
+# The button greys with the same answer now.
+expect can_kibitz false
+play once
+wait_idle
+expect view_position 2
+expect phase paused
+
+# --- Passing is a wrong answer, not a move that rewrites the problem --------
+# `pass` is the same act as a board click at the cursor, and availableActions()
+# says so — but the two agreed only as far as the snapshot they read. The pass
+# command carried its own `model.start()` and its own default `promote = true`,
+# so passing in a puzzle promoted the pass to the main line over the solution
+# (main_line_moves 2 → 1) and flipped the phase to Playing. A puzzle is not a
+# game to start; a pass in one is just another wrong answer.
+navigate_start
+wait_idle
+expect can_pass true
+pass
+wait_until msg tsumego_wrong
+wait_idle
+expect phase paused
+expect main_line_moves 2
+
+# And the problem still is one: the recorded solution is still the solution.
+navigate_start
+wait_idle
+click 1 1
+wait_idle
+click 1 1
+wait_until msg tsumego_solved
+wait_idle
+expect at_end true
 
 # Tsumego mode survives all of it, and leaves only by starting another game.
 expect tsumego true

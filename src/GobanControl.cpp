@@ -201,6 +201,34 @@ void GobanControl::mouseClick(int button, int state, int x, int y) {
     }
 }
 
+// A move made away from the end of the line — by a click on a fresh point, by a
+// click on a point already explored, or by a pass. All three are one act and
+// now ask one function what it means, because the tsumego half of the answer
+// had been written at one of the three call sites only.
+//
+// A puzzle is not a game: the answer sits in the main line and defines what
+// "correct" is, so nothing the solver tries may promote itself over it, and
+// trying does not start a match. `pass` promoted and started (main line 2 → 1
+// moves, phase Paused → Playing), and so did a *second* click on a wrong move
+// already explored — while the first click on that same point, the one path
+// carrying `promote=false`, was right. The rule lives here now, once.
+//
+// It asks `model.tsumegoMode` rather than the view's copy, though the call
+// sites around it ask the view: `promote` has to agree with the flag the *game
+// thread* consults when it decides whether to mark the move BM, and that is
+// this one. The two are set together but not at the same instant — the deferred
+// switchGame() path sets the model's on the game thread and the view's later,
+// in finishGameReplacement().
+void GobanControl::playVariationAt(const Move& m) const {
+    if (!model.tsumegoMode) {
+        model.start();
+        if (!engine.isRunning()) {
+            engine.run();
+        }
+    }
+    engine.navigateToVariation(m, !model.tsumegoMode);
+}
+
 // Left click on an on-board intersection. Callers must have validated that the
 // point is on the board and that initialization is complete.
 void GobanControl::boardClick(const Position& coord) {
@@ -259,36 +287,46 @@ void GobanControl::boardClick(const Position& coord) {
             return;
         }
 
-        // Second click: place stone
-        model.state.holdsStone = false;
-        model.updateReservoirs();
+        // Second click: place stone.
 
-        // Check if click matches an existing variation
+        // A click on one of the marked moves *follows* it. It is the Right
+        // arrow with a mouse: the move is already in the tree, so there is
+        // nothing to play, nothing to promote, and nothing to ask the rules —
+        // the position it leads to was legal when it was recorded.
+        //
+        // It used to go through playVariationAt(), which starts the match. The
+        // record then grew a copy of itself: following the marked move left the
+        // phase Playing at a mid-tree cursor, so the game loop asked the engine
+        // for the next one, and GameRecord::move() appends whatever it is
+        // handed — even a move the node already has as a child. GNU Go, being
+        // deterministic, answers with the recorded move itself, so the node
+        // ended up with two identical children drawn on top of each other and
+        // the main line acquired a letter it never had: `16a`, then `16b`, then
+        // `16c` for the same point, one per visit. Reported as "clicking the
+        // main variation plays it instead of following it", which is exactly
+        // what it was doing.
+        //
+        // Resuming play from a reviewed position is Start's job — the same
+        // division as `play once`, which asks the engine one question without
+        // turning the review back into a game.
         for (const auto& move : snap->variationMoves) {
             if (move == Move::NORMAL && move.pos == coord) {
-                spdlog::debug("Clicked on existing variation at ({},{})", coord.col(), coord.row());
-                engine.navigateToVariation(move);
+                spdlog::debug("Clicked on existing variation at ({},{}) — following it",
+                              coord.col(), coord.row());
+                releaseStone();
+                engine.navigateToVariation(move, false);
+                view.requestRepaint();
                 return;
             }
         }
 
-        // No matching variation — new move
-        if (view.isTsumegoMode()) {
-            // Game thread infers BM marking from context
-            Move newMove(coord, snap->colorToMove);
-            engine.navigateToVariation(newMove, false);
-            return;
-        }
-
-        // Normal mode: create new variation
+        // No matching variation — new move. In a tsumego the game thread infers
+        // the BM marking from the fact that this is a fresh branch.
         spdlog::debug("New variation during navigation (color={})",
             snap->colorToMove == Color::BLACK ? "B" : "W");
-        model.start();
-        if (!engine.isRunning()) {
-            engine.run();
-        }
-        Move newMove(coord, snap->colorToMove);
-        engine.navigateToVariation(newMove);
+        const Move variation(coord, snap->colorToMove);
+        if (!placeStone(variation)) return;
+        playVariationAt(variation);
         return;
     }
 
@@ -304,10 +342,9 @@ void GobanControl::boardClick(const Position& coord) {
             view.requestRepaint(GobanView::UPDATE_STONES);
             return;
         }
-        model.state.holdsStone = false;
-        model.updateReservoirs();
-        Move newMove(coord, snap->colorToMove);
-        engine.navigateToVariation(newMove, false);
+        const Move refutation(coord, snap->colorToMove);
+        if (!placeStone(refutation)) return;
+        playVariationAt(refutation);
         return;
     }
 
@@ -329,15 +366,56 @@ void GobanControl::boardClick(const Position& coord) {
         return;
     }
 
-    // A stone is actually being placed: this is the act that starts the game.
+    // A stone is actually being placed. The rules are asked *before* the game
+    // is started: a point the board will not take is not a move, so it must not
+    // flip the phase to Playing either — the same trap as merely picking a
+    // stone out of the bowl, above.
+    const auto move = engine.getLocalMove(coord);
+    if (!placeStone(move)) return;
+
     model.start();
     if (!engine.isRunning()) {
         engine.run();
     }
     spdlog::debug("engine.isRunning() = {}", engine.isRunning());
-    const auto move = engine.getLocalMove(coord);
     engine.playLocalMove(move);
     view.requestRepaint();
+}
+
+// The stone leaves the hand: it is on the board now (or on its way to the game
+// thread), so the reservoir gains it back.
+void GobanControl::releaseStone() const {
+    model.state.holdsStone = false;
+    model.updateReservoirs();
+}
+
+// Ask the rules before anyone else. Returns false — with the stone still in
+// hand — when the point will not take it.
+//
+// The engine used to be the only referee: every click went out as
+// `play <colour> <point>` and whatever GNU Go answered decided it. So a
+// misclick onto an occupied point came back as `? illegal move`, which the
+// message-log sink takes at error level and puts a red badge in front of the
+// user for what is, on a real board, nothing at all — you feel the stone not
+// go down and try again. One recorded endgame (2026-08-16, `play B M10` onto a
+// White stone from ten moves earlier) left exactly that as the whole contents
+// of last_run.log.
+//
+// The renderer had always known better: GobanView::updateCursor() draws the
+// held stone only where the point is empty, so the ghost stone silently
+// vanishes over a point this used to send anyway. Both now ask
+// GobanModel::isLegalMove(), which is the same rule the board itself is
+// rebuilt by — so what the user cannot see placed is exactly what a click will
+// not place. An engine refusal after this means the engine has drifted out of
+// sync with the board, which is worth an error line.
+bool GobanControl::placeStone(const Move& m) const {
+    if (!model.isLegalMove(m)) {
+        spdlog::debug("board click at {} refused by the rules — the stone stays in hand",
+                      m.toString());
+        return false;
+    }
+    releaseStone();
+    return true;
 }
 
 void GobanControl::buildRegistry() {
@@ -492,7 +570,18 @@ void GobanControl::buildRegistry() {
         //
         // And no model.start() on this path: reviewing must not flip the game
         // to Playing. That is what left the loop running at a mid-tree cursor.
-        if (!model.snapshot()->atEnd) {
+        //
+        // A tsumego takes that path from *anywhere*, end of the line included.
+        // The branch below reaches the engine only through playKibitzMove(),
+        // which hands the move to a player already blocked in genmove() and
+        // otherwise leaves it in `queuedMove` without waking anything — so on a
+        // real configuration the menu item asked no engine at all: no `kibitz:
+        // asking` line, no move, and the puzzle silently switched to Playing by
+        // the start() below. It only appeared to work against the mock, whose
+        // timing let the loop collect the queued move. Reported as "nothing
+        // happens at Space, Ctrl+Space or Nápověda", and two of those three
+        // were true.
+        if (!model.snapshot()->atEnd || model.tsumegoMode) {
             engine.requestKibitzNav();
             view.requestRepaint();
             return;
@@ -782,12 +871,12 @@ void GobanControl::buildRegistry() {
         // During navigation, pass creates a variation (game is paused — no turn
         // restriction). From the snapshot, as boardClick does: the two must
         // agree about what "mid-tree" means, and neither may read the tree.
+        // Through the same function too, not merely the same snapshot — the
+        // agreement stopped at the snapshot once, and a pass in a tsumego then
+        // promoted itself over the solution.
         const auto snap = model.snapshot();
         if (snap->navigating && !snap->atEnd) {
-            Move passMove(Move::PASS, snap->colorToMove);
-            model.start();
-            if (!engine.isRunning()) engine.run();
-            engine.navigateToVariation(passMove);
+            playVariationAt(Move(Move::PASS, snap->colorToMove));
         } else if (engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS) {
             model.start();
             if (!engine.isRunning()) engine.run();
@@ -1479,12 +1568,14 @@ void GobanControl::keyPress(int key, unsigned mods, bool downNotUp){
             if (key == Rml::Input::KI_RIGHT) {
                 return;  // Right key doesn't trigger kibitz
             }
-            // Tsumego: request engine move on dead branch via navigation
+            // Tsumego: ask through the command, which owns the policy — that a
+            // solved position is refused, and that a puzzle is never resumed as
+            // a match. Doing it here instead is what let the key and the menu
+            // item disagree: this branch reached the engine and `play once` did
+            // not. ADR-0005's rule, applied to a key handler.
             if (view.isTsumegoMode()) {
-                if (keySnap->onBadMovePath && actions().kibitz) {
-                    engine.requestKibitzNav();
-                }
-                return;  // Don't fall through to "play once" — would break navigation
+                command("play once");
+                return;  // Don't fall through — the table's binding plays a move
             }
             spdlog::debug("Navigation: at end of branch, Space falls through to kibitz");
         }
@@ -1721,6 +1812,7 @@ UiInputs GobanControl::uiInputs() const {
     // GameSnapshot and ADR-0006.
     const auto snap      = model.snapshot();
     in.atEndOfNavigation = snap->atEnd;
+    in.onBadMovePath     = snap->onBadMovePath;
     // The predicate toggle_territory used to guard itself with, lifted into the
     // policy so the button and the command cannot answer differently.
     in.scoredEnd         = snap->scoredEnd;
@@ -1835,6 +1927,10 @@ nlohmann::json GobanControl::dumpState() const {
         s["log_badge"]  = !log.hasUnseen() ? "none"
                         : (log.unseenSeverity() == MessageSeverity::Error ? "error" : "warning");
         s["engine_loading"] = engine.engineLoadingSummary();
+        // The line itself, not the condition behind it: a wait the user cannot
+        // see is the failure, so what was actually painted is the thing worth
+        // asserting.
+        s["status_text"] = parent->statusText();
     }
 
     // Sounds mixed all the way to their end, not merely requested. The
@@ -1842,6 +1938,20 @@ nlohmann::json GobanControl::dumpState() const {
     // exactly like one it played, which is why a swallowed stone sound had no
     // symptom to assert on.
     s["sounds_played"] = static_cast<double>(view.soundsPlayed());
+    // Text the glyph pass actually put on screen, not text that was prepared for
+    // it. The two move-marker toggles used to gate the whole pass, so switching
+    // both off blanked the coordinates, the markup and the evaluation as well —
+    // with every key describing them still reading true. Same reason
+    // sounds_played counts what was heard.
+    s["overlay_glyphs"] = static_cast<int>(view.overlayGlyphs());
+    // The stereo depth budget for the camera as it stands. `stereo_deviation`
+    // is the quantity the literature bounds at 1/30 of the image width; it is
+    // reported whatever shader is selected, because what it describes is the
+    // camera, not the shader.
+    s["stereo"]           = view.gobanShader.isStereo();
+    s["stereo_base"]      = view.stereoHalfBase();
+    s["stereo_near"]      = view.stereoNearPoint();
+    s["stereo_deviation"] = view.stereoDeviation();
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;
