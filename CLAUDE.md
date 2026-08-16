@@ -138,6 +138,7 @@ and `_spawnv` restart in `main.cpp`.
 - **cmake/**: CMake find modules for dependencies
 - **tests/**: unit tests, SGF fixtures, the mock GTP engine, and `tests/scenarios/`
 - **docs/architecture.md**: the component and thread map — start here
+- **docs/stereo.md**: the stereoscopic depth budget — read before touching the stereo camera
 - **docs/adr/**: Architecture Decision Records — why the code is the way it is
 
 ### Configuration System
@@ -892,108 +893,59 @@ cv = cross(cw, cu)                         // Up
 **Ray direction:**
 ```
 q0 = vertex.xy * aspectRatio               // Screen coordinate (-1 to 1)
-rdb = normalize(q0.x*cu + q0.y*cv + 3.0*cw)
+rdb = q0.x*cu + q0.y*cv + 3.0*cw           // NOT normalized — see docs/stereo.md
 ```
-The `3.0` is the focal length — rays spread from camera through a virtual screen at distance 3.0.
+The `3.0` is the focal length — rays spread from camera through a virtual screen at distance 3.0. The direction is left unnormalized because it is a *varying*: the fragment shader normalizes, and normalizing per vertex bends the interpolated rays.
 
 **C++ side** (`GobanView`): `cameraPan`, `cameraDistance`, and `cam.rLast` (quaternion) are the authoritative state. `boardCoordinate()` replicates the same camera model for screen→board ray casting. `zoomToRect()` projects board-plane corners into camera space to compute the exact distance for framing.
 
 ### Stereo Vertex Shader (`config/shaders/vertex/stereo.glsl`)
 
-Same `cameraPan`/`cameraDistance` uniforms. Eye positions are lateral offsets from the center camera position, scaled by distance to maintain consistent stereo base angle.
+Same `cameraPan`/`cameraDistance` uniforms. Eye positions are lateral offsets from the centre camera position by `eof`, which arrives as **half the stereo base in world units, already sized for this camera** by `GobanView::stereoHalfBase()` — the shader does no scaling of its own. `dof` shifts each eye's image horizontally: the stereoscopic window. See `docs/stereo.md`.
 
 ### Stereoscopic Deviation Theory
 
-The sources are in `res/stereo.zip` — Matěj Boháč, *Less is More! Keeping the
-Deviation Under Control* and *Výpočet maximální deviace* (klub stereoskopické
-fotografie). `src/Stereo.h` is the one implementation; `tests/test_stereo.cpp`
-and `tests/scenarios/stereo_depth_budget.scn` hold it to this.
+**The reasoning, the formulas and the sources are in `docs/stereo.md`** — read
+that before touching the stereo camera. What follows is the index of rules it
+argues for, each enforced by `tests/test_stereo.cpp` or
+`tests/scenarios/stereo_depth_budget.scn`.
 
-**Deviation** is the horizontal separation of the two images of a point, as a
-fraction of the image width, and what must be bounded is the *difference*
-between the nearest and the furthest point in frame:
-
-```
-deviation = base * focal_length * (1/near - 1/far)      // far = infinity: base * f / near
-```
-
-**Ceiling: 1/30th (3.3%) of the image width.** Projection is the demanding case
-and this is its number; being more conservative costs nothing, which is the
-article's own advice, so `Stereo::DEFAULT_DEVIATION` asks for 1/40.
-
-**It is set by the near point, not by the camera distance.** This is the whole
-of it, and getting it wrong is not a matter of taste: the board is a fixed-size
-object, so the nearest point in frame shrinks *far faster* than the camera
-distance as you zoom in. The base used to be `eof * cameraDistance / f`, which
-measured 1/20 of the image width at the default zoom and 1/12 zoomed in, on a
-1/30 ceiling — an error that grows as you approach, so a check at one zoom
-says nothing about another. `GobanView::stereoNearPoint()` asks the board box
-*and* the table's near edge, because "the nearest point is often not the
-subject, but the blades of grass at the bottom edge": the board binds at
-ordinary zoom, the table once the camera pulls back.
-
-**The window (`dof`) is not part of the deviation.** The horizontal image shift
-slides the whole depth range through the screen plane; it cancels in
-near-minus-far. It decides where the scene sits relative to the glass, not how
-much depth the eyes must accept.
-
-**One implementation, used by both layers.** `GobanView::stereoHalfBase()` is
-uploaded to the vertex shader (as the `eof` uniform, which therefore carries a
-*computed half-base in world units*, not the preference) **on every frame, from
-`shadeIt()`** — it lived in `setMetrics()` for one afternoon, which runs only on
-a board or shader change, so the board's base froze at whatever the camera was
-when the shader was last switched while the overlay's followed the camera. The
-same value places the glyph overlay's two eyes. Two implementations would let
-the labels drift off the wood they are lying on, which is exactly what a
-mismatched pair looks like.
-
-**Do not normalize a ray direction in a vertex shader.** `rdbl`/`rdbr` are
-varyings, so the fragment gets the interpolation of the four corner values, and
-interpolating unit vectors is not interpolating directions — it is only correct
-when the corners have equal length. The mono shader gets away with it, since
-`(±ratio, ±1, f)` all have the same length; `dof` breaks that symmetry, so
-pre-normalizing warped each eye and shrank the stereoscopic window to **85%** of
-the configured value (0.849 predicted, 0.853 measured at 4:3, `dof` 0.0925) —
-and the attenuation varies across the screen, which no constant can correct.
-The fragment shader normalizes anyway; that is where it belongs.
-
-**Anaglyph is greyscale, so annotation colour does not survive it.**
-`partial/stereo/on.glsl` writes `vec3(luma_left, 0.1, luma_right)`;
-`GobanOverlay::eyeInk()` reduces every label to its own brightness for the same
-reason, or text tinted green would vanish from the red eye. The evaluation's
-move-quality ramp therefore reads as brightness under a stereo shader — the
-`A`/`B`/`C` letters survive, the colour meaning does not. The ink is baked into
-the glyph buffers, so `GobanView::Update()` asks for an overlay rebuild whenever
-the selected shader changes.
-
-**Both eyes draw at the same depth**, so the overlay pass turns depth writes off
-— with them on, the first eye rejects the second and the right eye's text is
-simply missing.
-
-**One depth buffer, two eyes: take the nearer.** Depth here is a *layer* rather
-than a distance — `partial/algorithm/render.glsl` classifies a pixel as 0.25
-(board from below), 0.5 (a stone) or 0.75 (everything else), and the overlay
-draws at 0.4 (a label on a stone, in front) or 0.6 (a label on the board,
-behind). That is what hides an annotation under a stone. The stereo shader calls
-`render()` twice into one buffer, so writing `gl_FragDepth` inside it meant the
-second eye won outright: wherever the two eyes disagreed about a stone — most of
-the stone, once the window is wide — the best-move letter showed straight
-through it, which is what a stone carried in hand over a suggestion looked like.
-`render()` reports into `sceneDepth` and the caller decides; `stereo/on.glsl`
-takes `min(dl, dr)`, so a pixel either eye sees as a stone counts as one.
-
-**Why parallel cameras (not toe-in):**
-- Toe-in convergence causes keystone distortion and eye strain
-- Parallel cameras are physically correct (like human eyes at distance)
-- Zero parallax at infinity; objects closer have increasing parallax
-- Stereo effect naturally decreases with distance (correct for depth perception)
-
-**Parameters:**
-- `eof`: the deviation asked for, as a fraction of the image width, **clamped to
-  `Stereo::MAX_DEVIATION` (1/30)**. It used to be a bare eye-offset factor that
-  the shader scaled by the camera distance; the clamp is what makes a value left
-  over from those days — `user.json` ships whatever was last set, typically
-  0.0725 — safe rather than three times the ceiling. Lower is calmer; 1/40 is
-  the shipped default.
-- `dof`: the stereoscopic window, in `q0` units — where the scene sits relative
-  to the screen plane. Independent of the deviation above.
+- **The base is set by the near point, never by the camera distance.** The board
+  is a fixed-size object, so zooming in shrinks the nearest point in frame far
+  faster than the distance — the old rule measured 1/20 of the image width at
+  the default zoom and 1/12 zoomed in, against a 1/30 ceiling, an error that
+  *grows* as you approach. `Stereo::halfBase()` does the arithmetic;
+  `GobanView::stereoNearPoint()` asks the board box **and** the table's near
+  edge, because the near point is often the wood at the bottom of the frame
+  rather than the subject.
+- **1/30 of the image width is a ceiling, not a target.** `eof` is the deviation
+  *asked for* and is clamped to it, which is what makes a value left over from
+  the old meaning (`user.json` typically holds 0.0725) safe instead of three
+  times over. The shipped default asks 1/40.
+- **`dof` is the window, not the depth.** It slides the whole range through the
+  screen plane and cancels in near-minus-far. Never trade one for the other.
+- **One base, computed once, uploaded every frame.** `GobanView::stereoHalfBase()`
+  goes to the vertex shader from `shadeIt()` — it lived in `setMetrics()` for one
+  afternoon, which runs only on a board or shader change, so the board's base
+  froze at the last shader switch while the overlay's followed the camera. The
+  same value places `GobanOverlay`'s two eyes; two implementations would let the
+  labels drift off the wood they are lying on.
+- **Do not normalize a ray direction in a vertex shader.** Interpolating unit
+  vectors is not interpolating directions unless the corner rays have equal
+  length. Mono's do; `dof` breaks the symmetry, and pre-normalizing shrank the
+  stereoscopic window to 85% of the configured value, unevenly across the
+  screen. The fragment shader normalizes.
+- **One depth buffer, two eyes: `min(dl, dr)`.** Depth is a layer here (0.5 a
+  stone, 0.6 a label on the board), and the stereo shader renders twice into one
+  buffer. Letting the second call write `gl_FragDepth` made a best-move letter
+  show straight through the stone in hand wherever the eyes disagreed.
+- **Anaglyph is greyscale, so annotation colour does not survive it.**
+  `GobanOverlay::eyeInk()` reduces every label to its own brightness, or text
+  tinted green would vanish from the red eye — which means the evaluation's
+  move-quality ramp reads as brightness under a stereo shader. The ink is baked
+  into the glyph buffers, so a shader change forces an overlay rebuild.
+- **Both eyes draw at the same depth**, so the overlay pass turns depth writes
+  off — with them on, the first eye rejects the second and the right eye's text
+  is missing.
+- **Parallel cameras, never toe-in.** Toe-in keystones each eye differently,
+  which is a vertical disparity the eyes cannot fuse away.
