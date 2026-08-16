@@ -75,10 +75,41 @@ std::string GameThread::thinkingPlayerName() const {
 bool GameThread::runWhenEngineFree(std::function<void()> task, std::string* busyEngine) {
     if (busyEngine) busyEngine->clear();
 
-    // Nothing to wait for: no engine is mid-genmove, so the caller's thread may
-    // safely stop the loop and do the work itself, as it always has.
-    const std::string busy = thinkingPlayerName();
-    if (busy.empty() || isOnGameThread()) {
+    // On the game thread the loop is between iterations by construction: no
+    // genmove is in flight and none can start behind our back.
+    if (isOnGameThread()) {
+        task();
+        return true;
+    }
+
+    // "Is an engine thinking?" and "may one start?" have to be one question,
+    // asked under the lock the loop uses to publish `playerToMove`. Reading
+    // thinkingPlayerName() and acting on the answer afterwards left a window a
+    // few instructions wide: the loop set playerToMove and entered genmove in
+    // it, and the interrupt() inside the task then blocked the UI thread for the
+    // engine's whole think — the ADR-0001 freeze this function exists to
+    // prevent. Rare, and indistinguishable from a hang when it happens.
+    std::string busy;
+    {
+        std::lock_guard<std::mutex> lock(playerMutex);
+        Player* p = playerToMove.load();
+        if (p != nullptr && p->isTypeOf(Player::ENGINE)) {
+            busy = p->getName();
+        } else {
+            // Claim the loop before releasing the lock. The genmove branches
+            // test this inside the same critical section, so from here until the
+            // task has run no engine can be put on move.
+            deferredPending = true;
+        }
+    }
+
+    if (busy.empty()) {
+        // Cleared however the task leaves — an exception escaping here would
+        // otherwise stop the loop ever calling genmove again.
+        struct ClaimGuard {
+            std::atomic<bool>& flag;
+            ~ClaimGuard() { flag = false; }
+        } guard{deferredPending};
         task();
         return true;
     }
@@ -110,7 +141,10 @@ void GameThread::processDeferredTask() {
         task.swap(deferredTask);
     }
     if (!task) {
-        deferredPending = false;
+        // Set, but with no task behind it: that is runWhenEngineFree()'s inline
+        // claim, held while it runs the work on the caller's thread. Clearing it
+        // here would let a genmove start underneath that, which is the whole
+        // thing the claim prevents. Its own guard clears it.
         return;
     }
 
@@ -141,7 +175,7 @@ bool GameThread::takeDeferredTaskDone() {
     return deferredDone.exchange(false);
 }
 
-bool GameThread::interrupt(int timeoutMs) {
+bool GameThread::interrupt() {
     // Called from the game loop itself (a deferred action): the loop is between
     // iterations, so no move is in flight and nothing needs stopping. Joining
     // here would deadlock on self-join, and setting interruptRequested would
@@ -176,26 +210,6 @@ bool GameThread::interrupt(int timeoutMs) {
     // Unblocks a human player waiting on its condition variable. An engine
     // blocked in a GTP read is NOT unblocked by this — hence the timeout.
     playLocalMove(Move(Move::INTERRUPT, model.state.colorToMove));
-
-    if (timeoutMs >= 0) {
-        // Poll rather than wait on a condition variable: the game loop holds
-        // playerMutex around parts of its turn handling, and blocking on that
-        // here would risk a deadlock for the sake of a 10 ms poll.
-        const auto deadline = std::chrono::steady_clock::now() +
-                              std::chrono::milliseconds(timeoutMs);
-        while (loop.load() != LoopState::Stopped
-               && std::chrono::steady_clock::now() < deadline) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        if (loop.load() != LoopState::Stopped) {
-            spdlog::warn("interrupt: game loop still running after {} ms "
-                         "(engine is probably mid-genmove); not joining",
-                         timeoutMs);
-            // The state stays Stopping, so the loop exits when genmove
-            // returns; run() joins the finished thread before starting again.
-            return false;
-        }
-    }
 
     spdlog::debug("interrupt: joining thread...");
     spdlog::default_logger()->flush();
@@ -672,11 +686,24 @@ void GameThread::gameLoop() {
 
             // Atomically read and clear queuedMove under lock
             Move suggestedMove;
+            bool claimed = false;
             {
                 std::unique_lock<std::mutex> qLock(playerMutex);
-                suggestedMove = queuedMove;
-                queuedMove = Move(Move::INVALID, model.state.colorToMove);
-                playerToMove = humanPlayer;
+                // A game-replacing action has claimed the loop: it decided,
+                // under this same lock, that nothing was thinking, and it is
+                // now doing the work on another thread. Putting a player on
+                // move here is exactly what that claim exists to stop. See
+                // runWhenEngineFree().
+                claimed = deferredPending.load();
+                if (!claimed) {
+                    suggestedMove = queuedMove;
+                    queuedMove = Move(Move::INVALID, model.state.colorToMove);
+                    playerToMove = humanPlayer;
+                }
+            }
+            if (claimed) {
+                waitForCommandOrTimeout(50);
+                continue;
             }
 
             // To humanPlayer, which is what genmove() below blocks on. This read
@@ -742,11 +769,24 @@ void GameThread::gameLoop() {
 
             // Atomically read and clear queuedMove under lock
             Move suggestedMove;
+            bool claimed = false;
             {
                 std::unique_lock<std::mutex> qLock(playerMutex);
-                suggestedMove = queuedMove;
-                queuedMove = Move(Move::INVALID, model.state.colorToMove);
-                playerToMove = player;
+                // A game-replacing action has claimed the loop: it decided,
+                // under this same lock, that nothing was thinking, and it is
+                // now doing the work on another thread. Putting a player on
+                // move here is exactly what that claim exists to stop. See
+                // runWhenEngineFree().
+                claimed = deferredPending.load();
+                if (!claimed) {
+                    suggestedMove = queuedMove;
+                    queuedMove = Move(Move::INVALID, model.state.colorToMove);
+                    playerToMove = player;
+                }
+            }
+            if (claimed) {
+                waitForCommandOrTimeout(50);
+                continue;
             }
 
             player->suggestMove(suggestedMove);

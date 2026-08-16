@@ -106,23 +106,22 @@ public:
 
     std::string getName(size_t id) const { return playerManager->getName(id); }
 
-    /// Stops the game loop and joins it.
+    /// Stops the game loop and joins it. A no-op on the game thread itself.
     ///
-    /// The loop can be blocked inside a player's genmove(), which for an engine
-    /// is a blocking GTP read: nothing short of the engine replying will return
-    /// from it. A plain join() therefore freezes the caller for as long as the
-    /// engine thinks — which froze the whole UI when an SGF was opened during a
-    /// slow engine's move.
+    /// This waits, and it may wait a long time: the loop can be blocked inside a
+    /// player's genmove(), which for an engine is a blocking GTP read that
+    /// nothing but the engine replying will return from. It is therefore only
+    /// safe to call once you know no engine is on move — which is precisely what
+    /// `runWhenEngineFree()` establishes, under `playerMutex`, before handing a
+    /// task to a caller's thread.
     ///
-    /// timeoutMs < 0 waits indefinitely (the historical behaviour, used on the
-    /// paths that must succeed). A non-negative timeout gives up and returns
-    /// false instead of blocking; the loop still exits once genmove returns,
-    /// and run() joins the finished thread before starting a new one.
-    bool interrupt(int timeoutMs = -1);
-
-    /// Longest the UI is willing to stall waiting for the game loop to stop
-    /// before refusing an action outright.
-    static constexpr int INTERRUPT_TIMEOUT_MS = 1500;
+    /// It used to take a timeout, so a caller could give up rather than block.
+    /// Nothing ever passed one: `INTERRUPT_TIMEOUT_MS` was declared and never
+    /// referenced, and every call site used the default. A mitigation with no
+    /// caller is worse than none, because the comment describing it reads as a
+    /// guarantee — so the answer is the claim in runWhenEngineFree(), which
+    /// removes the wait instead of bounding it.
+    bool interrupt();
 
     /// Forceful shutdown: kill all engine processes (unblocks game thread), then interrupt.
     void shutdown();
