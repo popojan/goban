@@ -100,6 +100,16 @@ struct GameSnapshot {
     std::string comment;
     std::vector<BoardMarkup> markup;
 
+    // --- Stage 5: the last two GameState strings the UI read directly --------
+    // Same argument as `comment` above, and the same writers: both are set by
+    // the game thread immediately before the notify that lands in
+    // onBoardChange(), so publishing them here costs nothing and removes the
+    // last per-frame copy of a std::string the game thread may be reassigning.
+    // `state = GameState()` in onBoardSized() reassigns every one of them at
+    // once, which is the sharpest version of that race.
+    std::string scoringError;         ///< Detail behind GameState::SCORING_FAILED.
+    std::string passVariationLabel;   ///< "11b" — the move number a pass gets.
+
     int boardSize = 0;
 
     /// Where the position came from. Empty when the game lives in the daily

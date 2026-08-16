@@ -127,6 +127,11 @@ void GobanControl::finishGameReplacement() const {
     // UI half of a game-replacing action, always on the UI thread: either called
     // straight after the engine work, or from ElementGame's poll once a deferred
     // action completed on the game thread.
+    //
+    // The resize first. onBoardSized() only hands the new size over now, and the
+    // overlay rebuild below would otherwise be wiped by the next Update() — this
+    // runs before context->Update() in the frame.
+    view.applyPendingResize();
     view.setTsumegoMode(model.tsumegoMode);
     if (!model.tsumegoMode) {
         view.animateIntro();

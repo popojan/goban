@@ -682,6 +682,10 @@ void GobanView::animateIntro() {
 }
 
 void GobanView::Update() {
+	// First: everything below compares against `board`, and a resize handed over
+	// by the game thread has to land before those comparisons, not after.
+	applyPendingResize();
+
 	int newProgram = gobanShader.getCurrentProgram();
 	if (currentProgram != newProgram) {
 		updateFlag |= UPDATE_SHADER;
@@ -1134,15 +1138,26 @@ void GobanView::setAnalysisOverlay(bool shown) {
 }
 
 void GobanView::onBoardSized(int newBoardSize) {
+	// Hand it over; do not do it here. This runs on the game thread, and during
+	// startup on the engine-loader thread, with the board already on screen —
+	// while board.clear() assigns a std::string into all 361 points and the four
+	// overlay vectors below are walked by updateNavigationOverlay() once per
+	// repaint. See pendingBoardSize.
+	pendingBoardSize.store(newBoardSize);
+	// Only request UPDATE_BOARD (for shader dimension) and UPDATE_OVERLAY
+	// Don't request UPDATE_STONES - let onBoardChange handle that when stones are ready
+	requestRepaint(UPDATE_BOARD | UPDATE_OVERLAY);
+}
+
+void GobanView::applyPendingResize() {
+	const int newBoardSize = pendingBoardSize.exchange(-1);
+	if (newBoardSize < 0) return;
 	board.clear(newBoardSize);
 	lastMove = Position(-1, -1);
 	navOverlays.clear();
 	markupOverlays.clear();
 	analysisLabels.clear();
 	analysisTints.clear();
-	// Only request UPDATE_BOARD (for shader dimension) and UPDATE_OVERLAY
-	// Don't request UPDATE_STONES - let onBoardChange handle that when stones are ready
-	requestRepaint(UPDATE_BOARD | UPDATE_OVERLAY);
 }
 
 void GobanView::onStonePlaced(const Move& move) {

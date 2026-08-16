@@ -594,8 +594,7 @@ void ElementGame::performDeferredInitialization() {
     view.state.komi = -1.0f;
     view.state.handicap = -1;
     view.state.boardSize = -1;
-    view.state.black.clear();
-    view.state.white.clear();
+    shownPlayerIndex = {NO_PLAYER_SHOWN, NO_PLAYER_SHOWN};
 
     view.requestRepaint();
 }
@@ -1288,15 +1287,18 @@ void ElementGame::OnUpdate()
         syncDropdown(doc, "selBoard", std::to_string(model.state.boardSize));
         view.state.boardSize = model.state.boardSize;
     }
-    if (view.state.black != model.state.black) {
+    // The active-player *index* is the change detector, not the name. It is what
+    // the dropdown holds, PlayerManager hands it out under its mutex, and
+    // comparing it costs one integer — where `model.state.black` is a
+    // std::string the game thread reassigns (wholesale, in onBoardSized's
+    // `state = GameState()`) while this reads it.
+    for (int which = 0; which < 2; ++which) {
+        const size_t active = engine.getActivePlayer(which);
+        if (shownPlayerIndex[which] == active) continue;
         auto doc = context->GetDocument("game_window");
-        syncDropdown(doc, "selectBlack", std::to_string(engine.getActivePlayer(0)));
-        view.state.black = model.state.black;
-    }
-    if (view.state.white != model.state.white) {
-        auto doc = context->GetDocument("game_window");
-        syncDropdown(doc, "selectWhite", std::to_string(engine.getActivePlayer(1)));
-        view.state.white = model.state.white;
+        syncDropdown(doc, which == 0 ? "selectBlack" : "selectWhite",
+                     std::to_string(active));
+        shownPlayerIndex[which] = active;
     }
     // Check if current message is important (game-related, should override engine messages)
     auto isImportantMessage = [](GameState::Message msg) {
@@ -1316,8 +1318,12 @@ void ElementGame::OnUpdate()
     // string itself. The published snapshot is immutable, so the copy is safe
     // whatever the game thread does next. See ADR-0006 stage 3.
     std::string commentSnapshot = view.state.comment;
+    // Taken once, and used for every field below that the game thread owns:
+    // scoringError and passVariationLabel were being read straight out of
+    // GameState, where they are std::strings the game thread reassigns.
+    const auto snap = model.snapshot();
     if (posChanged) {
-        commentSnapshot = model.snapshot()->comment;
+        commentSnapshot = snap->comment;
     }
     if (msgChanged || posChanged) {
         switch (model.state.msg) {
@@ -1327,7 +1333,7 @@ void ElementGame::OnUpdate()
         case GameState::SCORING_FAILED:
             showMessage(Rml::CreateString(
                 templateText("tplScoringFailed", "Scoring failed: %s").c_str(),
-                model.state.scoringError.c_str()).c_str());
+                snap->scoringError.c_str()).c_str());
             break;
         case GameState::BLACK_RESIGNS:
             showMessage(getTemplateText(context, "templateBlackResigns"));
@@ -1351,7 +1357,7 @@ void ElementGame::OnUpdate()
             std::string msg = getTemplateText(context, "templateBlackPasses");
             auto pos = msg.find("{0}");
             if (pos != std::string::npos)
-                msg.replace(pos, 3, model.state.passVariationLabel);
+                msg.replace(pos, 3, snap->passVariationLabel);
             showMessage(msg);
             break;
         }
@@ -1359,7 +1365,7 @@ void ElementGame::OnUpdate()
             std::string msg = getTemplateText(context, "templateWhitePasses");
             auto pos = msg.find("{0}");
             if (pos != std::string::npos)
-                msg.replace(pos, 3, model.state.passVariationLabel);
+                msg.replace(pos, 3, snap->passVariationLabel);
             showMessage(msg);
             break;
         }

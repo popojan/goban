@@ -302,6 +302,8 @@ void GobanModel::publishSnapshot() {
     // user sees. Every writer sets these before the notify that lands here.
     next->comment       = state.comment;
     next->markup        = state.markup;
+    next->scoringError  = state.scoringError;
+    next->passVariationLabel = state.passVariationLabel;
     next->boardSize     = game.getBoardSize();
     next->sgfFile       = game.hasLoadedExternalDoc() ? game.getLoadedFilePath() : std::string();
     next->gameIndex     = game.getLoadedGameIndex();

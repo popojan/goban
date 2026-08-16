@@ -123,3 +123,47 @@ reader for the duration of a save or a load. The same stall, more code.
 the new scenarios generate. Rejected because "has not crashed yet" is what a data
 race looks like right up until it does, and the fix also removes a per-frame cost
 that grows with game length.
+
+## Implementation log — stage 5 (2026-08-16)
+
+The ADR was marked complete when nothing on a per-frame path read the *record*
+any more. A threading review found that the same argument had never been carried
+to `GameState`, which sits beside the record in `GobanModel`, is written by the
+game thread, and was still being read field-by-field by the UI every frame. Three
+things were left:
+
+- **`GameState::scoringError` and `passVariationLabel`** are now published like
+  `comment` and `markup`, and for the identical reason: both are `std::string`s
+  the game thread reassigns, and `GobanModel::onBoardSized()` reassigns *every*
+  field at once with `state = GameState()`. Both writers already set them
+  immediately before the notify that lands in `onBoardChange()`, so publishing
+  them costs nothing.
+
+- **The player dropdowns compare the active-player index, not the name.**
+  `ElementGame::OnUpdate()` was diffing `model.state.black` against its own copy
+  purely to decide whether to resync a dropdown whose value comes from
+  `getActivePlayer()` anyway. The index is a `size_t` handed out under
+  `PlayerManager::mutex`; the string was a race for no information. Publishing
+  the names instead was rejected — `onPlayerChange()` is not a position change,
+  so it would need its own `publishSnapshot()`, and that call can arrive on the
+  UI thread, where reading the record is the thing this ADR forbids.
+
+- **`GobanView::onBoardSized()` now hands over a size instead of acting.** Its
+  own file comment already said an observer callback "may do no more than raise
+  `updateFlag` and copy plain data", and it was calling `board.clear()` — which
+  assigns a `std::string` into each of 361 points — plus `.clear()` on four
+  `std::vector`s that `updateNavigationOverlay()` walks once per repaint. On a
+  vector that is an invalidated iterator, not a stale value, and it is reachable
+  on every startup that loads an SGF, because `loadEnginesParallel()` runs on its
+  own thread with the board already on screen. The size goes into an atomic and
+  `applyPendingResize()` does the work on the UI thread.
+
+  That one has a wrinkle worth keeping: `applyPendingResize()` is called from
+  `GobanView::Update()` **and** explicitly from
+  `GobanControl::finishGameReplacement()`. The latter rebuilds the overlays, and
+  it runs earlier in the frame than `Update()` — so with only the `Update()` call
+  the resize would clear the overlays that had just been rebuilt.
+
+What still reads the record directly on the UI thread is unchanged from the list
+above, and deliberately so.
+

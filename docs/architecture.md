@@ -68,8 +68,8 @@ See [ADR-0007](adr/0007-analysis-engine-owns-its-own-pipe.md).
 | **Game thread** | Engine pipes, all GTP traffic during a game | Not at all; UI actions are refused or deferred — [ADR-0001](adr/0001-engine-exclusive-ui-actions.md) |
 | **Analysis thread** | The analysis engine's pipe, and only that one | Not at all. It is a *different process* from the coach even when the same binary — [ADR-0007](adr/0007-analysis-engine-owns-its-own-pipe.md) |
 | **UI thread** | RmlUi documents, all widgets | Not at all; the game thread signals via `takeDeferredTaskDone()` |
-| **UI thread** | OpenGL context, `GobanView`, `GobanShader` | Not at all |
-| **Either, one at a time** | `GobanModel::board`, `GobanModel::state` | `GobanModel::mutex` for the board update; `GameState` fields are mostly written by the game thread and read per-frame |
+| **UI thread** | OpenGL context, `GobanView`, `GobanShader` | Not at all. Its `GameObserver` callbacks arrive from the game thread, so they raise `updateFlag` and hand over plain data — `onBoardSized()` stores a size in `pendingBoardSize`, and `applyPendingResize()` does the work here |
+| **Either, one at a time** | `GobanModel::board`, `GobanModel::state` | `GobanModel::mutex` for the board update. `GameState` is written by the game thread; its four `std::string` fields the UI needs — `comment`, `markup`, `scoringError`, `passVariationLabel` — are published in the snapshot rather than read from here (ADR-0006 stage 5). The scalars are still read per frame |
 | **Shared, locked** | `PlayerManager` player list, coach/kibitz indices | `PlayerManager::mutex` — see below |
 | **Lock-free** | `GamePhase`, `LoopState`, `EngineSync`, `Board::positionNumber`, `GameRecord::unsavedChanges`, `GobanView::updateFlag` | Atomics |
 
@@ -235,7 +235,8 @@ sequenceDiagram
 ```
 
 `GameSnapshot` is plain data — move counts, `atEnd`, `hasResult`, `scoredEnd`,
-the variation list, the comment, the markup. `GobanControl::uiInputs()`,
+the variation list, the comment, the markup, and the two message strings
+(`scoringError`, `passVariationLabel`). `GobanControl::uiInputs()`,
 `boardClick()`, `dumpState()` and the annotation display all read it and nothing
 else from the record.
 
@@ -377,9 +378,9 @@ still held: without it a command is invisible between the pop and the navigator
 raising its own flag, and a caller polling for idle reads the board before
 navigation has applied it.
 
-`GobanControl::isIdle()` must account for **all four** of engine thinking, queued
-*or in-flight* navigation, a deferred action still running, and
-`EngineSync::Syncing`. Every gap there has produced a flaky scenario at least
+`GobanControl::isIdle()` must account for **all five** of engine thinking, queued
+*or in-flight* navigation, a deferred action still running, `EngineSync::Syncing`,
+and a move sitting in `queuedMove` that the loop has not taken up. Every gap there has produced a flaky scenario at least
 once. It deliberately does *not* cover territory scoring — see the invariant in
 CLAUDE.md.
 

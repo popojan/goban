@@ -294,6 +294,27 @@ public:
     GameState state;
 
     std::atomic<int> updateFlag;  // Thread-safe: accessed from main thread and GameThread
+
+    /// A board size handed over by onBoardSized(), waiting for the UI thread to
+    /// act on it. -1 means nothing pending.
+    ///
+    /// The callback arrives on the game thread — and during startup on the
+    /// engine-loader thread, while the board is already being drawn. It used to
+    /// do the work itself: `board.clear()`, which assigns a std::string into
+    /// every one of 361 points, and `.clear()` on four std::vectors that
+    /// `updateNavigationOverlay()` walks once per repaint. That is the file
+    /// comment's own rule broken ("may do no more than raise `updateFlag` and
+    /// copy plain data"), and on a vector it is an invalidated iterator rather
+    /// than a stale value.
+    std::atomic<int> pendingBoardSize{-1};
+
+    /// Applies a pending onBoardSized(). UI thread only, and idempotent.
+    ///
+    /// Called from Update() — and explicitly from
+    /// GobanControl::finishGameReplacement(), which rebuilds the overlays
+    /// *before* the next Update() would run. Doing it only in Update() would
+    /// clear the overlays that had just been rebuilt.
+    void applyPendingResize();
     int currentProgram;
     bool showLastMoveOverlay;
     bool showNextMoveOverlay;

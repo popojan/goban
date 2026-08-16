@@ -19,6 +19,7 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/EventListener.h>
 #include <RmlUi/Core/StyleSheet.h>
+#include <array>
 #include <future>
 #include <atomic>
 #include <functional>
@@ -129,6 +130,14 @@ private:
     AnalysisService analysis;
     GobanControl control;
     std::mutex mutex;
+
+    /// Which player each colour's dropdown is currently showing. The change
+    /// detector for the two player dropdowns — an index rather than
+    /// `GameState::black`/`white`, which are std::strings the game thread
+    /// reassigns while this thread reads them. PlayerManager hands the index out
+    /// under its own mutex.
+    static constexpr size_t NO_PLAYER_SHOWN = static_cast<size_t>(-1);
+    std::array<size_t, 2> shownPlayerIndex{NO_PLAYER_SHOWN, NO_PLAYER_SHOWN};
 
     // Async engine loading state
     std::future<void> engineLoadFuture;
