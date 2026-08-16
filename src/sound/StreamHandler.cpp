@@ -36,6 +36,14 @@ int StreamHandler::PortAudioCallback(const void * input,
 {
         StreamHandler * handler = static_cast<StreamHandler *>(userData);
 
+        // The list is shared with the UI thread, which push_back()s into it. This
+        // used to run unlocked while processEvent() locked — the writers-and-not-
+        // readers shape again — so a reallocation could invalidate the iterator
+        // below mid-mix. The critical section is a memcpy of a few hundred
+        // samples per active sound; that is short enough to hold a mutex for in a
+        // callback, and enormously preferable to the alternative.
+        std::lock_guard<std::mutex> lock(handler->mut);
+
         // Clamp to pre-allocated buffer size (PortAudio may request more)
         if (frameCount > static_cast<unsigned long>(handler->FRAMES_PER_BUFFER))
                 frameCount = handler->FRAMES_PER_BUFFER;
@@ -116,6 +124,7 @@ int StreamHandler::PortAudioCallback(const void * input,
 
 
                         if (playbackEnded) {
+                                handler->completed.fetch_add(1, std::memory_order_relaxed);
                                 it = handler->data.erase(it);
                                 delete data;
                         } else
@@ -126,10 +135,17 @@ int StreamHandler::PortAudioCallback(const void * input,
         }
         // No delete needed - using pre-allocated buffer
 
-        // Stop stream when no more audio to play
-        if (handler->data.empty()) {
-                return paComplete;
-        }
+        // Never paComplete. Returning it when the list happened to be empty is
+        // what silently swallowed sounds: processEvent() started the stream
+        // *before* pushing the playback, the callback fired on its own thread in
+        // between, saw nothing to play and stopped the stream — and the sound
+        // that had just been queued was never heard. It bit the first sound after
+        // a quiet spell, because that is when the stream is not already running,
+        // which in practice means the stone you place yourself after thinking.
+        //
+        // The stream now runs until stopIfInactive() releases it after the idle
+        // timeout, which was always the intended way to give the device back.
+        // Silence costs one memset per buffer, about twenty times a second.
         return paContinue;
 }
 
@@ -143,19 +159,11 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
                         return;
                 }
 
-                // Use !Pa_IsStreamActive() instead of Pa_IsStreamStopped() because
-                // stream can be in "complete" state (not stopped, but not active either)
-                if (!Pa_IsStreamActive(stream))
-                {
-                        // If stream is in "complete" state (not stopped), stop it first
-                        if (!Pa_IsStreamStopped(stream)) {
-                                Pa_StopStream(stream);
-                        }
-                        PaError err = Pa_StartStream(stream);
-                        if (err != paNoError) {
-                                spdlog::warn("Audio: Pa_StartStream failed: {}", Pa_GetErrorText(err));
-                        }
-                }
+                // Queue it *before* the stream is running. The other order is the
+                // bug: Pa_StartStream() returns as soon as the callback thread is
+                // live, and that thread would find nothing to play. Whatever the
+                // callback does with an empty list, it cannot play a sound that
+                // has not been handed to it yet.
                 {
                         std::lock_guard<std::mutex> lock(mut);
                         data.push_back(new Playback {
@@ -166,6 +174,20 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
                         });
                 }
                 lastActivityTime = std::chrono::steady_clock::now();
+
+                if (!Pa_IsStreamActive(stream))
+                {
+                        // A stream that was stopped by stopIfInactive() is closed
+                        // outright, so this only has to cope with "stopped but
+                        // open" — which Pa_StartStream handles directly.
+                        if (!Pa_IsStreamStopped(stream)) {
+                                Pa_StopStream(stream);
+                        }
+                        PaError err = Pa_StartStream(stream);
+                        if (err != paNoError) {
+                                spdlog::warn("Audio: Pa_StartStream failed: {}", Pa_GetErrorText(err));
+                        }
+                }
                 break;
         case stop:
                 if (initialized && stream) {
@@ -188,15 +210,21 @@ StreamHandler::StreamHandler()
 }
 
 void StreamHandler::stopIfInactive() {
-        // Only shutdown if stream finished AND no pending playbacks (allow overlapping sounds)
-        // AND idle for at least IDLE_SHUTDOWN_SECONDS (to avoid lag from frequent shutdown/restart)
-        if (initialized && stream && data.empty() && !Pa_IsStreamActive(stream)) {
-                auto now = std::chrono::steady_clock::now();
-                auto idleSeconds = std::chrono::duration_cast<std::chrono::seconds>(
-                        now - lastActivityTime).count();
-                if (idleSeconds >= IDLE_SHUTDOWN_SECONDS) {
-                        shutdown();
-                }
+        // This is now the *only* thing that gives the device back — the callback
+        // no longer stops the stream on its own. It deliberately does not test
+        // Pa_IsStreamActive(): the stream is active for as long as it is open,
+        // by design, so that test would never pass again.
+        if (!initialized || !stream) return;
+        {
+                std::lock_guard<std::mutex> lock(mut);
+                if (!data.empty()) return;   // something is still playing
+        }
+        const auto now = std::chrono::steady_clock::now();
+        const auto idleSeconds = std::chrono::duration_cast<std::chrono::seconds>(
+                now - lastActivityTime).count();
+        if (idleSeconds >= IDLE_SHUTDOWN_SECONDS) {
+                spdlog::debug("Audio: idle for {}s, releasing the device", idleSeconds);
+                shutdown();
         }
 }
 

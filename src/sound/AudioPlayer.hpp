@@ -16,6 +16,10 @@ public:
     void init();
     void preload(const std::shared_ptr<Configuration> &config);
     size_t playbackCount() { return streamHandler.playbackCount(); }
+    /// Sounds mixed to completion since startup — see StreamHandler.
+    [[nodiscard]] unsigned long long completedPlaybacks() const {
+        return streamHandler.completedPlaybacks();
+    }
     void stopIfInactive() { streamHandler.stopIfInactive(); }
 
     void setMuted(const bool mute) { this->muted = mute; }

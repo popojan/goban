@@ -410,6 +410,25 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   *earlier in the frame* than `Update()` — so with only the `Update()` call the
   resize would clear the overlays that had just been rebuilt.
 
+### Sound
+- **Queue the playback, then start the stream.** `StreamHandler::processEvent()`
+  called `Pa_StartStream()` first and pushed the `Playback` afterwards. The
+  callback runs on PortAudio's own thread and fires as soon as the stream is
+  live, so it could find an empty list — and it used to answer that by returning
+  `paComplete`, stopping the stream and silently discarding the sound that had
+  just been queued. The callback never returns `paComplete` now; the stream runs
+  until `stopIfInactive()` releases the device after the idle timeout, which was
+  always the intended way to give it back.
+- **The audio callback locks like everyone else.** It shares `data` with the UI
+  thread, which `push_back`s into it — the writers-locked-readers-not shape
+  again, and a reallocation mid-mix invalidates the iterator it is walking.
+- **`sounds_played` counts what was *heard*, not what was asked for.** A request
+  the mixer never saw looked exactly like one it played, which is why a swallowed
+  stone sound had no symptom to assert on. It is an atomic incremented by the
+  callback, reported by `dumpState()`, and pinned by
+  `tests/scenarios/stone_sound_is_played.scn` — which needs a real output device,
+  so it is marked `# sound: on` and skipped unless `GOBAN_SCENARIO_AUDIO=1`.
+
 ### Telling the User Something
 - **Three surfaces, and they do not overlap.** `#lblStatus` / `#pnlLog` (top left)
   carry *application* status: which engine is still loading, and a badge for
@@ -588,6 +607,21 @@ of its decisions, and `tests/test_analysis.cpp` plus
   erased the territory permanently. `scoredEnd` is the predicate, so a
   resignation — which counted nothing — keeps its suggestions, and navigating
   back off the end brings them back.
+- **The wake decision comes from `fetch_or`'s previous value.** `requestRepaint()`
+  read `updateFlag`, then OR-ed into it — two operations, and between them the UI
+  thread can `exchange()` the flag to `UPDATE_NONE` and block in
+  `glfwWaitEvents()`. The read said "not idle, somebody will draw", the exchange
+  took the bits that somebody was going to draw, and the new bits landed with
+  nobody left to notice them: nothing repaints until an unrelated input event
+  arrives. A repaint is what plays the stone sound, so the symptom is a move that
+  is silent and, until the mouse moves, invisible. With `fetch_or` the cases are
+  exhaustive — bits landing before the exchange are drawn by it, bits landing
+  after observe `UPDATE_NONE` and post. Called from the game thread on every
+  move; not theoretical.
+- **`UPDATE_ALL` does not include `UPDATE_SOUND_STONE`, so never *assign* it.**
+  Sound is an event, not a surface, so it is rightly outside the redraw-everything
+  mask — which means `updateFlag = UPDATE_ALL` on a window resize threw away a
+  stone sound that had been requested and not yet played. It is `|=` now.
 - **Waking the renderer for a suggestion needs `UPDATE_STONES` too.** A label
   sets the annotation material, and that has to reach the stone upload or the
   grid stays drawn under it. This is why the publish gate does not ask for a

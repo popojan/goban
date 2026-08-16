@@ -355,9 +355,22 @@ void GobanView::reshape(int width, int height) {
 }
 
 void GobanView::requestRepaint(int what) {
-    bool wasIdle = (updateFlag == UPDATE_NONE && !animationRunning);
-    updateFlag |= what;
-    if (wasIdle) {
+    // The wake decision comes from fetch_or's *previous* value, not from a
+    // separate read. Reading updateFlag and then OR-ing it is two operations,
+    // and between them the UI thread can exchange the flag to UPDATE_NONE and
+    // block in glfwWaitEvents(): the read said "not idle, someone will draw", the
+    // exchange took the bits that someone was going to draw, and our bits landed
+    // afterwards with nobody left to notice them. Nothing then repaints until an
+    // unrelated input event arrives — and a repaint is what plays the stone
+    // sound, so the symptom is a move that is silent and, until you move the
+    // mouse, invisible.
+    //
+    // With fetch_or the two cases are exhaustive: if our bits landed before the
+    // exchange, the exchange takes them and draws them; if after, we observe
+    // UPDATE_NONE and post. Called from the game thread on every move, so this
+    // is not a theoretical ordering.
+    const int previous = updateFlag.fetch_or(what);
+    if (previous == UPDATE_NONE && !animationRunning) {
         glfwPostEmptyEvent();  // Wake the event loop only if it was idle
     }
 }
@@ -391,7 +404,12 @@ void GobanView::Render(int w, int h)
 		startTime = time;
 		lastTime = 0.0;
 		animationRunning = true;
-		updateFlag = UPDATE_ALL;
+		// OR, not assign. UPDATE_ALL is (1|2|4|8|16|32) and does *not* include
+		// UPDATE_SOUND_STONE (64) — sound is an event, not a surface, so it has
+		// no business being redrawn wholesale. Assigning therefore threw away a
+		// stone sound that had been requested and not yet played, if the window
+		// happened to be resized in between.
+		updateFlag |= UPDATE_ALL;
     // Ensure viewport is set correctly (RmlUi may have changed it)
 	}
 

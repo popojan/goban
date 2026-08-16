@@ -1810,6 +1810,12 @@ nlohmann::json GobanControl::dumpState() const {
                         : (log.unseenSeverity() == MessageSeverity::Error ? "error" : "warning");
         s["engine_loading"] = engine.engineLoadingSummary();
     }
+
+    // Sounds mixed all the way to their end, not merely requested. The
+    // distinction is the whole point: a request the mixer never saw looked
+    // exactly like one it played, which is why a swallowed stone sound had no
+    // symptom to assert on.
+    s["sounds_played"] = static_cast<double>(view.soundsPlayed());
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;

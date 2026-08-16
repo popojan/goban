@@ -61,6 +61,7 @@ trap 'rm -rf "$WORK" "$SCENARIO_GAMES"' EXIT
 
 pass=0
 fail=0
+skip=0
 failed_names=()
 
 for scn in "${scenarios[@]}"; do
@@ -94,7 +95,22 @@ for scn in "${scenarios[@]}"; do
     # Seed the throwaway settings with sound off. Stone sounds are pointless in
     # an automated run, and a CI box has no audio device — Pa_Initialize()'s
     # return value is not checked, so it is better not to open a stream at all.
-    printf '{"sound_enabled": false}\n' > "$WORK/${name}.user.json"
+    #
+    # A scenario that is *about* the audio path says `# sound: on` in its first
+    # few lines. It needs a real output device to prove anything — the mixer
+    # never runs without one — so it is skipped unless GOBAN_SCENARIO_AUDIO=1,
+    # which keeps the suite hermetic and the test runnable:
+    #   GOBAN_SCENARIO_AUDIO=1 tests/run_scenarios.sh
+    if sed -n '1,20p' "$scn" | grep -q '^# *sound: *on'; then
+        if [ "${GOBAN_SCENARIO_AUDIO:-0}" != "1" ]; then
+            echo "SKIP (needs an audio device; set GOBAN_SCENARIO_AUDIO=1)"
+            skip=$((skip + 1))
+            continue
+        fi
+        printf '{"sound_enabled": true}\n' > "$WORK/${name}.user.json"
+    else
+        printf '{"sound_enabled": false}\n' > "$WORK/${name}.user.json"
+    fi
 
     # --script implies a throwaway user.json, but pass one explicitly so
     # concurrent runs cannot collide.
@@ -123,7 +139,11 @@ for scn in "${scenarios[@]}"; do
 done
 
 echo
-echo "scenarios: $pass passed, $fail failed"
+if [ "$skip" -gt 0 ]; then
+    echo "scenarios: $pass passed, $fail failed, $skip skipped"
+else
+    echo "scenarios: $pass passed, $fail failed"
+fi
 if [ $fail -gt 0 ]; then
     printf 'failed: %s\n' "${failed_names[*]}"
     exit 1

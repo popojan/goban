@@ -153,6 +153,8 @@ public:
     }
     void stopAudioIfInactive() { player.stopIfInactive(); }
     void playSound(const std::string& id, double volume = 1.0) { player.play(id, volume); }
+    /// Sounds actually mixed to their end, for dumpState() and scenarios.
+    [[nodiscard]] unsigned long long soundsPlayed() const { return player.completedPlaybacks(); }
     bool toggleLastMoveOverlay();
     bool toggleNextMoveOverlay();
     void setTsumegoMode(bool enabled);
