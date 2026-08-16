@@ -58,7 +58,6 @@ public:
     // Active player management (activePlayer[] is the single source of truth for who plays each color)
     size_t activatePlayer(int which, size_t newIndex);
     size_t getActivePlayer(int which) const;
-    void setActivePlayer(int which, size_t index);  // Index-only, no notification
 
     // Check if both active players are human (used for Analysis mode check)
     bool areBothPlayersHuman() const;
@@ -67,8 +66,27 @@ public:
 
     // Player info
     std::string getName(size_t id) const;
-    const std::vector<Player*>& getPlayers() const { return players; }
-    size_t getNumPlayers() const { return numPlayers; }
+
+    /// A **copy** of the player list, taken under the mutex.
+    ///
+    /// It used to hand out a reference to the vector itself, with no lock —
+    /// which is the same partial-locking shape as the writers-unlocked bug
+    /// above, only the other way round. `loadEnginesParallel()` starts the game
+    /// loop as soon as the *coach* is ready and lets the remaining engines keep
+    /// loading, so the game thread walks this list (initial sync, scoring,
+    /// syncOtherEngines) while loader threads are still `push_back`ing into it.
+    /// A reallocation there invalidates the iterator the game thread is holding.
+    /// A vector of a handful of pointers is nothing to copy, and every caller
+    /// wanted a stable list anyway.
+    std::vector<Player*> getPlayers() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return players;
+    }
+
+    /// Whether the player assigned to a colour is an engine. One lock, so the
+    /// index and the list it indexes cannot come from two different moments.
+    bool isActivePlayerEngine(int which) const;
+
 
     // Engine loading progress, for the status indicator.
     //
@@ -111,8 +129,14 @@ public:
     /// instance run a CPU backend while the playing engine keeps the GPU.
     [[nodiscard]] std::optional<nlohmann::json> analysisConfig() const;
 
+    /// The human player, or nullptr if none has been registered yet. Analysis
+    /// mode blocks on this one whatever colour is to move. A single lock, unlike
+    /// the `getPlayers()[getHumanIndex()]` it replaces, which took the list and
+    /// the index at two different moments and bounds-checked neither.
+    Player* humanPlayer() const;
+
     // Special indices
-    size_t getHumanIndex() const { return human; }
+    size_t getHumanIndex() const { std::lock_guard<std::mutex> lock(mutex); return human; }
     size_t getCoachIndex() const { return coach; }
     size_t getKibitzIndex() const { return kibitz; }
 
@@ -150,7 +174,6 @@ private:
     nlohmann::json kibitzBot;
     bool analysisBotSet{false};
     bool kibitzBotSet{false};
-    size_t numPlayers{0};
     std::array<size_t, 2> activePlayer{0, 0};
 
     mutable std::mutex mutex;

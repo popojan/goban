@@ -230,13 +230,17 @@ void GameThread::shutdown() {
     spdlog::debug("shutdown: terminating engine processes");
     spdlog::default_logger()->flush();
     for (auto* player : playerManager->getPlayers()) {
-        if (player->isTypeOf(Player::ENGINE)) {
-            spdlog::debug("shutdown: terminating {}", player->getName());
-            spdlog::default_logger()->flush();
-            dynamic_cast<GtpEngine*>(player)->terminateProcess();
-            spdlog::debug("shutdown: terminated {}", player->getName());
-            spdlog::default_logger()->flush();
-        }
+        // Checked, unlike before: the ENGINE flag says what a player *is*, not
+        // what it is derived from, and the two other dynamic_casts in this file
+        // already test their result. Dereferencing a null here would crash on
+        // the way out, which is the worst place to have one.
+        auto* gtp = dynamic_cast<GtpEngine*>(player);
+        if (!gtp) continue;
+        spdlog::debug("shutdown: terminating {}", player->getName());
+        spdlog::default_logger()->flush();
+        gtp->terminateProcess();
+        spdlog::debug("shutdown: terminated {}", player->getName());
+        spdlog::default_logger()->flush();
     }
     // Now join — game thread exits fast since pipes are dead and interrupt is set.
     spdlog::debug("shutdown: joining game thread");
@@ -531,8 +535,8 @@ Move GameThread::handleKibitzRequest(Move move, Engine* kibitzEngine,
 std::string GameThread::collectEngineComments() const {
     std::ostringstream engineComments;
     for (auto p : playerManager->getPlayers()) {
-        if (p->isTypeOf(Player::ENGINE)) {
-            std::string engineMsg(dynamic_cast<GtpEngine*>(p)->lastError());
+        if (auto* gtp = dynamic_cast<GtpEngine*>(p)) {
+            std::string engineMsg(gtp->lastError());
             if (!engineMsg.empty()) {
                 if (engineComments.tellp() > 0) engineComments << "\n";
                 engineComments << engineMsg;
@@ -655,9 +659,9 @@ void GameThread::gameLoop() {
         // Navigation back/home calls model.pause(), blocking genmove via !model check above.
         // No separate navigatingHistory check needed.
 
-        if (gameMode == GameMode::ANALYSIS && coach && !stopRequested()) {
+        Player* humanPlayer = playerManager->humanPlayer();
+        if (gameMode == GameMode::ANALYSIS && coach && humanPlayer && !stopRequested()) {
             // Analysis mode: human plays either color, engine responds to human moves
-            Player* humanPlayer = playerManager->getPlayers()[playerManager->getHumanIndex()];
             spdlog::debug("Game loop: Analysis mode, waiting for human move (color={})",
                 model.state.colorToMove.toString());
 
@@ -1206,13 +1210,8 @@ bool GameThread::areBothPlayersEngines() const {
 
 bool GameThread::isCurrentPlayerEngine() const {
     // Get color to move (0 = black, 1 = white)
-    int colorIndex = (model.state.colorToMove == Color::BLACK) ? 0 : 1;
-    size_t playerIdx = playerManager->getActivePlayer(colorIndex);
-    auto& players = playerManager->getPlayers();
-    if (playerIdx >= players.size()) {
-        return false;
-    }
-    return players[playerIdx]->isTypeOf(Player::ENGINE);
+    const int colorIndex = (model.state.colorToMove == Color::BLACK) ? 0 : 1;
+    return playerManager->isActivePlayerEngine(colorIndex);
 }
 
 void GameThread::loadEngines(const std::shared_ptr<Configuration> conf) const {

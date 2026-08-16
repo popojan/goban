@@ -244,6 +244,14 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
   cannot all know which thread they are on. Same rule as
   `GobanModel::transitionTo()`: one writer. Pinned by
   `tests/scenarios/new_game_while_engine_thinking.scn`.
+- **`PlayerManager::getPlayers()` returns a copy, taken under the mutex.** It
+  used to hand out a reference to the vector with no lock, which is the
+  partial-locking shape the file comment warns about, only inverted.
+  `loadEnginesParallel()` starts the game loop as soon as the *coach* is ready
+  and lets the remaining engines keep loading, so the game thread walks that list
+  while loader threads are still `push_back`ing into it. Ask a single locked
+  question (`isActivePlayerEngine()`, `humanPlayer()`) rather than combining two
+  accessors, or the index and the list it indexes come from different moments.
 
 ### SGF Game Record Consistency
 - **PB/PW updated on first move**: Player names in SGF header are updated when the first move is made, capturing actual players after setup.

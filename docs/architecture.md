@@ -89,6 +89,14 @@ already hold it while they also assign the coach/kibitz indices. That pairing
 used to be the other way round — writers unlocked, readers locked — which is one
 of the three partial-locking holes CLAUDE.md warns about.
 
+`getPlayers()` returns a **copy**, and that is load-bearing rather than tidy:
+`loadEnginesParallel()` starts the game loop as soon as the *coach* is ready, so
+the game thread walks the list (initial sync, scoring, `syncOtherEngines`) while
+loader threads are still appending to it. It used to hand out a reference with no
+lock at all. For the same reason, a question that needs both an index and the
+list — "is the player on move an engine?" — is one locked call
+(`isActivePlayerEngine()`, `humanPlayer()`), never two accessors combined.
+
 **`GameThread::isOnGameThread()`** is a `thread_local` set at the top of
 `gameLoop()`. It exists because `interrupt()` must be a no-op when called from
 the loop it would join — and `run()` for the mirror reason: a deferred discarding

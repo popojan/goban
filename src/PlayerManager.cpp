@@ -87,15 +87,13 @@ size_t PlayerManager::getActivePlayer(int which) const {
     return activePlayer[which];
 }
 
-void PlayerManager::setActivePlayer(int which, size_t index) {
-    std::lock_guard<std::mutex> lock(mutex);
-    if (index < players.size()) {
-        activePlayer[which] = index;
-    }
-}
-
 bool PlayerManager::areBothPlayersHuman() const {
     std::lock_guard<std::mutex> lock(mutex);
+    // Bounds-checked like areBothPlayersEngines() below. setGameMode() asks this
+    // from the UI thread, which can be before any player has been registered.
+    if (activePlayer[0] >= players.size() || activePlayer[1] >= players.size()) {
+        return false;
+    }
     return players[activePlayer[0]]->isTypeOf(Player::HUMAN)
         && players[activePlayer[1]]->isTypeOf(Player::HUMAN);
 }
@@ -107,6 +105,17 @@ bool PlayerManager::areBothPlayersEngines() const {
     }
     return players[activePlayer[0]]->isTypeOf(Player::ENGINE)
         && players[activePlayer[1]]->isTypeOf(Player::ENGINE);
+}
+
+Player* PlayerManager::humanPlayer() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return human < players.size() ? players[human] : nullptr;
+}
+
+bool PlayerManager::isActivePlayerEngine(int which) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    const size_t index = activePlayer[which];
+    return index < players.size() && players[index]->isTypeOf(Player::ENGINE);
 }
 
 std::string PlayerManager::getName(size_t id) const {
@@ -252,7 +261,6 @@ void PlayerManager::loadHumanPlayers(const std::shared_ptr<Configuration>& confi
         human = addPlayer(new LocalHumanPlayer("Human"));
     }
 
-    numPlayers = human + 1;
     activePlayer[0] = human;
     activePlayer[1] = !engines.empty() ? coach : human;
 
@@ -313,8 +321,6 @@ void PlayerManager::removeSgfPlayers() {
             }
         }
 
-        numPlayers = players.size();
-
         // Restore active players from UserSettings if they were SGF players
         auto& settings = UserSettings::instance();
         auto findByName = [this](const std::string& name, size_t fallback) -> size_t {
@@ -345,5 +351,5 @@ void PlayerManager::removeSgfPlayers() {
     }
 
     spdlog::debug("removeSgfPlayers: {} players remaining, activePlayer=[{}, {}]",
-        numPlayers, activePlayer[0], activePlayer[1]);
+        players.size(), activePlayer[0], activePlayer[1]);
 }
