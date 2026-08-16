@@ -105,6 +105,37 @@ second.
   wrong" is the state of every scoring implementation in this class of program,
   and matching it is a choice rather than a default.
 
+## Measured, after the sketch was written
+
+A comparison on a position GNU Go itself calls a seki (its own 9×9 self-play,
+15 stones alive-in-seki):
+
+| | GNU Go 3.8 `--japanese-rules` | KataGo b18 9×9, `rules = japanese` |
+|---|---|---|
+| `final_status_list dead` | `[]` — 0.05 s | `[]` — 7.4 s |
+| `final_status_list seki` | **15 stones** — 0.00 s | **`[]`** — 1.1 s |
+| `final_status_list alive` | 42 stones | 57 — *including* the 15 |
+| `final_score` | `W+14.5` | `W+14.5` — 11.6 s |
+
+**KataGo accepts the seki query and never answers it**, folding those stones into
+`alive`. Its *score* is right — identical to GNU Go's — because its internal
+Japanese scoring handles seki; it simply does not expose the verdict.
+
+That is a direct problem for decision 3. Counting locally under Japanese rules
+needs to know where the seki is, and one of the two engines anyone would actually
+use will not say. So local counting cannot be strictly better than the engine's
+number: with KataGo as coach it would be *worse*, over-counting seki eyes while
+the engine's own figure was correct. Either the local count keeps `final_score`
+as an authority to defer to when the two disagree, or the ruleset work has to
+include deriving seki ourselves — which is life-and-death reading, the one thing
+this design deliberately delegates.
+
+Also worth recording, because it inverts the obvious expectation: GNU Go is
+instant on a *filled* board and pathological on a *sparse* one (10.3 s on a 9×9
+with two stones; minutes on a 19×19, which is what gets it killed — ADR-0009).
+KataGo is steady at a few seconds either way. On robustness KataGo is the better
+coach; on seki fidelity GNU Go is. Neither is better at both.
+
 ## Open questions
 
 - Where does the agreed dead list live in the SGF? `TB`/`TW` is the obvious
