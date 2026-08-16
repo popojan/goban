@@ -192,6 +192,51 @@ TEST_CASE("a wedged engine times out instead of hanging forever") {
     // The engine is killed on timeout: a late reply would otherwise be read as
     // the answer to the next command, which is worse than a dead engine.
     CHECK_FALSE(GtpClient::success(client->issueCommand("name")));
+    CHECK(client->hasFailed());
+}
+
+TEST_CASE("a killed engine can be put back") {
+    // Killing an unresponsive engine is right; leaving it dead for the rest of
+    // the session was not. One wedged final_status_list on a sparse board
+    // removed the coach permanently, and the only sign of it was a log line.
+    auto client = makeClient("--hang-on final_status_list");
+    REQUIRE(GtpClient::success(client->issueCommand("boardsize 9")));
+    client->setCommandTimeout(500);
+
+    REQUIRE_FALSE(GtpClient::success(client->issueCommand("final_status_list dead")));
+    REQUIRE(client->hasFailed());
+
+    CHECK(client->revive());
+    CHECK_FALSE(client->hasFailed());
+
+    // A live engine again — and a blank one, which is why the caller has to
+    // resynchronise it. Its board is the default, not the 9x9 set above.
+    CHECK(GtpClient::success(client->issueCommand("name")));
+    CHECK(GtpClient::success(client->issueCommand("boardsize 9")));
+    CHECK(body(client->issueCommand("genmove B")) != "");
+
+    // Nothing to revive when nothing has failed.
+    CHECK_FALSE(client->revive());
+}
+
+TEST_CASE("an engine that keeps wedging is eventually left down") {
+    // Bounded on purpose: without a ceiling, an engine that fails every command
+    // would be respawned on every game-loop iteration, ten times a second, for
+    // the rest of the session.
+    auto client = makeClient("--hang-on name");
+    client->setCommandTimeout(300);
+
+    for (int i = 0; i < GtpClient::MAX_REVIVES; ++i) {
+        REQUIRE_FALSE(GtpClient::success(client->issueCommand("name")));
+        REQUIRE(client->hasFailed());
+        CHECK(client->revive());
+    }
+
+    REQUIRE_FALSE(GtpClient::success(client->issueCommand("name")));
+    CHECK_FALSE(client->revive());
+    // And it stays down: every later attempt is refused without spawning.
+    CHECK_FALSE(client->revive());
+    CHECK(client->hasFailed());
 }
 
 TEST_CASE("a slow but responsive engine is not cut off early") {

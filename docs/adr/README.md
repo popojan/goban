@@ -71,3 +71,4 @@ A compact alternative for small decisions is the *Y-statement*:
 - [ADR-0006: The UI reads a published snapshot, not the SGF tree](0006-publish-a-game-snapshot.md) — *Accepted; complete*
 - [ADR-0007: Continuous analysis runs in a process of its own](0007-analysis-engine-owns-its-own-pipe.md) — *Accepted; Stages 1 and 2 implemented — panel, and move suggestions on the board. Ownership shading remains open*
 - [ADR-0008: Engines sync when the board changes, not when the player moves](0008-sync-engines-when-the-board-changes.md) — *Accepted; the wait moves off the first move, and `a.play` joins the policy*
+- [ADR-0009: A killed engine is restarted and resynchronised](0009-a-killed-engine-is-restarted-and-resynced.md) — *Accepted; gives the timeout kill the counterpart it never had*

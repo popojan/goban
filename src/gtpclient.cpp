@@ -709,19 +709,72 @@ GtpClient::GtpClient(const std::string& exe, const std::string& cmdline,
 
     initFilters(messages);
 
-    try {
-        proc_ = std::make_unique<Process>(program, params, workDir);
+    // Kept so the process can be started again after a timeout kill — see
+    // revive(). Resolution (findExecutable, resolveAgainstAppRoot) happens once,
+    // here, so a respawn cannot silently pick a different binary.
+    program_ = program;
+    params_ = params;
+    workDir_ = workDir;
 
-        // Always create stderr reader to prevent pipe buffer deadlock.
-        // If the child process writes to stderr and nobody reads it,
-        // the pipe buffer fills up and the child blocks.
-        stderrReader_ = std::make_unique<StderrReaderThread>(*proc_, [this](const std::string& line) {
-            (*this)(line);  // Logs at debug level and applies any filters
-        });
+    try {
+        spawn();
     } catch (const std::exception& e) {
         spdlog::error("Failed to start GTP engine: {}", e.what());
         throw;
     }
+}
+
+void GtpClient::spawn() {
+    proc_ = std::make_unique<Process>(program_, params_, workDir_);
+
+    // Always create stderr reader to prevent pipe buffer deadlock.
+    // If the child process writes to stderr and nobody reads it,
+    // the pipe buffer fills up and the child blocks.
+    stderrReader_ = std::make_unique<StderrReaderThread>(*proc_, [this](const std::string& line) {
+        (*this)(line);  // Logs at debug level and applies any filters
+    });
+}
+
+bool GtpClient::revive() {
+    if (!failed_.load()) return false;   // nothing to put back
+    if (terminated_.load()) return false; // deliberately shut down; leave it dead
+
+    if (reviveCount_ >= MAX_REVIVES) {
+        // Once, not on every loop iteration: failed_ stays set, so this branch
+        // is reachable ten times a second otherwise.
+        if (reviveCount_ == MAX_REVIVES) {
+            ++reviveCount_;
+            spdlog::error("{}: has stopped responding {} times; leaving it down for "
+                          "the rest of the session", exe, MAX_REVIVES);
+        }
+        return false;
+    }
+    ++reviveCount_;
+
+    // The reader before the process: it holds a reference to the Process and is
+    // sitting in a read on its stderr pipe. The engine is already dead, so that
+    // read has returned EOF and the join is immediate.
+    stderrReader_.reset();
+    proc_.reset();
+    {
+        std::lock_guard<std::mutex> lock(lastLineMutex_);
+        lastLine.clear();   // belonged to the process that just died
+    }
+
+    try {
+        spawn();
+    } catch (const std::exception& e) {
+        spdlog::error("{}: could not be restarted: {}", exe, e.what());
+        return false;
+    }
+
+    // Only now: a command arriving between the spawn and this would be written
+    // into a pipe nobody is reading yet.
+    failed_ = false;
+    spdlog::warn("{}: restarted after it stopped responding (attempt {} of {}). It "
+                 "knows nothing of the game yet and must be resynchronised.",
+                 exe, reviveCount_, MAX_REVIVES);
+    return true;
 }
 
 void GtpClient::initFilters(const nlohmann::json& messages) {
@@ -849,10 +902,16 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
             // read as the response to the *next* command — silently wrong
             // results are worse than a dead engine. Kill it so every subsequent
             // command fails fast and visibly instead.
+            //
+            // killProcess(), not terminateProcess(): the latter also raises
+            // `terminated_`, which means "shut down on purpose, stop reporting
+            // errors" — and an engine flagged that way is deliberately *not*
+            // revivable. Setting it here left the failure indistinguishable from
+            // a clean teardown, so nothing could put the engine back.
             spdlog::error("{}: terminating unresponsive engine to avoid a "
                           "desynchronised GTP stream", exe);
             failed_ = true;
-            terminateProcess();
+            killProcess();
             return {};   // success() == false
         }
 
@@ -956,9 +1015,16 @@ bool GtpClient::success(const CommandOutput& ret) {
 }
 
 GtpClient::~GtpClient() {
-    spdlog::debug("~GtpClient: sending quit to {}", exe);
-    spdlog::default_logger()->flush();
-    proc_->write("quit\n");
+    // Only an engine that is still alive gets asked to leave politely. Writing
+    // into the stdin of a process we killed ourselves raises SIGPIPE, and the
+    // only reason that has never shown up is that main.cpp ignores the signal
+    // process-wide — a disposition goban_core has no business depending on, as
+    // goban_tests proved by dying on it the moment the kill became synchronous.
+    if (!failed_.load() && !terminated_.load()) {
+        spdlog::debug("~GtpClient: sending quit to {}", exe);
+        spdlog::default_logger()->flush();
+        proc_->write("quit\n");
+    }
     proc_->closeStdin();
     if (!proc_->waitFor(2000)) {
         spdlog::warn("~GtpClient: {} did not exit gracefully, force-terminating", exe);
@@ -975,9 +1041,18 @@ GtpClient::~GtpClient() {
     spdlog::debug("~GtpClient: {} cleanup complete", exe);
 }
 
+void GtpClient::killProcess() {
+    if (!proc_) return;
+    proc_->terminate();
+    // Reap it. terminate() is a SIGKILL, so this returns at once — and without
+    // it every killed engine left a zombie for the rest of the session, which
+    // revive() would then produce one of per restart.
+    (void) proc_->wait();
+}
+
 void GtpClient::terminateProcess() {
     terminated_ = true;
-    if (proc_) proc_->terminate();
+    killProcess();
 }
 
 void GtpClient::interpolate(std::string& out) {

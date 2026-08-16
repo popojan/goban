@@ -365,6 +365,11 @@ private:
 
     void processDeferredTask();
 
+    /// Restarts any engine that was killed for not answering, and marks every
+    /// engine unsynced so the loop replays the record into them. Game thread
+    /// only: it swaps an engine's pipes. See GtpClient::revive().
+    void reviveFailedEngines();
+
     void processNavigationQueue();
     void executeNavCommand(const NavCommand& cmd);
     void processScoring();

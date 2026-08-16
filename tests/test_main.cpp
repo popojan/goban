@@ -3,9 +3,17 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
+#include <csignal>
 #include <memory>
 
 #include "Configuration.h"
+
+// The same disposition main.cpp installs, and for the same reason: GtpClient
+// writes into an engine's pipe and is written to handle a failed write, which
+// it only gets to do if the default action has not already killed the process.
+// Without this the test binary inherits the hazard without the mitigation — a
+// killed engine's teardown took the whole suite down with signal 13.
+static const int g_ignoreSigpipe = []() { std::signal(SIGPIPE, SIG_IGN); return 0; }();
 
 // goban_core declares this global (GameThread.h, GameRecord.cpp) but the
 // definition lives in the application's main.cpp, which tests do not link.

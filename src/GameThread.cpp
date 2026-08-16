@@ -578,6 +578,11 @@ void GameThread::gameLoop() {
 
     while (loop.load() == LoopState::Running) {
 
+        // Before anything that might want to talk to an engine. An engine killed
+        // for not answering used to stay dead for the session; putting it back
+        // is GTP traffic, so this is the only thread that may do it.
+        reviveFailedEngines();
+
         // Game-discarding actions (new game, load, switch game) requested while
         // an engine was thinking run here: the loop is between moves and owns
         // the engine pipes, so it is the only safe place for them.
@@ -820,6 +825,27 @@ void GameThread::gameLoop() {
     loop = LoopState::Stopped;
 }
 
+void GameThread::reviveFailedEngines() {
+    // Cheap enough to ask on every iteration: one atomic load per engine.
+    bool revived = false;
+    for (auto* p : playerManager->getPlayers()) {
+        if (!p->isTypeOf(Player::ENGINE)) continue;
+        auto* gtp = dynamic_cast<GtpEngine*>(p);
+        if (!gtp || !gtp->hasFailed()) continue;
+        if (gtp->revive()) revived = true;
+    }
+    if (!revived) return;
+
+    // A replacement process holds an empty board and has never heard of this
+    // game. Unsynced is exactly the answer: the loop's initial-sync block
+    // replays the record into every engine, coach first, which is the same
+    // machinery a load or a board size change uses. Doing it per engine here
+    // would be a second replay path for one caller.
+    spdlog::info("An engine was restarted; resynchronising every engine to the "
+                 "current position");
+    engineSync = EngineSync::Unsynced;
+}
+
 void GameThread::playLocalMove(const Move& move) {
     std::unique_lock<std::mutex> lock(playerMutex);
     Player* p = playerToMove.load();
@@ -996,6 +1022,29 @@ void GameThread::processNavigationQueue() {
         {
             std::lock_guard<std::mutex> lock(navQueueMutex);
             if (navQueue.empty()) return;
+            // Engines that are behind the record cannot be navigated: BACK
+            // issues `undo` and FORWARD issues `play`, both against whatever
+            // position the engine still holds. Leave the command queued until
+            // the sync block below has run — that is one iteration away, and
+            // isIdle() already counts Syncing as busy, so nothing polling for
+            // quiescence reads the board early.
+            //
+            // Reachable whenever something marks the engines Unsynced under a
+            // running loop: an SGF load, and now a restarted engine. Without
+            // this, reviveFailedEngines() handed a freshly spawned engine an
+            // `undo` on its empty board, which it refused — the coach then
+            // tracked a different position than the record for the rest of the
+            // game, which is the failure GameNavigator::syncEngines() warns
+            // about but cannot repair.
+            //
+            // TO_TREE_PATH is exempt, and must be: it sets the cursor and syncs
+            // the coach itself, and startup deliberately queues it before the
+            // engines are synced so the initial sync lands on the restored
+            // position rather than on the root.
+            if (engineSync.load() != EngineSync::Synced
+                && navQueue.front().type != NavCommand::TO_TREE_PATH) {
+                return;
+            }
             cmd = std::move(navQueue.front());
             navQueue.pop();
             // Claim the command before the lock drops. GameNavigator raises its

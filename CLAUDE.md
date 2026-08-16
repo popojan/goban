@@ -244,6 +244,25 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
   cannot all know which thread they are on. Same rule as
   `GobanModel::transitionTo()`: one writer. Pinned by
   `tests/scenarios/new_game_while_engine_thinking.scn`.
+- **Navigation waits for `EngineSync::Synced`.** `processNavigationQueue()`
+  leaves a command queued while the engines are behind the record: `BACK` issues
+  `undo` and `FORWARD` issues `play`, both against whatever position the engine
+  still holds, and `GameNavigator::syncEngines()` can only warn about the
+  divergence, not repair it. `TO_TREE_PATH` is the one exemption and must stay
+  one — it sets the cursor and syncs the coach itself, and startup deliberately
+  queues it *before* the initial sync so the sync lands on the restored position
+  rather than the root. The sync block is reached on every iteration where
+  `engineSync != Synced`, so nothing can stall behind this.
+- **A killed engine is put back, not written off.** See
+  `docs/adr/0009-a-killed-engine-is-restarted-and-resynced.md`.
+  `GtpClient::terminateProcess()` had no counterpart, so one unanswered
+  `final_status_list` — GNU Go's real behaviour on a sparse 19×19 — removed the
+  coach for the session and every later move went to a dead process.
+  `GameThread::reviveFailedEngines()` respawns it at the top of the loop and
+  marks everything `Unsynced`; the count is bounded (`GtpClient::MAX_REVIVES`).
+  **`terminated_` means "shut down on purpose" and nothing else** — an engine
+  flagged that way is deliberately not revivable, which is why the timeout path
+  calls the private `killProcess()` instead.
 - **`PlayerManager::getPlayers()` returns a copy, taken under the mutex.** It
   used to hand out a reference to the vector with no lock, which is the
   partial-locking shape the file comment warns about, only inverted.

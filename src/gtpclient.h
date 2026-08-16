@@ -102,6 +102,12 @@ class GtpClient {
 private:
     std::unique_ptr<Process> proc_;
     std::string exe;
+    /// Everything needed to spawn the process again, resolved once in the
+    /// constructor. Kept because a killed engine used to be gone for the rest of
+    /// the session — see revive().
+    std::string program_;
+    std::vector<std::string> params_;
+    std::string workDir_;
     std::string lastLine;
     mutable std::mutex lastLineMutex_;
     std::vector<OutputFilter> outputFilters;
@@ -113,6 +119,19 @@ private:
     // this one must keep reporting failure — pretending a dead engine answered
     // OK would let move replay and scoring proceed against nothing.
     std::atomic<bool> failed_{false};
+    /// How many times this engine has been respawned after a timeout. Bounded:
+    /// an engine that wedges on every command would otherwise be restarted ten
+    /// times a second forever.
+    int reviveCount_ = 0;
+
+    /// Spawns the process and its stderr reader from program_/params_/workDir_.
+    /// Throws what Process throws.
+    void spawn();
+
+    /// Kills and reaps the process without claiming it was shut down on purpose.
+    /// `terminateProcess()` is this plus the `terminated_` flag; the timeout
+    /// path wants only the killing, or the engine could never be revived.
+    void killProcess();
 
     nlohmann::json vars;
 
@@ -178,6 +197,33 @@ public:
 
     /// Kill the engine process immediately (unblocks any blocking readLine).
     void terminateProcess();
+
+    /// True once this engine has been killed for not answering. Every command
+    /// after that fails immediately, which is the point — but it also means the
+    /// engine is gone, so somebody has to notice and put it back.
+    [[nodiscard]] bool hasFailed() const { return failed_.load(); }
+
+    /// Start a replacement process for an engine killed after a timeout.
+    ///
+    /// Killing an unresponsive engine is right — a late reply read as the answer
+    /// to the next command is silently wrong results — but it had no
+    /// counterpart, so one wedged `final_status_list` on a sparse board removed
+    /// GNU Go for the rest of the session with a log line and nothing else. The
+    /// user's next move went to no engine at all.
+    ///
+    /// The replacement is a blank engine: it knows nothing of the game, so the
+    /// caller **must** resync it (`EngineSync::Unsynced` does that for every
+    /// engine at once). Same ownership rule as every other command here — the
+    /// game thread only, because it swaps the pipes this object reads.
+    ///
+    /// Returns false when there was nothing to revive, when the respawn itself
+    /// failed, or when this engine has already used up its attempts. Bounded
+    /// because an engine that wedges on every command must not be respawned in a
+    /// loop; the ceiling is per session, and it is logged when it is reached.
+    bool revive();
+
+    /// Respawns allowed before an engine is left dead for the session.
+    static constexpr int MAX_REVIVES = 3;
 
     /// Maximum time to wait for a response to a single GTP command.
     /// A negative value waits forever.
