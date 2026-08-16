@@ -99,6 +99,12 @@ bool GobanControl::newGameNow(unsigned boardSize) const {
         return false;
     }
     model.createNewRecord();
+    // Only now, with the empty record installed: the sync replays whatever the
+    // model holds, and starting it inside clearGame() above raced it against
+    // this line — the engines could be handed the whole of the game just
+    // discarded, and the next move came back "illegal move" on a board that
+    // looked empty. See GameThread::startSyncingNewGame().
+    engine.startSyncingNewGame();
 
     // Save game settings so fresh start uses these values (single save)
     auto& settings = UserSettings::instance();

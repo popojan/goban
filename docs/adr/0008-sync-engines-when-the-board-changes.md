@@ -89,6 +89,27 @@ cannot apply to the click that starts the sync, so the worst case survives it.
 Same objection. The wait is avoidable, and an avoidable wait that is merely
 well-labelled is still an avoidable wait.
 
+### Correction, 2026-08-16: the sync must not start before the new record exists
+
+Shipped broken, and found the next morning. `clearGame()` started the loop
+itself, but `newGameNow()` installs the empty record *after* `clearGame()`
+returns — so the replay raced `createNewRecord()` and could hand the engines the
+game being discarded. The board drew empty; GNU Go still held all 37 stones of
+the previous game and answered `? illegal move (command: play B F5)` when the
+player opened on F5, which was that game's own first move.
+
+The start therefore moved out to `GameThread::startSyncingNewGame()`, whose only
+call site is after `createNewRecord()`. It also checks its precondition —
+`moveCount > 0` means the previous record is still installed — and logs an error
+rather than syncing, because getting this wrong is invisible from the UI and
+surfaces much later as an engine refusing a legal-looking move.
+
+Worth recording that the reproduction failed: three runs against real GNU Go,
+replaying the actual recorded game, never fired the race. The window is a few
+instructions wide and the original session had KataGo analysing alongside. So
+the scenario named below pins the behaviour, not the race — the ordering is
+guarded structurally, by there being one call site, and by that check.
+
 ### Accepted cost: work that may be discarded
 
 Changing the board size twice in quick succession syncs twice. Each `clearGame()`

@@ -220,6 +220,14 @@ public:
 
     bool clearGame(int boardSize, float komi, int handicap);
 
+    /// Begin the replay into the engines for a freshly cleared game.
+    ///
+    /// Call **after** the model holds the new record: the sync reads whatever
+    /// record is installed, so running it while the previous game is still in
+    /// place replays that one into the engines instead. Separate from
+    /// `clearGame()` for exactly that reason — see its comment.
+    void startSyncingNewGame();
+
     void removeSgfPlayers() const;  // Remove temporary players created from SGF loading
 
     void setKomi(float komi);

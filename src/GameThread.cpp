@@ -290,7 +290,13 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
     setKomi(komi);
     setFixedHandicap(handicap);
+    // The loop is deliberately *not* started here — see startSyncingNewGame(),
+    // which the caller invokes once the model holds the new record.
+    return true;
 
+}
+
+void GameThread::startSyncingNewGame() {
     // Sync now, while the user is still looking at an empty board, rather than
     // billing it to their first move.
     //
@@ -299,21 +305,36 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
     // KataGo, rebuilding for a new board size is seconds. The player changed
     // the board size, sat thinking, reached for a stone, and *then* paid. The
     // SGF load path has always done it this way instead (see loadSGF: "start
-    // game thread early"), and there was never a principle behind the
-    // difference, only the two paths growing apart.
+    // game thread early"); there was never a principle behind the difference.
     //
-    // After setFixedHandicap(), never before: the sync replays the setup stones
-    // it places, so starting the loop above would race the handicap onto the
-    // board behind the replay's back.
+    // **Separate from clearGame() because of what the sync reads.** It replays
+    // whatever record the model currently holds, and newGameNow() installs the
+    // empty one *after* clearGame() returns. Starting the loop inside
+    // clearGame() therefore raced the replay against createNewRecord(): the
+    // game thread could still see the finished game and play every one of its
+    // stones into the engines, which then held a position the cleared board no
+    // longer showed. The next move landed on an occupied point and came back
+    // "illegal move". A fast mock won that race; GNU Go lost it.
     //
-    // isRunning() first, not run() alone: clearGame() also runs *on* the game
+    // isRunning() first, not run() alone: this path also runs *on* the game
     // thread when a discarding action was deferred past a genmove, and run()
     // takes playerMutex, which that path may already hold.
+    //
+    // The precondition is checked rather than trusted. Getting it wrong is
+    // invisible from the UI — the board draws empty either way — and only
+    // surfaces later as the engine refusing a legal-looking move, which is a
+    // long way from the cause. A fresh record has no moves; a handicap places
+    // setup stones, not moves, so this holds for those too.
+    if (model.snapshot()->moveCount > 0) {
+        spdlog::error("startSyncingNewGame: the previous record is still "
+                      "installed ({} moves) — the engines would be replayed "
+                      "the game being discarded; not starting the sync",
+                      model.snapshot()->moveCount);
+        return;
+    }
     if (!isRunning()) {
         run();
     }
-    return true;
-
 }
 
 void GameThread::setKomi(float komi) {
