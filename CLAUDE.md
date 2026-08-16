@@ -376,6 +376,18 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   there now (`tplStatusSyncing`, in all five languages, with an English
   fallback). Same trap as the exit hang: no input event arrives, so nothing
   repaints, so nothing can be reported.
+- **A click that cannot place a stone can still mean Start.** When it is an
+  engine's turn, `boardClick()` dispatches the `start` command — by asking
+  `availableActions()` a *different* question (`a.start`), never by going round
+  it. This is restored behaviour, not new: `boardClick()` called `model.start()`
+  + `run()` unconditionally for years, so clicking the board with a bot to move
+  began the match. It was lost as collateral twice and remarked on neither time —
+  4c5dcfc moved `start()` behind "a stone is actually being placed" (rightly:
+  merely *picking a stone out of the bowl* was flipping the phase to Playing on
+  an empty board), and 2d6b222's `!actions().play` guard then refused the click
+  outright. The same commit message that removed it still cited "a board click
+  already starts the game" as a reason for something else. Pinned by
+  `tests/scenarios/click_starts_engine_turn.scn`.
 - **A board click asks `a.play`, which *is* `a.pass`.** Not an equal-looking
   copy — assigned, so they cannot drift. They are one act at one point, and the
   review branch used to test `isThinking()` while the branch that starts a game

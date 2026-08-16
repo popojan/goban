@@ -220,6 +220,30 @@ void GobanControl::boardClick(const Position& coord) {
     // Finished is exempt because a click there is not a play: it means "clear",
     // and it is handled further down.
     if (model.phase() != GamePhase::Finished && !actions().play) {
+        // ...but a click that cannot place a stone is not necessarily a click
+        // that means nothing. On a game waiting for an engine to move it means
+        // Start, which is what it meant for years: boardClick() called
+        // model.start() + run() unconditionally, so clicking the board with a
+        // bot to move began the match.
+        //
+        // That was lost as collateral, twice and unremarked. 4c5dcfc moved
+        // start() behind "a stone is actually being placed" — rightly, because
+        // merely *picking a stone out of the bowl* was flipping the phase to
+        // Playing with nothing recorded — and the bot-to-move case went with it;
+        // the same commit message still cites "a board click already starts the
+        // game" as a reason for something else. Then the guard above refused the
+        // click outright, since a.play requires the turn to be the human's.
+        //
+        // Restored by asking availableActions() a *different* question rather
+        // than going round it: a.start is `!finished && !playing &&
+        // engineToMove`, which is exactly when the Start button lights up, and
+        // dispatching the command reuses the one path that owns model.start()
+        // and engine.run(). No second lifecycle route.
+        if (actions().start) {
+            spdlog::debug("board click with an engine to move: starting the game");
+            command("start");
+            return;
+        }
         spdlog::debug("board click refused by availableActions()");
         return;
     }
@@ -808,7 +832,9 @@ void GobanControl::buildRegistry() {
         // a game that is neither already running nor over. The command used to
         // test the phase alone, which meant it accepted a human-versus-human
         // game where the button was greyed and there was nothing to hand over:
-        // `pass` and a board click already start the game themselves.
+        // `pass` and a board click already start the game themselves — a click
+        // by placing a stone, and, when it is an engine's turn, by dispatching
+        // this command from boardClick().
         if (!actions().start) {
             spdlog::debug("start refused by availableActions()");
             ctx.notifyMenu = false;
