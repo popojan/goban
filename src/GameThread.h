@@ -272,7 +272,6 @@ public:
 
 	[[nodiscard]] Move getLocalMove(const Position& coord) const;
     [[nodiscard]] Move getLocalMove(Move::Special move) const;
-	void reset();
 
     void addGameObserver(GameObserver* pobserver) {
         gameObservers.push_back(pobserver);
@@ -325,7 +324,13 @@ private:
     std::vector<GameObserver*> gameObservers;
     GobanModel& model;
     std::unique_ptr<std::thread> thread;
-    std::mutex mutex2;
+    /// The one writer of the loop's lifecycle outside gameLoop() itself is
+    /// interrupt()/run(); there is deliberately no second setter. `reset()` used
+    /// to be one, and because it wrote Stopped unconditionally it told the
+    /// truth only on the UI thread — on the game thread (a deferred discarding
+    /// action) it claimed the running loop had stopped, which sent
+    /// startSyncingNewGame() into run() and the game thread into joining
+    /// itself. Same rule as GobanModel::transitionTo(): one writer.
     std::atomic<LoopState> loop{LoopState::Stopped};
     std::atomic<EngineSync> engineSync{EngineSync::Synced};
     std::atomic<Player*> playerToMove;

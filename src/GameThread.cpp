@@ -31,13 +31,7 @@ GameThread::GameThread(GobanModel &m) :
     );
 }
 
-void GameThread::reset() {
-    loop = LoopState::Stopped;
-    playerToMove = nullptr;
-}
-
 GameThread::~GameThread() {
-    std::unique_lock<std::mutex> lock(mutex2);
     interrupt();
     // PlayerManager destructor handles player cleanup
 }
@@ -397,6 +391,20 @@ bool GameThread::setFixedHandicap(int handicap) {
     return true;
 }
 void GameThread::run() {
+    // The loop cannot start itself: it is, by definition, already running. This
+    // is reachable — a discarding action deferred past a genmove runs
+    // newGameNow() / finalizeGameLoad() *on* the game thread, and both end by
+    // asking for the loop. Every line below is wrong there, and the join is
+    // fatal: std::thread::join() on one's own thread throws
+    // "Resource deadlock avoided", which nothing catches, so the process
+    // aborts. The mirror of interrupt()'s isOnGameThread() no-op, and the
+    // reason this is a guard here rather than at each call site is that the
+    // call sites cannot all know which thread they are on.
+    if (isOnGameThread()) {
+        spdlog::debug("run: already on the game thread, nothing to start");
+        return;
+    }
+
     std::unique_lock<std::mutex> lock(playerMutex);
 
     // If thread exists and finished, join it first before starting new one

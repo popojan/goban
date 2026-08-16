@@ -91,7 +91,11 @@ of the three partial-locking holes CLAUDE.md warns about.
 
 **`GameThread::isOnGameThread()`** is a `thread_local` set at the top of
 `gameLoop()`. It exists because `interrupt()` must be a no-op when called from
-the loop it would join.
+the loop it would join — and `run()` for the mirror reason: a deferred discarding
+action runs `newGameNow()` / `finalizeGameLoad()` *on* the game thread, and both
+end by asking for the loop. Starting a loop from inside it is at best a no-op;
+the join it used to reach threw "Resource deadlock avoided" and aborted the
+process.
 
 ---
 

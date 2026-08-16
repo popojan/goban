@@ -90,8 +90,10 @@ bool GobanControl::newGameNow(unsigned boardSize) const {
     // Engine and model work only. This may run on the game thread (when it was
     // deferred past a genmove), and RmlUi is not thread safe — every widget and
     // view update happens later in finishGameReplacement(), on the UI thread.
+    // A no-op when this was deferred and so runs on the game thread — which is
+    // the whole point: the loop is between moves there, and stopping it is
+    // neither possible nor needed. See ADR-0001.
     engine.interrupt();
-    engine.reset();
     engine.removeSgfPlayers();  // Remove temporary SGF players from previous load
     model.tsumegoMode = false;
     model.game.setSuppressSessionCopy(false);

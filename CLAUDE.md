@@ -230,6 +230,20 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **`Unsynced` is not "busy", `Syncing` is**: only `Syncing` — held while the game thread is actually replaying — may make `isIdle()` false. Waiting on `Unsynced` would never return, since nothing guarantees anyone will act on it. The replay always leaves `Syncing`, failure included.
 - **The sync starts when the board changes, not when the player moves — but only once the new record exists.** `GameThread::startSyncingNewGame()` is called from `newGameNow()` *after* `createNewRecord()`, never from `clearGame()`: the replay reads whatever record the model holds, and starting it inside `clearGame()` raced the empty record's installation. The engines were handed the game being discarded, the board drew empty, and GNU Go refused the player's opening move because that point was the old game's first stone. The function checks the precondition (`moveCount > 0` means the old record is still there) and logs an error rather than syncing — the failure is otherwise invisible until an engine disagrees with the board. A new game, a board size change and a handicap all begin the replay immediately — while the user is still looking at an empty board. It used to leave the engines `Unsynced` with the loop *stopped* until a click called `start()` + `run()`, which billed a several-second KataGo rebuild to the first move: stone stuck in hand, nothing on screen. The SGF load path had always started the thread early (`loadSGF`, "start game thread early"); the two paths had simply grown apart. Ordering matters twice — after `setFixedHandicap()`, because the replay carries its setup stones, and behind `if (!isRunning())`, because `clearGame()` also runs *on* the game thread when a discarding action was deferred, where `run()` would take a mutex that path may hold. Pinned by `tests/scenarios/sync_before_first_move.scn`, whose every assertion is "without a move having been played".
 - **All GTP from game thread**: Engine commands during active game must go through the game thread (navigation queue, initial sync). Direct GTP from UI thread is only safe when game thread is stopped (after `interrupt()`).
+- **`LoopState` has one writer outside the loop, and `run()` is a no-op on the
+  game thread.** `GameThread::reset()` was a second writer, and because it wrote
+  `Stopped` unconditionally it told the truth only on the UI thread. On the game
+  thread — where `newGameNow()` runs when a discarding action was deferred past a
+  genmove — it claimed the running loop had stopped, which defeated
+  `startSyncingNewGame()`'s `if (!isRunning())` guard and sent the game thread
+  into `thread->join()` on itself: `std::system_error`, "Resource deadlock
+  avoided", uncaught, `std::terminate`. `interrupt()` already leaves
+  `loop == Stopped` and `playerToMove` null on every path that reaches it, so
+  `reset()` was pure redundancy on the thread where it was not fatal. `run()` now
+  refuses on the game thread the way `interrupt()` does, because the call sites
+  cannot all know which thread they are on. Same rule as
+  `GobanModel::transitionTo()`: one writer. Pinned by
+  `tests/scenarios/new_game_while_engine_thinking.scn`.
 
 ### SGF Game Record Consistency
 - **PB/PW updated on first move**: Player names in SGF header are updated when the first move is made, capturing actual players after setup.
