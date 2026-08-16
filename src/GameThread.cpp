@@ -456,6 +456,14 @@ bool GameThread::analysisMayRun() const {
     return !(isRunning() && isCurrentPlayerEngine());
 }
 
+bool GameThread::hasQueuedMove() const {
+    if (!isRunning()) return false;
+    std::lock_guard<std::mutex> lock(playerMutex);
+    // INTERRUPT is not a move — interrupt() leaves one here when nobody is on
+    // move — and INVALID is the empty slot.
+    return queuedMove != Move::INVALID && queuedMove != Move::INTERRUPT;
+}
+
 bool GameThread::hasPendingNavigation() const {
     {
         std::lock_guard<std::mutex> lock(navQueueMutex);

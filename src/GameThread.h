@@ -208,6 +208,18 @@ public:
     /// loop is both unnecessary and impossible (it would join itself).
     [[nodiscard]] static bool isOnGameThread();
 
+    /// True while a move handed to the loop has not yet been taken up.
+    ///
+    /// `queuedMove` is where playLocalMove() leaves a move when nobody is
+    /// blocked in genmove() — between two moves, or before the loop has reached
+    /// its first turn. Quiescence has to count it: without this a scripted run
+    /// reads the board after a click and finds the stone not yet placed, and
+    /// `wait_idle` returns while the move is still in the air. Deliberately
+    /// false when the loop is *stopped*, for the same reason
+    /// `EngineSync::Unsynced` is not "busy" — a move nobody will collect is
+    /// stranded, not in flight, and waiting on it would never return.
+    [[nodiscard]] bool hasQueuedMove() const;
+
     /// True while any navigation command is queued or executing. Navigation is
     /// fire-and-forget from the UI thread, so isThinking() alone does not tell
     /// you whether the board has caught up; scripted runs and any other caller

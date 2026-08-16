@@ -1730,6 +1730,13 @@ bool GobanControl::isIdle() const {
     // EngineSync::Syncing counts: Unsynced persists with the loop stopped after
     // a new game, so waiting on that would never return.
     if (engine.isSyncingEngines()) return false;
+    // The fifth term, and the one this predicate was missing: a move handed to
+    // the loop that it has not taken up yet. playLocalMove() leaves it in
+    // `queuedMove` whenever nobody is blocked in genmove() — between two moves,
+    // or before the loop reaches its first turn — so a scripted run could ask
+    // for the board immediately after a click and be told, truthfully by the
+    // other four terms and uselessly, that everything was idle.
+    if (engine.hasQueuedMove()) return false;
     return true;
 }
 

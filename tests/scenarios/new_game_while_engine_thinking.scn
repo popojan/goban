@@ -44,8 +44,12 @@ wait_idle
 click 3 3
 wait_idle
 expect holds_stone true
+# `wait_idle` alone, deliberately: the placing click leaves the move in
+# `queuedMove` for the loop to take up, and until isIdle() counted that, this
+# read the board before the stone had landed. Every other scenario works around
+# it with `wait_until move_count >= N`.
 click 3 3
-wait_until move_count >= 1
+wait_idle
 expect black_stones 1
 # White is still the slow engine, so a reply proves the loop is turning.
 wait_until white_stones 1
