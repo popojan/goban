@@ -1086,6 +1086,18 @@ argues for, each enforced by `tests/test_stereo.cpp` or
   `pointer` command is sticky. `Auto` — the default — means "where the native
   pointer is actually wrong", which is a stereo shader; `Always` also takes the
   native pointer away in mono, which is why it is not the default.
+- **Everything that covers the board must draw the mark, not just the board.**
+  `pointerCoverage()` lives in `api.glsl` and has two callers: the wood in
+  `board.glsl`, and the **annotation patch** in `stones.glsl`. That patch is a
+  quad of clean board laid over the grid so a label has somewhere legible to sit,
+  and it hid the pointer exactly as it hides the lines — leaving the outer stub of
+  each tick showing, which is what looked wrong. Moving the ticks outside it is
+  not available: the patch reaches 0.4 of a spacing and the neighbour's starts at
+  0.6, so they would have to live in a corridor 0.2 wide, and the imprecise-hand
+  offset drifts the whole mark inside it. The patch names `idBlackStone` as its
+  `pid` and puts the coverage in `a.x` instead — which is exactly how a grid line
+  is inked (`shade.glsl` blends the object's material toward `materials[pid]` by
+  `a.x`), and is a no-op wherever the pointer is elsewhere.
 - **Its shape is constrained by what the board already means.** A disc is a
   stone and an upright cross is the grid — both shapes are taken, and either
   would be camouflage. Four ticks turned a quarter turn from the grid, gapped at

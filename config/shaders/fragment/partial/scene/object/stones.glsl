@@ -54,6 +54,21 @@ void rStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
                             // For annotation (idBoard), use vec2(0.0) to match board shading exactly
                             // Territory areas use vec2(1.0) for their colored appearance
                             ipp.a = (m0 == cidAnnotation) ? vec2(0.0) : vec2(1.0);
+
+                            // ...except where the pointer crosses it. This patch
+                            // is clean board laid over the grid so a label has
+                            // somewhere legible to sit, and it hid the pointer
+                            // exactly as it hides the lines — leaving the outer
+                            // stub of each tick showing, which is what looked
+                            // wrong. shade.glsl blends the object's material
+                            // toward materials[pid] by a.x, which is how a grid
+                            // line is inked, so the patch can carry the mark by
+                            // naming the same ink: with no pointer over it the
+                            // coverage is 0 and this is exactly as it was.
+                            if (m0 == cidAnnotation) {
+                                ipp.pid = idBlackStone;
+                                ipp.a = vec2(pointerCoverage(ro, ip), 0.0);
+                            }
                             vec3 bmin = vec3(dd.x - w25.x, 0.0, dd.y - w25.x);
                             vec3 bmax = vec3(dd.x + w25.x, 0.0, dd.y + w25.x);
                             mat3 ps = mat3(
