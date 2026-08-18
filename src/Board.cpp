@@ -529,14 +529,18 @@ bool Board::toggleTerritory() {
 	return showTerritory;
 }
 
-int Board::placeCursor(const Position& coord, const Color& col) {
-
-    glm::vec2 v(
+glm::vec2 Board::fuzzyOffset(const Position& coord) const {
+    // Where inside the cell the ray fell, measured from its centre: [-0.5, 0.5).
+    const glm::vec2 v(
         coord.x - static_cast<float>(coord.col()) - 0.5f,
         coord.y - static_cast<float>(coord.row()) - 0.5f
     );
+    return 6.0f * r1 * v;
+}
 
-    glm::vec2 add(6.0f * r1 * v);
+int Board::placeCursor(const Position& coord, const Color& col) {
+
+    const glm::vec2 add(fuzzyOffset(coord));
 
     Position pos(coord);
     pos.x = static_cast<float>(coord.col()) + add.x;

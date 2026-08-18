@@ -839,6 +839,38 @@ void GobanControl::buildRegistry() {
         }
     });
 
+    add("pointer", 0, 1,
+        "[auto|always|never] — when the board draws its own pointer instead of "
+        "the window system's; auto means under a stereo shader, where the native "
+        "one cannot be at the right depth",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->showMessage(pointerModeName(view.pointerMode_()));
+            return;
+        }
+        const auto parsed = parsePointerMode(ctx.args[0]);
+        if (!parsed) {
+            spdlog::warn("pointer: expected auto, always or never, got '{}'", ctx.args[0]);
+            return;
+        }
+        view.setPointerMode(*parsed);
+        UserSettings::instance().setPointerMode(pointerModeName(*parsed));
+        parent->showMessage(pointerModeName(*parsed));
+    });
+
+    add("mouse_click", 2, 2,
+        "<x> <y> — click at a window pixel, as the mouse would. The point is "
+        "whatever the ray finds, which is what makes it usable where a scenario "
+        "must act on the point it is hovering without knowing which one that is",
+        [this](CommandContext& ctx) {
+        try {
+            mouseClick(0, 1, std::stoi(ctx.args[0]), std::stoi(ctx.args[1]));
+        } catch (const std::exception&) {
+            spdlog::warn("mouse_click: expected two integers, got '{}' '{}'",
+                         ctx.args[0], ctx.args[1]);
+        }
+    });
+
     add("mouse_move", 2, 2,
         "<x> <y> — move the pointer to a window pixel, as the mouse would; for "
         "scenarios and the recorder, which otherwise cannot hover anything",
@@ -2140,6 +2172,13 @@ nlohmann::json GobanControl::dumpState() const {
     // stereo gate and the over-the-board gate both fold into this one number, so
     // a scenario asserting it is asserting the thing on screen.
     s["pointer_mark"]       = view.pointerMark();
+    s["pointer_mode"]       = pointerModeName(view.pointerMode_());
+    // The point under the pointer. A scenario that has to hover a *particular*
+    // intersection can only work in window pixels, so it needs to assert what
+    // those pixels resolved to — otherwise a camera change would silently move
+    // the test to a different point rather than failing.
+    s["cursor_col"]         = model.cursor.col();
+    s["cursor_row"]         = model.cursor.row();
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;

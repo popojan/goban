@@ -267,8 +267,26 @@ has different disparity from the point beneath it, so the eyes are given two
 fusion targets a few pixels apart — the same discomfort as the annotation
 clipping above. Lying on the surface there is one.
 
+**It moves like the stone it precedes.** The mark snaps to an intersection —
+naming a point is the whole job — but carries the same "imprecise hand" offset a
+stone in hand gets, from the *same* function (`Board::fuzzyOffset()`). So it
+slides a little within the point as the mouse moves and then jumps to the next,
+rather than sitting rigidly on the lattice. Measured with the shipped constants:
+about 1 px of drift per 8 px of mouse travel.
+
+**It gives way to the stone in hand.** Where a ghost stone is already showing
+where the click will land, the mark is not drawn — two indicators for one point.
+But it does not give way merely because a stone is *held*: on a point the rules
+refuse there is no ghost stone, so the mark is the only thing left, and its
+presence there is what says "not here".
+
 **The native pointer is hidden positionally.** Only while it is over the board,
-and only under a stereo shader: over the interface a screen-plane pointer is
-*correct*, that interface being flat at the screen plane itself. So it is never
-taken away where it works, and in mono it is never taken away at all — there the
-mismatch does not exist, and a second indicator would be clutter.
+and only when the board is drawing its own: over the interface a screen-plane
+pointer is *correct*, that interface being flat at the screen plane itself, so it
+is never taken away where it works.
+
+`pointer auto` (the default) draws the mark only under a stereo shader — where
+the native pointer is genuinely wrong. `pointer always` extends it to mono, where
+the native pointer is merely ordinary and a mark lying on the wood is nicer; that
+also hides the native pointer there, which is why it is opt-in. `pointer never`
+keeps the window system's pointer everywhere.

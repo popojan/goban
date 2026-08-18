@@ -91,6 +91,10 @@ void UserSettings::load() {
             anaglyphGreen = user["anaglyph_green"].get<float>();
         }
 
+        if (user.contains("pointer_mode")) {
+            pointerMode = user["pointer_mode"].get<std::string>();
+        }
+
         if (user.contains("coordinate_color")) {
             coordinateColor = user["coordinate_color"].get<std::string>();
         }
@@ -269,6 +273,9 @@ std::string UserSettings::serialize() const {
     if (anaglyphGreen >= 0.0f) {
         user["anaglyph_green"] = anaglyphGreen;
     }
+    if (!pointerMode.empty()) {
+        user["pointer_mode"] = pointerMode;
+    }
     if (!coordinateColor.empty()) {
         user["coordinate_color"] = coordinateColor;
     }
@@ -380,6 +387,12 @@ void UserSettings::setAnaglyph(const std::string& value) {
 void UserSettings::setAnaglyphStrength(float value) {
     std::lock_guard<std::mutex> lock(mutex);
     anaglyphStrength = value;
+    saveLocked();
+}
+
+void UserSettings::setPointerMode(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    pointerMode = value;
     saveLocked();
 }
 

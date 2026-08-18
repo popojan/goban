@@ -34,6 +34,17 @@
 
 extern std::shared_ptr<Configuration> config;
 
+/// When the board draws its own pointer instead of the window system's.
+///
+/// `Auto` is where the native pointer is genuinely *wrong* — under a stereo
+/// shader, where it is composited at the screen plane and so cannot be at the
+/// depth of the point it indicates. `Always` extends it to mono, where the
+/// native pointer is merely ordinary and a mark on the wood is nicer.
+enum class PointerMode { Auto, Always, Never };
+
+const char* pointerModeName(PointerMode mode);
+std::optional<PointerMode> parsePointerMode(const std::string& name);
+
 class GobanView: public GameObserver {
 public:
     enum {
@@ -285,9 +296,42 @@ public:
     /// Strength of the mark the shader draws on the wood; 0 draws nothing.
     /// Stereo only — in mono the native pointer already sits where it points,
     /// and a second indicator would be clutter rather than help.
-    [[nodiscard]] float pointerMark() const {
-        return (pointerOverBoard && gobanShader.isStereo()) ? pointerMarkStrength : 0.0f;
+    /// Whether the board is drawing the pointer at all, and so whether the
+    /// native one is taken away. Both the mark *and* the stone in hand count:
+    /// either way something on the wood is showing where the click will land, so
+    /// this is the one predicate the hiding decision reads.
+    [[nodiscard]] bool diegeticPointer() const {
+        if (pointerMode == PointerMode::Never || pointerMarkStrength <= 0.0f) return false;
+        if (!pointerOverBoard) return false;
+        // Auto means "where the native pointer is actually wrong", which is a
+        // stereo shader. It is the default rather than the only option: the
+        // drawn pointer turns out to be worth having in mono too, so `always`
+        // exists — but switching it on there also takes the native pointer away,
+        // and that is a change nobody asked for by default.
+        return pointerMode == PointerMode::Always || gobanShader.isStereo();
     }
+
+    /// Strength of the mark the shader draws on the wood; 0 draws nothing.
+    ///
+    /// Two indicators for one point is one too many, so it stands down wherever
+    /// the stone in hand is already showing where the click will land. It does
+    /// *not* stand down merely because a stone is held: on a point the rules
+    /// refuse there is no ghost stone, and with the native pointer hidden that
+    /// would leave no pointer at all — so its presence there says "not here",
+    /// which is the thing worth knowing.
+    [[nodiscard]] float pointerMark() const {
+        if (!diegeticPointer()) return 0.0f;
+        return ghostStoneVisible() ? 0.0f : pointerMarkStrength;
+    }
+
+    /// Whether the stone in hand is being drawn at the cursor. One predicate,
+    /// asked by updateCursor() when it places the ghost and by pointerMark()
+    /// when it decides to stay out of the way — a second copy would let the two
+    /// disagree, and then both would be drawn.
+    [[nodiscard]] bool ghostStoneVisible() const;
+
+    void setPointerMode(PointerMode mode);
+    [[nodiscard]] PointerMode pointerMode_() const { return pointerMode; }
 
     /// How much of the green channel the colour modes use. The dial for lenses
     /// that pass green through *both* filters, where no assignment of green to an
@@ -431,6 +475,7 @@ public:
     float pointerMarkStrength = 1.0f;
     bool pointerOverBoard = false;
     bool pointerOnWidget = false;
+    PointerMode pointerMode = PointerMode::Auto;
     void updatePointerState();
     /// Mirrors the GLFW input mode, so it is set on change rather than per frame.
     bool nativePointerHidden = false;

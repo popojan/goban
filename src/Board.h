@@ -326,6 +326,17 @@ public:
     bool toggleTerritoryAuto(bool);
 
     int placeCursor(const Position& p, const Color& col);
+
+    /// How far a stone being placed sits from the intersection it will land on,
+    /// in grid units — the "imprecise hand" that keeps a stone in hand from
+    /// snapping rigidly to the point. Derived from where inside the cell the ray
+    /// actually fell, so it slides as the mouse does and only then jumps a point.
+    ///
+    /// Shared rather than copied: the drawn pointer offsets by exactly this, so
+    /// the mark and the stone it precedes move as one thing. Two implementations
+    /// would drift, and the drift would be visible — the mark sitting off the
+    /// stone that lands on it.
+    [[nodiscard]] glm::vec2 fuzzyOffset(const Position& coord) const;
     double placeFuzzy(const Position& p, bool noFix = false);
 
     bool collides(int i, int j, int i0, int j0) const;

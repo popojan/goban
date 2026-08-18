@@ -106,6 +106,11 @@ public:
     std::string getGlasses() const { std::lock_guard<std::mutex> lock(mutex); return glasses; }
     void setGlasses(const std::string& value);
 
+    /// When the board draws its own pointer: "auto", "always", "never". Empty
+    /// means the config's answer stands.
+    std::string getPointerMode() const { std::lock_guard<std::mutex> lock(mutex); return pointerMode; }
+    void setPointerMode(const std::string& value);
+
     /// How much green the colour modes use; negative means "not set", so the
     /// config's answer stands. Same sentinel as anaglyphStrength.
     float getAnaglyphGreen() const { std::lock_guard<std::mutex> lock(mutex); return anaglyphGreen; }
@@ -270,6 +275,7 @@ private:
     float anaglyphBalanceL = 1.0f, anaglyphBalanceR = 1.0f;
     std::string glasses;
     float anaglyphGreen = -1.0f;
+    std::string pointerMode;
     std::string evaluationColor;
     std::string coordinateColor;
 

@@ -1064,10 +1064,28 @@ argues for, each enforced by `tests/test_stereo.cpp` or
   move reads the previous position. A null hover element counts as "not on a
   widget": there is no hover in a scripted run, and failing that way round leaves
   the native pointer visible when in doubt, which is the harmless direction.
-- **The mark names a point, so it snaps to one.** `Position` carries the
-  continuous ray hit; the uniform is uploaded from `col()`/`row()`. A pointer
-  sliding smoothly between lines names a place the board has no name for, and the
-  ghost stone and the click it precedes both snap already.
+- **The mark names a point, so it snaps to one — with the stone's own imprecise
+  hand on top.** `Position` carries the continuous ray hit; the uniform is
+  uploaded from `col()`/`row()` plus `Board::fuzzyOffset()`, the *same* function
+  the ghost stone uses, not a second copy. A pointer sliding freely names a place
+  the board has no name for; one snapped rigidly reads as stuck to a lattice.
+  Measured, the shipped constants give about 1 px of drift per 8 px of mouse
+  before it jumps a point. Two implementations would drift apart visibly — the
+  mark sitting off the stone that lands on it.
+- **Two indicators for one point is one too many, and zero is worse.** The mark
+  stands down wherever the ghost stone is already showing where the click will
+  land (`ghostStoneVisible()`, one predicate read by both `updateCursor()` and
+  `pointerMark()`). It does **not** stand down merely because a stone is held: on
+  a point the rules refuse there is no ghost stone, and the native pointer is
+  hidden, so that would leave no pointer at all — its presence there is what says
+  "not here". The hiding decision therefore reads `diegeticPointer()`, not
+  `pointerMark()`; reading the mark alone hands the native pointer back the
+  instant you take a stone out of the bowl.
+- **`auto` is not the only option.** The drawn pointer turns out to be worth
+  having in mono too, so `PointerMode` is `Auto` / `Always` / `Never` and the
+  `pointer` command is sticky. `Auto` — the default — means "where the native
+  pointer is actually wrong", which is a stereo shader; `Always` also takes the
+  native pointer away in mono, which is why it is not the default.
 - **Its shape is constrained by what the board already means.** A disc is a
   stone and an upright cross is the grid — both shapes are taken, and either
   would be camouflage. Four ticks turned a quarter turn from the grid, gapped at

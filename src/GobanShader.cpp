@@ -322,14 +322,16 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) cons
     {
         const Position coord = view.getBoardCoordinate(view.lastX, view.lastY);
         const int size = view.board.getSize();
-        // col()/row(), not x/y: Position carries the continuous ray hit, and a
-        // pointer that slid smoothly between lines would be naming a place the
-        // board has no name for. It snaps to the intersection, like the ghost
-        // stone and like the click that follows it — the mark says "here", and
-        // "here" on a Go board is a point.
+        // The point it names, plus the same imprecise-hand offset a stone in
+        // hand gets — Board::fuzzyOffset(), not a second copy of the arithmetic.
+        // Snapping rigidly was the first version and read as a cursor stuck to a
+        // lattice; drifting freely names a place the board has no name for. This
+        // does what the stone does: slides within the point, then jumps to the
+        // next one.
+        const glm::vec2 fuzz = view.board.fuzzyOffset(coord);
         const float cur[2] = {
-            static_cast<float>(coord.col()) - static_cast<float>(size) / 2.0f,
-            static_cast<float>(coord.row()) - static_cast<float>(size) / 2.0f,
+            static_cast<float>(coord.col()) + fuzz.x - static_cast<float>(size) / 2.0f,
+            static_cast<float>(coord.row()) + fuzz.y - static_cast<float>(size) / 2.0f,
         };
         glUniform2fv(fsu_cursor, 1, cur);
         glUniform1f(fsu_cursorMark, view.pointerMark());

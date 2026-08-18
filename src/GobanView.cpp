@@ -131,6 +131,15 @@ GobanView::GobanView(GobanModel& m)
                 spdlog::warn("glasses: '{}' is not red-cyan or red-blue", configuredGlasses);
             }
         }
+        const std::string configuredPointer = config->data.value("pointer_mode", std::string());
+        if (!configuredPointer.empty()) {
+            if (const auto parsed = parsePointerMode(configuredPointer)) {
+                pointerMode = *parsed;
+            } else {
+                spdlog::warn("pointer_mode: '{}' is not auto, always or never",
+                             configuredPointer);
+            }
+        }
         if (config->data.contains("pointer_mark")) {
             pointerMarkStrength = std::min(1.0f, std::max(0.0f,
                     config->data.value("pointer_mark", 1.0f)));
@@ -156,6 +165,9 @@ GobanView::GobanView(GobanModel& m)
     }
     if (const auto parsed = Stereo::parseGlasses(settings.getGlasses())) {
         glassesType = *parsed;
+    }
+    if (const auto parsed = parsePointerMode(settings.getPointerMode())) {
+        pointerMode = *parsed;
     }
     if (settings.getAnaglyphGreen() >= 0.0f) {
         anaglyphGreenLevel = Stereo::clampGreen(settings.getAnaglyphGreen());
@@ -973,6 +985,11 @@ void GobanView::moveCursor(float x, float y) {
     updatePointerState();
 }
 
+bool GobanView::ghostStoneVisible() const {
+    return model.state.holdsStone && model.isPointOnBoard(model.cursor)
+           && model.isLegalMove(Move(model.cursor, state.colorToMove));
+}
+
 void GobanView::updateCursor(){
     Position cursor = model.cursor;
 
@@ -985,9 +1002,8 @@ void GobanView::updateCursor(){
     // most of the rule but not the rule: a ko ban or a self-capture drew a
     // stone the click then sent to the engine anyway, to be refused. Both ends
     // ask GobanModel::isLegalMove() now — see GobanControl::placeStone().
-    if(model.state.holdsStone && model.isPointOnBoard(cursor)){
-        if(model.isLegalMove(Move(cursor, state.colorToMove)))
-            board.placeCursor(cursor, state.colorToMove);
+    if(ghostStoneVisible()) {
+        board.placeCursor(cursor, state.colorToMove);
     }
 }
 
@@ -1359,6 +1375,33 @@ void GobanView::setAnaglyphGreen(float green) {
 	requestRepaint(UPDATE_ALL);
 }
 
+const char* pointerModeName(PointerMode mode) {
+    switch (mode) {
+        case PointerMode::Always: return "always";
+        case PointerMode::Never:  return "never";
+        case PointerMode::Auto:   break;
+    }
+    return "auto";
+}
+
+std::optional<PointerMode> parsePointerMode(const std::string& name) {
+    std::string n;
+    for (char c : name) n += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (n == "auto" || n == "stereo") return PointerMode::Auto;
+    if (n == "always" || n == "on" || n == "yes") return PointerMode::Always;
+    if (n == "never" || n == "off" || n == "no") return PointerMode::Never;
+    return std::nullopt;
+}
+
+void GobanView::setPointerMode(PointerMode mode) {
+	if (pointerMode == mode) return;
+	pointerMode = mode;
+	// Re-asks both questions: whether to draw the mark, and whether the native
+	// pointer should be back. Neither follows from the mode alone.
+	requestRepaint(UPDATE_SOME);
+	updatePointerState();
+}
+
 void GobanView::setPointerOnWidget(bool onWidget) {
 	if (pointerOnWidget == onWidget) return;
 	pointerOnWidget = onWidget;
@@ -1377,7 +1420,10 @@ void GobanView::updatePointerState() {
 	// Hidden only where the drawn mark replaces it. If the mark is off — mono,
 	// or strength 0 — the native pointer stays, because taking it away without
 	// putting anything in its place is worse than the parallax it suffers from.
-	const bool hide = pointerMark() > 0.0f;
+	// diegeticPointer(), not pointerMark(): with a stone in hand the mark stands
+	// down in favour of the ghost stone, and reading the mark alone would hand
+	// the native pointer back the moment you picked a stone out of the bowl.
+	const bool hide = diegeticPointer();
 	if (hide != nativePointerHidden) {
 		nativePointerHidden = hide;
 		if (GLFWwindow* window = AppState::GetWindow()) {
