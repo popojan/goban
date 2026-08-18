@@ -103,3 +103,22 @@ expect anaglyph_leak_g 0.5
 # Back to doing nothing, which is a choice and must be honoured as one.
 anaglyph_leak 0 0 0
 expect anaglyph_leak_g 0
+
+# The green dial: the last lever for lenses that pass green through *both*
+# filters, where no assignment of green to an eye is clean.
+anaglyph_green 0.5
+expect anaglyph_green 0.5
+anaglyph_green 9
+expect anaglyph_green 1
+anaglyph_green -1
+expect anaglyph_green 0
+anaglyph_green 1
+
+# Which glasses are in use is a property of the viewer, so it survives a shader
+# switch exactly as the mode does.
+glasses red-blue
+expect glasses red-blue
+glasses red-cyan
+expect glasses red-cyan
+glasses nonsense
+expect glasses red-cyan

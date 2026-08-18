@@ -130,6 +130,10 @@ GobanView::GobanView(GobanModel& m)
                 spdlog::warn("glasses: '{}' is not red-cyan or red-blue", configuredGlasses);
             }
         }
+        if (config->data.contains("anaglyph_green")) {
+            anaglyphGreenLevel = Stereo::clampGreen(
+                    config->data.value("anaglyph_green", Stereo::DEFAULT_GREEN));
+        }
         const auto balance = config->data.value("anaglyph_balance", nlohmann::json::array());
         if (balance.is_array() && balance.size() == 2) {
             anaglyphEyeBalance = Stereo::clampBalance(
@@ -147,6 +151,9 @@ GobanView::GobanView(GobanModel& m)
     }
     if (const auto parsed = Stereo::parseGlasses(settings.getGlasses())) {
         glassesType = *parsed;
+    }
+    if (settings.getAnaglyphGreen() >= 0.0f) {
+        anaglyphGreenLevel = Stereo::clampGreen(settings.getAnaglyphGreen());
     }
     if (settings.hasAnaglyphBalance()) {
         Stereo::EyeBalance balance;
@@ -448,6 +455,7 @@ void GobanView::shadeIt(float time, const GobanShader& shader, int flags, int ey
 	shader.setAnaglyphLeak(anaglyphCrosstalk);
 	shader.setAnaglyphBalance(anaglyphEyeBalance);
 	shader.setGlasses(glassesType);
+	shader.setAnaglyphGreen(anaglyphGreenLevel);
 	shader.setTime(lastTime);
 	shader.setRotation(cam.setView());
 	shader.setCameraPan(cameraPan);
@@ -1327,6 +1335,13 @@ void GobanView::setAnaglyphStrength(float strength) {
 
 void GobanView::setAnaglyphLeak(const Stereo::Crosstalk& leak) {
 	anaglyphCrosstalk = Stereo::clampCrosstalk(leak);
+	requestRepaint(UPDATE_ALL);
+}
+
+void GobanView::setAnaglyphGreen(float green) {
+	const float next = Stereo::clampGreen(green);
+	if (anaglyphGreenLevel == next) return;
+	anaglyphGreenLevel = next;
 	requestRepaint(UPDATE_ALL);
 }
 

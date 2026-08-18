@@ -274,6 +274,39 @@ inline Crosstalk clampCrosstalk(Crosstalk c) {
     return c;
 }
 
+/** How much of the green channel the colour modes actually use, 0 to 1.
+ *
+ * Green is the one channel real lenses disagree about. The clean model says a
+ * cyan lens passes it and a blue lens blocks it, so it belongs to one eye or the
+ * other — but cheap dyed lenses have broad, overlapping passbands, and green sits
+ * in the middle of the spectrum. Measured on one such pair: giving green to the
+ * right eye put a second picture in the *red* lens, and giving it to the left put
+ * a second picture in the *blue* lens. Both, symmetrically. Green was reaching
+ * both eyes whoever owned it.
+ *
+ * Which kills the clean split, but not the picture. Ghosting is proportional to
+ * how much green is there, so scaling it down trades colour against the double
+ * image continuously, and somewhere below 1 is the most colour a given pair of
+ * lenses will carry. On a wooden board the loss is mild — suppressing green skews
+ * the image warm, which is where it already lives.
+ *
+ * **This is not `strength`.** That desaturates toward luminance, and grey has
+ * *full* green: turning it down leaves green's amplitude untouched and the ghost
+ * exactly where it was. The two dials look similar and do opposite things — one
+ * moves colour toward grey, this one moves the disputed channel toward black.
+ *
+ * Applied only where green carries an eye's image, never to `Gray`'s flat haze,
+ * which is not anybody's picture and is what makes that mode ghost-free.
+ */
+constexpr float DEFAULT_GREEN = 1.0f;
+
+inline float clampGreen(float g) { return std::min(1.0f, std::max(0.0f, g)); }
+
+/// Whether a mode's colour depends on green at all. `Gray` does not — it is the
+/// mode defined by leaving green out — so the dial is inert there, and saying so
+/// keeps a user from tuning a knob that cannot move.
+inline bool greenCarriesImage(Anaglyph mode) { return mode != Anaglyph::Gray; }
+
 /** Per-eye gain, for glasses whose two filters do not pass the same amount of
  *  light.
  *

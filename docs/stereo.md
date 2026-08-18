@@ -131,11 +131,49 @@ The left eye always owns red. What differs is what the right eye gets:
 | `dubois` | least-squares mix | least-squares mix | red/cyan |
 
 `gray` is the default because it is the forgiving one, and the reason is
-physical: **a red filter blocks blue well and green badly.** Keeping the right
-eye's image out of green means the worst leak has nothing to carry. Every other
-mode must use green — half the colour information is there — so all three need a
-genuinely cyan right lens. If the colour modes double up and `gray` does not, the
-glasses are the reason and no amount of tuning will fix it.
+physical: **green is the only channel real lenses disagree about.** Red and blue
+are never in doubt — a red lens passes red and blocks blue, the other lens does
+the reverse — so a mode that leaves green out cannot be wrong about anything.
+
+Which eye owns green is a property of the **glasses**, not of the mode, and that
+is what `glasses` selects:
+
+- **red/cyan**: the cyan lens passes green, so green belongs to the *right* eye.
+- **red/blue**: the blue lens blocks green while the red lens leaks it, so green
+  belongs to the *left* eye.
+
+Whichever eye holds two channels is the only eye that can carry hue — colour
+vision needs two — so exactly one eye is the coloured one, and which one flips.
+Getting this backwards delivers one eye's picture to the other, which appears as
+a **second image** rather than a wrong colour. If the colour modes double up and
+`gray` does not, this is the first setting to change.
+
+### When green reaches both eyes
+
+The split above is the clean model. Cheap dyed lenses do not honour it: their
+passbands are broad and overlapping, and green sits in the middle of the visible
+spectrum, so both filters pass a good part of it. Measured on one such pair —
+giving green to the right eye put a second picture in the **red** lens; giving it
+to the left put a second picture in the **blue** lens. Both, symmetrically.
+
+That is not a bug in either assignment. It means green carries to both eyes
+whoever owns it, so with those lenses only red and blue are cleanly separated —
+one channel per eye, one scalar per eye — and hue, needing two, is impossible.
+`gray` is then not a fallback but the correct answer, and its flat green is
+exactly right: it is the only arrangement that puts nothing in the channel both
+eyes can see.
+
+Short of that, ghosting is proportional to *how much* green is present, so
+`anaglyph_green` (0–1) trades colour against the double image continuously, and
+somewhere below 1 is the most colour a given pair will carry. On a wooden board
+the loss is mild: suppressing green skews the image warm, which is where it
+already lives.
+
+**`anaglyph_green` is not `anaglyph_strength`.** The latter desaturates toward
+luminance, and luminance has *full* green — measured under red/blue half-colour,
+`strength 0` left mean green at 106 of 255 where `green 0` took it to 0.1. One
+moves colour toward grey; the other moves the disputed channel toward black. The
+ghost only answers to the second.
 
 Beyond the channels, the modes trade colour fidelity against **retinal
 rivalry**: the discomfort of showing each eye a differently-coloured version of

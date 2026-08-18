@@ -161,6 +161,7 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     fsu_anaglyphLeak = glGetUniformLocation(gobanProgram, "anaglyphLeak");
     fsu_anaglyphBalance = glGetUniformLocation(gobanProgram, "anaglyphBalance");
     fsu_glasses = glGetUniformLocation(gobanProgram, "glasses");
+    fsu_anaglyphGreen = glGetUniformLocation(gobanProgram, "anaglyphGreen");
 
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
@@ -432,6 +433,10 @@ void GobanShader::setAnaglyphBalance(const Stereo::EyeBalance& balance) const {
 
 void GobanShader::setGlasses(Stereo::Glasses g) const {
     glUniform1i(fsu_glasses, Stereo::glassesUniform(g));
+}
+
+void GobanShader::setAnaglyphGreen(float green) const {
+    glUniform1f(fsu_anaglyphGreen, green);
 }
 
 void GobanShader::setEof(float val) {

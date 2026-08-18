@@ -106,6 +106,11 @@ public:
     std::string getGlasses() const { std::lock_guard<std::mutex> lock(mutex); return glasses; }
     void setGlasses(const std::string& value);
 
+    /// How much green the colour modes use; negative means "not set", so the
+    /// config's answer stands. Same sentinel as anaglyphStrength.
+    float getAnaglyphGreen() const { std::lock_guard<std::mutex> lock(mutex); return anaglyphGreen; }
+    void setAnaglyphGreen(float value);
+
     /// The readout's ink, as a hex string. Empty means "whatever the application
     /// config ships" — the distinction matters, because writing it unconditionally
     /// would pin today's default into every user.json and quietly defeat any
@@ -264,6 +269,7 @@ private:
     bool anaglyphBalanceSet = false;
     float anaglyphBalanceL = 1.0f, anaglyphBalanceR = 1.0f;
     std::string glasses;
+    float anaglyphGreen = -1.0f;
     std::string evaluationColor;
     std::string coordinateColor;
 

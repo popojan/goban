@@ -52,6 +52,8 @@ public:
     void setAnaglyphBalance(const Stereo::EyeBalance&) const;
     /// Which channels reach which eye; see Stereo::Glasses.
     void setGlasses(Stereo::Glasses) const;
+    /// How much green the colour modes use; see Stereo::DEFAULT_GREEN.
+    void setAnaglyphGreen(float) const;
     void setRotation(glm::mat4x4) const;
     void setResolution(float, float);
     void setGamma(float);
@@ -135,6 +137,7 @@ private:
     GLint fsu_anaglyphLeak = -1;
     GLint fsu_anaglyphBalance = -1;
     GLint fsu_glasses = -1;
+    GLint fsu_anaglyphGreen = -1;
 
     GLint iWhiteCapturedCount = -1;
     GLint iBlackCapturedCount = -1;

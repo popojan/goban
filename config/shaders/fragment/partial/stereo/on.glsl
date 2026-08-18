@@ -53,6 +53,14 @@ uniform vec2 anaglyphBalance;
 // green has two channels, and is therefore the only eye that can carry hue.
 uniform int glasses;
 
+// How much of the green channel the colour modes use, 0..1. Real lenses disagree
+// about green — a cheap pair passes it through *both* filters — so whichever eye
+// owns it, the other sees a ghost proportional to how much is there. Scaling it
+// trades colour against the double image continuously. See Stereo::DEFAULT_GREEN,
+// and note this is not anaglyphStrength: grey has full green, so desaturating
+// does nothing to this ghost.
+uniform float anaglyphGreen;
+
 // Dubois' least-squares projection (Eric Dubois, "A projection method to
 // generate anaglyph stereo images"), which picks the channel mix that minimises
 // the perceived error under real red/cyan filters rather than assuming the
@@ -118,11 +126,11 @@ vec3 eyeContribution(vec3 c)
             // colour agree: the coloured eye always keeps its own channels; what
             // they differ about is the other eye, below. Dubois lands here too,
             // its red/cyan matrices being the wrong projection for these lenses.
-            return vec3(c.r, c.g, 0.0);
+            return vec3(c.r, anaglyphGreen * c.g, 0.0);
         }
         if (anaglyph == 2) return vec3(c.r, 0.0, 0.0);
         if (anaglyph == 3) return vec3(dot(duboisLeftR, c),
-                                       dot(duboisLeftG, c),
+                                       anaglyphGreen * dot(duboisLeftG, c),
                                        dot(duboisLeftB, c));
         // Half-colour: this is the grey eye under red/cyan.
         return vec3(lum, 0.0, 0.0);
@@ -140,10 +148,10 @@ vec3 eyeContribution(vec3 c)
         return (anaglyph == 2) ? vec3(0.0, 0.0, c.b) : vec3(0.0, 0.0, lum);
     }
     if (anaglyph == 3) return vec3(dot(duboisRightR, c),
-                                   dot(duboisRightG, c),
+                                   anaglyphGreen * dot(duboisRightG, c),
                                    dot(duboisRightB, c));
     // Half-colour and colour agree here: the coloured eye keeps its channels.
-    return vec3(0.0, c.g, c.b);
+    return vec3(0.0, anaglyphGreen * c.g, c.b);
 }
 
 // What this eye must pre-subtract so its own image cancels where it leaks into
@@ -157,11 +165,15 @@ vec3 crosstalkCorrection(vec3 c)
     // A channel's correction is driven by the eye that does *not* own it, so the
     // ownership of green flips this with the glasses exactly as it flips the
     // composite above.
+    // The green terms scale with anaglyphGreen for the same reason the image
+    // does: they cancel a ghost whose size is what the dial just changed, and a
+    // correction fitted at full green would cut a hole at half of it.
     if (eye == 0) {
         return redBlue ? vec3(0.0, 0.0, anaglyphLeak.b * lum)
-                       : vec3(0.0, anaglyphLeak.g * lum, anaglyphLeak.b * lum);
+                       : vec3(0.0, anaglyphGreen * anaglyphLeak.g * lum,
+                              anaglyphLeak.b * lum);
     }
-    return redBlue ? vec3(anaglyphLeak.r * lum, anaglyphLeak.g * lum, 0.0)
+    return redBlue ? vec3(anaglyphLeak.r * lum, anaglyphGreen * anaglyphLeak.g * lum, 0.0)
                    : vec3(anaglyphLeak.r * lum, 0.0, 0.0);
 }
 

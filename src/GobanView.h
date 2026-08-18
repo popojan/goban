@@ -268,6 +268,12 @@ public:
     void setGlasses(Stereo::Glasses g);
     [[nodiscard]] Stereo::Glasses glasses() const { return glassesType; }
 
+    /// How much of the green channel the colour modes use. The dial for lenses
+    /// that pass green through *both* filters, where no assignment of green to an
+    /// eye is clean and the only remaining lever is how much of it there is.
+    void setAnaglyphGreen(float green);
+    [[nodiscard]] float anaglyphGreen() const { return anaglyphGreenLevel; }
+
     /// The readout's ink. Alpha included, because half-opacity dark is what makes
     /// text read as *part of* a wooden board rather than printed on top of it —
     /// and that is the whole claim the diegetic version is making.
@@ -400,6 +406,7 @@ public:
     Stereo::Crosstalk anaglyphCrosstalk{};
     Stereo::EyeBalance anaglyphEyeBalance{};
     Stereo::Glasses glassesType = Stereo::Glasses::RedCyan;
+    float anaglyphGreenLevel = Stereo::DEFAULT_GREEN;
     /// Only used when the composite can go negative; see StereoComposite.
     mutable StereoComposite stereoComposite;
     TextAlign readoutAlign = TextAlign::Center;

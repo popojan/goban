@@ -839,6 +839,30 @@ void GobanControl::buildRegistry() {
         }
     });
 
+    add("anaglyph_green", 0, 1,
+        "[0..1] — how much green the colour modes use; the dial for lenses that "
+        "pass green through both filters, where no clean split exists",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->showMessage(std::to_string(view.anaglyphGreen()));
+            return;
+        }
+        try {
+            view.setAnaglyphGreen(std::stof(ctx.args[0]));
+        } catch (const std::exception&) {
+            spdlog::warn("anaglyph_green: '{}' is not a number", ctx.args[0]);
+            return;
+        }
+        UserSettings::instance().setAnaglyphGreen(view.anaglyphGreen());
+        // Said plainly rather than left to be discovered: in gray the green
+        // channel carries neither eye, so this dial cannot move anything, and a
+        // user turning it in the mode most likely to be selected would otherwise
+        // conclude the setting does not work.
+        if (!Stereo::greenCarriesImage(view.anaglyph())) {
+            parent->showMessage("gray uses no green — try half-color");
+        }
+    });
+
     add("anaglyph_balance", 0, 2,
         "[left right] — per-eye gain, for glasses whose filters pass different "
         "amounts of light; a blue lens is much darker than a red one",
@@ -2099,6 +2123,7 @@ nlohmann::json GobanControl::dumpState() const {
     s["anaglyph_balance_l"] = view.anaglyphBalance().left;
     s["anaglyph_balance_r"] = view.anaglyphBalance().right;
     s["glasses"]            = Stereo::glassesName(view.glasses());
+    s["anaglyph_green"]     = view.anaglyphGreen();
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;

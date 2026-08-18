@@ -283,3 +283,28 @@ TEST_CASE("per-eye gain is bounded") {
     CHECK(b.right == doctest::Approx(Stereo::MAX_BALANCE));
     CHECK_FALSE(Stereo::clampBalance({1.0f, 1.4f}).isUnity());
 }
+
+TEST_CASE("the green dial is bounded, and is not the strength dial") {
+    CHECK(Stereo::clampGreen(0.5f) == doctest::Approx(0.5f));
+    CHECK(Stereo::clampGreen(-1.0f) == doctest::Approx(0.0f));
+    CHECK(Stereo::clampGreen(2.0f) == doctest::Approx(1.0f));
+    CHECK(Stereo::DEFAULT_GREEN == doctest::Approx(1.0f));
+
+    // The distinction the two dials exist on either side of, and the reason both
+    // are needed. `strength` desaturates toward luminance — and luminance has
+    // *full* green, so it cannot reduce the one channel leaky lenses dispute.
+    // Measured on the shipped board under red/blue half-colour: strength 0 left
+    // mean green at 106 of 255, where green 0 took it to 0.1.
+    //
+    // Nothing in C++ enforces that; it is a property of the shader. What is
+    // pinned here is that they are separate values, so a later "simplification"
+    // that folds one into the other has to come past this comment.
+    CHECK(Stereo::clampGreen(0.0f) != Stereo::DEFAULT_STRENGTH);
+
+    // Inert in gray, which is the mode defined by leaving green out — so the
+    // command says so rather than letting a user tune a knob that cannot move.
+    CHECK_FALSE(Stereo::greenCarriesImage(Stereo::Anaglyph::Gray));
+    CHECK(Stereo::greenCarriesImage(Stereo::Anaglyph::HalfColor));
+    CHECK(Stereo::greenCarriesImage(Stereo::Anaglyph::Color));
+    CHECK(Stereo::greenCarriesImage(Stereo::Anaglyph::Dubois));
+}

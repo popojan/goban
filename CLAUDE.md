@@ -977,17 +977,31 @@ argues for, each enforced by `tests/test_stereo.cpp` or
 - **Depth is a layer here** — 0.25 the board from below, 0.5 a stone, 0.75
   everything else, with the overlay's own passes at 0.4 (a label on a stone) and
   0.6 (a label on the board). It is a classification, not a distance.
-- **`gray` is the default because it is the only mode that spares green.** A red
-  filter blocks blue well and **green badly**, so keeping the right eye's image
-  out of green is what makes an anaglyph survive imperfect glasses. `gray` puts
-  the right eye in blue alone and holds green at a flat 0.1 — it works in
-  red/blue *and* red/cyan. The colour modes must use green, since half the colour
-  information is there, so all three need a genuinely cyan right lens; if they
-  ghost and `gray` does not, the glasses are the reason and tuning cannot fix it.
-  This shipped broken once: giving green to the right eye in `gray` changed
-  nothing in red or blue and ghosted immediately on real glasses. `Stereo::usesCyan()`
-  is the predicate, and **the overlay's colour mask must follow it** — text in a
-  channel the board is not using ghosts on its own.
+- **Green is the only channel the lenses disagree about, and which eye owns it is
+  a property of the *glasses*.** Red and blue are never in doubt; a cyan lens
+  passes green so it belongs to the right eye, a blue lens blocks it while the red
+  one leaks it so it belongs to the left. `Stereo::Glasses` selects that, and
+  `eyeChannels()` is the one answer both the shader's composite and **the
+  overlay's colour mask** follow — text in a channel the board is not using ghosts
+  on its own, and text in the other eye's channel is a second picture. Whichever
+  eye holds two channels is the only one that can carry hue, so exactly one eye is
+  coloured and which one flips. This shipped wrong twice in one session, once in
+  each direction, and each time the symptom was *one lens seeing two boards* — not
+  a wrong colour.
+- **`gray` is the default because it leaves green out entirely**, which is what
+  makes it the only mode that cannot be wrong about it. Its flat 0.1 green carries
+  neither eye; never scale that by an eye's gain or by `anaglyph_green`.
+- **Real lenses can pass green to *both* eyes**, and then no assignment is clean:
+  measured on one pair, green to the right eye ghosted in the red lens and green
+  to the left ghosted in the blue. Hue is then impossible — only red and blue are
+  separated, one scalar per eye, and colour needs two — so `gray` is the correct
+  answer rather than a fallback. `anaglyph_green` scales the disputed channel for
+  everything short of that.
+- **`anaglyph_green` is not `anaglyph_strength`.** `strength` desaturates toward
+  luminance, and luminance has *full* green, so it cannot touch this ghost:
+  measured under red/blue half-colour, `strength 0` left mean green at 106 of 255
+  where `green 0` took it to 0.1. One moves colour toward grey, the other moves
+  green toward black. Do not fold them together.
 - **A cancellation is subtracted from the channel the eye *can* see.** Light
   arriving through the wrong filter cannot be removed from a channel that eye
   does not receive. The left eye gets `R + α·(right image in G,B)`, so red is
