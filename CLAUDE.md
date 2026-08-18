@@ -990,7 +990,23 @@ argues for, each enforced by `tests/test_stereo.cpp` or
   a wrong colour.
 - **`gray` is the default because it leaves green out entirely**, which is what
   makes it the only mode that cannot be wrong about it. Its flat 0.1 green carries
-  neither eye; never scale that by an eye's gain or by `anaglyph_green`.
+  neither eye, so nothing may treat it as an image: never scale it by an eye's
+  gain or by `anaglyph_green`, and **never aim a crosstalk correction at it** — a
+  constant that leaks is a uniform brightness offset, not a second picture, so
+  subtracting an eye's *shape* from it would create a ghost in the one mode chosen
+  for having none.
+- **A red lens leaks blue too.** Dyed red filters are not clean long-pass: many
+  have a secondary transmission window in deep blue/violet, and a display's blue
+  primary is not monochromatic, so some of it arrives in the left eye. That is
+  what `anaglyph_leak`'s `r` term is for, and it is the one correction that
+  applies in `gray` — where the right eye's image is carried in blue in every
+  arrangement. Verified: `anaglyph_leak 0.08 0 0` drops mean red by 12.0 against a
+  predicted 0.08 x 147.9 = 11.8, with green and blue untouched.
+- **`config/base.json` is shipped and tracked; a live experiment belongs in
+  `user.json`.** Every one of these commands writes there. Values tuned by eye in
+  the config file have twice reached a commit — a `move_quality` palette that was
+  not monotonic and an `anaglyph_green` of 0 — and the second one silently
+  disables colour for every fresh install. Diff `base.json` before committing.
 - **Real lenses can pass green to *both* eyes**, and then no assignment is clean:
   measured on one pair, green to the right eye ghosted in the red lens and green
   to the left ghosted in the blue. Hue is then impossible — only red and blue are

@@ -162,18 +162,24 @@ vec3 crosstalkCorrection(vec3 c)
 {
     float lum = (c.r + c.g + c.b) / 3.0;
     bool redBlue = (glasses == 1);
+    bool greenIsImage = (anaglyph != 0);
     // A channel's correction is driven by the eye that does *not* own it, so the
     // ownership of green flips this with the glasses exactly as it flips the
     // composite above.
     // The green terms scale with anaglyphGreen for the same reason the image
     // does: they cancel a ghost whose size is what the dial just changed, and a
     // correction fitted at full green would cut a hole at half of it.
+    //
+    // ...and they vanish in Gray, where green is a flat haze carrying neither
+    // eye. A constant that leaks is a uniform brightness offset, not a second
+    // image, so there is nothing there to cancel — subtracting an eye's shape
+    // from it would *create* a ghost in the one mode chosen for having none.
+    float g = greenIsImage ? anaglyphGreen * anaglyphLeak.g * lum : 0.0;
     if (eye == 0) {
         return redBlue ? vec3(0.0, 0.0, anaglyphLeak.b * lum)
-                       : vec3(0.0, anaglyphGreen * anaglyphLeak.g * lum,
-                              anaglyphLeak.b * lum);
+                       : vec3(0.0, g, anaglyphLeak.b * lum);
     }
-    return redBlue ? vec3(anaglyphLeak.r * lum, anaglyphGreen * anaglyphLeak.g * lum, 0.0)
+    return redBlue ? vec3(anaglyphLeak.r * lum, g, 0.0)
                    : vec3(anaglyphLeak.r * lum, 0.0, 0.0);
 }
 

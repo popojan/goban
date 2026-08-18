@@ -62,3 +62,5 @@ last_run.log.*
 valgrind.log*
 user.json.*
 tests/scenarios/.games/
+
+res/stereo.zip
