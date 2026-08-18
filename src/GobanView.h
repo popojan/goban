@@ -268,6 +268,27 @@ public:
     void setGlasses(Stereo::Glasses g);
     [[nodiscard]] Stereo::Glasses glasses() const { return glassesType; }
 
+    /// Whether the pointer is over the board surface rather than over a widget,
+    /// which is what decides both halves of the diegetic pointer: the mark is
+    /// drawn, and the native pointer is hidden.
+    ///
+    /// Positional on purpose. Over the RmlUi interface the native pointer is
+    /// *correct* — that interface is itself flat at the screen plane, so a
+    /// zero-parallax pointer agrees with it. The mismatch exists only over the
+    /// ray-traced board, so that is the only place it is taken away.
+    /// The half of the answer only RmlUi knows: a widget is under the pointer,
+    /// so it is not on the wood however the ray falls. The other half — whether
+    /// the ray lands on an intersection — is settled in moveCursor(), which is
+    /// what keeps the gate in step with the mouse rather than a frame behind it.
+    void setPointerOnWidget(bool onWidget);
+
+    /// Strength of the mark the shader draws on the wood; 0 draws nothing.
+    /// Stereo only — in mono the native pointer already sits where it points,
+    /// and a second indicator would be clutter rather than help.
+    [[nodiscard]] float pointerMark() const {
+        return (pointerOverBoard && gobanShader.isStereo()) ? pointerMarkStrength : 0.0f;
+    }
+
     /// How much of the green channel the colour modes use. The dial for lenses
     /// that pass green through *both* filters, where no assignment of green to an
     /// eye is clean and the only remaining lever is how much of it there is.
@@ -407,6 +428,12 @@ public:
     Stereo::EyeBalance anaglyphEyeBalance{};
     Stereo::Glasses glassesType = Stereo::Glasses::RedCyan;
     float anaglyphGreenLevel = Stereo::DEFAULT_GREEN;
+    float pointerMarkStrength = 1.0f;
+    bool pointerOverBoard = false;
+    bool pointerOnWidget = false;
+    void updatePointerState();
+    /// Mirrors the GLFW input mode, so it is set on change rather than per frame.
+    bool nativePointerHidden = false;
     /// Only used when the composite can go negative; see StereoComposite.
     mutable StereoComposite stereoComposite;
     TextAlign readoutAlign = TextAlign::Center;

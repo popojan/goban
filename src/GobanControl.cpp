@@ -839,6 +839,18 @@ void GobanControl::buildRegistry() {
         }
     });
 
+    add("mouse_move", 2, 2,
+        "<x> <y> — move the pointer to a window pixel, as the mouse would; for "
+        "scenarios and the recorder, which otherwise cannot hover anything",
+        [this](CommandContext& ctx) {
+        try {
+            mouseMove(std::stoi(ctx.args[0]), std::stoi(ctx.args[1]));
+        } catch (const std::exception&) {
+            spdlog::warn("mouse_move: expected two integers, got '{}' '{}'",
+                         ctx.args[0], ctx.args[1]);
+        }
+    });
+
     add("anaglyph_green", 0, 1,
         "[0..1] — how much green the colour modes use; the dial for lenses that "
         "pass green through both filters, where no clean split exists",
@@ -2124,6 +2136,10 @@ nlohmann::json GobanControl::dumpState() const {
     s["anaglyph_balance_r"] = view.anaglyphBalance().right;
     s["glasses"]            = Stereo::glassesName(view.glasses());
     s["anaglyph_green"]     = view.anaglyphGreen();
+    // What the shader was actually told to draw, not what policy would like: the
+    // stereo gate and the over-the-board gate both fold into this one number, so
+    // a scenario asserting it is asserting the thing on screen.
+    s["pointer_mark"]       = view.pointerMark();
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;

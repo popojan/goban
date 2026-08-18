@@ -1046,5 +1046,35 @@ argues for, each enforced by `tests/test_stereo.cpp` or
 - **Both eyes draw at the same depth**, so the overlay pass turns depth writes
   off — with them on, the first eye rejects the second and the right eye's text
   is missing.
+- **A native mouse pointer cannot be fixed, only replaced.** The window system
+  composites it at the screen plane with no disparity, so under an anaglyph it
+  can never sit at the depth of the point it indicates — fuse the board and there
+  are two pointers. No value tunes that; a 2D overlay has no depth. The mark is
+  therefore drawn *in* the scene, riding the grid's own `dd` coverage in
+  `scene/object/board.glsl`, which gives it each eye's disparity, the board's
+  antialiasing and its occlusion with no second code path.
+- **The native pointer is hidden positionally, never globally.** Over the RmlUi
+  interface it is *correct*, that interface being flat at the screen plane
+  itself; the mismatch exists only over the ray-traced board. Both halves of the
+  test are needed and they come from different places: RmlUi knows a widget is
+  hovered (`setPointerOnWidget()`, from `OnUpdate`), and the ray knows whether it
+  lands on an intersection (`moveCursor()`). **The positional half must be
+  settled in `moveCursor()`**, not deferred to the next `OnUpdate()`, or the gate
+  describes where the mouse *was* — and a scenario asserting straight after a
+  move reads the previous position. A null hover element counts as "not on a
+  widget": there is no hover in a scripted run, and failing that way round leaves
+  the native pointer visible when in doubt, which is the harmless direction.
+- **The mark names a point, so it snaps to one.** `Position` carries the
+  continuous ray hit; the uniform is uploaded from `col()`/`row()`. A pointer
+  sliding smoothly between lines names a place the board has no name for, and the
+  ghost stone and the click it precedes both snap already.
+- **Its shape is constrained by what the board already means.** A disc is a
+  stone and an upright cross is the grid — both shapes are taken, and either
+  would be camouflage. Four ticks turned a quarter turn from the grid, gapped at
+  the centre so the intersection stays clear and reaching past a stone's radius so
+  they survive a point that is occupied.
+- **`cursor` is uploaded with the camera, not behind `UPDATE_STONES`.** It lived
+  in that branch, and the mouse-move path raises the flag only while a stone is
+  in hand — so the uniform went stale in exactly the case the pointer exists for.
 - **Parallel cameras, never toe-in.** Toe-in keystones each eye differently,
   which is a vertical disparity the eyes cannot fuse away.

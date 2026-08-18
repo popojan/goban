@@ -1,6 +1,7 @@
 #include "GobanView.h"
 #include <GLFW/glfw3.h>
 #include "AudioPlayer.hpp"
+#include "AppState.h"
 #include "ElementGame.h"
 
 #include <cmath>
@@ -129,6 +130,10 @@ GobanView::GobanView(GobanModel& m)
             } else {
                 spdlog::warn("glasses: '{}' is not red-cyan or red-blue", configuredGlasses);
             }
+        }
+        if (config->data.contains("pointer_mark")) {
+            pointerMarkStrength = std::min(1.0f, std::max(0.0f,
+                    config->data.value("pointer_mark", 1.0f)));
         }
         if (config->data.contains("anaglyph_green")) {
             anaglyphGreenLevel = Stereo::clampGreen(
@@ -957,6 +962,15 @@ void GobanView::moveCursor(float x, float y) {
     if(model.state.holdsStone) {
         updateFlag |= UPDATE_STONES | UPDATE_OVERLAY;
     }
+    else if (pointerMark() > 0.0f) {
+        // The mark follows the mouse, so it needs a frame even with no stone in
+        // hand — which is the whole case it exists for.
+        updateFlag |= UPDATE_SOME;
+    }
+    // Settled here rather than in the next frame's OnUpdate: the gate would
+    // otherwise describe where the mouse was, and a scenario asserting it
+    // straight after a move would read the previous position.
+    updatePointerState();
 }
 
 void GobanView::updateCursor(){
@@ -1343,6 +1357,34 @@ void GobanView::setAnaglyphGreen(float green) {
 	if (anaglyphGreenLevel == next) return;
 	anaglyphGreenLevel = next;
 	requestRepaint(UPDATE_ALL);
+}
+
+void GobanView::setPointerOnWidget(bool onWidget) {
+	if (pointerOnWidget == onWidget) return;
+	pointerOnWidget = onWidget;
+	updatePointerState();
+}
+
+void GobanView::updatePointerState() {
+	const bool over = !pointerOnWidget && model.isPointOnBoard(model.cursor);
+	if (pointerOverBoard != over) {
+		pointerOverBoard = over;
+		// Any flag will do: the board is redrawn on every frame that renders at
+		// all, and the cursor uniform is uploaded with the camera rather than
+		// behind UPDATE_STONES.
+		requestRepaint(UPDATE_SOME);
+	}
+	// Hidden only where the drawn mark replaces it. If the mark is off — mono,
+	// or strength 0 — the native pointer stays, because taking it away without
+	// putting anything in its place is worse than the parallax it suffers from.
+	const bool hide = pointerMark() > 0.0f;
+	if (hide != nativePointerHidden) {
+		nativePointerHidden = hide;
+		if (GLFWwindow* window = AppState::GetWindow()) {
+			glfwSetInputMode(window, GLFW_CURSOR,
+			                 hide ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL);
+		}
+	}
 }
 
 void GobanView::setGlasses(Stereo::Glasses g) {

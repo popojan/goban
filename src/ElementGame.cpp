@@ -1162,6 +1162,25 @@ void ElementGame::OnUpdate()
     //view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSizeX);
     view.board.updateMetrics(model.metrics);
 
+    // Is the pointer on the wood, or on a widget lying over it? Asked here
+    // rather than from the mousemove handler, because that handler stops firing
+    // the moment the pointer moves onto a panel — so the answer would latch at
+    // "over the board" and the native pointer would stay hidden over the menus.
+    //
+    // Two conditions, and both are needed: RmlUi must report this element as the
+    // hovered one (a toolbar or a dialog over the board is not the board), and
+    // the ray must land on a real intersection (the table and the margin are not
+    // the board either).
+    if (auto* context = GetContext()) {
+        // nullptr counts as "not on a widget": RmlUi reports no hover element
+        // in a scripted run, where there is no real pointer at all, and the
+        // board-coordinate test below is the real gate anyway. Failing this way
+        // round leaves the native pointer visible when in doubt, which is the
+        // harmless direction — the other way hides it over the menus.
+        const Rml::Element* hover = context->GetHoverElement();
+        view.setPointerOnWidget(hover != nullptr && hover != this);
+    }
+
     // The lifecycle phase, not state.reason. The two diverge after navigating
     // back from a finished game: the phase returns to Paused but the reason
     // stays set, which used to grey out Start, Pass, Undo and Kibitz on a

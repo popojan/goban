@@ -66,3 +66,12 @@ const int maxCaptured = 91;
 uniform vec4 ddc[2 * maxCaptured];
 
 /* === DO NOT CHANGE ABOVE == */
+
+// The pointer mark drawn on the wood, and how strongly: 0 hides it.
+//
+// A native mouse pointer is composited by the window system at the screen plane,
+// with no disparity at all, so under a stereo shader it can never sit at the
+// depth of the point it indicates — fuse the board and you see two pointers.
+// A mark ray-traced with the board inherits that eye's disparity and occlusion
+// for free, which is the only way a pointer and its target can agree.
+uniform float cursorMark;

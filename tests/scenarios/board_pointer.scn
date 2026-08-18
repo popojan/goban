@@ -1,0 +1,51 @@
+# config: mock.json
+#
+# The pointer drawn on the board, and the native one it replaces.
+#
+# A native mouse pointer is composited by the window system at the screen plane,
+# with no disparity at all, so under an anaglyph it can never sit at the depth of
+# the point it indicates: fuse the board and you see two pointers. There is no
+# value to tune — a 2D overlay has no depth — so the pointer has to be drawn
+# *in* the scene, where it inherits each eye's disparity and occlusion.
+#
+# `pointer_mark` is what the shader was actually told to draw, so it folds both
+# gates into one number: stereo, and over the wood rather than over a widget.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/board_pointer.scn
+
+new_game 9
+wait_idle
+
+# Mono first. The native pointer already sits where it points, so nothing is
+# drawn and nothing is taken away — a second indicator would be clutter.
+expect stereo false
+mouse_move 512 400
+expect pointer_mark 0
+
+# Four steps along the shader list is [stereo] Red Carpet.
+cycle shaders
+cycle shaders
+cycle shaders
+cycle shaders
+expect stereo true
+
+# On the wood: the mark is drawn, and the native pointer is hidden under it.
+mouse_move 512 400
+expect pointer_mark 1
+
+# Off the board there is no intersection to name, so the mark stands down and
+# the native pointer comes back. Well outside the window, so this cannot be a
+# near miss on the margin.
+mouse_move 5000 5000
+expect pointer_mark 0
+
+# ...and back, because it follows the pointer rather than latching.
+mouse_move 512 400
+expect pointer_mark 1
+
+# Switching back to mono retires it too: the whole reason it exists is the
+# parallax mismatch, and in mono there is none.
+cycle shaders
+cycle shaders
+expect stereo false
+expect pointer_mark 0

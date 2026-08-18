@@ -152,6 +152,7 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     fsu_cc = glGetUniformLocation(gobanProgram, "cc");
     iddc = glGetUniformLocation(gobanProgram, "ddc");
     fsu_cursor = glGetUniformLocation(gobanProgram, "cursor");
+    fsu_cursorMark = glGetUniformLocation(gobanProgram, "cursorMark");
 
     vsu_eof = glGetUniformLocation(gobanProgram, "eof");
     vsu_dof = glGetUniformLocation(gobanProgram, "dof");
@@ -311,12 +312,27 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) cons
         glBindBuffer(GL_UNIFORM_BUFFER, bufStones);
         glBufferData(GL_UNIFORM_BUFFER, view.board.getSizeOf(), view.board.getStones(), GL_DYNAMIC_DRAW);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        Position coord = view.getBoardCoordinate(view.lastX, view.lastY);
-        float cur[2];
-        int size = view.board.getSize();
-        cur[0] = static_cast<float>(coord.x - static_cast<float>(size) / 2.0);
-        cur[1] = static_cast<float>(coord.y - static_cast<float>(size) / 2.0);
+    }
+
+    // Outside UPDATE_STONES, beside the camera. It used to live inside that
+    // branch, and the mouse-move path raises the flag only while a stone is in
+    // hand — so the one case the pointer mark exists for is exactly the case in
+    // which the uniform went stale and the mark stayed where the mouse had last
+    // been holding something.
+    {
+        const Position coord = view.getBoardCoordinate(view.lastX, view.lastY);
+        const int size = view.board.getSize();
+        // col()/row(), not x/y: Position carries the continuous ray hit, and a
+        // pointer that slid smoothly between lines would be naming a place the
+        // board has no name for. It snaps to the intersection, like the ghost
+        // stone and like the click that follows it — the mark says "here", and
+        // "here" on a Go board is a point.
+        const float cur[2] = {
+            static_cast<float>(coord.col()) - static_cast<float>(size) / 2.0f,
+            static_cast<float>(coord.row()) - static_cast<float>(size) / 2.0f,
+        };
         glUniform2fv(fsu_cursor, 1, cur);
+        glUniform1f(fsu_cursorMark, view.pointerMark());
     }
 
     glUniform2fv(iCameraPan, 1, glm::value_ptr(view.cameraPan));

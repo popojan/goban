@@ -162,6 +162,43 @@ void rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
                                     dd = min(dd, 1.0 + dd0 / boardaa);
                                 }
                             }
+
+                            // The pointer: four diagonal ticks around the point
+                            // under the mouse, inked like the grid because it is
+                            // the same act — a mark on the wood — and because
+                            // riding the same `dd` coverage gives it the board's
+                            // own antialiasing and occlusion with no second path.
+                            //
+                            // Rotated a quarter turn from the grid, so no arm is
+                            // ever parallel to a line, and gapped at the centre,
+                            // so it never covers the intersection it is naming.
+                            // A disc would read as a stone and an upright cross
+                            // as grid: on this board both shapes are taken.
+                            if (cursorMark > 0.0) {
+                                // cursor arrives centred on the board in grid
+                                // units, offset by half a spacing — the C++ side
+                                // subtracts N/2.0 where the lines sit at N-1 over
+                                // 2 — so this is the one place that knows it.
+                                vec2 cpos = vec2(wwx, wwy) * (cursor + 0.5);
+                                vec2 dxz = ip.xz - cpos;
+                                // Into the diagonal frame: the arms lie along the
+                                // grid's diagonals, which is what keeps them
+                                // distinguishable from the lines they sit on.
+                                vec2 e = vec2(dxz.x + dxz.y, dxz.x - dxz.y) * 0.7071067;
+                                // Lighter than a grid line, so the pointer never
+                                // competes with the board it is moving over.
+                                float hw = 0.045 * wwx;  // arm half-width
+                                float gap = 0.34 * wwx;  // clear of the point itself
+                                float out2 = 0.72 * wwx; // and clear of a stone on it
+                                float arm1 = max(abs(e.y) - hw, max(gap - abs(e.x), abs(e.x) - out2));
+                                float arm2 = max(abs(e.x) - hw, max(gap - abs(e.y), abs(e.y) - out2));
+                                float sd = min(arm1, arm2);
+                                // The board's own pixel footprint, so the ticks
+                                // soften with distance exactly as the grid does.
+                                float aa = max(boardbb * distance(ro, ip), 1e-6);
+                                float cov = cursorMark * (1.0 - smoothstep(-aa, aa, sd));
+                                dd = min(dd, 1.0 - cov);
+                            }
                         }
                     }
                 }

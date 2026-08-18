@@ -242,3 +242,33 @@ because halving the work per invocation improves occupancy.
 
 The overlay's eye loop is driven by the caller for the same reason: each eye's
 text must be tested against that eye's board.
+
+## The mouse pointer
+
+A native pointer is composited by the window system at the screen plane, with no
+disparity at all. Under an anaglyph it therefore cannot sit at the depth of the
+point it indicates: fuse the board and you see two pointers, fuse the pointer and
+the board doubles. There is no value to tune — a 2D overlay has no depth — so the
+only fix is to draw the pointer *in* the scene.
+
+It rides the grid's own coverage accumulator in `scene/object/board.glsl`, which
+means it inherits each eye's disparity, the board's antialiasing and its
+occlusion by stones without a second code path, and it is inked like a grid line
+because it is the same act: a mark on the wood.
+
+**Shape.** Four ticks, turned a quarter turn from the grid so no arm is ever
+parallel to a line, gapped at the centre so the intersection it names stays
+clear, and reaching past a stone's radius so they still read on an occupied
+point. The two obvious shapes are unavailable: on this board a disc already means
+a stone and an upright cross already means the grid.
+
+**Flat on the wood, not floating above it.** A marker in a plane above the board
+has different disparity from the point beneath it, so the eyes are given two
+fusion targets a few pixels apart — the same discomfort as the annotation
+clipping above. Lying on the surface there is one.
+
+**The native pointer is hidden positionally.** Only while it is over the board,
+and only under a stereo shader: over the interface a screen-plane pointer is
+*correct*, that interface being flat at the screen plane itself. So it is never
+taken away where it works, and in mono it is never taken away at all — there the
+mismatch does not exist, and a second indicator would be clutter.

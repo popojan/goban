@@ -145,6 +145,7 @@ private:
     GLint iBlackReservoirCount = -1;
     GLint iddc = -1;
     GLint fsu_cursor = -1;
+    GLint fsu_cursorMark = -1;
 
     static const std::array<GLfloat, 16> vertexBufferData;
     static const GLushort elementBufferData[];
