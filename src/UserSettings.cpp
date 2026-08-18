@@ -60,6 +60,33 @@ void UserSettings::load() {
             evaluationColor = user["evaluation_color"].get<std::string>();
         }
 
+        if (user.contains("anaglyph")) {
+            anaglyph = user["anaglyph"].get<std::string>();
+        }
+
+        if (user.contains("anaglyph_strength")) {
+            anaglyphStrength = user["anaglyph_strength"].get<float>();
+        }
+
+        if (user.contains("anaglyph_leak") && user["anaglyph_leak"].is_array()
+            && user["anaglyph_leak"].size() == 3) {
+            anaglyphLeakR = user["anaglyph_leak"][0].get<float>();
+            anaglyphLeakG = user["anaglyph_leak"][1].get<float>();
+            anaglyphLeakB = user["anaglyph_leak"][2].get<float>();
+            anaglyphLeakSet = true;
+        }
+
+        if (user.contains("anaglyph_balance") && user["anaglyph_balance"].is_array()
+            && user["anaglyph_balance"].size() == 2) {
+            anaglyphBalanceL = user["anaglyph_balance"][0].get<float>();
+            anaglyphBalanceR = user["anaglyph_balance"][1].get<float>();
+            anaglyphBalanceSet = true;
+        }
+
+        if (user.contains("glasses")) {
+            glasses = user["glasses"].get<std::string>();
+        }
+
         if (user.contains("coordinate_color")) {
             coordinateColor = user["coordinate_color"].get<std::string>();
         }
@@ -220,6 +247,21 @@ std::string UserSettings::serialize() const {
     if (!evaluationColor.empty()) {
         user["evaluation_color"] = evaluationColor;
     }
+    if (!anaglyph.empty()) {
+        user["anaglyph"] = anaglyph;
+    }
+    if (anaglyphStrength >= 0.0f) {
+        user["anaglyph_strength"] = anaglyphStrength;
+    }
+    if (anaglyphLeakSet) {
+        user["anaglyph_leak"] = {anaglyphLeakR, anaglyphLeakG, anaglyphLeakB};
+    }
+    if (anaglyphBalanceSet) {
+        user["anaglyph_balance"] = {anaglyphBalanceL, anaglyphBalanceR};
+    }
+    if (!glasses.empty()) {
+        user["glasses"] = glasses;
+    }
     if (!coordinateColor.empty()) {
         user["coordinate_color"] = coordinateColor;
     }
@@ -319,6 +361,38 @@ void UserSettings::setEvaluationOnBoard(bool value) {
 void UserSettings::setEvaluationAlign(const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex);
     evaluationAlign = value;
+    saveLocked();
+}
+
+void UserSettings::setAnaglyph(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    anaglyph = value;
+    saveLocked();
+}
+
+void UserSettings::setAnaglyphStrength(float value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    anaglyphStrength = value;
+    saveLocked();
+}
+
+void UserSettings::setGlasses(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    glasses = value;
+    saveLocked();
+}
+
+void UserSettings::setAnaglyphBalance(float left, float right) {
+    std::lock_guard<std::mutex> lock(mutex);
+    anaglyphBalanceL = left; anaglyphBalanceR = right;
+    anaglyphBalanceSet = true;
+    saveLocked();
+}
+
+void UserSettings::setAnaglyphLeak(float r, float g, float b) {
+    std::lock_guard<std::mutex> lock(mutex);
+    anaglyphLeakR = r; anaglyphLeakG = g; anaglyphLeakB = b;
+    anaglyphLeakSet = true;
     saveLocked();
 }
 

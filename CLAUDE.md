@@ -962,10 +962,52 @@ argues for, each enforced by `tests/test_stereo.cpp` or
   length. Mono's do; `dof` breaks the symmetry, and pre-normalizing shrank the
   stereoscopic window to 85% of the configured value, unevenly across the
   screen. The fragment shader normalizes.
-- **One depth buffer, two eyes: `min(dl, dr)`.** Depth is a layer here (0.5 a
-  stone, 0.6 a label on the board), and the stereo shader renders twice into one
-  buffer. Letting the second call write `gl_FragDepth` made a best-move letter
-  show straight through the stone in hand wherever the eyes disagreed.
+- **One pass per eye, and the two are summed.** Superseded `min(dl, dr)`, which
+  was the least-bad answer while both eyes shared a depth buffer: one number per
+  pixel cannot describe two occlusions, so it classified a pixel as a stone
+  wherever *either* eye saw one and clipped the other eye's annotation along a
+  silhouette it should have been drawn past — a best-move letter with its
+  right-hand side missing. `max()` only swaps that for text painted over a stone.
+  Rendering an eye at a time, with a depth clear between, gives each its own
+  occlusion. **It is not slower**: the shader always called `render()` twice per
+  fragment and two passes call it once each — measured on `tests/bench/`, mono
+  unchanged at 28.8 fps and stereo 12.4 → **14.9** fps, occupancy paying for the
+  extra draw. `GobanOverlay::draw()` takes the eye from its caller for the same
+  reason: each eye's text must be tested against that eye's board.
+- **Depth is a layer here** — 0.25 the board from below, 0.5 a stone, 0.75
+  everything else, with the overlay's own passes at 0.4 (a label on a stone) and
+  0.6 (a label on the board). It is a classification, not a distance.
+- **`gray` is the default because it is the only mode that spares green.** A red
+  filter blocks blue well and **green badly**, so keeping the right eye's image
+  out of green is what makes an anaglyph survive imperfect glasses. `gray` puts
+  the right eye in blue alone and holds green at a flat 0.1 — it works in
+  red/blue *and* red/cyan. The colour modes must use green, since half the colour
+  information is there, so all three need a genuinely cyan right lens; if they
+  ghost and `gray` does not, the glasses are the reason and tuning cannot fix it.
+  This shipped broken once: giving green to the right eye in `gray` changed
+  nothing in red or blue and ghosted immediately on real glasses. `Stereo::usesCyan()`
+  is the predicate, and **the overlay's colour mask must follow it** — text in a
+  channel the board is not using ghosts on its own.
+- **A cancellation is subtracted from the channel the eye *can* see.** Light
+  arriving through the wrong filter cannot be removed from a channel that eye
+  does not receive. The left eye gets `R + α·(right image in G,B)`, so red is
+  written as `L − α·Rt`, a negative term driven by the **right** eye's pass; green
+  and blue carry `Rt − β·L`, driven by the left's. `Stereo::Crosstalk` names each
+  component by the channel it corrects, which is why `g` is the one to raise.
+  Same structure as Dubois' negative off-diagonal coefficients.
+- **A negative contribution needs a float target, or it is silently discarded.**
+  A fixed-point framebuffer clamps a negative fragment to zero *before* the
+  additive blend, so Dubois and any non-zero `anaglyph_leak` looked applied and
+  did nothing — measured, clamped Dubois gave (0.689, 0.778, 0.230) against an
+  exact (0.655, 0.703, 0.150). `Stereo::needsSignedAccumulation()` routes exactly
+  those through `StereoComposite` (an `RGBA16F` renderbuffer resolved by a blit,
+  the blit being the clamp, once, at the end). Everything else stays on the
+  direct path — cheaper, and already verified on real glasses. Keep that split:
+  do not put the validated modes behind the new machinery for uniformity.
+- **`glUniform` applies to the bound program.** `setEye()` and `setAnaglyph()`
+  are called from inside `shadeIt()`, after `use()`. Setting them from the eye
+  loop instead wrote them nowhere and every mode rendered as mode zero — which
+  looks exactly like a mode that is not implemented yet.
 - **Anaglyph is greyscale, so annotation colour does not survive it.**
   `GobanOverlay::eyeInk()` reduces every label to its own brightness, or text
   tinted green would vanish from the red eye — which means the evaluation's

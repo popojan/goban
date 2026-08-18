@@ -29,6 +29,7 @@
 #include "Configuration.h"
 #include "AudioPlayer.hpp"
 #include "AnalysisService.h"
+#include "StereoComposite.h"
 
 
 extern std::shared_ptr<Configuration> config;
@@ -147,7 +148,7 @@ public:
     void resetView();
     void saveView();          // Save current camera to preset (user-triggered)
     void saveCurrentView();   // Save current camera for session restore (auto on exit)
-    void shadeIt(float time, const GobanShader &shader, int flags) const;
+    void shadeIt(float time, const GobanShader &shader, int flags, int eye = 0) const;
 
     // Smooth camera transition via quaternion slerp + pan/distance lerp
     void animateCamera(const DDG::Quaternion& targetRotation,
@@ -230,6 +231,42 @@ public:
     /// Parses a name back, returning nullopt for anything else so a caller can
     /// tell a typo from a choice.
     static std::optional<TextAlign> parseAlign(const std::string& name);
+
+    /// How the two eyes are combined into the anaglyph. Same two-level
+    /// arrangement as the readout ink: `config/base.json` ships the default,
+    /// `user.json` carries a choice the user made, and the `anaglyph` command
+    /// sets it live — which is the point, since the only way to pick between
+    /// these is to look at the board through the glasses.
+    ///
+    /// Not per shader. Ink is, because a shader could redefine the board dark
+    /// (ADR-0011); this cannot, because every stereo shader here is red/cyan and
+    /// the choice is about the *glasses and the eyes behind them*, which do not
+    /// change when the board does.
+    void setAnaglyph(Stereo::Anaglyph mode);
+    [[nodiscard]] Stereo::Anaglyph anaglyph() const { return anaglyphMode; }
+
+    /// How much of each eye's own colour survives against its plain brightness.
+    /// The cheap half of coping with imperfect glasses: ghosting and rivalry
+    /// both scale with how different the two eyes' images are.
+    void setAnaglyphStrength(float strength);
+    [[nodiscard]] float anaglyphStrength() const { return anaglyphColorStrength; }
+
+    /// Per-channel crosstalk cancellation, tuned for the glasses actually in
+    /// use. See Stereo::Crosstalk for why it is subtracted where it is.
+    void setAnaglyphLeak(const Stereo::Crosstalk& leak);
+    [[nodiscard]] const Stereo::Crosstalk& anaglyphLeak() const { return anaglyphCrosstalk; }
+
+    /// Per-eye gain. The one adjustment that helps red/blue glasses, where the
+    /// colour modes cannot: a blue filter is much darker than a red one, and the
+    /// eyes do not average that mismatch away.
+    void setAnaglyphBalance(const Stereo::EyeBalance& balance);
+    [[nodiscard]] const Stereo::EyeBalance& anaglyphBalance() const { return anaglyphEyeBalance; }
+
+    /// Which channels reach which eye. The single most consequential setting
+    /// here: get it wrong and one eye receives the other's image, which is a
+    /// second picture rather than a wrong colour.
+    void setGlasses(Stereo::Glasses g);
+    [[nodiscard]] Stereo::Glasses glasses() const { return glassesType; }
 
     /// The readout's ink. Alpha included, because half-opacity dark is what makes
     /// text read as *part of* a wooden board rather than printed on top of it —
@@ -358,6 +395,13 @@ public:
     bool showCoordinates = false;
     glm::vec4 coordinateInk{0.0f, 0.0f, 0.0f, 1.0f};
     float coordOffset = 0.425f;
+    Stereo::Anaglyph anaglyphMode = Stereo::Anaglyph::Gray;
+    float anaglyphColorStrength = Stereo::DEFAULT_STRENGTH;
+    Stereo::Crosstalk anaglyphCrosstalk{};
+    Stereo::EyeBalance anaglyphEyeBalance{};
+    Stereo::Glasses glassesType = Stereo::Glasses::RedCyan;
+    /// Only used when the composite can go negative; see StereoComposite.
+    mutable StereoComposite stereoComposite;
     TextAlign readoutAlign = TextAlign::Center;
     glm::vec4 readoutInk{0.0f, 0.0f, 0.0f, 1.0f};
     /// Ink for a readout describing a position that has been left. Follows

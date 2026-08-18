@@ -101,6 +101,64 @@ GobanView::GobanView(GobanModel& m)
                              "#rrggbb or #rrggbbaa", staleConfigured);
             }
         }
+        // The shipped anaglyph mode. A name that will not parse leaves the
+        // built-in Gray standing rather than falling to whatever `0` happens to
+        // mean, the same degradation the ink above gets.
+        const std::string configuredAnaglyph = config->data.value("anaglyph", std::string());
+        if (!configuredAnaglyph.empty()) {
+            if (const auto parsed = Stereo::parseAnaglyph(configuredAnaglyph)) {
+                anaglyphMode = *parsed;
+            } else {
+                spdlog::warn("anaglyph: '{}' is not gray, half-color, color or dubois",
+                             configuredAnaglyph);
+            }
+        }
+        if (config->data.contains("anaglyph_strength")) {
+            anaglyphColorStrength = Stereo::clampStrength(
+                    config->data.value("anaglyph_strength", Stereo::DEFAULT_STRENGTH));
+        }
+        const auto leak = config->data.value("anaglyph_leak", nlohmann::json::array());
+        if (leak.is_array() && leak.size() == 3) {
+            anaglyphCrosstalk = Stereo::clampCrosstalk(
+                    {leak[0].get<float>(), leak[1].get<float>(), leak[2].get<float>()});
+        }
+        const std::string configuredGlasses = config->data.value("glasses", std::string());
+        if (!configuredGlasses.empty()) {
+            if (const auto parsed = Stereo::parseGlasses(configuredGlasses)) {
+                glassesType = *parsed;
+            } else {
+                spdlog::warn("glasses: '{}' is not red-cyan or red-blue", configuredGlasses);
+            }
+        }
+        const auto balance = config->data.value("anaglyph_balance", nlohmann::json::array());
+        if (balance.is_array() && balance.size() == 2) {
+            anaglyphEyeBalance = Stereo::clampBalance(
+                    {balance[0].get<float>(), balance[1].get<float>()});
+        }
+    }
+
+    // ...and the user's own choice over it, since picking between these means
+    // looking at the board through the glasses.
+    if (const auto parsed = Stereo::parseAnaglyph(settings.getAnaglyph())) {
+        anaglyphMode = *parsed;
+    }
+    if (settings.getAnaglyphStrength() >= 0.0f) {
+        anaglyphColorStrength = Stereo::clampStrength(settings.getAnaglyphStrength());
+    }
+    if (const auto parsed = Stereo::parseGlasses(settings.getGlasses())) {
+        glassesType = *parsed;
+    }
+    if (settings.hasAnaglyphBalance()) {
+        Stereo::EyeBalance balance;
+        settings.getAnaglyphBalance(balance.left, balance.right);
+        anaglyphEyeBalance = Stereo::clampBalance(balance);
+    }
+    if (settings.hasAnaglyphLeak()) {
+        // Asked for explicitly, so an all-zero answer is honoured rather than
+        // read as "unset" — turning the correction off is a choice.
+        Stereo::Crosstalk leak;
+        settings.getAnaglyphLeak(leak.r, leak.g, leak.b);
+        anaglyphCrosstalk = Stereo::clampCrosstalk(leak);
     }
 
     // Load shader settings (separate from camera)
@@ -377,9 +435,19 @@ void GobanView::requestRepaint(int what) {
     }
 }
 
-void GobanView::shadeIt(float time, const GobanShader& shader, int flags) const {
+void GobanView::shadeIt(float time, const GobanShader& shader, int flags, int eye) const {
 	shader.use();
 
+	// Both of these have to be set *after* use(): glUniform applies to whatever
+	// program is currently bound, so setting them from the caller's loop —
+	// where the program is not bound yet — silently writes them nowhere, and
+	// every mode renders as mode zero.
+	shader.setEye(eye);
+	shader.setAnaglyph(anaglyphMode);
+	shader.setAnaglyphStrength(anaglyphColorStrength);
+	shader.setAnaglyphLeak(anaglyphCrosstalk);
+	shader.setAnaglyphBalance(anaglyphEyeBalance);
+	shader.setGlasses(glassesType);
 	shader.setTime(lastTime);
 	shader.setRotation(cam.setView());
 	shader.setCameraPan(cameraPan);
@@ -476,44 +544,120 @@ void GobanView::Render(int w, int h)
 	    }
 	}
 
-    shadeIt(time, gobanShader, flags);
-
-   	glEnable(GL_BLEND);
-
-	glEnable(GL_DEPTH_TEST);
+	// The overlay's glyph buffers are shared by both eyes, so they are built
+	// once, before either pass — and before the board, because a pass that draws
+	// the text has to have it.
 	if (flags & UPDATE_OVERLAY){
         gobanOverlay.Update(board, model);
 	}
 
-	// Every piece of text in the program shares this pass: move numbers, the
-	// variation labels, SGF markup, the coordinate margin, the evaluation's
-	// A/B/C and its board readout. It used to run only when one of the two
-	// move-marker toggles was on, which was true when it was written — back then
-	// the markers *were* the overlay. Everything since joined the same buffers
-	// without revisiting the gate, so turning both markers off took the
-	// coordinates, the markup and the whole evaluation display down with them.
-	// The two toggles are honoured where they belong: updateLastMoveOverlay()
-	// and updateNavigationOverlay() simply do not place their labels.
+	// One pass per eye under an anaglyph shader, board and text together.
+	//
+	// The eyes cannot share a depth buffer. It holds one number per pixel, and a
+	// stone in the left eye's image sits where bare board is in the right's, so
+	// any single value is wrong for one of them: the old `min(dl, dr)` in
+	// partial/stereo/on.glsl classified the pixel as a stone wherever *either*
+	// eye saw one, which clipped the other eye's annotation along a silhouette
+	// it should have been drawn past. Rendering an eye at a time gives each its
+	// own occlusion, and the depth clear between them is what keeps the second
+	// from being tested against the first.
+	//
+	// It costs nothing: the stereo fragment shader always called render() twice
+	// per pixel, and two passes call it once each. Measured on the 19x19
+	// benchmark, before and after, in tests/bench/.
+	const int eyes = gobanShader.isStereo() ? 2 : 1;
 	unsigned glyphs = 0;
-	if (time - startTime >= gobanShader.animT) {
-		gobanOverlay.use();
-		glyphs += gobanOverlay.draw(model, cam, 0);
-		gobanOverlay.unuse();
-		animationRunning = false;
-    }
 
-    glUseProgram(0);
+	// Dubois and crosstalk cancellation work by subtracting one eye's image from
+	// the channels the other eye reads, so their contributions go *negative* —
+	// and a fixed-point framebuffer clamps a negative fragment to zero before the
+	// additive blend can subtract it, which would leave the correction looking
+	// applied and doing nothing. Those configurations accumulate into a float
+	// target instead, resolved by a blit that clamps once at the end.
+	//
+	// Only those. Every other mode is positive throughout and stays on the direct
+	// path, which is one framebuffer cheaper and already verified on real
+	// glasses.
+	const bool signedComposite = gobanShader.isStereo()
+	        && Stereo::needsSignedAccumulation(anaglyphMode, anaglyphCrosstalk);
+	const bool compositing = signedComposite
+	        && stereoComposite.begin(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+
+	for (int eye = 0; eye < eyes; ++eye) {
+		if (gobanShader.isStereo()) {
+			// The eyes are summed, not masked into fixed channels. Masking was
+			// enough while both were grey and owned one channel each, but a
+			// Dubois composite puts *both* eyes in all three — that is what its
+			// crosstalk correction is — so the channel each eye may write is no
+			// longer a constant. The first pass establishes the frame by
+			// overwriting; the second adds to it.
+			if (eye == 0) {
+				glDisable(GL_BLEND);
+			} else {
+				glClear(GL_DEPTH_BUFFER_BIT);
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_ONE, GL_ONE);
+			}
+		}
+
+		shadeIt(time, gobanShader, flags, eye);
+
+		// Text blends over the board normally; only the board pass above is
+		// additive. Set explicitly rather than assumed — the second eye's pass
+		// leaves GL_ONE, GL_ONE behind it.
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glEnable(GL_DEPTH_TEST);
+
+		// Every piece of text in the program shares this pass: move numbers, the
+		// variation labels, SGF markup, the coordinate margin, the evaluation's
+		// A/B/C and its board readout. It used to run only when one of the two
+		// move-marker toggles was on, which was true when it was written — back then
+		// the markers *were* the overlay. Everything since joined the same buffers
+		// without revisiting the gate, so turning both markers off took the
+		// coordinates, the markup and the whole evaluation display down with them.
+		// The two toggles are honoured where they belong: updateLastMoveOverlay()
+		// and updateNavigationOverlay() simply do not place their labels.
+		if (time - startTime >= gobanShader.animT) {
+			gobanOverlay.use();
+			glyphs += gobanOverlay.draw(model, cam, 0, eye);
+			gobanOverlay.unuse();
+			animationRunning = false;
+		}
+
+		glUseProgram(0);
+
+		if (time - startTime >= gobanShader.animT) {
+			gobanOverlay.use();
+			glyphs += gobanOverlay.draw(model, cam, 1, eye);
+			gobanOverlay.unuse();
+			animationRunning = false;
+		}
+	}
+
+	// Resolve before restoring state: the blit is what turns the signed
+	// accumulation into something displayable, and it must happen while the
+	// float target is still bound.
+	if (compositing) stereoComposite.end();
+
+	if (gobanShader.isStereo()) {
+		// RmlUi draws the rest of the interface after this returns and does not
+		// set either of these itself. GobanShader::draw() and
+		// GobanOverlay::draw() both bracket themselves in
+		// glPushAttrib/glPopAttrib, which restores the state to whatever was
+		// current when they were entered — ours — so nothing else puts it back.
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
 
 	if (time - startTime >= gobanShader.animT) {
-		gobanOverlay.use();
-		glyphs += gobanOverlay.draw(model, cam, 1);
-		gobanOverlay.unuse();
-		animationRunning = false;
 		// What actually went to the screen, for the same reason sounds_played
 		// counts what was heard: every state key describing an overlay stayed
 		// true while nothing was drawn, so the suite could not see this at all.
 		// Only stored on a frame that ran the pass — a frame skipped for the
-		// intro animation says nothing about the overlay either way.
+		// intro animation says nothing about the overlay either way. Still
+		// doubles under a stereo shader: the eye loop is out here now, but each
+		// label is still drawn once per eye.
 		overlayGlyphsDrawn.store(glyphs);
 	}
 
@@ -1022,7 +1166,8 @@ void GobanView::updateAnalysisOverlay() {
 	}
 
 	for (const auto& label : evaluationLabels(*report, labelledPositions,
-	                                          markupPositions, DEFAULT_EVAL_LABELS)) {
+	                                          markupPositions, DEFAULT_EVAL_LABELS,
+	                                          gobanShader.qualityPalette())) {
 		// No point to sit on, so it goes to the margin. updateFloatingLabels()
 		// runs immediately after this and picks it up.
 		if (label.pass) {
@@ -1161,6 +1306,42 @@ void GobanView::setCoordinates(bool shown) {
 	if (showCoordinates == shown) return;
 	showCoordinates = shown;
 	requestRepaint(UPDATE_OVERLAY);
+}
+
+void GobanView::setAnaglyph(Stereo::Anaglyph mode) {
+	if (anaglyphMode == mode) return;
+	anaglyphMode = mode;
+	// The board is repainted with a new composite, and that is all: the overlay
+	// ink deliberately does not follow. Every mode gives the left eye the red
+	// channel alone, so a green label is invisible to it whatever the board
+	// does — which is the rule GobanOverlay::eyeInk() already enforces.
+	requestRepaint(UPDATE_ALL);
+}
+
+void GobanView::setAnaglyphStrength(float strength) {
+	const float next = Stereo::clampStrength(strength);
+	if (anaglyphColorStrength == next) return;
+	anaglyphColorStrength = next;
+	requestRepaint(UPDATE_ALL);
+}
+
+void GobanView::setAnaglyphLeak(const Stereo::Crosstalk& leak) {
+	anaglyphCrosstalk = Stereo::clampCrosstalk(leak);
+	requestRepaint(UPDATE_ALL);
+}
+
+void GobanView::setGlasses(Stereo::Glasses g) {
+	if (glassesType == g) return;
+	glassesType = g;
+	// UPDATE_ALL, not a bare repaint: the overlay masks its text into the
+	// channels its eye owns, and those just changed, so the glyph buffers have to
+	// be rebuilt as well as the board redrawn.
+	requestRepaint(UPDATE_ALL);
+}
+
+void GobanView::setAnaglyphBalance(const Stereo::EyeBalance& balance) {
+	anaglyphEyeBalance = Stereo::clampBalance(balance);
+	requestRepaint(UPDATE_ALL);
 }
 
 void GobanView::setReadoutColor(const glm::vec4& color) {

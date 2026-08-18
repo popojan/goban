@@ -735,6 +735,142 @@ void GobanControl::buildRegistry() {
         UserSettings::instance().setEvaluationAlign(GobanView::alignName(next));
     });
 
+    add("anaglyph", 0, 1,
+        "[gray|half-color|color|dubois] — how a stereo shader combines the two "
+        "eyes; with no argument, cycles through them",
+        [this](CommandContext& ctx) {
+        Stereo::Anaglyph next;
+        if (ctx.args.empty()) {
+            // Cycling, for the same reason evaluation_align cycles: the only way
+            // to choose between these is to look at the board through the
+            // glasses, and more colour is not simply better — it buys retinal
+            // rivalry with it.
+            switch (view.anaglyph()) {
+                case Stereo::Anaglyph::Gray:      next = Stereo::Anaglyph::HalfColor; break;
+                case Stereo::Anaglyph::HalfColor: next = Stereo::Anaglyph::Dubois;    break;
+                case Stereo::Anaglyph::Dubois:    next = Stereo::Anaglyph::Color;     break;
+                case Stereo::Anaglyph::Color:     next = Stereo::Anaglyph::Gray;      break;
+            }
+        } else {
+            const auto parsed = Stereo::parseAnaglyph(ctx.args[0]);
+            if (!parsed) {
+                spdlog::warn("anaglyph: expected gray, half-color, color or dubois, "
+                             "got '{}'", ctx.args[0]);
+                return;
+            }
+            next = *parsed;
+        }
+        view.setAnaglyph(next);
+        UserSettings::instance().setAnaglyph(Stereo::anaglyphName(next));
+        // Named on screen because cycling is blind otherwise: half-colour and
+        // Dubois differ subtly on a board that is mostly wood.
+        parent->showMessage(Stereo::anaglyphName(next));
+    });
+
+    add("anaglyph_strength", 0, 1,
+        "[0..1] — how much of each eye's colour survives against its brightness; "
+        "1 is the mode as published, 0 collapses it to gray",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->showMessage(std::to_string(view.anaglyphStrength()));
+            return;
+        }
+        try {
+            view.setAnaglyphStrength(std::stof(ctx.args[0]));
+        } catch (const std::exception&) {
+            spdlog::warn("anaglyph_strength: '{}' is not a number", ctx.args[0]);
+            return;
+        }
+        UserSettings::instance().setAnaglyphStrength(view.anaglyphStrength());
+    });
+
+    add("anaglyph_leak", 0, 3,
+        "[r g b] — crosstalk cancelled per channel, for the glasses you actually "
+        "have; try raising g first, since red filters leak green worst",
+        [this](CommandContext& ctx) {
+        const auto& leak = view.anaglyphLeak();
+        if (ctx.args.empty()) {
+            parent->showMessage(std::to_string(leak.r) + " " + std::to_string(leak.g)
+                                + " " + std::to_string(leak.b));
+            return;
+        }
+        // One argument sets green alone. That is not a shortcut for its own sake:
+        // green through the red filter is the leak that actually bites, and it is
+        // the one a user will be reaching for.
+        Stereo::Crosstalk next = leak;
+        try {
+            if (ctx.args.size() == 1) {
+                next.g = std::stof(ctx.args[0]);
+            } else {
+                next.r = std::stof(ctx.args[0]);
+                next.g = std::stof(ctx.args[1]);
+                next.b = ctx.args.size() > 2 ? std::stof(ctx.args[2]) : 0.0f;
+            }
+        } catch (const std::exception&) {
+            spdlog::warn("anaglyph_leak: expected numbers, got '{}'", ctx.args[0]);
+            return;
+        }
+        view.setAnaglyphLeak(next);
+        const auto& applied = view.anaglyphLeak();
+        UserSettings::instance().setAnaglyphLeak(applied.r, applied.g, applied.b);
+    });
+
+    add("glasses", 0, 1,
+        "[red-cyan|red-blue] — which channels reach which eye; red/blue lenses "
+        "block green, so it belongs to the left eye there instead of the right",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->showMessage(Stereo::glassesName(view.glasses()));
+            return;
+        }
+        const auto parsed = Stereo::parseGlasses(ctx.args[0]);
+        if (!parsed) {
+            spdlog::warn("glasses: expected red-cyan or red-blue, got '{}'", ctx.args[0]);
+            return;
+        }
+        view.setGlasses(*parsed);
+        UserSettings::instance().setGlasses(Stereo::glassesName(*parsed));
+        // Said plainly, because Dubois silently stops being Dubois here and a
+        // user who chose it deserves to know why the picture changed.
+        if (!Stereo::duboisApplies(*parsed) && view.anaglyph() == Stereo::Anaglyph::Dubois) {
+            parent->showMessage("red-blue: Dubois needs cyan, using half-color");
+        } else {
+            parent->showMessage(Stereo::glassesName(*parsed));
+        }
+    });
+
+    add("anaglyph_balance", 0, 2,
+        "[left right] — per-eye gain, for glasses whose filters pass different "
+        "amounts of light; a blue lens is much darker than a red one",
+        [this](CommandContext& ctx) {
+        const auto& balance = view.anaglyphBalance();
+        if (ctx.args.empty()) {
+            parent->showMessage(std::to_string(balance.left) + " "
+                                + std::to_string(balance.right));
+            return;
+        }
+        // One argument brightens the *right* eye and leaves the left alone,
+        // because that is the asymmetry these glasses actually have: it is the
+        // darker filter that needs the help, and raising one eye rather than
+        // lowering the other keeps the picture off the floor.
+        Stereo::EyeBalance next = balance;
+        try {
+            if (ctx.args.size() == 1) {
+                next.left = 1.0f;
+                next.right = std::stof(ctx.args[0]);
+            } else {
+                next.left = std::stof(ctx.args[0]);
+                next.right = std::stof(ctx.args[1]);
+            }
+        } catch (const std::exception&) {
+            spdlog::warn("anaglyph_balance: expected numbers, got '{}'", ctx.args[0]);
+            return;
+        }
+        view.setAnaglyphBalance(next);
+        const auto& applied = view.anaglyphBalance();
+        UserSettings::instance().setAnaglyphBalance(applied.left, applied.right);
+    });
+
     add("evaluation_color", 0, 1,
         "[#rrggbb|#rrggbbaa|reset] — the ink of the board readout; alpha is what "
         "makes it read as part of the wood",
@@ -1952,6 +2088,17 @@ nlohmann::json GobanControl::dumpState() const {
     s["stereo_base"]      = view.stereoHalfBase();
     s["stereo_near"]      = view.stereoNearPoint();
     s["stereo_deviation"] = view.stereoDeviation();
+    // Reported whatever shader is selected, for the same reason: it is a
+    // property of the viewer, not of the shader, and it outlives a switch to
+    // mono and back.
+    s["anaglyph"]          = Stereo::anaglyphName(view.anaglyph());
+    s["anaglyph_strength"] = view.anaglyphStrength();
+    s["anaglyph_leak_r"]   = view.anaglyphLeak().r;
+    s["anaglyph_leak_g"]   = view.anaglyphLeak().g;
+    s["anaglyph_leak_b"]   = view.anaglyphLeak().b;
+    s["anaglyph_balance_l"] = view.anaglyphBalance().left;
+    s["anaglyph_balance_r"] = view.anaglyphBalance().right;
+    s["glasses"]            = Stereo::glassesName(view.glasses());
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
     s["show_territory"] = model.board.showTerritory;

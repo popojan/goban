@@ -69,6 +69,43 @@ public:
     std::string getEvaluationAlign() const { std::lock_guard<std::mutex> lock(mutex); return evaluationAlign; }
     void setEvaluationAlign(const std::string& value);
 
+    /// How the anaglyph combines the eyes: "gray", "half-color", "color",
+    /// "dubois". Empty means "whatever the application config ships", on the
+    /// `evaluation_color` precedent — writing a default here would pin today's
+    /// choice into every user.json and defeat any later change to it.
+    std::string getAnaglyph() const { std::lock_guard<std::mutex> lock(mutex); return anaglyph; }
+    void setAnaglyph(const std::string& value);
+
+    /// How much of each eye's colour survives; negative means "not set", so the
+    /// shipped default stays in charge. Same reasoning as evaluationColor's
+    /// empty string — a written-out default pins today's choice forever.
+    float getAnaglyphStrength() const { std::lock_guard<std::mutex> lock(mutex); return anaglyphStrength; }
+    void setAnaglyphStrength(float value);
+
+    /// Per-channel crosstalk cancellation, measured for the user's own glasses.
+    /// `hasAnaglyphLeak()` distinguishes "no correction wanted" from "never
+    /// asked", which matters because zero is a legitimate answer.
+    bool hasAnaglyphLeak() const { std::lock_guard<std::mutex> lock(mutex); return anaglyphLeakSet; }
+    void getAnaglyphLeak(float& r, float& g, float& b) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        r = anaglyphLeakR; g = anaglyphLeakG; b = anaglyphLeakB;
+    }
+    void setAnaglyphLeak(float r, float g, float b);
+
+    /// Per-eye gain, for filters that pass different amounts of light. Same
+    /// "asked or not" distinction as the leak: unity is a legitimate answer.
+    bool hasAnaglyphBalance() const { std::lock_guard<std::mutex> lock(mutex); return anaglyphBalanceSet; }
+    void getAnaglyphBalance(float& left, float& right) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        left = anaglyphBalanceL; right = anaglyphBalanceR;
+    }
+    void setAnaglyphBalance(float left, float right);
+
+    /// Which glasses are in use: "red-cyan" or "red-blue". Empty means the
+    /// config's answer stands.
+    std::string getGlasses() const { std::lock_guard<std::mutex> lock(mutex); return glasses; }
+    void setGlasses(const std::string& value);
+
     /// The readout's ink, as a hex string. Empty means "whatever the application
     /// config ships" — the distinction matters, because writing it unconditionally
     /// would pin today's default into every user.json and quietly defeat any
@@ -220,6 +257,13 @@ private:
     bool evaluationOnBoard = false;
     bool coordinates = false;
     std::string evaluationAlign = "center";
+    std::string anaglyph;
+    float anaglyphStrength = -1.0f;
+    bool anaglyphLeakSet = false;
+    float anaglyphLeakR = 0.0f, anaglyphLeakG = 0.0f, anaglyphLeakB = 0.0f;
+    bool anaglyphBalanceSet = false;
+    float anaglyphBalanceL = 1.0f, anaglyphBalanceR = 1.0f;
+    std::string glasses;
     std::string evaluationColor;
     std::string coordinateColor;
 

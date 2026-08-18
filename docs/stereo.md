@@ -114,3 +114,93 @@ Scenarios assert `stereo_deviation` (bounded at 1/30), `stereo_near`,
 every label is drawn once per eye. See `tests/scenarios/stereo_depth_budget.scn`
 and `tests/test_stereo.cpp`. **Assert at more than one zoom**: that is the
 property the old rule lacked, and a single screenshot cannot see it.
+
+## Combining the eyes: anaglyph modes
+
+Everything above is about *where* the two images go. This is about how they are
+carried in one picture, and it is where a real pair of glasses stops behaving
+like the ideal filters the textbooks assume.
+
+The left eye always owns red. What differs is what the right eye gets:
+
+| Mode | Right eye | Left eye | Glasses |
+|---|---|---|---|
+| `gray` | blue only, green held at 0.1 | brightness | red/blue **and** red/cyan |
+| `half-color` | its own green and blue | brightness | red/cyan |
+| `color` | its own green and blue | its own red | red/cyan |
+| `dubois` | least-squares mix | least-squares mix | red/cyan |
+
+`gray` is the default because it is the forgiving one, and the reason is
+physical: **a red filter blocks blue well and green badly.** Keeping the right
+eye's image out of green means the worst leak has nothing to carry. Every other
+mode must use green — half the colour information is there — so all three need a
+genuinely cyan right lens. If the colour modes double up and `gray` does not, the
+glasses are the reason and no amount of tuning will fix it.
+
+Beyond the channels, the modes trade colour fidelity against **retinal
+rivalry**: the discomfort of showing each eye a differently-coloured version of
+one object. More colour is not simply better.
+
+### Two dials for imperfect glasses
+
+`anaglyph_strength` (0–1) is how much of each eye's own colour survives against
+its plain brightness. Both ghosting and rivalry scale with how *different* the
+two eyes' images are, so this is one continuous dial from the mode as published
+down to `gray`. It reduces the leak; it does not cancel it.
+
+`anaglyph_leak [r g b]` cancels it. Each eye pre-subtracts its own image from the
+channels the other eye reads, so what gets through the wrong filter meets a
+matching hole. The direction is the part worth stating carefully, because it is
+not the obvious one:
+
+> Light reaching an eye through the wrong channel **cannot be removed from the
+> channel that eye cannot see.** It has to be pre-subtracted from the channel it
+> *can*.
+>
+> The left eye receives `R + α·(right image, carried in G and B)`, so red must be
+> written as `L − α·Rt` — a negative red term driven by the **right** eye's pass.
+> Symmetrically, green and blue carry `Rt − β·L`, driven by the **left** eye's.
+
+Each component names the channel being corrected, so `g` is the one to raise
+first. Useful values are small — on the shipped wood, `0.12` already takes green
+to nearly zero — and too much draws a dark hole where the other eye's image is,
+which is why it is clamped at 0.5.
+
+This is exactly the structure of Dubois' negative off-diagonal coefficients,
+generalised to a number you can measure for the glasses on your face. Published
+Dubois can do no better than the filters it was fitted to.
+
+### Why the composite sometimes needs a float target
+
+Dubois and any non-zero `anaglyph_leak` produce **negative** contributions — that
+is what a cancellation is. The two eyes are summed by additive blending in
+separate passes (see below), and a fixed-point framebuffer clamps a negative
+fragment to zero *before* the blend, so on the direct path those terms are
+silently discarded: the correction looks applied and does nothing. Measured on
+the shipped wood, clamped Dubois gave `(0.689, 0.778, 0.230)` where exact Dubois
+gives `(0.655, 0.703, 0.150)` — not a rounding error, especially in blue.
+
+So `Stereo::needsSignedAccumulation()` routes exactly those configurations
+through `StereoComposite`, an `RGBA16F` renderbuffer resolved by a blit — the
+blit being the clamp, once, at the end, after every contribution has had its
+chance to subtract. Everything else stays on the direct path, which is one
+framebuffer cheaper and already verified against real glasses.
+
+## One pass per eye
+
+The stereo fragment shader renders **one eye per pass**, and the two are summed.
+It used to render both in a single invocation, which forced the two eyes to share
+one depth buffer, and one number per pixel cannot describe two different
+occlusions: `min(dl, dr)` classified a pixel as a stone wherever *either* eye saw
+one, so the other eye's annotation was clipped along a silhouette it should have
+been drawn past — a best-move letter with its right-hand side missing. `max()`
+only swaps that for text painted over a stone.
+
+Rendering an eye at a time gives each its own depth, with a depth clear between
+them. It is not slower: the shader always called `render()` twice per fragment,
+and two passes call it once each. Measured on `tests/bench/`, 19×19 with 140
+stones at 1024×768 — mono unchanged at 28.8 fps, stereo **12.4 → 14.9 fps**,
+because halving the work per invocation improves occupancy.
+
+The overlay's eye loop is driven by the caller for the same reason: each eye's
+text must be tested against that eye's board.

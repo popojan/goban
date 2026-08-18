@@ -155,6 +155,12 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
 
     vsu_eof = glGetUniformLocation(gobanProgram, "eof");
     vsu_dof = glGetUniformLocation(gobanProgram, "dof");
+    fsu_eye = glGetUniformLocation(gobanProgram, "eye");
+    fsu_anaglyph = glGetUniformLocation(gobanProgram, "anaglyph");
+    fsu_anaglyphStrength = glGetUniformLocation(gobanProgram, "anaglyphStrength");
+    fsu_anaglyphLeak = glGetUniformLocation(gobanProgram, "anaglyphLeak");
+    fsu_anaglyphBalance = glGetUniformLocation(gobanProgram, "anaglyphBalance");
+    fsu_glasses = glGetUniformLocation(gobanProgram, "glasses");
 
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
@@ -359,6 +365,13 @@ int GobanShader::choose(int idx) {
     // overlay has to draw the same two eyes, and a path comparison is not a
     // fact about the shader.
     currentProgramStereo = shader.value("stereo", 0) != 0;
+    // Same shape, and the same reason: an appearance fact the CPU has to act
+    // on, declared by the shader rather than inferred. The global block is the
+    // default and no shipped shader overrides it, so this normally resolves to
+    // exactly what `annotations` says.
+    currentPalette = resolveQualityPalette(
+            config->data.value("annotations", json::object()),
+            shader.value("annotations", json::object()));
     if(!vertexFile.empty() && !fragmentFile.empty()) {
         initProgram(vertexFile, fragmentFile);
         currentProgram = newProgram;
@@ -395,6 +408,30 @@ void GobanShader::setRotation(glm::mat4x4 m) const {
 void GobanShader::setResolution(float w, float h) {
     width = w;
     height = h;
+}
+
+void GobanShader::setEye(int eye) const {
+    glUniform1i(fsu_eye, eye);
+}
+
+void GobanShader::setAnaglyph(Stereo::Anaglyph mode) const {
+    glUniform1i(fsu_anaglyph, Stereo::anaglyphUniform(mode));
+}
+
+void GobanShader::setAnaglyphStrength(float strength) const {
+    glUniform1f(fsu_anaglyphStrength, strength);
+}
+
+void GobanShader::setAnaglyphLeak(const Stereo::Crosstalk& leak) const {
+    glUniform3f(fsu_anaglyphLeak, leak.r, leak.g, leak.b);
+}
+
+void GobanShader::setAnaglyphBalance(const Stereo::EyeBalance& balance) const {
+    glUniform2f(fsu_anaglyphBalance, balance.left, balance.right);
+}
+
+void GobanShader::setGlasses(Stereo::Glasses g) const {
+    glUniform1i(fsu_glasses, Stereo::glassesUniform(g));
 }
 
 void GobanShader::setEof(float val) {

@@ -155,7 +155,8 @@ void GobanOverlay::Update(const Board& board, const GobanModel& model) {
 	}
 
 }
-unsigned GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigned which) const {
+unsigned GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, unsigned which,
+                            int eye) const {
 	if (!overlayReady
 		|| std::all_of(layers.begin(), layers.end(), [](const Layer& x){return x.empty; }))
 			return 0;
@@ -180,21 +181,25 @@ unsigned GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, uns
 
 	st->set_depth(which < 1 ? 0.6 : 0.4);
 
-	// One pass in mono; one per eye under an anaglyph shader. The two terms
-	// that differ are exactly the two the stereo vertex shader applies to the
-	// board — the eye offset and the horizontal image shift — and the offset
-	// comes from GobanView::stereoHalfBase(), the same value the shader is
-	// handed. Two implementations would let the labels drift off the wood they
-	// are supposed to be lying on.
+	// This call draws one eye; the caller loops. The two terms that differ are
+	// exactly the two the stereo vertex shader applies to the board — the eye
+	// offset and the horizontal image shift — and the offset comes from
+	// GobanView::stereoHalfBase(), the same value the shader is handed. Two
+	// implementations would let the labels drift off the wood they are supposed
+	// to be lying on.
+	//
+	// The loop used to be here, both eyes back to back after a single board
+	// pass. It moved out to GobanView::Render() so that each eye's text is drawn
+	// against a depth buffer holding that eye's own board: with one buffer for
+	// both, whichever occlusion it held clipped the other eye's labels.
 	const bool stereo = view.gobanShader.isStereo();
-	const float eye = stereo ? view.stereoHalfBase() : 0.0f;
+	const float halfBase = stereo ? view.stereoHalfBase() : 0.0f;
 	const float hit = stereo ? view.gobanShader.getDof() : 0.0f;
-	const int passes = stereo ? 2 : 1;
+	const int pass = stereo ? eye : 0;
 
-	// Both eyes draw at the same depth, so with depth writes on the first would
-	// reject the second outright and the right eye's text would simply be
-	// missing. The pass has no reason to write depth at all: it runs last, over
-	// a board that is already resolved.
+	// The text writes no depth. It runs last within its eye's pass, over a board
+	// that is already resolved, and both layers sit at fixed depths of their own
+	// — so with writes on, the first layer drawn would reject the second.
 	glDepthMask(GL_FALSE);
 
 	for (size_t layer = which; layer < (which == 0 ? 1 : layers.size()); ++layer) {
@@ -225,16 +230,29 @@ unsigned GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, uns
 		float content_scale = std::min(static_cast<float>(height) / 2.0f, 10000.0f);
 		float text_scale = content_scale;
 
-		for (int pass = 0; pass < passes; ++pass) {
-		// Left eye first. It sits at -eye along the camera's right axis, so the
+		{
+		// The left eye sits at -halfBase along the camera's right axis, so the
 		// target's camera-space X grows by that much; the image shift goes the
 		// same way, the shader's `q0.x + dof`.
 		const float side = (pass == 0) ? 1.0f : -1.0f;
 		if (stereo) {
-			// Left into red, right into blue — the channels the fragment
-			// shader's own composite writes, `vec3(left, 0.1, right)`.
-			glColorMask(pass == 0 ? GL_TRUE : GL_FALSE, GL_FALSE,
-			            pass == 0 ? GL_FALSE : GL_TRUE, GL_FALSE);
+			// Exactly the channels this eye's image occupies — asked of the same
+			// function the shader's composite follows, because the answer is not
+			// a constant: green belongs to the right eye in red/cyan and to the
+			// left in red/blue, and in Gray it belongs to neither.
+			//
+			// Following the board here is not tidiness. Text in a channel the
+			// board is not using ghosts on its own, and text in the *other* eye's
+			// channel is a second picture — the two failures this whole setting
+			// exists to avoid, reproduced by the overlay alone.
+			//
+			// The text is masked even though the board it lies on is summed
+			// rather than masked: a label carries no colour worth preserving,
+			// eyeInk() having already reduced it to brightness.
+			const auto own = Stereo::eyeChannels(view.anaglyph(), view.glasses(), pass);
+			glColorMask(own.r ? GL_TRUE : GL_FALSE,
+			            own.g ? GL_TRUE : GL_FALSE,
+			            own.b ? GL_TRUE : GL_FALSE, GL_FALSE);
 		}
 		{
 			float F = GobanView::FOCAL_LENGTH;
@@ -246,7 +264,7 @@ unsigned GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, uns
 			// the labels then separate by the sum of the two — measured 9.5% of
 			// the image width where the stone under them separated by 3.5%,
 			// which is what "the number floats miles off the stone" looks like.
-			float x = -cs * (ta_cam.x - side * eye);
+			float x = -cs * (ta_cam.x - side * halfBase);
 			float y = -cs * ta_cam.y;
 			float z = cs * ta_cam.z;
 

@@ -430,6 +430,7 @@ else()
         src/GobanControl.h
         src/GobanOverlay.h
         src/GobanShader.h
+        src/StereoComposite.h
         src/GobanView.h
         src/OpenGL.h
         src/ScenarioRunner.h
@@ -448,6 +449,7 @@ else()
         src/GobanControl.cpp
         src/GobanOverlay.cpp
         src/GobanShader.cpp
+        src/StereoComposite.cpp
         src/GobanView.cpp
         src/ScenarioRunner.cpp
         src/main.cpp

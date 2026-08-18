@@ -60,7 +60,12 @@ public:
 	/// pass ran at all: every overlay in the program is built into these same
 	/// buffers, so `eval_labels` or `coordinates_shown` can be perfectly true
 	/// with nothing on screen. Same argument as `sounds_played`.
-	unsigned draw(const GobanModel&, const DDG::Camera&, unsigned) const;
+	/// Draw one layer group for one eye. `eye` is 0 under a mono shader and is
+	/// driven by the caller under a stereo one, because the board has to be
+	/// rendered per eye as well — each eye's text must be tested against that
+	/// eye's own depth, which is the whole reason the passes are interleaved.
+	/// See the eye loop in GobanView::Render().
+	unsigned draw(const GobanModel&, const DDG::Camera&, unsigned, int eye = 0) const;
     ~GobanOverlay();
     void setReady() { overlayReady = true; }
 	void Update(const Board& board, const GobanModel& model);
