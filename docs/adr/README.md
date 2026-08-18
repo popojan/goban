@@ -73,3 +73,4 @@ A compact alternative for small decisions is the *Y-statement*:
 - [ADR-0008: Engines sync when the board changes, not when the player moves](0008-sync-engines-when-the-board-changes.md) — *Accepted; the wait moves off the first move, and `a.play` joins the policy*
 - [ADR-0009: A killed engine is restarted and resynchronised](0009-a-killed-engine-is-restarted-and-resynced.md) — *Accepted; gives the timeout kill the counterpart it never had*
 - [ADR-0010: The aftermath is negotiated, not declared](0010-the-aftermath-is-negotiated-not-declared.md) — *Proposed; a sketch only. Nothing implemented, and the ruleset question waits on it*
+- [ADR-0011: Annotation ink is data in the shader's config entry](0011-annotation-ink-is-data-on-the-cpu-side.md) — *Accepted; the palette cannot live in GLSL because the overlay bakes colour on the CPU*

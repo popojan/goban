@@ -1,5 +1,6 @@
 #include "AnalysisService.h"
 
+#include "Configuration.h"
 #include "GameSnapshot.h"
 #include "GameThread.h"
 #include "GobanModel.h"
@@ -97,32 +98,89 @@ std::vector<Move> playableMoves(const std::vector<Move>& path) {
     return out;
 }
 
-glm::vec4 moveQualityColor(double winrateLoss) {
-    // Three stops, linear between them. The numbers are a Go judgement rather
-    // than a computed thing: a point and a half of win rate is where a move
-    // stops being an alternative and starts being a concession, and ten points
-    // is a blunder in anyone's book. Expect to tune these by eye against a lit
-    // wooden board — they are the most likely thing here to look wrong.
-    constexpr double kSlightly = 0.015;
-    constexpr double kBlunder  = 0.10;
-    const glm::vec4 best   {0.20f, 0.80f, 0.30f, 1.0f};   // green
-    const glm::vec4 middle {0.95f, 0.80f, 0.20f, 1.0f};   // amber
-    const glm::vec4 worst  {0.90f, 0.25f, 0.20f, 1.0f};   // red
+QualityPalette resolveQualityPalette(const nlohmann::json& global,
+                                     const nlohmann::json& shader) {
+    QualityPalette palette;   // the shipped fallback; every read below is optional
 
-    const double loss = std::max(0.0, winrateLoss);
-    if (loss <= kSlightly) {
-        const float t = static_cast<float>(loss / kSlightly);
-        return best + (middle - best) * t;
+    // One helper for both sources, so the global block and a shader's override
+    // cannot drift in what they accept. A stop that will not parse leaves that
+    // stop alone rather than taking the whole array down: a typo in the third
+    // colour must not silently revert the two the user got right.
+    const auto readStops = [&palette](const nlohmann::json& from) {
+        if (!from.is_object()) return;
+        const auto it = from.find("move_quality");
+        if (it == from.end()) return;
+        if (!it->is_array() || it->size() != 3) {
+            spdlog::warn("annotations.move_quality must be three colours "
+                         "[best, middle, worst]; keeping the built-in palette");
+            return;
+        }
+        glm::vec4* const stops[3] = {&palette.best, &palette.middle, &palette.worst};
+        for (size_t i = 0; i < 3; ++i) {
+            if (!(*it)[i].is_string()) continue;
+            const auto text = (*it)[i].get<std::string>();
+            if (text.empty()) continue;
+            if (const auto parsed = parseHexColor(text)) {
+                *stops[i] = *parsed;
+            } else {
+                spdlog::warn("annotations.move_quality[{}]: '{}' is not #rgb, "
+                             "#rrggbb or #rrggbbaa", i, text);
+            }
+        }
+    };
+
+    readStops(global);
+    readStops(shader);   // the shader's own board wins where it has an opinion
+
+    // Thresholds from the global block only. A shader entry carrying them would
+    // be saying ten points of win rate is a blunder under one board and not
+    // under another, which is not a thing a shader can know.
+    if (global.is_object()) {
+        const auto it = global.find("move_quality_loss");
+        if (it != global.end()) {
+            if (it->is_array() && it->size() == 2
+                && (*it)[0].is_number() && (*it)[1].is_number()) {
+                const double slightly = (*it)[0].get<double>();
+                const double blunder  = (*it)[1].get<double>();
+                // Ordered and positive, or the ramp inverts and every move
+                // reads as its opposite. Refusing is the safe failure here.
+                if (slightly > 0.0 && blunder > slightly) {
+                    palette.slightly = slightly;
+                    palette.blunder  = blunder;
+                } else {
+                    spdlog::warn("annotations.move_quality_loss: needs 0 < "
+                                 "concession ({}) < blunder ({}); keeping {} and {}",
+                                 slightly, blunder, palette.slightly, palette.blunder);
+                }
+            } else {
+                spdlog::warn("annotations.move_quality_loss must be two numbers "
+                             "[concession, blunder]; keeping {} and {}",
+                             palette.slightly, palette.blunder);
+            }
+        }
     }
-    if (loss >= kBlunder) return worst;
-    const float t = static_cast<float>((loss - kSlightly) / (kBlunder - kSlightly));
-    return middle + (worst - middle) * t;
+    return palette;
+}
+
+glm::vec4 moveQualityColor(double winrateLoss, const QualityPalette& palette) {
+    // Three stops, linear between them. What they are and why they sit where
+    // they do is on QualityPalette; this is only the interpolation.
+    const double loss = std::max(0.0, winrateLoss);
+    if (loss <= palette.slightly) {
+        const float t = static_cast<float>(loss / palette.slightly);
+        return palette.best + (palette.middle - palette.best) * t;
+    }
+    if (loss >= palette.blunder) return palette.worst;
+    const float t = static_cast<float>((loss - palette.slightly)
+                                       / (palette.blunder - palette.slightly));
+    return palette.middle + (palette.worst - palette.middle) * t;
 }
 
 std::vector<EvalLabel> evaluationLabels(const AnalysisReport& report,
                                         const std::set<std::pair<int, int>>& labelled,
                                         const std::set<std::pair<int, int>>& markup,
-                                        size_t maxLabels) {
+                                        size_t maxLabels,
+                                        const QualityPalette& palette) {
     std::vector<EvalLabel> out;
     if (report.moves.empty() || maxLabels == 0) return out;
 
@@ -171,7 +229,7 @@ std::vector<EvalLabel> evaluationLabels(const AnalysisReport& report,
             // `pass` a plausible A1 to draw on.
             label.pos = Position(-1, -1);
             label.text = "pass";
-            label.color = moveQualityColor(std::abs(bestWinrate - m->winrateBlack));
+            label.color = moveQualityColor(std::abs(bestWinrate - m->winrateBlack), palette);
             out.push_back(label);
             continue;
         }
@@ -180,7 +238,7 @@ std::vector<EvalLabel> evaluationLabels(const AnalysisReport& report,
 
         EvalLabel label;
         label.pos = m->move.pos;
-        label.color = moveQualityColor(std::abs(bestWinrate - m->winrateBlack));
+        label.color = moveQualityColor(std::abs(bestWinrate - m->winrateBlack), palette);
         if (labelled.count(key)) {
             // Tint only: the variation keeps its own "3a", and the colour still
             // says what the engine thinks of it.

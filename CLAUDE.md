@@ -757,12 +757,39 @@ of its decisions, and `tests/test_analysis.cpp` plus
 - **Stale is a second colour, not a factor.** `annotations.readout_stale_color`
   defaults to `readout_color`, so the guard is invisible until someone opts in.
   Multiplying an alpha the user has already tuned down has no defensible default.
-- **Annotation ink is global, not per shader — for now.** It arguably belongs to
-  the shader, which is what decides the board is wood-coloured; but all six
-  shaders draw the same board today, so per-shader ink would be six copies of one
-  value. `annotations` in `config/base.json` is the default, and a shader entry
-  gaining its own `annotations` block to override it is a pure addition whenever
-  a dark-board shader makes it stop being duplication.
+- **Annotation ink is global by default and overridable per shader.** It belongs
+  to the shader, which is what decides the board is wood-coloured, but all six
+  shaders draw the same board today, so `annotations` in `config/base.json` is
+  the default and a shader entry's own `annotations` block is laid over it.
+  `GobanShader::choose()` resolves the two, beside `stereo` and `height`. Only
+  `move_quality` is read from a shader entry so far; the rest is global.
+- **The move-quality palette cannot live in the GLSL, include system or not.**
+  See `docs/adr/0011-annotation-ink-is-data-on-the-cpu-side.md`. The consumer is
+  `add_text()`, which bakes colour into the glyph vertex buffers on the **CPU**,
+  and the ray-traced shader never draws a letter — so a `const vec3` in a shared
+  partial would sit unread in six fragment shaders for the benefit of a pipeline
+  with no way to fetch it. Same reasoning already recorded on `isStereo()`: an
+  appearance fact the CPU must act on is declared in the shader's *config entry*,
+  never inferred from its source. **The stops are shader-scoped** (an appearance
+  judgement about one board); **the thresholds are global** (`move_quality_loss`
+  — ten points of win rate is a blunder under any board), and
+  `resolveQualityPalette()` enforces that split.
+- **The ramp must rise monotonically in mean brightness, and stay below the
+  wood.** Not a preference. `GobanOverlay::eyeInk()` collapses every label to
+  `(r+g+b)/3` under a stereo shader, so there the ramp *is* ink density: the
+  shipped stops run 0.17 → 0.28 → 0.37 against wood at 0.58, so the best move is
+  the most firmly printed and a blunder fades toward the board. The original
+  palette ran 0.43 → **0.65** → 0.45 — amber lighter than the board it was
+  written on, green and red the same grey — which is why the ramp said nothing in
+  stereo and read as signal lights in colour. A dark-board shader overriding the
+  stops must invert the ordering, and nothing in a hex string will say so. Pinned
+  by `tests/test_analysis.cpp`, which checks the whole interpolated ramp rather
+  than the three stops.
+- **A malformed palette degrades per stop, not per array.** A typo in the third
+  colour keeps the two that parsed and warns; dropping all three would hide the
+  typo, and applying none would revert a palette the user had half-tuned.
+  Thresholds out of order are refused outright — an inverted ramp reads every
+  move as its opposite.
 - **A shipped default goes in `config/base.json`, a user's choice in `user.json`,
   and an unmade choice is written nowhere.** `annotations.readout_color` ships the
   readout's ink; `evaluation_color` overrides it. `UserSettings` writes

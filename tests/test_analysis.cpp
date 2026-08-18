@@ -285,6 +285,110 @@ TEST_CASE("the quality ramp runs from the best move to a blunder") {
     CHECK(moveQualityColor(99.0).r == doctest::Approx(bad.r));
 }
 
+TEST_CASE("the ramp is ink on wood, and readable once hue is thrown away") {
+    // The constraint the palette exists to satisfy. GobanOverlay::eyeInk()
+    // reduces every label to (r+g+b)/3 under a stereo shader, so under anaglyph
+    // the ramp is read as ink density: it has to be monotonic in mean
+    // brightness, or the stops are indistinguishable smudges. They also all
+    // have to sit below the wood — (0.824, 0.635, 0.282), mean 0.58 — or a
+    // label is *lighter* than the board it is printed on, which is what the
+    // first palette got wrong.
+    const auto mono = [](const glm::vec4& c) { return (c.r + c.g + c.b) / 3.0f; };
+    constexpr float kWood = (0.824f + 0.635f + 0.282f) / 3.0f;
+
+    const QualityPalette palette;
+    CHECK(mono(palette.best) < mono(palette.middle));
+    CHECK(mono(palette.middle) < mono(palette.worst));
+    CHECK(mono(palette.worst) < kWood);
+
+    // And it holds all the way along, not merely at the stops — the ramp is
+    // what gets drawn, and a non-monotonic interior would be invisible here.
+    float previous = -1.0f;
+    for (double loss = 0.0; loss <= 0.12; loss += 0.005) {
+        const float grey = mono(moveQualityColor(loss));
+        CHECK(grey >= previous);
+        CHECK(grey < kWood);
+        previous = grey;
+    }
+}
+
+TEST_CASE("the palette is data: the config supplies it, a shader may override") {
+    using nlohmann::json;
+
+    // Absent is the shipped palette, not black. Every failure below degrades to
+    // this, for the reason readout_color does.
+    const QualityPalette fallback;
+    const QualityPalette absent = resolveQualityPalette(json::object(), json::object());
+    CHECK(absent.best.g == doctest::Approx(fallback.best.g));
+    CHECK(absent.slightly == doctest::Approx(fallback.slightly));
+
+    const json global = {
+        {"move_quality", {"#102030", "#405060", "#708090"}},
+        {"move_quality_loss", {0.02, 0.30}},
+    };
+    const QualityPalette configured = resolveQualityPalette(global, json::object());
+    CHECK(configured.best.r == doctest::Approx(0x10 / 255.0f));
+    CHECK(configured.middle.g == doctest::Approx(0x50 / 255.0f));
+    CHECK(configured.worst.b == doctest::Approx(0x90 / 255.0f));
+    CHECK(configured.slightly == doctest::Approx(0.02));
+    CHECK(configured.blunder == doctest::Approx(0.30));
+
+    // A shader with its own board wins on the colours...
+    const json shader = {{"move_quality", {"#ffffff", "#eeeeee", "#dddddd"}}};
+    const QualityPalette overridden = resolveQualityPalette(global, shader);
+    CHECK(overridden.best.r == doctest::Approx(1.0f));
+    CHECK(overridden.worst.r == doctest::Approx(0xdd / 255.0f));
+    // ...and loses on the thresholds, which it has no standing to hold an
+    // opinion about: ten points of win rate is a blunder under any board.
+    const json greedy = {
+        {"move_quality_loss", {0.5, 0.9}},
+    };
+    const QualityPalette split = resolveQualityPalette(global, greedy);
+    CHECK(split.slightly == doctest::Approx(0.02));
+    CHECK(split.blunder == doctest::Approx(0.30));
+}
+
+TEST_CASE("a malformed palette keeps the stops it could not read") {
+    using nlohmann::json;
+    const QualityPalette fallback;
+
+    // A typo in one colour must not revert the two that parsed. The shipped
+    // palette is tuned as a set, so a half-applied override is the one outcome
+    // worth avoiding — and silently dropping all three would hide the typo.
+    const json partial = {{"move_quality", {"#102030", "not a colour", "#708090"}}};
+    const QualityPalette mixed = resolveQualityPalette(partial, json::object());
+    CHECK(mixed.best.r == doctest::Approx(0x10 / 255.0f));
+    CHECK(mixed.middle.g == doctest::Approx(fallback.middle.g));
+    CHECK(mixed.worst.b == doctest::Approx(0x90 / 255.0f));
+
+    // Wrong shape entirely, and the wrong number of stops, both stand aside.
+    CHECK(resolveQualityPalette(json{{"move_quality", "#102030"}}, json::object())
+                  .best.g == doctest::Approx(fallback.best.g));
+    CHECK(resolveQualityPalette(json{{"move_quality", {"#102030", "#405060"}}},
+                                json::object())
+                  .best.g == doctest::Approx(fallback.best.g));
+
+    // Thresholds out of order would invert the ramp — every move reading as its
+    // opposite — so they are refused rather than applied.
+    const json inverted = {{"move_quality_loss", {0.4, 0.1}}};
+    CHECK(resolveQualityPalette(inverted, json::object()).blunder
+          == doctest::Approx(fallback.blunder));
+    const json zero = {{"move_quality_loss", {0.0, 0.1}}};
+    CHECK(resolveQualityPalette(zero, json::object()).slightly
+          == doctest::Approx(fallback.slightly));
+}
+
+TEST_CASE("the drawn labels take the palette they are given") {
+    // The whole point of making it data: a palette handed in has to reach the
+    // labels, or it is configuration that configures nothing.
+    QualityPalette palette;
+    palette.best = {0.1f, 0.2f, 0.3f, 1.0f};
+    const auto labels = evaluationLabels(rankedReport(3), {}, {},
+                                         DEFAULT_EVAL_LABELS, palette);
+    REQUIRE(labels.size() == 3);
+    CHECK(labels[0].color.b == doctest::Approx(0.3f));
+}
+
 TEST_CASE("suggestions with no label of their own get rank letters") {
     const auto labels = evaluationLabels(rankedReport(3), {}, {}, DEFAULT_EVAL_LABELS);
     REQUIRE(labels.size() == 3);

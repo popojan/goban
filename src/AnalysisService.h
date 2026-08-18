@@ -225,13 +225,67 @@ struct EvalLabel {
     bool pass = false;
 };
 
+/// The three stops of the move-quality ramp, and the two losses they sit at.
+///
+/// The stops are an **appearance** judgement — they are ink on a lit wooden
+/// board, and a shader that redefines the board dark needs its own — so they are
+/// per-shader overridable. The thresholds are a **Go** judgement: ten points of
+/// win rate is a blunder on any board, under any shader, so they are global and
+/// deliberately not overridable per shader. `resolveQualityPalette()` enforces
+/// that split.
+///
+/// The defaults here are the fallback, in the `readout_color` tradition: a
+/// missing or malformed config value leaves the shipped palette standing rather
+/// than producing invisible ink.
+struct QualityPalette {
+    /// Ink, not signal light. The board is lit wood — (0.824, 0.635, 0.282),
+    /// mean 0.58 — and these are letters printed on it, so every stop sits
+    /// *below* the wood in brightness. The first palette did not: bright amber
+    /// came out at mean 0.65, lighter than the board it was written on.
+    ///
+    /// That brightness is not incidental, because `GobanOverlay::eyeInk()`
+    /// reduces every label to (r+g+b)/3 under a stereo shader — anaglyph is
+    /// greyscale, so hue does not survive it and the ramp is read as ink density
+    /// there. These three *increase* monotonically in mean brightness: 0.17,
+    /// 0.28, 0.37. The best move is the most firmly printed and a blunder fades
+    /// toward the wood, which is the same ordering in colour and in mono. The
+    /// old stops were 0.43, 0.65, 0.45 — green and red were the same grey as
+    /// each other, which is why the ramp said nothing in stereo.
+    ///
+    /// **A dark-board shader must invert that ordering**, and nothing in a hex
+    /// string says so. It is the one thing to get right when overriding these.
+    glm::vec4 best   {0.06f, 0.32f, 0.12f, 1.0f};   ///< deep green
+    glm::vec4 middle {0.48f, 0.30f, 0.05f, 1.0f};   ///< ochre
+    glm::vec4 worst  {0.66f, 0.24f, 0.22f, 1.0f};   ///< brick red
+
+    /// A Go judgement rather than a computed thing: a point and a half of win
+    /// rate is where a move stops being an alternative and starts being a
+    /// concession, and ten points is a blunder in anyone's book.
+    double slightly = 0.015;
+    double blunder  = 0.10;
+};
+
+/// The palette a shader draws with: the global `annotations` block, with the
+/// shader entry's own `annotations` block laid over it.
+///
+/// `global` and `shader` are both the *`annotations` object* — not the whole
+/// config, and not the whole shader entry — so this stays a pure function over
+/// plain data and needs neither a GL context nor the config singleton. Either
+/// may be null or absent, which is the ordinary case: no shader ships an
+/// override today.
+///
+/// Only `move_quality` is taken from `shader`. `move_quality_loss` is read from
+/// `global` alone, on purpose — see `QualityPalette`.
+QualityPalette resolveQualityPalette(const nlohmann::json& global,
+                                     const nlohmann::json& shader);
+
 /// Win-rate loss against the best move — 0 for the best move itself — mapped
 /// onto the quality ramp.
 ///
 /// Relative rather than absolute on purpose: in a game that is already decided
 /// every move's absolute win rate is pinned near 100% or 0%, and a ramp over
 /// that distinguishes nothing. Loss stays informative to the last move.
-glm::vec4 moveQualityColor(double winrateLoss);
+glm::vec4 moveQualityColor(double winrateLoss, const QualityPalette& palette = {});
 
 /// What the analysis report wants drawn, given what the board already carries.
 ///
@@ -253,7 +307,8 @@ glm::vec4 moveQualityColor(double winrateLoss);
 std::vector<EvalLabel> evaluationLabels(const AnalysisReport& report,
                                         const std::set<std::pair<int, int>>& labelled,
                                         const std::set<std::pair<int, int>>& markup,
-                                        size_t maxLabels);
+                                        size_t maxLabels,
+                                        const QualityPalette& palette = {});
 
 /// How many suggestions the board shows at once.
 constexpr size_t DEFAULT_EVAL_LABELS = 5;
