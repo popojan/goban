@@ -191,7 +191,9 @@ TEST_CASE("concurrent writers neither lose entries nor corrupt the buffer") {
     std::vector<std::thread> writers;
     writers.reserve(kThreads);
     for (int t = 0; t < kThreads; ++t) {
-        writers.emplace_back([&log, t]() {
+        // kPerThread is captured explicitly: MSVC requires it, where GCC and
+        // Clang treat reading a constexpr as no capture at all.
+        writers.emplace_back([&log, t, kPerThread]() {
             for (int i = 0; i < kPerThread; ++i) {
                 log.add(t == 0 ? MessageSeverity::Error : MessageSeverity::Info,
                         "10:00:00", "thread " + std::to_string(t));

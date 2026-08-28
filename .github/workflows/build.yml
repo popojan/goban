@@ -96,6 +96,10 @@ jobs:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' }}
     runs-on: windows-latest
     strategy:
+      # Without this a failure in one architecture cancels the other, so x86 has
+      # never once completed: x64 failed first every time and took it with it.
+      # The two are independent artifacts and each is worth knowing about.
+      fail-fast: false
       matrix:
         arch: [x86, x64]
         include:

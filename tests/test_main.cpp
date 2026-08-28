@@ -13,7 +13,14 @@
 // it only gets to do if the default action has not already killed the process.
 // Without this the test binary inherits the hazard without the mitigation — a
 // killed engine's teardown took the whole suite down with signal 13.
+//
+// POSIX only, and guarded the same way main.cpp guards its copy: SIGPIPE does
+// not exist on Windows, where a write to a broken pipe fails as an ordinary
+// error rather than by signal, so there is nothing to disarm. MSVC never saw
+// this file until the release build ran for the first time in six months.
+#ifndef _WIN32
 static const int g_ignoreSigpipe = []() { std::signal(SIGPIPE, SIG_IGN); return 0; }();
+#endif
 
 // goban_core declares this global (GameThread.h, GameRecord.cpp) but the
 // definition lives in the application's main.cpp, which tests do not link.
