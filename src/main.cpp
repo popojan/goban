@@ -612,7 +612,9 @@ int main(int argc, char** argv)
     glfwMakeContextCurrent(window);
     // Vsync paces interactive use; a scripted run wants frames as fast as the
     // GPU can produce them, both for benchmarks and to keep CI runs brisk.
-    glfwSwapInterval(scenarioFile.empty() ? 1 : 0);
+    const bool vsyncWanted = scenarioFile.empty();
+    bool vsyncOn = vsyncWanted;
+    glfwSwapInterval(vsyncOn ? 1 : 0);
 
     // Set window icon from executable resource (Windows only)
 #ifdef _WIN32
@@ -770,6 +772,37 @@ int main(int argc, char** argv)
                 if (scenario.finished()) {
                     scenarioActive = false;
                     AppState::RequestExit();
+                }
+            }
+
+            // Vsync is dropped while the window is unfocused, and this is not a
+            // performance tweak — it is the whole of a freeze.
+            //
+            // Under Wayland a surface that is not being presented receives no
+            // frame callbacks, and with vsync on `eglSwapBuffers` waits for one.
+            // The wait is unbounded: the main thread stops reading the Wayland
+            // socket, so the compositor's `xdg_wm_base.ping` goes unanswered and
+            // it offers to kill us. Measured on Hyprland, moving goban to an
+            // inactive workspace: 12.1 s parked in the swap, eight pings queued
+            // and then all answered in a 36 microsecond burst the instant the
+            // window came back. Nothing was broken — the app was in a swap.
+            //
+            // There is nothing better to test. Hyprland sends no
+            // `wl_surface.leave` and no configure when a window stops being
+            // shown; it simply stops sending frame callbacks, so neither GLFW
+            // nor we can ask whether the surface is visible. Focus is the one
+            // signal that does arrive, and it arrives in time: `wl_keyboard.leave`
+            // landed 262 ms before the swap blocked.
+            //
+            // Unfocused is not the same as hidden, so this costs vsync on a
+            // window that is merely in the background — tearing nobody is
+            // looking at, on frames this event-driven loop only produces when
+            // something actually changed.
+            if (vsyncWanted) {
+                const bool focused = glfwGetWindowAttrib(window, GLFW_FOCUSED) != 0;
+                if (focused != vsyncOn) {
+                    vsyncOn = focused;
+                    glfwSwapInterval(vsyncOn ? 1 : 0);
                 }
             }
 

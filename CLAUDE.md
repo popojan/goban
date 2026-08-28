@@ -643,6 +643,24 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   *not* help: the discard is not about the target. Scripted runs therefore ask
   GLFW for X11 (XWayland counts) when `DISPLAY` is set, and fall back if that
   fails. This is why `screenshot` produced black images for as long as it existed.
+- **Vsync is dropped while the window is unfocused, and that is a freeze fix, not
+  a performance tweak.** Under Wayland a surface that is not being presented gets
+  no frame callbacks, and with vsync on `eglSwapBuffers` waits for one —
+  unbounded. The main thread then stops reading the Wayland socket, so
+  `xdg_wm_base.ping` goes unanswered and the compositor offers to kill the
+  application. Measured on Hyprland by moving goban to an inactive workspace:
+  **12.1 s parked in the swap, eight pings queued and all answered in a 36 µs
+  burst** the instant the window came back — nothing was broken, the app was in a
+  swap. **There is nothing better to test than focus**: Hyprland sends no
+  `wl_surface.leave` and no configure when a window stops being shown, so neither
+  GLFW nor we can ask whether the surface is visible; `wl_keyboard.leave` is the
+  one signal that arrives, and it arrives 262 ms early. Unfocused is not hidden,
+  so the cost is vsync on a background window — tearing nobody is looking at.
+  **It only shows when something is repainting while hidden**, which is why it
+  went unnoticed for so long and why it became easy to hit: engine loading, the
+  intro animation and the wait clock all repaint on a timer. An idle goban never
+  enters a swap and never freezes, which is why four attempts to reproduce it
+  with an idle window all came back clean.
 - **SIGPIPE is ignored.** Two callers need it: `GtpClient` writes into an engine's
   pipe and is written to handle a failed write — which it only gets to do if the
   default disposition has not already killed the process — and the X11 display
