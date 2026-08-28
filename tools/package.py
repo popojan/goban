@@ -35,6 +35,15 @@ EXCLUDE_SUFFIXES = {".swp", ".bak", ".pyc"}
 
 DOCS = ["LICENSE", "README.md", "RELEASE_NOTES.md", "CREDITS.md", "THIRD-PARTY.md"]
 
+GAMES_README = """\
+Games you play are saved here.
+
+Goban writes one SGF per day, a collection holding that day's games, and keeps
+the file it last had open. Nothing here is needed to run the program — the
+folder is shipped so it is obvious where records go, and because a zip cannot
+store an empty directory.
+"""
+
 ENGINE_README = """\
 Put GTP engines here.
 
@@ -169,6 +178,7 @@ def main() -> int:
     # Written to, at runtime, from the working directory. Shipping them empty is
     # what makes the folder runnable straight out of the archive.
     (staging / "games").mkdir()
+    (staging / "games" / "README.txt").write_text(GAMES_README, encoding="utf-8")
     (staging / "engine").mkdir()
     (staging / "engine" / "README.txt").write_text(ENGINE_README, encoding="utf-8")
 
