@@ -80,8 +80,41 @@ for arch in x64 x86; do
     echo "-> $out  ($(du -h "$out" | cut -f1))"
 done
 
+# The gallery. The page's previous images were six years old and two of them
+# showed a menu bar removed in the RmlUi migration, so they advertised a program
+# nobody could download. These are regenerated per release by
+# tools/make-screenshot.sh; copying them here is the last manual-ish step.
+SHOTS="hero territory closeup shader stereo detail"
+echo
+echo "--- images ---"
+for shot in $SHOTS; do
+    for suffix in "" "-thumb"; do
+        src="res/screenshot/${shot}${suffix}.png"
+        [ -f "$src" ] || { echo "warning: no $src (run tools/make-screenshot.sh)"; continue; }
+        cp "$src" "$SITE/static/image/goban-${VERSION}-${shot}${suffix}.png"
+    done
+done
+echo "-> $SITE/static/image/goban-${VERSION}-*.png"
+
+GALLERY=""
+for shot in $SHOTS; do
+    [ -f "res/screenshot/${shot}.png" ] || continue
+    case $shot in
+      stereo) title=' title="anaglyph shader — needs red/cyan glasses"' ;;
+      detail) title=' title="engine evaluation drawn on the board"' ;;
+      *)      title="" ;;
+    esac
+    GALLERY="${GALLERY}      a(href=\"/goban/image/goban-${VERSION}-${shot}.png\")
+        img(src=\"/goban/image/goban-${VERSION}-${shot}-thumb.png\"${title})
+      | &nbsp;
+"
+done
+
 cat <<EOF
 
+Replace the gallery block in $SITE/views/pages/index.pug with:
+
+${GALLERY}
 Add to $SITE/views/pages/index.pug — the download link near the top, and a
 changelog section. The link text is what the analytics event records, so keep it
 the file name:

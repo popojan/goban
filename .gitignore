@@ -8,6 +8,17 @@ build/
 # Assembled release bundles (tools/package.py)
 dist/
 
+# Generated screenshots. The *sources* are tracked — res/screenshot/*.scn,
+# *-user.json and the two SGFs — and tools/make-screenshot.sh regenerates the
+# images from them; tools/release-hrajsi.sh then copies them into the site repo,
+# which is where gallery assets belong. Tracking them here would add ~9 MB of new
+# blobs to the history on every release, for files nothing in this repository
+# reads.
+#
+# res/screenshot.png is deliberately NOT covered by this: it is the README's
+# image and GitHub serves it from the repository.
+res/screenshot/*.png
+
 # Binary executable
 goban
 
