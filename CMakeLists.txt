@@ -178,9 +178,22 @@ function(fetch_rmlui)
     set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
     set(RMLUI_TESTS OFF CACHE BOOL "" FORCE)
 
+    # 6.3 rather than 6.2 for one line: the GL2 backend's macOS branch included
+    # <AGL/agl.h>, a framework Apple removed, so every macOS build failed at
+    # "'AGL/agl.h' file not found" on any recent SDK. Nothing in the file uses
+    # AGL — the include was the only occurrence — and upstream deleted it in 6.3.
+    #
+    # The bump costs two things, both dealt with rather than worked around.
+    # SystemInterface_GLFW now takes the window at construction, so it can no
+    # longer be a file-scope static (see main.cpp). And it creates all six
+    # standard cursors up front, which on X11 raises GLFW_CURSOR_UNAVAILABLE for
+    # any the theme lacks; the three that can fail are `move`, `resize` and
+    # `unavailable`, and no stylesheet here asks for any of them — the only
+    # cursor this interface uses is `pointer`. GlfwErrorCallback demotes that
+    # code, so it no longer opens every session with a warning badge.
     FetchContent_Declare(rmlui
             GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
-            GIT_TAG 6.2)
+            GIT_TAG 6.3)
 
     FetchContent_MakeAvailable(rmlui)
 
@@ -294,8 +307,16 @@ else()
     cmake_language(CALL find_libsgfcplusplus)
 
     if(WIN32)
-        # WIN32_LEAN_AND_MEAN prevents windows.h from including winsock.h
-        add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN)
+        # WIN32_LEAN_AND_MEAN prevents windows.h from including winsock.h.
+        #
+        # NOMINMAX is not optional: windows.h defines `min` and `max` as macros,
+        # which turn every `std::min(...)` / `std::numeric_limits<T>::max()` into
+        # a syntax error — "C2589: '(': illegal token on right side of '::'".
+        # main.cpp defined it for itself, so the failure hid until something in
+        # a *header* used them: GtpClient::scoringTimeout(), the move-quality
+        # ramp in AnalysisService, and libsgfcplusplus's own SgfcMessageID.h.
+        # It belongs here, once, for every target.
+        add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN -DNOMINMAX)
     endif()
 
     # RmlUi backend files (Platform + Renderer)
@@ -305,8 +326,16 @@ else()
     )
 
     if(WIN32)
-        # Windows: vcpkg dependencies
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
+        # Windows: vcpkg dependencies.
+        #
+        # /SUBSYSTEM:WINDOWS used to be set here, in CMAKE_EXE_LINKER_FLAGS —
+        # which is global, so it applied to *every* executable. The application
+        # wants it and says so properly a few hundred lines down
+        # (WIN32_EXECUTABLE TRUE, which is what CMake reads to pick the
+        # subsystem and the entry point). mock_gtp_engine is a console program
+        # with a plain main(), and the global flag sent the linker looking for
+        # WinMain in it: "LNK2019: unresolved external symbol WinMain".
+        # One target's linking is not a project-wide setting.
     elseif(APPLE)
         # iconv is needed by libsgfcplusplus for SGF encoding conversion
         find_library(ICONV_LIBRARY iconv REQUIRED)
@@ -412,6 +441,17 @@ else()
         nlohmann_json::nlohmann_json
         ${CMAKE_THREAD_LIBS_INIT}
     )
+
+    # libsgfcplusplus calls iconv for SGF encoding conversion, and on macOS that
+    # is a separate library rather than part of libc. It was linked into the
+    # application through EXTRA_LIBS, which goban_tests does not use — so the
+    # tests failed to link (`_iconv_open`, `_OpenIconV`, arm64) while the app
+    # built. It belongs on goban_core, PUBLIC, because that is the target that
+    # pulls in libsgfcplusplus; everything linking it then gets iconv too.
+    if(APPLE)
+        find_library(ICONV_LIBRARY iconv REQUIRED)
+        target_link_libraries(goban_core PUBLIC ${ICONV_LIBRARY})
+    endif()
 
     target_compile_options(goban_core PRIVATE ${GOBAN_WARNING_FLAGS})
 

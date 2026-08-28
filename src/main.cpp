@@ -44,6 +44,7 @@
 #include <memory>
 #include <fstream>
 #include <set>
+#include <optional>
 
 #include "MessageLog.h"
 #include "UserSettings.h"
@@ -159,6 +160,13 @@ void ExecuteRestart() {
 // Custom SystemInterface to route RmlUi logs to spdlog
 class GobanSystemInterface : public SystemInterface_GLFW {
 public:
+    // RmlUi 6.3 made the backend's system interface take the window at
+    // construction, where 6.2 was default-constructible. Inheriting the
+    // constructor is the whole adaptation; the consequence is that this can no
+    // longer be a file-scope static, because there is no window until main()
+    // has made one — see `system_interface` below.
+    using SystemInterface_GLFW::SystemInterface_GLFW;
+
     bool LogMessage(Rml::Log::Type type, const Rml::String& message) override {
         switch (type) {
             case Rml::Log::LT_ERROR:
@@ -184,7 +192,11 @@ public:
     }
 };
 
-static GobanSystemInterface system_interface;
+// Constructed once the window exists, and destroyed before GLFW is terminated —
+// ~SystemInterface_GLFW() gives GLFW back the cursors it created. A file-scope
+// object would instead be destroyed during static destruction, after
+// glfwTerminate() has already run.
+static std::optional<GobanSystemInterface> system_interface;
 static RenderInterface_GL2 render_interface;
 
 // Centralized cleanup for graceful exit on errors
@@ -212,6 +224,11 @@ static void CleanupResources(GLFWwindow* window) {
         context = nullptr;  // Will be destroyed by Rml::Shutdown()
     }
     Rml::Shutdown();  // Safe to call even if not initialized
+
+    // Before glfwTerminate(): the destructor calls into GLFW to release the
+    // cursors. Safe if never constructed, and safe twice — CleanupResources()
+    // is deliberately re-entrant.
+    system_interface.reset();
 
     // Cleanup GLFW
     if (window) {
@@ -250,8 +267,20 @@ static void WriteScreenshotPPM(GLFWwindow* window, const std::string& path) {
 
 // GLFW callbacks
 static void GlfwErrorCallback(int error, const char* description) {
-    // Wayland doesn't support window positioning - demote to debug
-    if (error == GLFW_FEATURE_UNAVAILABLE) {
+    // Two GLFW conditions are "this platform cannot do that", not faults, and
+    // there is nothing a user could do about either. Everything else warns, and
+    // reaches the message panel through the log sink.
+    //
+    //  * FEATURE_UNAVAILABLE — Wayland does not support window positioning.
+    //  * CURSOR_UNAVAILABLE — X11 cursor themes need not carry the shapes GLFW
+    //    3.4 added, and RmlUi's backend creates all six up front. It asks for
+    //    RESIZE_ALL, RESIZE_NWSE and NOT_ALLOWED, none of which any stylesheet
+    //    here references — the only cursor this interface asks for is `pointer`,
+    //    which is always available. GLFW returns null and the backend then sets
+    //    no cursor, so the effect is nil; without this the effect was two
+    //    warnings and a badge on the message panel at every startup, which is
+    //    noise in the one place a user is meant to trust.
+    if (error == GLFW_FEATURE_UNAVAILABLE || error == GLFW_CURSOR_UNAVAILABLE) {
         spdlog::debug("GLFW: {}", description);
     } else {
         spdlog::warn("GLFW Error {}: {}", error, description);
@@ -630,7 +659,8 @@ int main(int argc, char** argv)
     // Initialize RmlUi
     render_interface.SetViewport(window_width, window_height);
     Rml::SetRenderInterface(&render_interface);
-    Rml::SetSystemInterface(&system_interface);
+    system_interface.emplace(window);
+    Rml::SetSystemInterface(&*system_interface);
 
     Rml::Initialise();
 
