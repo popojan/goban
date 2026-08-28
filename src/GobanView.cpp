@@ -593,6 +593,21 @@ void GobanView::Render(int w, int h)
         // pass has just written.
         updateAnalysisOverlay();
         updateFloatingLabels();
+
+        // An annotation is two halves on two different flags: the glyph is
+        // built into the overlay's own buffers under UPDATE_OVERLAY, and the
+        // patch of clean board under it is a material in `glStones`, which is
+        // uploaded only under UPDATE_STONES. A repaint carrying just the first
+        // therefore draws a label with the grid still under it, and leaves the
+        // patch of a label that has gone.
+        //
+        // Every caller was expected to know that and ask for both. The wait
+        // indicator did not — it asks for a bare UPDATE_OVERLAY twice a second,
+        // continuously, and precisely while an engine is thinking and the
+        // suggestions are churning, which is how the two halves came apart on
+        // screen. Asking the board whether anything actually changed is one
+        // question in one place, and it cannot be forgotten at a call site.
+        if (board.takeAnnotationDirty()) flags |= UPDATE_STONES;
 	}
 
 	if (flags & UPDATE_STONES) {

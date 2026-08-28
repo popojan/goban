@@ -347,6 +347,29 @@ public:
                          const std::optional<glm::vec4>& color = std::nullopt);
     void removeBoardOverlay(const Position& p);
 
+    /// Whether an annotation patch has been added or removed since this was last
+    /// asked, and clears the record in the asking.
+    ///
+    /// `setBoardOverlay()` and `removeBoardOverlay()` write the annotation
+    /// material straight into `glStones` — the buffer that reaches the GPU only
+    /// under `UPDATE_STONES`, in `GobanShader::shadeIt()`. The glyphs are built
+    /// into the overlay's *own* buffers, which are rebuilt under
+    /// `UPDATE_OVERLAY`. So the two halves of one annotation travel on different
+    /// flags, and a repaint carrying only the second draws a label with no patch
+    /// under it, or leaves a patch behind whose label is gone.
+    ///
+    /// That trap was documented and still caught the wait indicator, which asks
+    /// for a bare `UPDATE_OVERLAY` twice a second — continuously, and precisely
+    /// while an engine is thinking and the suggestions are churning. Relying on
+    /// every caller to remember an implicit coupling had one job and lost it, so
+    /// `GobanView::Update()` now asks *the board* whether the stones need
+    /// uploading rather than asking the caller to have known.
+    [[nodiscard]] bool takeAnnotationDirty() {
+        const bool dirty = annotationDirty;
+        annotationDirty = false;
+        return dirty;
+    }
+
     /// Recolour a label that is already there, leaving its text alone. Nothing
     /// happens if the point carries no label — the evaluation overlay tints
     /// what the navigation overlay wrote, and the two are rebuilt in the same
@@ -416,6 +439,10 @@ public:
     /// copies it in, so moving anywhere gives scoring another chance. Do not
     /// clear it by hand — that reintroduces the retry storm.
     bool territoryFailed;
+
+    /// See takeAnnotationDirty(). Not copied by updateStones(): it describes
+    /// this board's own unflushed writes, not any property of the position.
+    bool annotationDirty = false;
 private:
     Position cursor;
     std::atomic<long> moveNumber{0};

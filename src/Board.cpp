@@ -259,6 +259,9 @@ void Board::setBoardOverlay(const Position& p, const std::string& text,
 
     // Only set annotation material if point is empty (no stone)
     if ((*this)[p].stone == Color::EMPTY) {
+        // glStones only reaches the GPU under UPDATE_STONES; the glyph rides
+        // UPDATE_OVERLAY. See takeAnnotationDirty().
+        if (glStones[idx + 0] != mAnnotation) annotationDirty = true;
         glStones[idx + 0] = mAnnotation;
         // Center the position at the grid intersection for the patch
         glStones[idx - 2] = static_cast<float>(j) - 0.5f * static_cast<float>(boardSize) + 0.5f;
@@ -292,6 +295,7 @@ void Board::removeBoardOverlay(const Position& p) {
 
     if (glStones[idx + 0] == mAnnotation) {
         glStones[idx + 0] = mEmpty;
+        annotationDirty = true;
     }
 }
 

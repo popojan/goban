@@ -1274,3 +1274,81 @@ TEST_CASE("GobanModel::isLegalMove asks the board, and only about placed stones"
     CHECK(model.isLegalMove(Move(Move::INTERRUPT, Color::BLACK)));
     CHECK(model.isLegalMove(Move(Move::KIBITZED, Color::BLACK)));
 }
+
+// ---------------------------------------------------------------------------
+// Annotation patches and their glyphs travel on different repaint flags
+// ---------------------------------------------------------------------------
+//
+// An annotation is two halves. The glyph is built into GobanOverlay's own
+// buffers under UPDATE_OVERLAY; the patch of clean board beneath it is a
+// material in `glStones`, which GobanShader::shadeIt() uploads only under
+// UPDATE_STONES. A repaint carrying one and not the other puts a label on a
+// point with the grid still showing through it, or leaves a patch behind after
+// its label is gone — both of which were seen on screen.
+//
+// The coupling used to be a comment asking every caller to remember. These pin
+// the mechanism that replaced it: the board records the write, and
+// GobanView::Update() asks.
+
+TEST_CASE("setting a board overlay marks the stone buffer dirty") {
+    Board board(9);
+    const Position p(3, 3);
+
+    // Nothing pending on a fresh board.
+    CHECK(board.takeAnnotationDirty() == false);
+
+    board.setBoardOverlay(p, "A");
+    CHECK(board.takeAnnotationDirty() == true);
+    // Taking it clears it — Update() asks once per overlay pass.
+    CHECK(board.takeAnnotationDirty() == false);
+}
+
+TEST_CASE("removing a board overlay marks it dirty too") {
+    // The direction that leaves a patch behind with no label, which is the
+    // symptom that is hardest to explain when you meet it.
+    Board board(9);
+    const Position p(3, 3);
+    board.setBoardOverlay(p, "A");
+    (void)board.takeAnnotationDirty();
+
+    board.removeBoardOverlay(p);
+    CHECK(board.takeAnnotationDirty() == true);
+}
+
+TEST_CASE("re-setting the same overlay does not ask for an upload") {
+    // updateAnalysisOverlay() runs on every overlay pass and rewrites the same
+    // labels; if that dirtied the buffer every time, the flag would mean
+    // "an overlay pass happened" rather than "a patch changed", and the upload
+    // it forces would be unconditional.
+    Board board(9);
+    const Position p(3, 3);
+    board.setBoardOverlay(p, "A");
+    (void)board.takeAnnotationDirty();
+
+    board.setBoardOverlay(p, "B");     // same point, same material, new text
+    CHECK(board.takeAnnotationDirty() == false);
+}
+
+TEST_CASE("a label on an occupied point has no patch, and asks for no upload") {
+    // setBoardOverlay() only lays a patch on an empty point — a stone already
+    // hides the grid. The dirty flag has to agree with that, or every move
+    // number on a stone would force a pointless upload.
+    Board board(9);
+    const Position p(3, 3);
+    board.updateStone(p, Color(Color::BLACK));
+    (void)board.takeAnnotationDirty();
+
+    board.setBoardOverlay(p, "1");
+    CHECK(board.takeAnnotationDirty() == false);
+}
+
+TEST_CASE("removing an overlay that never laid a patch asks for no upload") {
+    Board board(9);
+    const Position p(3, 3);
+    board.updateStone(p, Color(Color::BLACK));
+    board.setBoardOverlay(p, "1");
+    (void)board.takeAnnotationDirty();
+
+    board.removeBoardOverlay(p);
+    CHECK(board.takeAnnotationDirty() == false);
+}
