@@ -814,8 +814,16 @@ void ElementGame::syncPrisonerLabels() {
     const std::string blackTpl = templateText("templatePrisonersBlack", "Black: %d");
 
     // White's prisoners are the black stones taken, and vice versa.
-    const int whiteHasTaken = model.state.capturedBlack;
-    const int blackHasTaken = model.state.capturedWhite;
+    //
+    // From the Board, which is the only thing that counts captures.
+    // GameState::capturedBlack/capturedWhite were initialised to zero and never
+    // assigned anywhere, so these labels read 0 for the whole of every game, and
+    // the bowls stayed empty because the shader is handed the same dead numbers.
+    // Fixing the *pairing* of two permanently-zero values, as this function once
+    // did, could not show it.
+    const auto snap = model.snapshot();
+    const int whiteHasTaken = snap->capturedBlack;
+    const int blackHasTaken = snap->capturedWhite;
 
     for (const char* id : {"cntWhite", "lblPrisonersWhite"}) {
         if (auto* el = doc->GetElementById(id)) {
@@ -1219,15 +1227,25 @@ void ElementGame::OnUpdate()
         view.state.colorToMove = model.state.colorToMove;
         requestRepaint();
     }
-    if ((view.state.capturedBlack != model.state.capturedBlack)
-        || (view.state.capturedWhite != model.state.capturedWhite) /*stones captured */
+    const auto capturedSnap = model.snapshot();
+    const int boardCapturedBlack = capturedSnap->capturedBlack;
+    const int boardCapturedWhite = capturedSnap->capturedWhite;
+    if ((view.capturedBlackShown != boardCapturedBlack)
+        || (view.capturedWhiteShown != boardCapturedWhite) /*stones captured */
         || (view.state.reason != GameState::NO_REASON && model.state.reason == GameState::NO_REASON) /* new game */)
     {
         syncPrisonerLabels();
-        requestRepaint();
+        // UPDATE_STONES, not a bare repaint: these two numbers are uniforms
+        // (iBlackCapturedCount / iWhiteCapturedCount) that GobanShader uploads
+        // only under that flag, and they are what tell the shader how many
+        // stones to draw in the bowls. The default UPDATE_SOME copied the counts
+        // into the view and never got them to the GPU — the same shape as the
+        // annotation patch that travelled on one flag while its glyph travelled
+        // on another.
+        view.requestRepaint(GobanView::UPDATE_STONES);
 
-        view.state.capturedBlack = model.state.capturedBlack;
-        view.state.capturedWhite = model.state.capturedWhite;
+        view.capturedBlackShown = boardCapturedBlack;
+        view.capturedWhiteShown = boardCapturedWhite;
         view.state.reason = model.state.reason;
     }
     if(view.state.reservoirBlack != model.state.reservoirBlack

@@ -409,6 +409,12 @@ public:
     /// the same 0.85-spacing strip of wood the readout uses at the bottom.
     /// Fixed to those two edges whether or not the readout is on, so nothing
     /// ever moves and they can never collide.
+    /// The two move markers. Neither is persisted, so both start on in a fresh
+    /// process — which is what makes a bare toggle deterministic in a script.
+    /// Exposed so a scenario can say so rather than assume it.
+    [[nodiscard]] bool isLastMoveOverlayShown() const { return showLastMoveOverlay; }
+    [[nodiscard]] bool isNextMoveOverlayShown() const { return showNextMoveOverlay; }
+
     bool toggleCoordinates();
     [[nodiscard]] bool areCoordinatesShown() const { return showCoordinates; }
     void setCoordinates(bool shown);
@@ -473,6 +479,20 @@ public:
     } cameraAnim;
 
     GameState state;
+
+    /// What this view last handed the shader — the uniforms deciding how many
+    /// stones are drawn in the bowls. **Not the prisoner count**: that is model
+    /// data and lives in GameSnapshot. This is the per-view record of what has
+    /// been drawn, so a second view of the same model keeps its own and
+    /// ElementGame::OnUpdate() can still do nothing when nothing has changed.
+    ///
+    /// The two roles used to share one field. GameState::capturedBlack was
+    /// serving as both the model's count and this shadow, and the model half was
+    /// never assigned anywhere — so the bowls stayed empty and the prisoner
+    /// labels read 0 for the whole of every game, while Board had the right
+    /// number all along.
+    int capturedBlackShown = 0;
+    int capturedWhiteShown = 0;
 
     std::atomic<int> updateFlag;  // Thread-safe: accessed from main thread and GameThread
 

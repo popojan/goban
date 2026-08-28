@@ -493,6 +493,27 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 - **Keep `availableActions()` pure over plain data.** It must not take a `GobanModel` or `GameThread`: `isThinking()` reads a member only the game loop sets, so the engine-thinking cases would stop being testable — and they are half of what it decides.
 - **The UI thread must not read the SGF tree *or* `GameState`'s strings — it reads `GobanModel::snapshot()`.** The game thread owns that tree and mutates it freely; `GameRecord`'s const accessors take no lock, and its own mutex covers neither the readers nor half the mutators. `uiInputs()` and `dumpState()` take every record fact from the published `GameSnapshot` (ADR-0006). **Whoever changes what the UI displays must publish it**: `onBoardChange()` is the funnel that covers moves, navigation, load, switch, scoring and handicap; `createNewRecord()` and `onBoardSized()` publish for themselves because the new-game path bypasses it. A missed publish shows up as stale UI and the scenario suite catches it — both misses in the original change were caught on the first run. A plain scalar that changes off the position-change path becomes atomic instead, as `GameRecord::unsavedChanges` did; saving is not a position change. **ADR-0006 is complete through stage 5**: `comment`, `markup`, `scoringError` and `passVariationLabel` are all published, so nothing on a per-frame or per-keystroke path reads the record *or* copies a `GameState` string. The player dropdowns compare `getActivePlayer()` — a `size_t` handed out under `PlayerManager::mutex` — rather than `state.black`/`state.white`, because the index is what the widget holds and the string was a race for no information. `GobanModel::onBoardSized()` does `state = GameState()`, reassigning every one of those strings at once, which is the sharpest version of the hazard. What remains by design is listed in the ADR — `hasGameWorthKeeping()`, save/archive, and the dialog seed — all on explicit user actions. Note that `ElementGame`'s old `positionNumber` guard was not wrong, only insufficient: an atomic edge makes a write *visible* but grants no exclusion, so copying a `std::string` or walking a `std::vector` across it is still a use-after-free. The same partial-locking shape has now been found three times — `GameRecord`, `PlayerManager` (writers unlocked while readers locked), and the process pipes — so when a reader crosses this boundary, check the writers before assuming a mutex means anything.
 - **Widget state reads the phase, not `state.reason`.** They diverge after navigating back from a finished game: the phase returns to `Paused` while the reason stays set. See the `state.reason` invariant above.
+- **Prisoner counts come from `Board`, published in `GameSnapshot`. `GameState`
+  never held them.** `GameState::capturedBlack`/`capturedWhite` existed, were
+  initialised to zero and were **never assigned anywhere in the program** — while
+  `Board::capturedCount()` had the right number the whole time. Both readers took
+  the dead pair: the prisoner labels showed 0 for the whole of every game, and
+  the shader was handed 0 for `iBlackCapturedCount`, so **the bowls never held a
+  single prisoner in any game the program has ever rendered**. The fields are
+  gone; the snapshot carries the counts, which is also what makes them safe to
+  read every frame while the game thread rebuilds the board.
+  **The view keeps a shadow of what it last drew** (`GobanView::capturedBlackShown`)
+  and that is not a second copy of the truth — it is the per-view dirty check, so
+  a second view of the same model keeps its own and `OnUpdate()` still does
+  nothing when nothing changed. The two roles sharing one field is what hid this.
+  And the repaint it asks for must carry **`UPDATE_STONES`**: these are uniforms
+  that `GobanShader::shadeIt()` uploads only under that flag, so the bare
+  `requestRepaint()` copied the counts into the view and never got them to the
+  GPU — the same shape as the annotation patch that travelled on one flag while
+  its glyph travelled on another. Pinned by `board_click_stone_in_hand.scn`
+  through `prisoners_drawn_white`, which reports what the *renderer* was handed:
+  every assertion on `captured_white` passed throughout, because the Board was
+  right all along. Same distinction as `sounds_played`.
 - **A quantity displayed in two places is written by one function.**
   `ElementGame::syncPrisonerLabels()` writes all four prisoner labels. It was two
   copies, and they disagreed: `capturedBlack` counts *black stones removed*, so

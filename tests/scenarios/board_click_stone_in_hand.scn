@@ -78,3 +78,38 @@ wait_idle
 expect move_count 3
 expect black_stones 2
 expect white_stones 1
+
+# Prisoners reach the renderer, not just the board.
+#
+# `captured_white` is what the Board counted; `prisoners_drawn_white` is what the
+# shader was handed, and that is the number deciding how many stones sit in the
+# bowls. They were not the same thing: the renderer was fed
+# GameState::capturedWhite, which was initialised to zero and never assigned
+# anywhere in the program, so the bowls stayed empty and the prisoner labels read
+# 0 for the whole of every game — while every assertion on captured_white passed,
+# because the Board was right all along. Same distinction as sounds_played.
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+# Black B1, White A1, Black A2 — which takes the corner stone. Black moves
+# first, so the colours fall out of the order.
+click 1 0
+click 1 0
+wait_until move_count >= 1
+click 0 0
+click 0 0
+wait_until move_count >= 2
+click 0 1
+click 0 1
+wait_until move_count >= 3
+
+expect captured_white 1
+expect captured_black 0
+# wait_until, not expect: this reports what reached the renderer, so it needs a
+# frame — and that frame has to carry UPDATE_STONES, which is the other half of
+# the bug. A bare repaint copied the count into the view and never uploaded it.
+wait_until prisoners_drawn_white 1
+expect prisoners_drawn_black 0

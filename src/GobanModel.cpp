@@ -33,7 +33,10 @@ void GobanModel::onBoardSized(int boardSize) {
 	calcCapturedWhite = 0;
 
     metrics.calc(boardSize);
-    calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
+    // The arguments are overwritten with Metrics::maxc on entry: this lays out
+    // bowl positions for every slot, and the *count* uniforms decide how many
+    // are drawn. It never depended on a live capture count.
+    calcCaptured(metrics, 0, 0);
     state.metricsReady = true;
 
     // The record was replaced or resized out from under the UI. onBoardChange
@@ -291,6 +294,9 @@ void GobanModel::publishSnapshot() {
     next->hasResult     = game.hasGameResult();
     next->scoredEnd     = game.shouldShowTerritory();
     next->resultMessage = game.getResultMessage();
+    // From the Board, which is the only thing that counts captures.
+    next->capturedBlack = board.capturedCount(Color::BLACK);
+    next->capturedWhite = board.capturedCount(Color::WHITE);
     next->colorToMove   = game.getColorToMove();
     next->variationMoves = game.getVariations();
     next->variations    = next->variationMoves.size();

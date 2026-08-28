@@ -303,8 +303,8 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) cons
     glUniform2fv(iResolution, 1, glm::value_ptr(view.resolution));
     if (updateFlag & GobanView::UPDATE_STONES) {
         spdlog::debug("place stones via glBufferData()");
-        glUniform1i(iBlackCapturedCount,  view.state.capturedBlack);
-        glUniform1i(iWhiteCapturedCount, view.state.capturedWhite);
+        glUniform1i(iBlackCapturedCount,  view.capturedBlackShown);
+        glUniform1i(iWhiteCapturedCount, view.capturedWhiteShown);
         glUniform1i(iBlackReservoirCount,  static_cast<int>(view.state.reservoirBlack / 2));
         glUniform1i(iWhiteReservoirCount, static_cast<int>(view.state.reservoirWhite / 2));
         glUniform4fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);

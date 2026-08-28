@@ -44,7 +44,10 @@ public:
     Color colorToMove;
     std::string black;
     std::string white;
-    int capturedBlack, capturedWhite;
+    /// Prisoner counts do NOT live here. Board::capturedCount() is the only
+    /// thing that counts captures; these fields were initialised to zero and
+    /// never assigned, so every reader of them displayed 0 for the whole of
+    /// every game. See ElementGame::syncPrisonerLabels().
     int reservoirBlack, reservoirWhite;
     float komi;
     int handicap;
@@ -64,7 +67,7 @@ public:
     std::string passVariationLabel;  // e.g. "11b" when a pass variation exists during navigation
     std::string scoringError;  // Error detail for SCORING_FAILED message
 
-    GameState(): colorToMove(Color::BLACK), capturedBlack(0), capturedWhite(0),
+    GameState(): colorToMove(Color::BLACK),
                  reservoirBlack(32), reservoirWhite(32),
                  komi(0.5f), handicap(0), boardSize(19), result(0.0f), cmd("xxx"), msg(PAUSED),
                  reason(NO_REASON), scoreDelta(0.0f), winner(Color::EMPTY), metricsReady(false),

@@ -103,6 +103,17 @@ wait_idle
 toggle_coordinates on
 toggle_evaluation_readout on
 toggle_evaluation_moves on
+# The recorded continuation is switched off: "48" and the engine's A-E are two
+# different kinds of "play here" and reading them on one board is confusing. The
+# last-move marker stays — that is context, not a suggestion.
+#
+# A bare toggle, because this one takes no on|off argument. That is only
+# deterministic because the marker is not persisted and so always starts on in a
+# fresh process; the assertions either side say so, rather than trusting it.
+expect next_move_shown true
+toggle_next_move_overlay
+expect next_move_shown false
+expect last_move_shown true
 # The clock says "waiting" and would be caught mid-analysis. Off for the shot.
 toggle_wait_clock off
 

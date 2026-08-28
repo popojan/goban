@@ -58,6 +58,17 @@ struct GameSnapshot {
 
     GameState::Message resultMessage = GameState::NONE;
 
+    /// Prisoners at the cursor: stones of that colour removed from the board.
+    /// `capturedBlack` is what *White* has taken.
+    ///
+    /// Published rather than read off the model's Board, because the UI wants
+    /// them every frame — the prisoner labels and the count of stones the shader
+    /// draws in the bowls — while the game thread is free to rebuild that Board
+    /// under it. They lived in GameState before, where nothing ever assigned
+    /// them, so both displays read 0 for the whole of every game.
+    int capturedBlack = 0;
+    int capturedWhite = 0;
+
     // --- Stage 2: what the command handlers read ----------------------------
     // boardClick(), `pass` and keyPress() all consult the record to decide what
     // a click or a key means before handing the work to the game thread. They

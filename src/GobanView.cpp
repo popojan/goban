@@ -240,8 +240,8 @@ GobanView::GobanView(GobanModel& m)
     // Sync initial state from model to prevent stale default values (e.g., reservoir counts)
     state.reservoirBlack = model.state.reservoirBlack;
     state.reservoirWhite = model.state.reservoirWhite;
-    state.capturedBlack = model.state.capturedBlack;
-    state.capturedWhite = model.state.capturedWhite;
+    capturedBlackShown = model.snapshot()->capturedBlack;
+    capturedWhiteShown = model.snapshot()->capturedWhite;
     // Initialize colorToMove to EMPTY so first OnUpdate() will sync with model and update player toggle indicators
     state.colorToMove = Color::EMPTY;
 }

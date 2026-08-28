@@ -2121,6 +2121,13 @@ nlohmann::json GobanControl::dumpState() const {
     s["white_stones"]   = model.board.stonesOnBoard(Color::WHITE);
     s["captured_black"] = model.board.capturedCount(Color::BLACK);
     s["captured_white"] = model.board.capturedCount(Color::WHITE);
+    // What the *renderer* was handed, as against what the board knows. These
+    // are the uniforms that decide how many stones sit in the bowls, and they
+    // were permanently zero while the two keys above were right — so a scenario
+    // asserting only the board's count could not see it. Same distinction as
+    // sounds_played and overlay_glyphs.
+    s["prisoners_drawn_black"] = view.capturedBlackShown;
+    s["prisoners_drawn_white"] = view.capturedWhiteShown;
 
     // Lifecycle flags — the ones the Design Invariants are written about
     s["mode"]           = (engine.getGameMode() == GameMode::ANALYSIS) ? "analysis" : "match";
@@ -2262,6 +2269,8 @@ nlohmann::json GobanControl::dumpState() const {
         s["eval_readout_shown"] = view.isEvaluationReadoutShown();
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());
         s["coordinates_shown"] = view.areCoordinatesShown();
+    s["last_move_shown"] = view.isLastMoveOverlayShown();
+    s["next_move_shown"] = view.isNextMoveOverlayShown();
         s["coord_color"] = hexFromColor(view.coordinateColor());
         s["coord_offset"] = view.coordinateOffset();
         s["eval_color"] = hexFromColor(view.readoutColor());
