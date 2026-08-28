@@ -25,6 +25,7 @@ OUT_DIR="res/screenshot"
 PPM="$OUT_DIR/hero.ppm"
 HERO="$OUT_DIR/hero.png"
 PREVIEW="res/screenshot.png"      # what README.md references
+DETAIL="$OUT_DIR/detail.png"      # 1:1 crop, for hraj.si
 
 if [ ! -x ./goban ]; then
     echo "error: ./goban not built" >&2
@@ -46,11 +47,12 @@ if [ ! -f "$PPM" ]; then
     exit 1
 fi
 
-python3 - "$PPM" "$HERO" "$PREVIEW" "$PREVIEW_W" <<'PY'
+python3 - "$PPM" "$HERO" "$PREVIEW" "$PREVIEW_W" "$DETAIL" <<'PY'
 import sys
 from PIL import Image
 
-ppm, hero, preview, width = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+ppm, hero, preview, width, detail = (sys.argv[1], sys.argv[2], sys.argv[3],
+                                     int(sys.argv[4]), sys.argv[5])
 im = Image.open(ppm)
 im.save(hero)
 print("hero    %s  %dx%d" % (hero, im.size[0], im.size[1]))
@@ -61,6 +63,28 @@ print("hero    %s  %dx%d" % (hero, im.size[0], im.size[1]))
 h = max(1, round(width * im.size[1] / im.size[0]))
 im.resize((width, h), Image.LANCZOS).save(preview)
 print("preview %s  %dx%d" % (preview, width, h))
+
+# The detail crop, at native resolution — no resampling, because the point is to
+# show the annotations at the size they are actually drawn.
+#
+# 880 px wide: GitHub's .markdown-body is max-width 980 with 45 px padding, so
+# about 890 px is usable, and images carry max-width:100% — anything wider is
+# scaled down and is no longer 1:1. (On a narrow window it scales anyway; that
+# cannot be helped.) For a page you control, cut it to that page's content width.
+#
+# The band holds all five suggestions and the readout, so it shows the whole
+# green-amber-red ramp rather than a couple of letters. Coordinates are in hero
+# pixels and follow the camera pinned in hero-user.json — change the framing and
+# they need re-cutting, which is why a capture of another size is skipped rather
+# than cropped blindly.
+BAND = (590, 460, 1470, 990)
+if im.size == (1920, 1080):
+    c = im.crop(BAND)
+    c.save(detail)
+    print("detail  %s  %dx%d  (1:1, no resampling)" % (detail, c.size[0], c.size[1]))
+else:
+    print("detail  skipped: hero is %dx%d, and the crop band assumes 1920x1080"
+          % im.size)
 PY
 
 rm -f "$PPM"
