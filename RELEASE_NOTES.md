@@ -62,6 +62,10 @@ compositor offering to kill the application whenever its window was not on scree
 - macOS builds are experimental and unsigned.
 - The evaluation needs an engine that supports `lz-analyze` or `kata-analyze`;
   GNU Go does not.
+- **The first launch on a machine pauses while the shader is compiled** — around
+  15 seconds on one Windows/NVIDIA box, 6 on Intel — with the window unresponsive
+  and nothing to say so. The graphics driver caches the result, so it happens
+  once and every later start is immediate. It is a genuine wait, not a hang.
 
 ## Building
 
