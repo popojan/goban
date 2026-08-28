@@ -58,12 +58,6 @@ public:
     bool getEvaluationMoves() const { std::lock_guard<std::mutex> lock(mutex); return evaluationMoves; }
     void setEvaluationMoves(bool value);
 
-    /// The evaluation as text on the board's near edge instead of in the panel.
-    /// Off by default: it replaces a readout that always works with one that is
-    /// an open question about how a live element feels in world space.
-    bool getEvaluationOnBoard() const { std::lock_guard<std::mutex> lock(mutex); return evaluationOnBoard; }
-    void setEvaluationOnBoard(bool value);
-
     /// Where the board readout sits along the edge: "center", "left", "right".
     /// A taste question, so it is stored rather than decided.
     std::string getEvaluationAlign() const { std::lock_guard<std::mutex> lock(mutex); return evaluationAlign; }
@@ -264,7 +258,6 @@ private:
     // Live evaluation overlay
     bool evaluationEnabled = false;
     bool evaluationMoves = false;
-    bool evaluationOnBoard = false;
     bool coordinates = false;
     std::string evaluationAlign = "center";
     std::string anaglyph;

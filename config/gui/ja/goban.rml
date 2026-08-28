@@ -47,7 +47,6 @@
                             <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">最後の手</div>
                             <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">次の手</div>
                             <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">候補手</div>
-                            <div class="cmd toggle_evaluation_board unselected" id="cmdEvaluationBoard" onmouseup="toggle_evaluation_board">盤上に形勢</div>
                             <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">座標</div>
                         </div>
                         <div class="grp">
@@ -217,15 +216,6 @@
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
-        <!-- Live evaluation (ADR-0007). A third display surface on purpose: it
-             carries a value that is continuously *true*, where #lblMessage
-             carries things that *happened once*. Placement is one rule in
-             base.rcss (#grpAnalysis). -->
-        <div id="grpAnalysis" class="hide">
-            <div id="barEval"><div id="barEvalFill"></div></div>
-            <div id="lblEvalWinrate"></div>
-            <div id="lblEvalScore"></div>
-        </div>
 
         <!-- Status indicator and the log behind it. Placement is one rule in
              base.rcss (#grpStatus); nothing here depends on where it sits. -->
@@ -248,8 +238,6 @@
     <!-- Status indicator templates. %s is the engine name for the loading case,
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">%s を読み込み中…</div>
-    <div class="template" id="tplStatusSyncing">エンジンを同期中…</div>
-    <div class="template" id="tplStatusThinking">%s が考えています…</div>
     <div class="template" id="tplStatusMessages">× メッセージ</div>
     <div class="template" id="tplStatusWarning">⚠ メッセージ (%d)</div>
     <div class="template" id="tplStatusError">⚠ メッセージ (%d)</div>
@@ -257,9 +245,6 @@
     <!-- Live evaluation. Everything is in Black's frame of reference:
          engines report for the side to move, so raw numbers flip every
          move and read as noise. -->
-    <div class="template" id="tplEvalWinrate">黒 %d%%</div>
-    <div class="template" id="tplEvalScoreBlack">黒+%.1f</div>
-    <div class="template" id="tplEvalScoreWhite">白+%.1f</div>
 
     <!-- Status and command feedback -->
     <div class="template" id="templateKomi">コミ: %.1f</div>

@@ -13,6 +13,39 @@ const char *font_path = nullptr;
 
 static std::array<std::shared_ptr<GlyphyBuffer>, 3> buffer;
 
+// The atlas the font is warmed with: the fixed set plus whatever the
+// configuration asks to be drawn, with the font asked about every character.
+//
+// The check matters more than the folding. The *shipped* overlay font is Roboto:
+// 98 glyphs, ASCII only — no ●, no ○, not even •. Only the CJK font that ships
+// for zh/ja/ko has them. So someone configuring a stone glyph against the
+// default font would otherwise get a blank margin and nothing anywhere to
+// explain it, which is exactly the silent failure the atlas has always been
+// capable of and never reported.
+std::string GobanOverlay::atlasString(FT_Face face) {
+	std::vector<std::string> extra;
+	if (config) {
+		const auto annotations = config->data.value("annotations", nlohmann::json::object());
+		for (const char* key : {"wait_glyph", "wait_glyph_syncing", "atlas_extra"}) {
+			const std::string s = annotations.value(key, std::string());
+			if (!s.empty()) extra.push_back(s);
+		}
+	}
+	const std::string atlas = Wait::atlasWith(extra);
+
+	if (face) {
+		for (const auto& ch : Wait::utf8Chars(atlas)) {
+			const unsigned long cp = Wait::codepoint(ch);
+			if (FT_Get_Char_Index(face, cp) == 0) {
+				spdlog::warn("Overlay font has no glyph for U+{:04X} ('{}'); it will "
+				             "not be drawn. The shipped overlay font is ASCII only — "
+				             "point fonts.overlay at a font that has it.", cp, ch);
+			}
+		}
+	}
+	return atlas;
+}
+
 std::array<Layer, 3> GobanOverlay::layers = {
 	{ { 0.0f, glm::vec4(0.0,0.0,0.0, 1.0) },
 	{ 1.0f, glm::vec4(0.9, 0.9, 0.9, 1.0) },
@@ -50,6 +83,8 @@ bool GobanOverlay::init() {
 
     font = std::make_shared<GlyphyFont>(ft_face, st->get_atlas());
 
+	const std::string atlas = atlasString(ft_face);
+
 	for (size_t i = 0; i < layers.size(); ++i) {
 		spdlog::debug("Creating overlay buffer[{0}]", i);
 	    auto b = std::make_shared<GlyphyBuffer>();
@@ -59,12 +94,7 @@ bool GobanOverlay::init() {
         // Warms the atlas; the geometry is cleared before anything is drawn, so
         // the colour is irrelevant here.
         static const GLfloat white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-        // Every character that can ever be drawn has to be in the atlas. The
-        // punctuation is for the evaluation readout ("B+4.5", "62%"); the font
-        // has all of it, but a glyph absent from this string simply does not
-        // appear.
-	    b->add_text("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#^O+-.%",
-	                font, 12.0, white);
+	    b->add_text(atlas.c_str(), font, 12.0, white);
 		buffer[i] = b;
 	}
 

@@ -684,31 +684,6 @@ void GobanControl::buildRegistry() {
         ctx.checked = next;
     });
 
-    add("toggle_evaluation_board", 0, 1,
-        "[on|off] — show the evaluation on the board's edge instead of in the panel",
-        [this](CommandContext& ctx) {
-        if (!actions().evaluation) {
-            spdlog::debug("toggle_evaluation_board refused by availableActions()");
-            ctx.notifyMenu = false;
-            return;
-        }
-        bool next = !view.isEvaluationOnBoard();
-        if (!ctx.args.empty()) {
-            const std::string arg = toLower(ctx.args[0]);
-            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
-                && arg != "1" && arg != "0") {
-                spdlog::warn("toggle_evaluation_board: expected on or off, got '{}'",
-                             ctx.args[0]);
-                ctx.notifyMenu = false;
-                return;
-            }
-            next = (arg == "on" || arg == "true" || arg == "1");
-        }
-        view.setEvaluationOnBoard(next);
-        UserSettings::instance().setEvaluationOnBoard(next);
-        ctx.checked = next;
-    });
-
     add("evaluation_align", 0, 1,
         "[left|center|right] — where the board readout sits along the edge; "
         "with no argument, cycles through them",
@@ -2137,6 +2112,15 @@ nlohmann::json GobanControl::dumpState() const {
         s["status_text"] = parent->statusText();
     }
 
+    // The two game waits, which the board reports rather than the status line.
+    // Same argument as status_text above and for the same reason it replaced a
+    // bare isThinking(): what was *painted* is the thing that was missing, so
+    // that is what a scenario asserts. `wait_text` is empty during the grace
+    // period, when the wait is real but deliberately not yet mentioned — so the
+    // kind and the text are both reported, and they are not the same question.
+    s["wait_indicator"] = waitKindName(view.waitIndicator());
+    s["wait_text"] = view.waitIndicatorText();
+
     // Sounds mixed all the way to their end, not merely requested. The
     // distinction is the whole point: a request the mixer never saw looked
     // exactly like one it played, which is why a swallowed stone sound had no
@@ -2219,11 +2203,10 @@ nlohmann::json GobanControl::dumpState() const {
         const auto& analysis = parent->getAnalysis();
         s["eval_enabled"] = analysis.isEnabled();
         s["eval_state"]   = analysisStateName(analysis.state());
-        // The board annotations are a separate feature from the panel, and off
-        // by default — `eval_labels` reading 0 with the panel running is the
-        // normal case, not a fault.
+        // The move suggestions are a separate feature from the readout, and off
+        // by default — `eval_labels` reading 0 with the evaluation running is
+        // the normal case, not a fault.
         s["eval_moves_shown"] = view.isAnalysisOverlayShown();
-        s["eval_on_board"] = view.isEvaluationOnBoard();
         s["eval_board_text"] = view.evaluationReadoutText();
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());
         s["coordinates_shown"] = view.areCoordinatesShown();

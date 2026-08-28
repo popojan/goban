@@ -127,17 +127,13 @@ wait_until eval_state disabled
 expect eval_enabled false
 expect eval_winrate -1
 
-# The diegetic readout: the same numbers on the board's near edge instead of in
-# the panel. One readout in one place — turning it on takes the panel away
-# rather than saying the same thing twice.
+# The readout lives on the board's near edge, and nowhere else. It began as an
+# experiment beside an RmlUi panel; the panel is gone (ADR-0012), so there is no
+# placement setting left to exercise — the evaluation is on the board, or it is
+# off, which is what `toggle_evaluation` above already decides.
 toggle_evaluation on
 wait_until eval_state running
 wait_until eval_winrate 60
-expect eval_on_board false
-
-toggle_evaluation_board on
-expect eval_on_board true
-expect eval_winrate 60
 
 # The composed text, which is the only part of the board readout a headless run
 # can check — the glyphs themselves are never drawn here. Black leads at 60%,
@@ -166,8 +162,9 @@ wait_until has_result true
 expect eval_state running
 wait_until eval_board_text ""
 
-toggle_evaluation_board off
-expect eval_on_board false
-# wait_until, not expect: this key reports what was last *drawn*, so it needs a
-# frame to catch up — same as eval_labels.
+# And switching the evaluation off takes it away entirely. wait_until, not
+# expect: this key reports what was last *drawn*, so it needs a frame to catch
+# up — same as eval_labels.
+toggle_evaluation off
+wait_until eval_state disabled
 wait_until eval_board_text ""

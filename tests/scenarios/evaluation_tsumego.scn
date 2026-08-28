@@ -36,7 +36,13 @@ expect can_evaluation false
 wait_until eval_state disabled
 expect eval_labels 0
 expect eval_tints 0
-expect eval_board_text ""
+# wait_until, not expect: this key reports what was last *drawn*, so it needs a
+# frame to catch up after AnalysisService drops the report — same as eval_labels.
+# It used to pass as an `expect` for the wrong reason: the board readout was
+# behind a placement toggle that defaulted off, so there was never anything to
+# clear. With the RmlUi panel retired (ADR-0012) the readout is the only surface
+# and is always live, so the frame actually has to happen.
+wait_until eval_board_text ""
 
 # Suppressed, not switched off: the user's choice is untouched, so it is still
 # there to restore. Asserting this is what stops a future fix from "solving" the

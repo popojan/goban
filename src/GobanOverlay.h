@@ -5,6 +5,7 @@
 #include  "glyphy/GlyphyFont.h"
 #include "GobanModel.h"
 #include "Camera.h"
+#include "WaitIndicator.h"
 #include <GlyphyState.h>
 
 class GobanView;
@@ -80,6 +81,11 @@ public:
 	void setFloatingLabels(std::vector<FloatingLabel> labels) {
 		floating = std::move(labels);
 	}
+
+	/// Wait::BASE_ATLAS plus every character the configuration asks to be drawn,
+	/// warning about any the font cannot supply. The composition itself is
+	/// Wait::atlasWith() in WaitIndicator.h, where it tests without a font.
+	static std::string atlasString(FT_Face face);
 private:
     FT_Library ft_library;
     FT_Face ft_face;

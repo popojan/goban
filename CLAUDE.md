@@ -397,19 +397,19 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   either one alone fixes nothing: `getIdleTimeout()` did not cover
   `isSyncingEngines()`, so the loop blocked in `glfwWaitEvents()` and drew no
   frame at all during the sync — and there was no message to draw. Both are
-  there now (`tplStatusSyncing`, in all five languages, with an English
-  fallback). Same trap as the exit hang: no input event arrives, so nothing
+  there now. Same trap as the exit hang: no input event arrives, so nothing
   repaints, so nothing can be reported.
   **And the same hole was open for a genmove — the longest wait of the three.**
   Nothing in the UI read `isThinking()` at all, so an engine searching was a
   greyed toolbar and a board that did not move: 30.9 s measured for one kibitz
   from the stock 9x9 KataGo on a CPU backend, reported as "nothing happens".
-  Both halves again — `getIdleTimeout()` now covers `isThinking()`, and
-  `tplStatusThinking` names the engine, because with several configured
-  "thinking" does not say which. Pinned by `kibitz_two_engines.scn`, which
-  asserts `status_text` rather than the condition behind it: what was painted is
-  the thing that was missing. *The status bar itself is provisional — see the
-  diegetic-HUD direction; replace the surface, keep both halves.*
+  Both halves again — `getIdleTimeout()` now covers `isThinking()`, and there is
+  something to draw. **The surface changed and both halves survived it**
+  (ADR-0012): the text banners `tplStatusThinking` / `tplStatusSyncing` are gone,
+  replaced by the wait indicator on the board, and `getIdleTimeout()` still has
+  to keep waking the loop — an animation needs that more than text did. Pinned by
+  `kibitz_two_engines.scn`, which asserts `wait_indicator` and `wait_text` rather
+  than the condition behind them: what was painted is the thing that was missing.
 - **A click that cannot place a stone can still mean Start.** When it is an
   engine's turn, `boardClick()` dispatches the `start` command — by asking
   `availableActions()` a *different* question (`a.start`), never by going round
@@ -536,18 +536,57 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   so it is marked `# sound: on` and skipped unless `GOBAN_SCENARIO_AUDIO=1`.
 
 ### Telling the User Something
-- **Three surfaces, and they do not overlap.** `#lblStatus` / `#pnlLog` (top left)
-  carry *application* status: which engine is still loading, and a badge for
-  warnings and errors. `#lblMessage` (bottom, centre) carries *game* content —
-  results, SGF comments — plus command feedback and confirmation prompts.
-  `#grpAnalysis` (bottom right) carries the live evaluation. Loading
-  text used to live in `lblMessage`; it was unnamed, English in every language,
-  and competing with four other claimants.
-- **The first two split on ownership; the third splits on tense.** `#lblMessage`
-  carries **events** — things that happened once, that scroll past.
-  `#grpAnalysis` carries **state** — a value that is continuously true and
-  repaints twice a second. That is why the evaluation could not join the message
-  box as a fifth claimant, and it is the rule any further surface has to answer.
+- **Two panels, and the board. State goes on the board** (ADR-0012).
+  `#lblStatus` / `#pnlLog` (top left) carry *application* status: which engine is
+  still loading, and a badge for warnings and errors. `#lblMessage` (bottom,
+  centre) carries *game* content — results, SGF comments — plus command feedback
+  and confirmation prompts. Loading text used to live in `lblMessage`; it was
+  unnamed, English in every language, and competing with four other claimants.
+- **The two panels split on ownership; anything continuously true splits off
+  onto the board.** `#lblMessage` carries **events** — things that happened once,
+  that scroll past. **State** — a value that is continuously true — goes in the
+  wood margin through the overlay's glyph pass: the evaluation readout, and the
+  wait indicator. There was a third panel, `#grpAnalysis`, and retiring it is
+  ADR-0012: keeping a placement toggle between it and the board version meant
+  shipping the worse surface as the default, and a choice between two renderings
+  of one fact is a failure to decide rather than a feature. Anything new that
+  wants to show continuous state has no panel to join, which is the point.
+- **A board annotation is carved, not lit.** No pulsing, no fading, no dimming
+  anywhere in the margin. An animated opacity reads as a screen effect laid over
+  the scene rather than as part of it, which is the one quality the diegetic
+  display exists to have. This killed a pulsing thinking-mark that had been
+  built and tested, and it is why `annotations.readout_stale_color` ships fully
+  transparent (below). Motion is allowed when it is *physical*: the wait
+  indicator's second count ticking over is what a clock beside a board does, and
+  it doubles as the repaint gate, so a wait costs one frame per second rather
+  than the twenty `getIdleTimeout()` offers.
+- **The wait indicator is what `#lblStatus` used to say in words.** `WaitKind`
+  is `None` / `Thinking` / `Syncing`, told to the view once per frame by
+  `ElementGame::syncStatusIndicator()`, which is where both conditions were
+  already computed. Two labels — a configurable mark and an elapsed count — laid
+  out left to right from one anchor at the free end of the bottom margin, so
+  they cannot drift apart. `dumpState()` reports `wait_indicator` (the kind) and
+  `wait_text` (what was actually composed and placed); they are different
+  questions, because during the grace period the wait is real and deliberately
+  unmentioned. **The 0.5 s grace is not decoration**: GNU Go answers a genmove in
+  13 ms, so without it every move of a bot match flashes the mark for one frame,
+  which is the "something is broken" reading the indicator exists to prevent.
+  The clock runs from the true start, so the first count shown is honest.
+- **The mark is anonymous, and that is a known cost.** The banner named the
+  engine, and with several configured "thinking" does not say which. Colour
+  cannot carry it — `GobanOverlay::eyeInk()` flattens hue to brightness under any
+  stereo shader — so the name lives only in the log for now. Open question in
+  ADR-0012; do not treat the omission as settled.
+- **The glyph atlas is composed, and a missing glyph is now loud.**
+  `Wait::atlasWith()` folds every character the configuration asks to be drawn
+  into `Wait::BASE_ATLAS`, and `GobanOverlay::atlasString()` asks the font about
+  each one. The atlas used to be a string literal, which made it a *silent* gate
+  — a character not in it simply does not appear. That was survivable while every
+  drawable string was written in C++ and stopped being so with
+  `annotations.wait_glyph`. **The shipped overlay font is Roboto: 98 glyphs,
+  ASCII only** — no `●`, no `○`, not even `•`. Only the CJK font that ships for
+  zh/ja/ko has them, so the default mark is `O` and a real stone glyph needs
+  `fonts.overlay` pointed at a font that has one.
 - **Diagnostics reach the user through a spdlog sink, not through call sites.**
   `installMessageLogSink()` feeds `MessageLog`, so every existing
   `spdlog::warn`/`error` surfaces without being touched, and a new one surfaces
@@ -754,9 +793,17 @@ of its decisions, and `tests/test_analysis.cpp` plus
   tenth of a point on screen, which reads as a bug. A **resignation** scores
   nothing and keeps the readout, and navigating back off the end brings it back,
   because `scoredEnd` follows the cursor.
-- **Stale is a second colour, not a factor.** `annotations.readout_stale_color`
-  defaults to `readout_color`, so the guard is invisible until someone opts in.
-  Multiplying an alpha the user has already tuned down has no defensible default.
+- **Stale is a second colour, not a factor** — and it ships fully transparent, so
+  a stale readout is **blanked, not dimmed**. This deliberately reverses ADR-0007
+  decision 13, which argued for dimming "because blanking would flicker once per
+  move"; the flicker is accepted. A half-faded number reads as a fault or as a
+  distraction, and the rule is that the information is either correct and fully
+  present or it is absent — the same rule that keeps the wait mark from pulsing.
+  `annotations.readout_stale_color` is `#00000000` in `config/base.json` and is
+  Jan's own choice, made by looking at it; **do not "fix" it back to
+  `readout_color`.** The mechanism stays a second colour rather than a factor
+  over the first, because multiplying an alpha the user has already tuned down
+  has no defensible default — so anyone who prefers dimming can still have it.
 - **Annotation ink is global by default and overridable per shader.** It belongs
   to the shader, which is what decides the board is wood-coloured, but all six
   shaders draw the same board today, so `annotations` in `config/base.json` is

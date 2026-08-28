@@ -576,11 +576,10 @@ void ElementGame::performDeferredInitialization() {
     // the *process* does not, and will not until the user asks for it.
     analysis.start();
     analysis.setEnabled(UserSettings::instance().getEvaluationEnabled());
-    // Restored separately from the panel: it is a separate feature, and its
-    // default is off so that turning the panel on never silently starts
-    // pointing at the board.
+    // Restored separately from the evaluation itself: the suggestions are a
+    // separate feature, and their default is off so that turning the evaluation
+    // on never silently starts pointing at the board.
     view.setAnalysisOverlay(UserSettings::instance().getEvaluationMoves());
-    view.setEvaluationOnBoard(UserSettings::instance().getEvaluationOnBoard());
     view.setCoordinates(UserSettings::instance().getCoordinates());
     if (auto align = GobanView::parseAlign(UserSettings::instance().getEvaluationAlign())) {
         view.setEvaluationAlign(*align);
@@ -619,6 +618,19 @@ void ElementGame::performDeferredInitialization() {
 /// hold that state for a minute while every action is correctly greyed out and
 /// indistinguishable from a broken program.
 void ElementGame::syncStatusIndicator() {
+    // The two game waits are reported by the board itself, not by this line: a
+    // blinking mark and an elapsed count in the wood margin, drawn through the
+    // overlay's glyph pass so every shader gets them and each eye of a stereo
+    // one gets its own. See WaitKind. This line keeps the two tenants that are
+    // *about the application* rather than about the game — which engine is still
+    // loading, and the message badge.
+    //
+    // Told every frame rather than on change: setWaitIndicator() is what keeps
+    // asking for the repaint that animates the blink.
+    view.setWaitIndicator(engine.isSyncingEngines() ? WaitKind::Syncing
+                          : engine.isThinking()     ? WaitKind::Thinking
+                                                    : WaitKind::None);
+
     auto context = GetContext();
     if (!context) return;
     auto doc = context->GetDocument("game_window");
@@ -648,30 +660,6 @@ void ElementGame::syncStatusIndicator() {
     } else if (!loading.empty()) {
         text = Rml::CreateString(getTemplateText(context, "tplStatusLoading").c_str(),
                                  loading.c_str()).c_str();
-        severityClass = "loading";
-    } else if (engine.isSyncingEngines()) {
-        // The replay into the engines after a board size change, a clear or an
-        // SGF load. Not "loading" — the process is up; it is being brought to a
-        // position, which on a CPU KataGo is seconds of a live-looking UI with
-        // nothing thinking. Without this the first move after resizing the board
-        // simply sat there: the stone stayed in hand, the toolbar was greyed by
-        // a rule the user could not see, and it read as a dead program.
-        text = templateText("tplStatusSyncing", "Synchronising engines…");
-        severityClass = "loading";
-    } else if (engine.isThinking()) {
-        // The third silent wait, and the longest: 30.9 seconds measured for one
-        // kibitz from the stock 9x9 KataGo on a CPU backend. Nothing in the UI
-        // read isThinking() at all, so the whole of that was a greyed toolbar
-        // and a board that did not move — reported, reasonably, as "nothing
-        // happens". It names the engine for the same reason the loading line
-        // does: with two configured, "thinking" does not say which.
-        //
-        // Below the badge would be wrong: this is transient and current, and
-        // the badge is a count of things already past.
-        const std::string who = engine.thinkingEngineName();
-        text = Rml::CreateString(
-            templateText("tplStatusThinking", "%s is thinking…").c_str(),
-            who.c_str()).c_str();
         severityClass = "loading";
     } else if (log.hasUnseen()) {
         // Messages since the panel was last opened, not the size of the buffer.
@@ -835,64 +823,6 @@ void ElementGame::syncPrisonerLabels() {
     for (const char* id : {"cntBlack", "lblPrisonersBlack"}) {
         if (auto* el = doc->GetElementById(id)) {
             el->SetInnerRML(Rml::CreateString(blackTpl.c_str(), blackHasTaken).c_str());
-        }
-    }
-}
-
-/// Writes the evaluation panel from the analysis thread's last report.
-///
-/// Two rules from ADR-0007 live here. **Never a placeholder** (decision 12): no
-/// report means the panel is hidden outright, because a bar resting in the
-/// middle because nothing has been computed cannot be told from a genuine even
-/// game — the same mistake as reading a failed score as zero. And the one case
-/// that is *stale* rather than absent — the numbers were true for a position
-/// that has since been left, or the search has yielded to a playing engine — is
-/// dimmed rather than blanked, since blanking would flicker once per move.
-void ElementGame::syncEvaluationPanel() {
-    auto context = GetContext();
-    if (!context) return;
-    auto doc = context->GetDocument("game_window");
-    if (!doc) return;
-    auto* panel = doc->GetElementById("grpAnalysis");
-    if (!panel) return;   // a translated .rml without the element degrades to silence
-
-    // One readout, in one place. With the board version on, the panel steps
-    // aside rather than saying the same thing twice — which is the whole point
-    // of the experiment: to see the diegetic one *instead of* the panel, not
-    // beside it.
-    const auto report = analysis.report();
-    const bool show = report != nullptr && !view.isEvaluationOnBoard();
-    if (panel->IsClassSet("show") != show) {
-        panel->SetClass("show", show);
-        panel->SetClass("hide", !show);
-    }
-    if (!show) return;
-
-    const bool stale = analysis.state() != AnalysisState::Running
-                       || report->positionId != model.snapshot()->positionId;
-    if (panel->IsClassSet("stale") != stale) {
-        panel->SetClass("stale", stale);
-    }
-
-    const int percent = static_cast<int>(std::lround(report->winrateBlack * 100.0));
-    if (auto* fill = doc->GetElementById("barEvalFill")) {
-        fill->SetProperty("width", Rml::CreateString("%d%%", percent).c_str());
-    }
-    if (auto* label = doc->GetElementById("lblEvalWinrate")) {
-        label->SetInnerRML(Rml::CreateString(
-            templateText("tplEvalWinrate", "B %d%%").c_str(), percent).c_str());
-    }
-    if (auto* label = doc->GetElementById("lblEvalScore")) {
-        // Absent rather than zero: `lz-analyze` has no score at all, and 0.0 is
-        // a legitimate result. Same distinction Engine::final_score() draws.
-        if (report->scoreLeadBlack) {
-            const double lead = *report->scoreLeadBlack;
-            const char* id = lead >= 0.0 ? "tplEvalScoreBlack" : "tplEvalScoreWhite";
-            const char* fallback = lead >= 0.0 ? "B+%.1f" : "W+%.1f";
-            label->SetInnerRML(Rml::CreateString(
-                templateText(id, fallback).c_str(), std::fabs(lead)).c_str());
-        } else {
-            label->SetInnerRML("");
         }
     }
 }
@@ -1226,13 +1156,7 @@ void ElementGame::OnUpdate()
         if (coordEl && coordEl->IsClassSet("selected") != coordChecked) {
             OnMenuToggle("toggle_coordinates", coordChecked);
         }
-        auto* boardEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationBoard");
-        const bool boardChecked = view.isEvaluationOnBoard();
-        if (boardEl && boardEl->IsClassSet("selected") != boardChecked) {
-            OnMenuToggle("toggle_evaluation_board", boardChecked);
-        }
     }
-    syncEvaluationPanel();
 
     // Sync game mode menu toggle with engine state (analysis or tsumego)
     {

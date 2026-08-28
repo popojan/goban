@@ -179,12 +179,6 @@ private:
     /// cannot disagree about which colour took which stones — they did.
     void syncPrisonerLabels();
 
-    /// The evaluation panel — a third display surface, and the first one that
-    /// carries *state* rather than events. `#lblMessage` shows things that
-    /// happened once; this shows a value that is continuously true, which is why
-    /// it could not go there. See ADR-0007 decision 11.
-    void syncEvaluationPanel();
-
     bool logPanelOpen{false};
     uint64_t logVersionShown{0};
     std::string statusTextShown;

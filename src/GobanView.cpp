@@ -90,6 +90,35 @@ GobanView::GobanView(GobanModel& m)
             }
             coordOffset = offset;
         }
+        // The wait indicator's ink follows the readout's unless it is given one
+        // of its own — same two-level arrangement, and the same reason: these
+        // are all annotation ink on the same wood, and a default that differs
+        // from its neighbours by accident looks like a bug.
+        waitInk = readoutInk;
+        const std::string waitConfigured = annotations.value("wait_color", std::string());
+        if (!waitConfigured.empty()) {
+            if (const auto parsed = parseHexColor(waitConfigured)) {
+                waitInk = *parsed;
+            } else {
+                spdlog::warn("annotations.wait_color: '{}' is not #rgb, #rrggbb "
+                             "or #rrggbbaa", waitConfigured);
+            }
+        }
+        const std::string glyph = annotations.value("wait_glyph", std::string());
+        if (!glyph.empty()) waitGlyph = glyph;
+        waitGlyphSyncing = annotations.value("wait_glyph_syncing", std::string());
+        if (annotations.contains("wait_grace")) {
+            const float grace = annotations.value("wait_grace", 0.5f);
+            // Zero is meaningful — a scenario wants the mark on the first frame —
+            // so only a negative one is refused.
+            if (grace < 0.0f) {
+                spdlog::warn("annotations.wait_grace {} is negative; keeping {}",
+                             grace, waitGrace);
+            } else {
+                waitGrace = grace;
+            }
+        }
+
         const std::string staleConfigured = config->data
                 .value("annotations", nlohmann::json::object())
                 .value("readout_stale_color", std::string());
@@ -1240,7 +1269,10 @@ void GobanView::updateFloatingLabels() {
 	// the way of the territory patches that fill the board there. A resignation
 	// scores nothing, so it keeps the readout, and navigating back off the end
 	// brings it back because scoredEnd follows the cursor.
-	if (showEvaluationOnBoard && analysis && !snap->scoredEnd) {
+	// No placement choice any more: the evaluation is drawn on the board, or the
+	// analysis is off and there is no report to draw. The RmlUi panel that used
+	// to be the alternative is gone — see ADR-0012.
+	if (analysis && !snap->scoredEnd) {
 		if (const auto report = analysis->report()) {
 			// The margin runs from row -0.85 to row 0 — 0.85 grid spacings of
 			// wood on every board size, because the constant in Metrics::calc()
@@ -1305,11 +1337,52 @@ void GobanView::updateFloatingLabels() {
 		// because the readout is centred by default and the eye finds the end of
 		// a line there; left when the user has pushed the readout right, since
 		// two right-aligned strings share one anchor and would overprint.
-		const bool readoutOnTheRight = showEvaluationOnBoard && !readoutText.empty()
+		const bool readoutOnTheRight = !readoutText.empty()
 		                               && readoutAlign == TextAlign::Right;
 		labels.push_back({glm::vec2(readoutOnTheRight ? 0.0f : lastCol, MARGIN_ROW),
 		                  passSuggestion, size, passSuggestionInk, 0u,
 		                  readoutOnTheRight ? TextAlign::Left : TextAlign::Right});
+	}
+	// The wait indicator: a mark and how long it has been waiting.
+	//
+	// The mark does not pulse. A board annotation is carved or it is not there;
+	// an opacity that breathes reads as a screen effect laid over the scene
+	// rather than as part of it, which is the one quality this is here to have.
+	// The count ticking over is the whole animation, and it is the physical kind
+	// — what a clock beside a board does. See Wait::displayedSecond().
+	//
+	// Two labels rather than one string, laid out left to right from a single
+	// anchor: the mark left-aligned on it, the count left-aligned a fixed gap
+	// along. The gap is in grid units, so it scales with the board exactly as
+	// the glyph size (0.8/N of a square) does, and they cannot drift apart.
+	waitText.clear();
+	if (waitKind != WaitKind::None) {
+		const float elapsed = static_cast<float>(glfwGetTime()) - waitStarted;
+		const int second = Wait::displayedSecond(elapsed, waitGrace);
+		if (second != Wait::NOT_SHOWN) {
+			constexpr float MARGIN_ROW = -0.425f;
+			constexpr float GAP = 0.7f;
+			const float size = 0.8f / static_cast<float>(model.getBoardSize());
+			const float lastCol = static_cast<float>(model.getBoardSize()) - 1.0f;
+			// The end of the margin nothing else is using. Left by default — the
+			// readout is centred and the pass suggestion is right — and moved to
+			// the right only when the user has pulled the readout left onto it.
+			const bool readoutOnTheLeft = !readoutText.empty()
+			                              && readoutAlign == TextAlign::Left;
+			const float anchor = readoutOnTheLeft ? lastCol - 2.0f : 0.0f;
+
+			const std::string& glyph = (waitKind == WaitKind::Syncing && !waitGlyphSyncing.empty())
+			                           ? waitGlyphSyncing : waitGlyph;
+			const std::string count = std::to_string(second) + "s";
+
+			labels.push_back({glm::vec2(anchor, MARGIN_ROW), glyph, size,
+			                  waitInk, 0u, TextAlign::Left});
+			labels.push_back({glm::vec2(anchor + GAP, MARGIN_ROW), count, size,
+			                  waitInk, 0u, TextAlign::Left});
+			// What a scenario can assert on, since the glyphs themselves are
+			// unreachable from a headless run. Written as it reads.
+			waitText = glyph + " " + count;
+		}
 	}
 	if (showCoordinates) {
 		const int N = static_cast<int>(model.getBoardSize());
@@ -1333,6 +1406,33 @@ void GobanView::updateFloatingLabels() {
 	}
 
 	gobanOverlay.setFloatingLabels(std::move(labels));
+}
+
+void GobanView::setWaitIndicator(WaitKind kind) {
+	if (kind != waitKind) {
+		waitKind = kind;
+		waitStarted = static_cast<float>(glfwGetTime());
+		waitSecondShown = Wait::NOT_SHOWN;
+		if (kind == WaitKind::None) waitText.clear();
+		// A wait ending has to repaint too, or the last frame drawn keeps the
+		// indicator on a board that is no longer waiting for anything.
+		requestRepaint(UPDATE_OVERLAY);
+		return;
+	}
+	if (kind == WaitKind::None) return;
+
+	// Still waiting. A frame is worth drawing when the count would change and
+	// not otherwise — the mark itself is static, so twenty identical frames a
+	// second would be twenty rebuilds of every glyph buffer for no visible
+	// difference. getIdleTimeout() offers the ticks; this decides which of them
+	// are worth anything. Same shape as the evaluation's publish gate, which
+	// deliberately asks for no repaint when the displayed values have not moved.
+	const float elapsed = static_cast<float>(glfwGetTime()) - waitStarted;
+	const int second = Wait::displayedSecond(elapsed, waitGrace);
+	if (second != waitSecondShown) {
+		waitSecondShown = second;
+		requestRepaint(UPDATE_OVERLAY);
+	}
 }
 
 bool GobanView::toggleCoordinates() {
@@ -1494,17 +1594,6 @@ std::optional<TextAlign> GobanView::parseAlign(const std::string& name) {
 void GobanView::setEvaluationAlign(TextAlign align) {
 	if (readoutAlign == align) return;
 	readoutAlign = align;
-	requestRepaint(UPDATE_OVERLAY);
-}
-
-bool GobanView::toggleEvaluationOnBoard() {
-	setEvaluationOnBoard(!showEvaluationOnBoard);
-	return showEvaluationOnBoard;
-}
-
-void GobanView::setEvaluationOnBoard(bool shown) {
-	if (showEvaluationOnBoard == shown) return;
-	showEvaluationOnBoard = shown;
 	requestRepaint(UPDATE_OVERLAY);
 }
 

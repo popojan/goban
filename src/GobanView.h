@@ -45,6 +45,10 @@ enum class PointerMode { Auto, Always, Never };
 const char* pointerModeName(PointerMode mode);
 std::optional<PointerMode> parsePointerMode(const std::string& name);
 
+// WaitKind, waitKindName() and the blink curve; see WaitIndicator.h for why the
+// two game waits are drawn on the board rather than written in #lblStatus.
+#include "WaitIndicator.h"
+
 class GobanView: public GameObserver {
 public:
     enum {
@@ -213,20 +217,21 @@ public:
     /// "3a" stays and only takes on colour.
     void updateAnalysisOverlay();
 
-    /// The evaluation as text on the wood, in the margin nearest the camera,
-    /// instead of in the RmlUi panel. The panel is small, overlays a board that
-    /// took some trouble to render, and is the one piece of the interface not in
-    /// the scene; this is the experiment in putting it there.
+    /// The evaluation as text on the wood, in the margin nearest the camera.
+    ///
+    /// This began as an experiment beside an RmlUi panel and is now the only
+    /// place the evaluation is shown. The panel was small, overlaid a board that
+    /// took some trouble to render, and was the one piece of the interface not
+    /// in the scene — so once the board version worked, keeping a choice between
+    /// them meant shipping the worse one as the default. There is no placement
+    /// setting any more: the evaluation is on the board, or it is off.
     ///
     /// Bottom edge because it is the only strip independent of the shader — all
     /// four variants draw the same wood there, and it is empty in every one.
     /// Every label placed by board coordinate rather than by board point: the
-    /// evaluation readout and, when shown, the coordinate labels. One function
-    /// because setFloatingLabels() replaces the whole list.
+    /// evaluation readout, the wait indicator and, when shown, the coordinate
+    /// labels. One function because setFloatingLabels() replaces the whole list.
     void updateFloatingLabels();
-    bool toggleEvaluationOnBoard();
-    [[nodiscard]] bool isEvaluationOnBoard() const { return showEvaluationOnBoard; }
-    void setEvaluationOnBoard(bool shown);
     /// What the board readout currently says, empty when it says nothing. The
     /// glyphs themselves are unreachable from a headless run, so this is the
     /// only way a scenario can check that the text was composed correctly —
@@ -363,6 +368,25 @@ public:
     static constexpr float MAX_SAFE_COORD_OFFSET = 0.7f;
     [[nodiscard]] const glm::vec4& readoutColor() const { return readoutInk; }
 
+    /// What the board is waiting for, told to it once per frame by
+    /// ElementGame — which is where the two conditions are already computed, so
+    /// nothing here has to interrogate the game thread.
+    ///
+    /// Idempotent: passing the same kind again leaves the elapsed clock running.
+    /// Changing kind, or arriving from None, restarts it. While a wait is
+    /// current this asks for an overlay repaint whenever the displayed count
+    /// changes — `getIdleTimeout()` already wakes the main loop at 20 Hz for
+    /// exactly these two states, but a wake draws nothing unless the view is
+    /// dirty, and identical frames are not worth drawing.
+    void setWaitIndicator(WaitKind kind);
+    [[nodiscard]] WaitKind waitIndicator() const { return waitKind; }
+
+    /// What the indicator currently reads, empty when it is not shown. The
+    /// glyphs themselves are unreachable from a headless run, so — exactly as
+    /// with the evaluation readout — this is the only way a scenario can assert
+    /// that the thing was composed and placed at all.
+    [[nodiscard]] const std::string& waitIndicatorText() const { return waitText; }
+
     /// Column letters along the top margin and row numbers down the left, in
     /// the same 0.85-spacing strip of wood the readout uses at the bottom.
     /// Fixed to those two edges whether or not the readout is on, so nothing
@@ -462,7 +486,6 @@ public:
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
     bool showAnalysisOverlay = false;
-    bool showEvaluationOnBoard = false;
     bool showCoordinates = false;
     glm::vec4 coordinateInk{0.0f, 0.0f, 0.0f, 1.0f};
     float coordOffset = 0.425f;
@@ -489,6 +512,27 @@ public:
     glm::vec4 readoutStaleInk{0.0f, 0.0f, 0.0f, 1.0f};
     bool haveStaleInk = false;
     std::string readoutText;
+
+    /// The wait indicator: which wait, since when, and what it last read.
+    WaitKind waitKind = WaitKind::None;
+    float waitStarted = 0.0f;
+    std::string waitText;
+    /// Configurable because the shipped overlay font decides what is drawable at
+    /// all, and it is Roboto: 98 glyphs, ASCII only. A stone (● / ○) needs a
+    /// font that has one — the CJK font that ships for zh/ja/ko does — so the
+    /// default has to be a character that exists everywhere, and the better
+    /// character has to be reachable without a code change.
+    std::string waitGlyph = "O";
+    std::string waitGlyphSyncing;   ///< Falls back to waitGlyph when unset.
+    glm::vec4 waitInk{0.0f, 0.0f, 0.0f, 1.0f};
+    /// How long a wait has to last before it is worth mentioning. GNU Go answers
+    /// in milliseconds; without this every move in a bot match flashes the mark
+    /// for one frame.
+    float waitGrace = 0.5f;
+    /// The count last drawn, so a frame is asked for when it changes and not
+    /// once per idle tick. Wait::NOT_SHOWN while inside the grace period.
+    int waitSecondShown = Wait::NOT_SHOWN;
+
     const AnalysisService* analysis = nullptr;
     /// Kept apart because they are undone differently: a label this overlay
     /// added is removed, whereas a point it merely tinted belongs to somebody

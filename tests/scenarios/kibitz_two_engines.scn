@@ -49,15 +49,26 @@ expect can_kibitz false
 # KataGo on a CPU backend, which was duly reported as "nothing happens".
 #
 # Two things are needed and neither works alone: getIdleTimeout() has to keep
-# waking the main loop, or no frame is drawn and no message can appear however
-# well it is written — and there has to be a message. It names the engine for
-# the same reason the loading line does; with two configured, "thinking" does
-# not say which, and the one that matters is the slow one.
-expect status_text kibitzmock is thinking…
+# waking the main loop, or no frame is drawn and nothing can appear however well
+# it is written — and there has to be something to draw.
+#
+# It is drawn on the board now rather than written across the top of it: a
+# blinking mark and an elapsed count in the wood margin, through the overlay's
+# glyph pass, so it reaches every shader and each eye of a stereo one. The wide
+# status banner it replaced spoiled the thing the program is for.
+expect wait_indicator thinking
+# What was actually *composed and placed*, not merely the condition behind it —
+# same argument as status_text before it, and as sounds_played. The count is not
+# pinned to a value because it is a clock; that it is there at all is the claim.
+expect_not wait_text ""
+# The status line is left to the tenants that are about the application rather
+# than the game: which engine is still loading, and the message badge.
+expect status_text ""
 
 wait_until move_count >= 3
 expect at_end true
 expect phase paused
 expect thinking false
-# It stands down again. A status line that stayed would be worse than none.
-expect status_text ""
+# It stands down again. A mark that stayed would be worse than none.
+expect wait_indicator none
+expect wait_text ""
