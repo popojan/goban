@@ -22,7 +22,7 @@ jobs:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -53,17 +53,26 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
           make -j$(nproc)
 
+      # A release that fails its own tests should not be published. Linux only:
+      # the suite is the same everywhere and this is the platform that can run it
+      # without a display.
+      - name: Run tests
+        run: cd build && ctest --output-on-failure --timeout 120
+
+      - name: Package
+        run: python3 tools/package.py --binary build/goban --platform linux-x64
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: goban-linux-x64
-          path: build/goban
+          path: dist/*.tar.gz
 
   build-macos:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos' }}
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -76,10 +85,8 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          # Note: macOS doesn't need X11/ALSA - GLFW uses Cocoa, PortAudio uses CoreAudio
-          # This may require CMakeLists.txt fixes for macOS
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON || true
-          make -j$(sysctl -n hw.ncpu) || true
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON
+          make -j$(sysctl -n hw.ncpu)
 
       - name: Build goban
         run: |
@@ -87,17 +94,24 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
           make -j$(sysctl -n hw.ncpu)
 
+      - name: Package
+        run: python3 tools/package.py --binary build/goban --platform macos-x64
+
       - name: Upload artifact
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: goban-macos-x64
-          path: build/goban
+          path: dist/*.tar.gz
 
   build-windows:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' }}
     runs-on: windows-latest
     strategy:
+      # Without this a failure in one architecture cancels the other, so x86 has
+      # never once completed: x64 failed first every time and took it with it.
+      # The two are independent artifacts and each is worth knowing about.
+      fail-fast: false
       matrix:
         arch: [x86, x64]
         include:
@@ -108,12 +122,12 @@ jobs:
             cmake_arch: x64
             triplet: x64-windows-static
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Install dependencies via vcpkg
         run: vcpkg install freetype portaudio libsndfile --triplet ${{ matrix.triplet }}
@@ -133,12 +147,18 @@ jobs:
           cmake .. -A ${{ matrix.cmake_arch }} -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
           cmake --build . --config Release
 
+      - name: Package
+        shell: bash
+        run: |
+          exe=$(find build -name goban.exe | head -1)
+          python tools/package.py --binary "$exe" --platform windows-${{ matrix.arch }}
+
       - name: Upload artifact
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: goban-windows-${{ matrix.arch }}
-          path: build/**/goban.exe
+          path: dist/*.zip
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -147,27 +167,50 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+
+      # The tag and the version compiled into the About dialog must agree. They
+      # are set in two different places by two different hands, and a release
+      # whose binary reports a different number than its own tag is not
+      # something anyone can debug from a bug report.
+      - name: Check the tag matches CMakeLists
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          proj=$(sed -n 's/.*project(goban.*VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          echo "tag=$tag  CMakeLists=$proj"
+          if [ "$tag" != "$proj" ]; then
+            echo "::error::tag v$tag does not match PROJECT_VERSION $proj"
+            exit 1
+          fi
+
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
-      - name: Prepare release files
+      # Each artifact is our archive inside GitHub's own artifact zip — zip
+      # inside zip, which looks odd when downloading from the Actions page. It is
+      # inherent: GitHub always zips an artifact, and we must upload a real
+      # archive rather than the bare folder because **artifact zips do not carry
+      # the executable bit**, so an uploaded directory arrives with a `goban`
+      # nobody can run. Downloading here unwraps the outer layer and leaves our
+      # archives, which is what gets published — a released asset has no extra
+      # wrapping.
+      - name: Collect
         run: |
           mkdir -p release
-          cp artifacts/goban-linux-x64/goban release/goban-linux-x64
-          cp artifacts/goban-macos-x64/goban release/goban-macos-x64 || true
-          find artifacts/goban-windows-x64 -name "goban.exe" -exec cp {} release/goban-windows-x64.exe \;
-          find artifacts/goban-windows-x86 -name "goban.exe" -exec cp {} release/goban-windows-x86.exe \;
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
           ls -la release/
 
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: RELEASE_NOTES.md
-
+      # `gh` rather than a third-party action: it is GitHub's own CLI,
+      # preinstalled on every runner, it is what tools/release-hrajsi.sh and
+      # tools/release-gallery.sh already use, and it removes both a supply-chain
+      # dependency and a Node deprecation surface from the release path.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: release/*
-          body_path: RELEASE_NOTES.md
-          draft: false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            release/*

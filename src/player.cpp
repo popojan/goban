@@ -1,5 +1,6 @@
 #include "player.h"
-#include "SGF.h"
+
+#include "ScenarioRecorder.h"
 
 Move GtpEngine::genmove(const Color& colorToMove) {
     GtpClient::CommandOutput ret(issueCommand(colorToMove == Color::BLACK ? "genmove B" : "genmove W"));
@@ -8,13 +9,20 @@ Move GtpEngine::genmove(const Color& colorToMove) {
         return {Move::INVALID, colorToMove};
     }
     spdlog::debug("Parsing move string [{}]", ret[0]);
-    return Move::parseGtp(ret[0], colorToMove);
-}
 
-const Board& GtpEngine::showboard() {
-    board.territoryReady = false;
-    board.parseGtp(GtpClient::showboard());
-    return board;
+    // Capture the reply so a recorded session can be replayed against the mock
+    // engine, without the original (possibly nondeterministic) engine installed.
+    if (ret[0].size() > 2 && ret[0][0] == '=') {
+        std::string vertex = ret[0].substr(1);
+        const size_t start = vertex.find_first_not_of(" \t");
+        const size_t end = vertex.find_last_not_of(" \t\r\n");
+        if (start != std::string::npos) {
+            vertex = vertex.substr(start, end - start + 1);
+            ScenarioRecorder::instance().recordEngineMove(getName(), vertex);
+        }
+    }
+
+    return Move::parseGtp(ret[0], colorToMove);
 }
 
 bool GtpEngine::fixed_handicap(int handicap, std::vector<Position>& stones) {
@@ -40,6 +48,13 @@ bool GtpEngine::komi(float komi) {
 }
 
 bool GtpEngine::play(const Move& m) {
+    // Only NORMAL and PASS moves are valid GTP play commands
+    // RESIGN, INVALID, INTERRUPT, KIBITZED are not sendable via "play"
+    if (m != Move::NORMAL && m != Move::PASS) {
+        spdlog::debug("GtpEngine::play: skipping non-playable move type {}", m.toString());
+        return true;  // No-op for non-playable moves
+    }
+
     std::stringstream ssout;
     ssout << "play " << m;
     return GtpClient::success(GtpClient::issueCommand(ssout.str()));
@@ -48,7 +63,11 @@ bool GtpEngine::play(const Move& m) {
 bool GtpEngine::boardsize(unsigned boardSize) {
     std::stringstream ssout;
     ssout << "boardsize " << boardSize;
-    return GtpClient::success(GtpClient::issueCommand(ssout.str()));
+    bool success = GtpClient::success(GtpClient::issueCommand(ssout.str()));
+    if (success) {
+        board.clear(boardSize);  // Sync internal board state with new size
+    }
+    return success;
 }
 
 bool GtpEngine::clear() {
@@ -60,114 +79,115 @@ bool GtpEngine::undo() {
     return GtpClient::success(GtpClient::issueCommand("undo"));
 }
 
-bool GtpEngine::estimateTerritory(bool finalize, const Color& colorToMove) {
-    bool success = true;
-    if (finalize) {
-        spdlog::debug("Estimating final territory (GTP-standard method)");
+namespace {
 
-        // Get dead stones using standard GTP command
-        auto deadResult = GtpClient::issueCommand("final_status_list dead");
-        spdlog::debug("final_status_list dead: {} response(s)", deadResult.size());
-
-        // Parse dead stone positions
-        std::vector<Position> deadStones;
-        if (GtpClient::success(deadResult) && !deadResult.empty()) {
-            // Parse positions from response (format: "= A1 B2 C3 ..." or multi-line)
-            for (const auto& line : deadResult) {
-                std::istringstream ss(line);
-                // Skip leading '=' if present
-                char c = ss.peek();
-                if (c == '=') {
-                    ss.get();
-                }
-                Position pos;
-                while (ss >> pos) {
-                    if (pos.col() >= 0 && pos.row() >= 0) {
-                        deadStones.push_back(pos);
-                        spdlog::debug("Dead stone at: col={} row={}", pos.col(), pos.row());
-                    }
-                }
-            }
+/// Appends the vertices in a `final_status_list` reply to `out`.
+///
+/// Shared by the `dead` and `seki` queries so the two cannot drift: the reply is
+/// one or more lines, the first carrying the `=` GTP prefix, each holding
+/// whitespace-separated vertices.
+void parseVertexList(const GtpClient::CommandOutput& reply, std::vector<Position>& out) {
+    for (const auto& line : reply) {
+        std::istringstream ss(line);
+        if (ss.peek() == '=') ss.get();
+        Position pos;
+        while (ss >> pos) {
+            if (pos.col() >= 0 && pos.row() >= 0) out.push_back(pos);
         }
-
-        // Calculate territory using flood-fill from dead stones
-        board.calculateTerritoryFromDeadStones(deadStones);
-        success = true;
-
-        spdlog::debug("Territory estimation completed with {} dead stones", deadStones.size());
     }
-    else {
-        /*
-        std::stringstream ss;
-        ss << "initial_influence " << colorToMove << " influence_regions";
-        GtpClient::CommandOutput ret = GtpClient::issueCommand(ss.str());
-        board.clearTerritory();
-        board.parseGtpInfluence(ret);
-        ret = GtpClient::issueCommand("dragon_status");
-        for (size_t i = 0; i < ret.size(); ++i) {
-            spdlog::debug(ret[i]);
-            std::stringstream ssi(ret[i]);
-            char c;
-            if (i == 0) {
-                ssi >> c;
-            }
-            Position pos;
-            ssi >> pos;
-            ssi >> c >> c;
-            if (c == 'd') {
-                {
-                    std::ostringstream ss;
-                    ss << "dragon_stones " << pos;
-                    ret = GtpClient::issueCommand(ss.str());
-                }
-                if (GtpClient::success(ret)) {
-                    std::istringstream ss(ret[0].substr(2));
-                    Position p;
-                    while ((ss >> p)){
-                        board[p].influence = Color::other(board[p].stone);
-                    }
-                }
-            }
-        }
-        */
-    }
-    board.territoryReady = success;
-    return success;
 }
 
-const Board& GtpEngine::showterritory(bool final, Color colorToMove) {
-    estimateTerritory(final, colorToMove);
-    board.score = final ? final_score() : 0.0f;
-    board.invalidate();
-    return board;
+}  // namespace
+
+bool GtpEngine::applyTerritory(Board& targetBoard) {
+    // Apply territory calculation to an existing board built locally from the
+    // SGF replay, rather than asking the engine for the board state.
+    //
+    // Scoring is bounded more tightly than a genmove. The command timeout has to
+    // tolerate a strong engine thinking, but nothing about scoring a finished
+    // position justifies minutes — and when it does take minutes it is because
+    // the engine is at the wrong position or wedged, which is precisely the case
+    // that should fail rather than freeze the game thread.
+    const ScopedTimeout boundedForScoring(*this, scoringTimeout());
+
+    // Get dead stones from engine (requires final_status_list support)
+    auto deadResult = GtpClient::issueCommand("final_status_list dead");
+
+    if (!GtpClient::success(deadResult)) {
+        // Engine doesn't support final_status_list - graceful degradation
+        spdlog::warn("Engine [{}] doesn't support final_status_list, territory not shown",
+                     getName());
+        targetBoard.territoryReady = false;
+        return false;
+    }
+
+    // Parse dead stone positions
+    std::vector<Position> deadStones;
+    parseVertexList(deadResult, deadStones);
+    // Seki as well, and it is not optional detail: a group alive in seki has
+    // eyes that belong to nobody, and the flood fill reaches them from exactly
+    // the stones an ordinary eye is reached from. Asking only for `dead` — which
+    // is all this did — hands those points to whoever surrounds them.
+    //
+    // `seki` is one of GTP 2's three standard statuses, alongside `alive` and
+    // `dead`; GNU Go answers it (an invalid status comes back as
+    // "? invalid status", so a refusal is distinguishable). Support is uneven in
+    // practice, though, so a refusal is read as "no seki here" and costs nothing
+    // — the same graceful degradation the dead list itself gets, one level down.
+    std::vector<Position> sekiStones;
+    const auto sekiResult = GtpClient::issueCommand("final_status_list seki");
+    if (GtpClient::success(sekiResult)) {
+        parseVertexList(sekiResult, sekiStones);
+    } else {
+        spdlog::debug("Engine [{}] did not answer final_status_list seki; "
+                      "assuming no seki", getName());
+    }
+
+    spdlog::debug("applyTerritory: {} dead stones, {} seki stones from engine",
+                  deadStones.size(), sekiStones.size());
+
+    // Calculate territory using flood-fill
+    targetBoard.calculateTerritoryFromDeadStones(deadStones, sekiStones);
+
+    // The shading is valid from here on, whatever happens to the score.
+    targetBoard.showTerritory = true;
+    targetBoard.showTerritoryAuto = true;
+
+    const std::optional<float> score = final_score();
+    if (!score) {
+        // Territory can be shown, but there is no result to state. Leaving
+        // territoryReady false lets the caller try another engine or report the
+        // failure honestly; writing 0.0 here claimed a drawn game instead, and
+        // that invented zero is what set the scoring fallback going.
+        spdlog::warn("Engine [{}] gave dead stones but no final_score", getName());
+        targetBoard.territoryReady = false;
+        return false;
+    }
+
+    targetBoard.score = *score;
+    targetBoard.territoryReady = true;
+    return true;
 }
 
-bool GtpEngine::setTerritory(const GtpClient::CommandOutput& ret, Board& b, const Color& color) {
-    if(GtpClient::success(ret) && ret.at(0).length() > 2) {
-        std::stringstream ss;
-        ss << ret.front().substr(2) << "\n";
-        std::copy(++ret.begin(), ret.end(), std::ostream_iterator<std::string>(ss, "\n"));
-        std::string s;
-        spdlog::debug(ss.str());
-        Position p;
-        while((ss >> p)) {
-            if(color == Color::EMPTY)
-                b[p].influence = Color::other(b[p].stone);
-            else
-                b[p].influence = color;
-        }
-        return true;
+std::optional<float> GtpEngine::final_score() {
+    const GtpClient::CommandOutput ret = GtpClient::issueCommand("final_score");
+    if (!GtpClient::success(ret) || ret.empty() || ret[0].size() < 2) {
+        return std::nullopt;
     }
-    return false;
+    // "= B+12.5" / "= W+3" / "= 0" (jigo). A reply we cannot parse is a failure,
+    // not a zero.
+    std::istringstream ss(ret[0].substr(2));
+    char winner = '\0';
+    float score = 0.0f;
+    if (!(ss >> winner)) {
+        return std::nullopt;
+    }
+    if (winner == '0') {
+        return 0.0f;  // drawn
+    }
+    if ((winner != 'B' && winner != 'W') || !(ss >> score)) {
+        return std::nullopt;
+    }
+    return winner == 'B' ? score : -score;
 }
 
-float GtpEngine::final_score() {
-    if(const GtpClient::CommandOutput ret = GtpClient::issueCommand("final_score"); GtpClient::success(ret)) {
-        std::istringstream ss(ret[0].substr(2));
-        char winner;
-        float score = 0.0;
-        ss >> winner >> score;
-        return winner == 'B' ? score : -score;
-    }
-    return 0.0f;
-}

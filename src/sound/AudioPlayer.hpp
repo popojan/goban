@@ -14,10 +14,19 @@ public:
     void loop(const std::string& id, double volume = 1.0);
     void stop();
     void init();
-    void preload(const std::shared_ptr<Configuration> config);
+    void preload(const std::shared_ptr<Configuration> &config);
     size_t playbackCount() { return streamHandler.playbackCount(); }
+    /// Sounds mixed to completion since startup — see StreamHandler.
+    [[nodiscard]] unsigned long long completedPlaybacks() const {
+        return streamHandler.completedPlaybacks();
+    }
+    void stopIfInactive() { streamHandler.stopIfInactive(); }
+
+    void setMuted(const bool mute) { this->muted = mute; }
+    bool isMuted() const { return muted; }
 private:
     FileHandler fileHandler;
     StreamHandler streamHandler;
+    bool muted;
 };
 #endif

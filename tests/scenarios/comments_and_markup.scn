@@ -1,0 +1,114 @@
+# SGF comments and board markup, followed across navigation.
+#
+# This is the coverage ADR-0006 stage 3 was waiting for. `model.state.comment`
+# and `model.state.markup` are a std::string and a std::vector written by the
+# game thread in syncStateAfterNavigation() and read by the UI thread — by
+# ElementGame::OnUpdate()'s message tail and by GobanView's overlay — with no
+# synchronisation whatsoever. A reallocation concurrent with a read is a
+# use-after-free.
+#
+# The fix is to publish them through GameSnapshot like everything else, and the
+# point of this scenario is to pin what they contain *first*, so the refactor
+# has something to be checked against. It is written against behaviour, not
+# implementation, so it should survive that change untouched.
+#
+# tests/data/markup.sgf is 19x19:
+#   1. B[dd]  C[markup node], LB[pp:A][qq:B] TR[cc] SQ[dc] CR[ce] MA[cf]
+#   2. W[pp]  BM[1], no comment
+#   3. B[jj]  no comment
+
+load_sgf tests/data/markup.sgf
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect main_line_moves 3
+expect at_end true
+
+# --- At the end of the game there is no annotation --------------------------
+expect comment ""
+expect markup_count 0
+
+navigate_start
+wait_idle
+expect view_position 0
+expect comment ""
+expect markup_count 0
+
+# --- Move 1 carries both a comment and six markup items ---------------------
+navigate_forward
+wait_idle
+expect view_position 1
+expect comment markup node
+# Two labels, a triangle, a square, a circle and a cross.
+expect markup_count 6
+
+# --- Both belong to the node, not to the board ------------------------------
+# Stepping forward onto a node with neither must clear them; leaving them behind
+# would show move 1's annotations against move 2's position.
+navigate_forward
+wait_idle
+expect view_position 2
+expect comment ""
+expect markup_count 0
+
+# --- And they come back on the way back -------------------------------------
+navigate_back
+wait_idle
+expect view_position 1
+expect comment markup node
+expect markup_count 6
+
+# --- Jumping, not just stepping ---------------------------------------------
+navigate_end
+wait_idle
+expect view_position 3
+expect comment ""
+expect markup_count 0
+
+navigate_start
+wait_idle
+expect markup_count 0
+
+# --- A different file, to show the comment really follows the node ----------
+# simple.sgf comments moves 1 and 3 and leaves 2 and 4 bare.
+load_sgf tests/data/simple.sgf
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+navigate_start
+wait_idle
+
+navigate_forward
+wait_idle
+expect view_position 1
+expect comment opening move
+
+navigate_forward
+wait_idle
+expect view_position 2
+expect comment ""
+
+navigate_forward
+wait_idle
+expect view_position 3
+expect comment third move
+
+# --- Playing a new move leaves the annotation behind ------------------------
+# A variation from move 1 is a different node, so it carries none of move 1's
+# markup — the overlay must not keep drawing it.
+navigate_start
+wait_idle
+navigate_forward
+wait_idle
+expect comment opening move
+
+click 10 10
+wait_idle
+expect holds_stone true
+click 10 10
+wait_until view_position >= 2
+wait_idle
+expect comment ""
+expect markup_count 0

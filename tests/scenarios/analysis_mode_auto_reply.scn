@@ -1,0 +1,74 @@
+# What analysis mode actually does, and why it is refused for a human-versus-
+# human game.
+#
+# The mode's distinguishing behaviour is that it answers every human move with
+# the *kibitz* engine — and it consults currentKibitz(), never the colour
+# assignment. So entering it with two humans would quietly turn the game into
+# human-versus-engine, which is what setGameMode() refuses. It used to refuse
+# silently: the menu entry simply failed to light up.
+#
+# Kibitz on demand is a separate thing and needs no mode change; the Kibitz
+# button works in an ordinary match. That is what makes the refusal acceptable
+# rather than a missing feature. See docs/game-modes.md.
+
+# --- 1. Refused for human versus human --------------------------------------
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect mode match
+
+toggle_analysis_mode
+wait_idle
+expect mode match          # unchanged, and the refusal now says why
+
+# --- 2. Kibitz does not need analysis mode ----------------------------------
+# Deliberately issued straight after a move, with no settling delay. Between two
+# moves nobody is blocked in genmove — the loop clears playerToMove and sleeps
+# 500 ms — and a kibitz request arriving in that window used to be dropped, so
+# this needed a `wait 900` to pass. It now queues, exactly as a local move does.
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+
+play once
+wait_until move_count >= 2
+wait_idle
+# The kibitz engine played a move in a game whose two players are both human.
+expect move_count 2
+expect mode match
+
+# --- 3. With an engine on the board, analysis mode is available -------------
+switch_player white mock
+wait_idle
+toggle_analysis_mode
+wait_idle
+expect mode analysis
+
+# --- 4. In analysis mode the reply ignores the colour assignment ------------
+# Loading a game that carries a result selects analysis mode by itself.
+load_sgf tests/data/resign.sgf
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect mode analysis
+expect main_line_moves 3
+
+navigate_back
+wait_idle
+expect view_position 2
+
+# One variation from the human. Both players are human, yet the position
+# advances by *two* moves: the kibitz engine answers regardless.
+click 0 0
+wait_idle
+expect holds_stone true
+click 0 0
+wait_until view_position >= 4
+wait_idle
+expect view_position 4
+expect black_stones 2
+expect white_stones 2

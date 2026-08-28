@@ -1,0 +1,105 @@
+# The two prompts that stand between a user and losing a game: Clear and Quit.
+# discard_game_prompt.scn covers the board-size and handicap dropdowns, which
+# take the same route; these two are the ones nothing exercised.
+#
+# The distinction that matters throughout is between "a prompt appeared and was
+# answered" and "the command silently did nothing", which look identical from
+# the outside — so `prompt_active` is asserted before every answer.
+#
+# Both players are human and every move is a pass, so nothing advances on its own.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect phase setup
+expect move_count 0
+
+# --- Nothing recorded: refused outright, and no prompt ----------------------
+# An empty board has nothing to clear, so asking whether to discard it would be
+# a question with no stakes. The button is greyed for the same reason.
+expect can_clear false
+clear
+expect prompt_active false
+wait_idle
+expect phase setup
+
+# --- With a game under way, Clear asks --------------------------------------
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+expect can_clear true
+
+clear
+expect prompt_active true
+expect move_count 1          # nothing happens until the answer arrives
+prompt_no
+wait_idle
+expect prompt_active false
+expect move_count 1          # declined, and the game survived
+expect phase playing
+
+clear
+expect prompt_active true
+prompt_yes
+wait_idle
+expect prompt_active false
+expect move_count 0
+expect phase setup
+# The board size survives a clear: it is restored from the saved settings, not
+# reset to the application default.
+expect board_size 9
+
+# --- Quit asks before abandoning a game in progress -------------------------
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+
+quit
+expect prompt_active true
+prompt_no
+wait_idle
+expect prompt_active false
+# Declining leaves everything exactly as it was — the application is still here
+# to answer, which is itself the assertion.
+expect move_count 1
+expect phase playing
+expect board_size 9
+
+# --- A prompt survives a game that is still moving --------------------------
+#
+# Everything above deliberately keeps the board still: "both players are human
+# and every move is a pass, so nothing advances on its own". That is exactly the
+# condition under which this bug is invisible.
+#
+# Reported from a Windows bundle test: in a bot-versus-bot match it was
+# impossible to quit. The tail of ElementGame::OnUpdate() clears the message on
+# every position change that carries no comment, and clearMessage() used to drop
+# pendingPromptCallback along with the text — so each move did not merely hide
+# the confirmation, it cancelled it. With GNU Go answering in milliseconds the
+# prompt was gone before it could be clicked, and the only way out was to kill
+# the process.
+#
+# White is the mock engine here, so moves keep arriving while the prompt is up.
+switch_player white mock
+wait_idle
+
+quit
+expect prompt_active true
+
+# A position change while the prompt is open — the whole point. wait_until
+# rather than a fixed delay, so this asserts a move actually landed rather than
+# that some time passed.
+wait_until move_count >= 2
+expect prompt_active true
+
+# And it is still answerable, which is the part that was really broken: the
+# callback had been dropped, so even clicking where the prompt had been did
+# nothing.
+prompt_no
+wait_idle
+expect prompt_active false
+expect phase playing

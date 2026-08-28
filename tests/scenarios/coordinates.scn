@@ -1,0 +1,24 @@
+# Board coordinate labels: column letters along the top margin, row numbers down
+# the left, in the same strip of wood the evaluation readout uses at the bottom.
+# Fixed to those two edges so they can never collide with it.
+#
+# Off by default — the labels are a study aid, not part of the board.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/coordinates.scn
+
+new_game 9
+wait_idle
+expect coordinates_shown false
+
+toggle_coordinates on
+expect coordinates_shown true
+
+# They survive a board size change: the margin is 0.85 grid spacings on every
+# board, so the labels need no per-size arithmetic and simply follow.
+board_size 19
+wait_idle
+expect board_size 19
+expect coordinates_shown true
+
+toggle_coordinates off
+expect coordinates_shown false

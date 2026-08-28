@@ -1,0 +1,24 @@
+# Exercises the interaction recorder end to end. The recorder is disabled during
+# scripted replay (recording a replay is noise), so this scenario only checks
+# that report_bug is reachable and harmless; the real round-trip is verified by
+# tests/check_recorder.sh, which runs the app twice.
+
+new_game 9
+wait_idle
+expect board_size 9
+
+switch_player black mock
+switch_player white mock
+wait_idle
+
+start
+wait_until move_count >= 3
+toggle_analysis_mode
+wait_idle
+expect mode analysis
+
+navigate_start
+wait_idle
+expect view_position 0
+
+report_bug

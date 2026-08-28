@@ -1,0 +1,41 @@
+# Regression: loading an SGF while a slow engine is thinking used to hang the
+# whole application. GTP cannot abort a command in flight, and the UI thread
+# waited for the game loop to stop — which it could not until the engine replied.
+#
+# Loading discards the current game, so the pending move is worthless: the work
+# is now deferred to the game thread, which drops the move and then loads.
+# See docs/adr/0001-engine-exclusive-actions.md.
+#
+# Uses the slow-mock bot (--delay-ms) so an engine really is mid-genmove when
+# the load is requested. Without the fix this scenario times out.
+
+new_game 9
+wait_idle
+switch_player black slowmock
+switch_player white slowmock
+wait_idle
+
+start
+# Wait only for the match to be under way; do NOT wait for idle, the whole
+# point is to act while an engine is thinking.
+wait_until move_count >= 1
+expect running true
+
+# Request the load mid-genmove. This must return immediately.
+load_sgf tests/data/simple.sgf
+
+# The load lands once the engine's move arrives and is discarded. Wait on the
+# board size: main_line_moves is ambiguous here, because the bots' own moves
+# would satisfy it just as well.
+wait_until board_size 19
+wait_idle
+expect board_size 19
+expect main_line_moves >= 4
+expect navigating true
+
+# And the app is still alive and responsive afterwards.
+navigate_start
+wait_idle
+expect view_position 0
+expect black_stones 0
+expect white_stones 0

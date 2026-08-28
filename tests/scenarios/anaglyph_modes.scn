@@ -1,0 +1,124 @@
+# How the two eyes are combined into the anaglyph, and that the choice sticks.
+#
+# The modes themselves are a shader composite and cannot be asserted from here —
+# what this pins is the part that has broken before in other settings: that the
+# command reaches the view, that a name survives the round trip it makes through
+# user.json, and that a typo is refused rather than silently selecting mode zero.
+#
+# The mode is deliberately *not* a property of the shader. It describes the
+# glasses and the eyes behind them, so it outlives a switch to a mono shader and
+# back — which is the last thing asserted here.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/anaglyph_modes.scn
+
+new_game 9
+wait_idle
+
+# Set rather than asserted. The shipped default is gray — base.json says so, and
+# it is the arrangement that tolerates imperfect glasses — but the mode is a
+# user choice that persists into user.json on purpose, so by its second run this
+# scenario would be starting from whatever its first run left behind. A scenario
+# that asserts a default it also changes passes exactly once.
+anaglyph gray
+expect anaglyph gray
+
+anaglyph dubois
+expect anaglyph dubois
+
+anaglyph half-color
+expect anaglyph half-color
+
+anaglyph color
+expect anaglyph color
+
+# Spellings are forgiving, because this is typed rather than picked from a list.
+anaglyph grey
+expect anaglyph gray
+anaglyph half_colour
+expect anaglyph half-color
+
+# A typo is refused and leaves the mode alone. Falling back to the first enum
+# value would be indistinguishable from the user having asked for gray.
+anaglyph duboys
+expect anaglyph half-color
+
+# With no argument it cycles, which is how the choice is actually made: the only
+# way to judge these is to look at the board through the glasses. The order runs
+# gray, half-colour, Dubois, colour — increasing rivalry, so the first step off
+# gray is the gentlest one.
+anaglyph
+expect anaglyph dubois
+anaglyph
+expect anaglyph color
+anaglyph
+expect anaglyph gray
+anaglyph
+expect anaglyph half-color
+
+# Four steps along the shader list is [stereo] Red Carpet, and two more wrap back
+# to mono. The mode survives both, because it is not the shader's property.
+cycle shaders
+cycle shaders
+cycle shaders
+cycle shaders
+expect stereo true
+expect anaglyph half-color
+
+anaglyph dubois
+cycle shaders
+cycle shaders
+expect stereo false
+expect anaglyph dubois
+
+# The two dials for imperfect glasses. Both default to doing nothing, both are
+# clamped, and both persist — so like the mode above they are set rather than
+# assumed.
+anaglyph_strength 0.4
+expect anaglyph_strength 0.4
+
+# Clamped, not refused: these are tuned by eye against a moving target, so an
+# overshoot should land at the limit rather than throw the setting away.
+anaglyph_strength 5
+expect anaglyph_strength 1
+anaglyph_strength -1
+expect anaglyph_strength 0
+anaglyph_strength 1
+
+# One argument sets green alone, because green through the red filter is the
+# leak that actually bites.
+anaglyph_leak 0.08
+expect anaglyph_leak_g 0.08
+expect anaglyph_leak_r 0
+expect anaglyph_leak_b 0
+
+anaglyph_leak 0.03 0.09 0.01
+expect anaglyph_leak_r 0.03
+expect anaglyph_leak_g 0.09
+expect anaglyph_leak_b 0.01
+
+# Past the ceiling it stops cancelling a ghost and starts cutting a hole.
+anaglyph_leak 0 9 0
+expect anaglyph_leak_g 0.5
+
+# Back to doing nothing, which is a choice and must be honoured as one.
+anaglyph_leak 0 0 0
+expect anaglyph_leak_g 0
+
+# The green dial: the last lever for lenses that pass green through *both*
+# filters, where no assignment of green to an eye is clean.
+anaglyph_green 0.5
+expect anaglyph_green 0.5
+anaglyph_green 9
+expect anaglyph_green 1
+anaglyph_green -1
+expect anaglyph_green 0
+anaglyph_green 1
+
+# Which glasses are in use is a property of the viewer, so it survives a shader
+# switch exactly as the mode does.
+glasses red-blue
+expect glasses red-blue
+glasses red-cyan
+expect glasses red-cyan
+glasses nonsense
+expect glasses red-cyan

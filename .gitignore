@@ -5,11 +5,29 @@
 cmake-build-*/
 build/
 
+# Assembled release bundles (tools/package.py)
+dist/
+
+# Generated screenshots. The *sources* are tracked — res/screenshot/*.scn,
+# *-user.json and the two SGFs — and tools/make-screenshot.sh regenerates the
+# images from them; tools/release-hrajsi.sh then copies them into the site repo,
+# which is where gallery assets belong. Tracking them here would add ~9 MB of new
+# blobs to the history on every release, for files nothing in this repository
+# reads.
+#
+# res/screenshot.png is deliberately NOT covered by this: it is the README's
+# image and GitHub serves it from the repository.
+res/screenshot/*.png
+
 # Binary executable
 goban
 
-# Dependencies (external libraries)
-deps/
+# Dependencies (external libraries). Fetched sources are ignored; the patches
+# applied to them are not — they are the only record of what we changed, and for
+# GNU Go that record is a GPL obligation rather than a convenience. The existing
+# ones survived only by having been tracked before this rule existed.
+deps/*
+!deps/_patches/
 external/
 
 # External Go engines
@@ -45,3 +63,28 @@ publish/
 
 # Claude Code local instructions
 CLAUDE.local.md
+wiki/
+
+# Current user configuration
+user.json
+
+# Test fixtures must survive the blanket *.sgf rule above
+!tests/data/*.sgf
+
+# The game record the release screenshot is taken from. Tracked deliberately:
+# it comes out of games/, which is ignored wholesale, so without this line the
+# asset the screenshot scenario depends on would be silently untracked and lost
+# on the next clean checkout.
+!res/screenshot/*.sgf
+
+# Scenario runs and recorded bug reports
+reports/
+scenario-user.json
+
+# Local scratch logs
+last_run.log.*
+valgrind.log*
+user.json.*
+tests/scenarios/.games/
+
+res/stereo.zip

@@ -1,0 +1,53 @@
+# config: mock-wedge.json
+#
+# An engine killed for not answering must be put back.
+#
+# The shape is GNU Go's: `final_status_list dead` on a sparse board never
+# returns, so GtpClient times out and kills the process — correctly, because a
+# late reply read as the answer to the *next* command is silently wrong results.
+# What was missing was the counterpart. terminateProcess() had no undo, so one
+# double pass on a thin board removed the coach for the rest of the session, and
+# the only trace was a log line: every later move went to no engine at all.
+#
+# GameThread::reviveFailedEngines() now respawns it between loop iterations —
+# the only thread allowed to touch those pipes — and marks every engine
+# Unsynced, so the record is replayed into the replacement.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+# Two passes end the game, which is what asks the coach to count.
+pass
+wait_until move_count >= 1
+wait_idle
+pass
+wait_until phase finished
+
+# The coach never answers, is killed after scoring_timeout_ms, and the position
+# is reported honestly rather than as a score of zero.
+wait_until msg scoring_failed
+
+# ...and the engine comes back. Unsynced is the visible consequence: the
+# replacement holds an empty board, so the loop replays the record into it.
+wait_until engine_sync synced
+wait_idle
+
+# The proof that it is really back: navigating and playing both need a live
+# coach, and both go through it. Before the revive these were silently refused.
+navigate_back
+wait_idle
+expect view_position 1
+
+# White is to move here: move 2 was White's pass, so undoing it leaves White on
+# turn. The stone lands as a variation on the second pass.
+click 3 3
+wait_idle
+expect holds_stone true
+click 3 3
+wait_until white_stones 1
+wait_idle
+expect white_stones 1
+expect view_position 2

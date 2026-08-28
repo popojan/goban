@@ -1,0 +1,94 @@
+# The game lifecycle, walked end to end through the real application.
+#
+# ADR-0002 replaced the `started` / `isGameOver` pair with a single `phase`.
+# This scenario asserts it at every transition the application can make, which
+# is the coverage the ADR wanted in place before the phase became authoritative.
+#
+# Both players are human and every move is a pass, so nothing advances on its
+# own and no assertion has to race the genmove loop.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+# Setup: a fresh, empty record.
+expect phase setup
+expect move_count 0
+
+# Playing: the first move starts the game.
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+
+# Finished: two passes in a row end it.
+pass
+wait_until phase finished
+# RE is written by the territory pass that follows the double pass, not by the
+# move, so it lags the phase — and wait_idle does not cover scoring, because a
+# failed scoring attempt never sets territoryReady and would hang the wait.
+# Everything below depends on RE: the navigation restore reads hasGameResult().
+wait_until has_result true
+wait_idle
+expect phase finished
+expect move_count 2
+
+# Start is refused on a finished game — the phase must not move.
+start
+wait_idle
+expect phase finished
+
+# Paused: navigating away from the end of a finished game resumes review.
+navigate_back
+wait_idle
+expect phase paused
+expect view_position 1
+
+# Back to the end of a finished game restores Finished, because the user has
+# not pressed Start.
+navigate_end
+wait_idle
+expect phase finished
+expect at_end true
+
+# Paused at the root. move_count is 0 here, exactly as in Setup, so the record —
+# not the view position — is what separates the two.
+navigate_start
+wait_idle
+expect phase paused
+expect move_count 0
+expect main_line_moves 2
+
+# Playing again. Start hands the turn to an engine, so in this human-versus-human
+# game it is refused whatever the phase — there is nobody to hand the turn to,
+# which is what the greyed-out Start button has always said. The command used to
+# test the phase alone and accepted it here; ADR-0005 put both on one answer.
+start
+wait_idle
+expect phase paused
+
+# Playing a move is what resumes a human game. Mid-tree this pass follows the
+# existing continuation rather than branching, but `pass` starts the game before
+# navigating, so the phase moves either way.
+pass
+wait_until move_count >= 1
+wait_idle
+expect phase playing
+
+# Setup: a new game discards the record.
+new_game 9
+wait_idle
+expect phase setup
+expect main_line_moves 0
+
+# Finished straight out of a load: the SGF ends in a double pass.
+load_sgf tests/data/double_pass.sgf
+wait_idle
+expect phase finished
+expect at_end true
+
+navigate_start
+wait_idle
+expect phase paused

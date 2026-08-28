@@ -1,32 +1,75 @@
+/** \file
+ *  \brief Per-game display state — whose turn, captures, komi, result, the
+ *         message line — plus the SGF markup types.
+ *
+ * The mutable companion to GameRecord: everything the board and the message line
+ * need that is not the move tree. Written mostly by the game thread and read per
+ * frame by the UI, which is why the fields the UI actually depends on are copied
+ * into GameSnapshot rather than read from here.
+ *
+ * `reason` is **not** part of the lifecycle and outlives it: `enterReview()`
+ * leaves it set, so a game navigated back from a finished position has phase
+ * `Paused` and reason `DOUBLE_PASS` at the same time. Ask `GobanModel::phase()`
+ * for lifecycle questions. The inconsistency is known and pinned by
+ * tests/test_gamephase.cpp; do not add readers of `reason` as a lifecycle test.
+ */
 #ifndef GOBAN_VIEWSTATE_H
 #define GOBAN_VIEWSTATE_H
 
 #include "Board.h"
+#include <vector>
+#include <string>
+
+// SGF markup types for board annotations
+enum class MarkupType {
+    LABEL,      // LB - text label
+    TRIANGLE,   // TR - triangle marker
+    SQUARE,     // SQ - square marker
+    CIRCLE,     // CR - circle marker
+    MARK        // MA - X marker
+};
+
+// Single markup annotation on the board
+struct BoardMarkup {
+    Position pos;
+    MarkupType type;
+    std::string label;  // Only used for LABEL type
+
+    BoardMarkup(Position p, MarkupType t, const std::string& l = "")
+        : pos(p), type(t), label(l) {}
+};
 
 class GameState {
 public:
     Color colorToMove;
     std::string black;
     std::string white;
-    int capturedBlack, capturedWhite;
+    /// Prisoner counts do NOT live here. Board::capturedCount() is the only
+    /// thing that counts captures; these fields were initialised to zero and
+    /// never assigned, so every reader of them displayed 0 for the whole of
+    /// every game. See ElementGame::syncPrisonerLabels().
     int reservoirBlack, reservoirWhite;
     float komi;
     int handicap;
+    int boardSize;
     float result;
     std::string cmd;
-    std::string err;
+    std::string comment;  // SGF comment for current move (C property)
+    std::vector<BoardMarkup> markup;  // SGF markup annotations (LB/TR/SQ/CR/MA)
     
     enum Message {
         NONE, WHITE_PASS, BLACK_PASS, WHITE_RESIGNS, BLACK_RESIGNS,
         BLACK_RESIGNED, WHITE_RESIGNED, WHITE_WON, BLACK_WON, PAUSED,
-        CALCULATING_SCORE
+        CALCULATING_SCORE, SCORING_FAILED, TSUMEGO_SOLVED, TSUMEGO_WRONG
     };
 
     Message msg;
+    std::string passVariationLabel;  // e.g. "11b" when a pass variation exists during navigation
+    std::string scoringError;  // Error detail for SCORING_FAILED message
 
-    GameState(): colorToMove(Color::BLACK), black(), white(), capturedBlack(0), capturedWhite(0),
+    GameState(): colorToMove(Color::BLACK),
                  reservoirBlack(32), reservoirWhite(32),
-                 komi(0.5f), handicap(0), result(0.0f), cmd("xxx"), msg(PAUSED),
+                 komi(0.5f), handicap(0), boardSize(19), result(0.0f), cmd("xxx"), msg(PAUSED),
                  reason(NO_REASON), scoreDelta(0.0f), winner(Color::EMPTY), metricsReady(false),
                  holdsStone(false)
     { }

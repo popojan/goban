@@ -1,8 +1,8 @@
 #include "FileChooserDataSource.h"
+#include "GameRecord.h"
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include <fstream>
-#include <sstream>
 #include "SGF.h"
 
 FileChooserDataSource::FileChooserDataSource(const std::string& gamesPath)
@@ -22,7 +22,7 @@ FileChooserDataSource::~FileChooserDataSource() {
     games.clear();
 }
 
-void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::string& table, int row_index, const std::vector<std::string>& columns) {
+void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::string& table, int row_index, const std::vector<std::string>& columns) const {
     if (table == "files") {
         // Check if this is the first row and we can navigate up
         if (row_index == 0 && currentPath.has_parent_path()) {
@@ -33,7 +33,7 @@ void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::str
                 } else if (columns[i] == "type") {
                     row.push_back(std::string(strUp.c_str()));
                 } else if (columns[i] == "path") {
-                    row.push_back(std::string(currentPath.parent_path().string().c_str()));
+                    row.push_back(std::string(currentPath.parent_path().u8string().c_str()));
                 }
             }
             return;
@@ -66,7 +66,7 @@ void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::str
             } else if (columns[i] == "type") {
                 row.push_back(std::string(file.type.c_str()));
             } else if (columns[i] == "path") {
-                row.push_back(std::string(file.fullPath.string().c_str()));
+                row.push_back(std::string(file.fullPath.u8string().c_str()));
             }
         }
     }
@@ -110,7 +110,7 @@ void FileChooserDataSource::GetRow(std::vector<std::string>& row, const std::str
     }
 }
 
-int FileChooserDataSource::GetNumRows(const std::string& table) {
+int FileChooserDataSource::GetNumRows(const std::string& table) const {
     if (table == "files") {
         // Calculate base number of files on current page
         int totalFiles = static_cast<int>(files.size());
@@ -176,7 +176,7 @@ void FileChooserDataSource::refreshFileList() {
         if (std::filesystem::exists(currentPath) && std::filesystem::is_directory(currentPath)) {
             for (const auto& entry : std::filesystem::directory_iterator(currentPath)) {
                 FileEntry fileEntry;
-                fileEntry.name = entry.path().filename().string();
+                fileEntry.name = entry.path().filename().u8string();
                 fileEntry.fullPath = entry.path();
                 
                 // Use status() once instead of multiple calls
@@ -191,7 +191,7 @@ void FileChooserDataSource::refreshFileList() {
                 
                 if (fileEntry.isDirectory) {
                     fileEntry.type = strDirectory;
-                } else if (fileEntry.name.find(".sgf") != std::string::npos) {
+                } else if (fileEntry.fullPath.extension() == ".sgf") {
                     fileEntry.type = strSgfFile;
                 } else {
                     // Skip non-SGF files
@@ -224,7 +224,7 @@ void FileChooserDataSource::SelectFile(int fileIndex) {
     if (file.isDirectory) {
         // Navigate to directory
         SetCurrentPath(file.fullPath);
-    } else if (file.name.find(".sgf") != std::string::npos) {
+    } else if (file.fullPath.extension() == ".sgf") {
         // Load games for the selected SGF file
         LoadSelectedFileGames();
     }
@@ -257,15 +257,27 @@ int FileChooserDataSource::GetSelectedGameIndex() const {
 std::string FileChooserDataSource::GetSelectedFilePath() const {
     const FileEntry* file = GetSelectedFile();
     if (file && !file->isDirectory) {
-        return file->fullPath.string();
+        return file->fullPath.u8string();
     }
     return "";
 }
 
 int FileChooserDataSource::FindFileByPath(const std::string& path) const {
+    // Try exact match first
     for (size_t i = 0; i < files.size(); ++i) {
-        if (files[i].fullPath.string() == path) {
+        if (files[i].fullPath.u8string() == path) {
             return static_cast<int>(i);
+        }
+    }
+    // Try normalized path comparison (handles ./games/ vs games/ etc.)
+    std::error_code ec;
+    auto targetPath = std::filesystem::weakly_canonical(path, ec);
+    if (!ec) {
+        for (size_t i = 0; i < files.size(); ++i) {
+            auto filePath = std::filesystem::weakly_canonical(files[i].fullPath, ec);
+            if (!ec && filePath == targetPath) {
+                return static_cast<int>(i);
+            }
         }
     }
     return -1;
@@ -273,8 +285,8 @@ int FileChooserDataSource::FindFileByPath(const std::string& path) const {
 
 void FileChooserDataSource::LoadSelectedFileGames() {
     const FileEntry* file = GetSelectedFile();
-    if (file && !file->isDirectory && file->name.find(".sgf") != std::string::npos) {
-        previewSGF(file->fullPath.string());
+    if (file && !file->isDirectory && file->fullPath.extension() == ".sgf") {
+        previewSGF(file->fullPath.u8string());
     }
 }
 
@@ -293,15 +305,20 @@ void FileChooserDataSource::previewSGF(const std::string& filePath) {
     spdlog::debug("Games list updated (data source disabled)");
 }
 
-std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string& filePath) {
+std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string& filePath) const {
     using namespace LibSgfcPlusPlus;
     
     std::vector<SGFGameInfo> gameList;
     
     try {
+        auto sgfContent = GameRecord::readFileContent(filePath);
+        if (!sgfContent) {
+            spdlog::error("Failed to read SGF file: {}", filePath);
+            return gameList;
+        }
         auto reader = SgfcPlusPlusFactory::CreateDocumentReader();
-        auto result = reader->ReadSgfFile(filePath);
-        
+        auto result = reader->ReadSgfContent(*sgfContent);
+
         if (!result || !result->IsSgfDataValid()) {
             spdlog::error("Failed to parse SGF file: {}", filePath);
             return gameList;
@@ -363,11 +380,31 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
                             gameInfo.date = textValue->GetSimpleTextValue();
                         }
                         break;
+                    case SgfcPropertyType::AB: // Setup black stones
+                        gameInfo.hasSetupStones = true;
+                        break;
+                    case SgfcPropertyType::AW: // Setup white stones
+                        gameInfo.hasSetupStones = true;
+                        gameInfo.hasSetupWhiteStones = true;
+                        break;
                     default:
                         break;
                 }
             }
             
+            // FF[3] compat: setup stones may be on first child instead of root
+            if (!gameInfo.hasSetupStones && rootNode->HasChildren()) {
+                auto firstChild = rootNode->GetFirstChild();
+                for (const auto& property : firstChild->GetProperties()) {
+                    auto pt = property->GetPropertyType();
+                    if (pt == SgfcPropertyType::AB || pt == SgfcPropertyType::AW) {
+                        gameInfo.hasSetupStones = true;
+                        if (pt == SgfcPropertyType::AW)
+                            gameInfo.hasSetupWhiteStones = true;
+                    }
+                }
+            }
+
             // Count moves by traversing the game tree
             gameInfo.moveCount = countMovesInGame(game);
             
@@ -388,35 +425,61 @@ std::vector<SGFGameInfo> FileChooserDataSource::parseSGFGames(const std::string&
     return gameList;
 }
 
-int FileChooserDataSource::countMovesInGame(std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game) {
+int FileChooserDataSource::countMovesInGame(const std::shared_ptr<LibSgfcPlusPlus::ISgfcGame> game) {
     using namespace LibSgfcPlusPlus;
-    
+
     int moveCount = 0;
-    auto currentNode = game->GetRootNode();
-    
-    // Traverse the game tree to count move nodes
+    int nodeCount = 0;
+    auto rootNode = game->GetRootNode();
+
+    // Traverse the game tree to count move nodes (main line only)
     std::function<void(std::shared_ptr<ISgfcNode>)> traverseNode = [&](std::shared_ptr<ISgfcNode> node) {
         if (!node) return;
-        
-        // Check if this node contains a move property
+        nodeCount++;
+
+        // Check if this node contains a move property (B or W, not AB/AW)
         auto properties = node->GetProperties();
         for (const auto& property : properties) {
             auto propertyType = property->GetPropertyType();
             if (propertyType == SgfcPropertyType::B || propertyType == SgfcPropertyType::W) {
                 moveCount++;
+                spdlog::trace("countMovesInGame: node {} has {} move, total={}", nodeCount,
+                    propertyType == SgfcPropertyType::B ? "B" : "W", moveCount);
                 break; // Only count once per node
             }
         }
-        
-        // Traverse children (we'll just follow the main line for move counting)
+
+        // Traverse children (follow main line only)
         auto children = node->GetChildren();
         if (!children.empty()) {
-            traverseNode(children[0]); // Follow main line
+            traverseNode(children[0]);
         }
     };
-    
-    traverseNode(currentNode);
+
+    traverseNode(rootNode);
+    spdlog::debug("countMovesInGame: {} nodes traversed, {} moves counted", nodeCount, moveCount);
     return moveCount;
+}
+
+bool FileChooserDataSource::isTsumegoDetected() const {
+    if (games.empty()) return false;
+    // Require white setup stones (AW) in most games (>= 80%)
+    // This distinguishes tsumego (AB+AW) from handicap games (AB only)
+    int setupCount = 0;
+    int resultCount = 0;
+    int totalMoves = 0;
+    for (const auto& g : games) {
+        if (g.hasSetupWhiteStones) setupCount++;
+        if (!g.gameResult.empty()) resultCount++;
+        totalMoves += g.moveCount;
+    }
+    // Games with results are completed games, not tsumego collections
+    if (resultCount > 0) return false;
+    float setupRatio = static_cast<float>(setupCount) / static_cast<float>(games.size());
+    if (setupRatio < 0.8f) return false;
+    // Average moves per game: tsumego typically < 50, full games typically > 150
+    float avgMoves = static_cast<float>(totalMoves) / static_cast<float>(games.size());
+    return avgMoves <= 50;
 }
 
 void FileChooserDataSource::SetFilesPage(int page) {

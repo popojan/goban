@@ -243,19 +243,25 @@ namespace DDG
    // GEOMETRIC OPERATIONS --------------------------------------------------
    
    Quaternion slerp( const Quaternion& q0, const Quaternion& q1, double t )
-   // spherical-linear interpolation
+   // spherical-linear interpolation via nlerp (normalize after lerp)
    {
       // interpolate length
       double m0 = q0.norm();
       double m1 = q1.norm();
       double m = (1-t)*m0 + t*m1;
-   
-      // interpolate direction
+
+      // interpolate direction via nlerp
       Quaternion p0 = q0 / m0;
       Quaternion p1 = q1 / m1;
-      double theta = acos(( p0.conj()*p1 ).re() );
-      Quaternion p = ( sin((1-t)*theta)*p0 + sin(t*theta)*p1 )/sin(theta);
-   
+
+      // Ensure shortest path
+      if (( p0.conj()*p1 ).re() < 0.0) {
+         p1 = -1.0 * p1;
+      }
+
+      Quaternion p = (1-t)*p0 + t*p1;
+      p.normalize();
+
       return m*p;
    }
    

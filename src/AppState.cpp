@@ -2,6 +2,39 @@
 
 namespace AppState {
 
+/// The monitor the window is actually on, rather than the primary one.
+///
+/// glfwGetPrimaryMonitor() was used unconditionally, so on a multi-monitor
+/// setup fullscreen always landed on the primary output — not the one you were
+/// looking at. Matching by the window's centre point handles unequal
+/// resolutions and stacked layouts, where testing a corner does not.
+///
+/// Wayland has no global window position, so glfwGetWindowPos() reports nothing
+/// there and this falls back to the primary monitor — the old behaviour, and
+/// still wrong on a multi-head Wayland session. GLFW 3.4 exposes no way to ask
+/// which output a surface is on, so the escape hatch is to run on X11 (see
+/// `--platform` in main.cpp), where this works properly.
+static GLFWmonitor* MonitorForWindow(GLFWwindow* window) {
+    if (!window) return glfwGetPrimaryMonitor();
+
+    int wx = 0, wy = 0, ww = 0, wh = 0;
+    glfwGetWindowPos(window, &wx, &wy);
+    glfwGetWindowSize(window, &ww, &wh);
+    const int cx = wx + ww / 2;
+    const int cy = wy + wh / 2;
+
+    int count = 0;
+    GLFWmonitor** monitors = glfwGetMonitors(&count);
+    for (int i = 0; i < count; ++i) {
+        int mx = 0, my = 0, mw = 0, mh = 0;
+        glfwGetMonitorWorkarea(monitors[i], &mx, &my, &mw, &mh);
+        if (cx >= mx && cx < mx + mw && cy >= my && cy < my + mh) {
+            return monitors[i];
+        }
+    }
+    return glfwGetPrimaryMonitor();
+}
+
 static GLFWwindow* g_window = nullptr;
 static bool g_exitRequested = false;
 static bool g_fullscreen = false;
@@ -40,8 +73,8 @@ bool ToggleFullscreen() {
         glfwGetWindowPos(g_window, &g_windowedX, &g_windowedY);
         glfwGetWindowSize(g_window, &g_windowedWidth, &g_windowedHeight);
 
-        // Get primary monitor and its video mode
-        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        // The monitor the window is on, not whichever one is primary.
+        GLFWmonitor* monitor = MonitorForWindow(g_window);
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 
         // Switch to fullscreen
@@ -70,8 +103,8 @@ void SetFullscreen(bool fullscreen) {
         glfwGetWindowPos(g_window, &g_windowedX, &g_windowedY);
         glfwGetWindowSize(g_window, &g_windowedWidth, &g_windowedHeight);
 
-        // Get primary monitor and its video mode
-        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        // The monitor the window is on, not whichever one is primary.
+        GLFWmonitor* monitor = MonitorForWindow(g_window);
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 
         // Switch to fullscreen

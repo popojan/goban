@@ -20,7 +20,7 @@ public:
     float squareSizeX;
     float squareSizeY;
 
-    static const int maxc = 91;
+    static constexpr int maxc = 91;
     float tmpc[8 * maxc];
     float translate[3];
 

@@ -2,22 +2,16 @@
 #define GOBAN_GOBANSHADER_H
 
 #include <string>
-#include "glyphy/GlyphyFont.h"
+#include "AnalysisService.h"
 #include "Metrics.h"
+#include "Stereo.h"
 #include "GobanModel.h"
 
 class GobanView;
 
 #include "OpenGL.h"
 #include "Board.h"
-#include "GobanModel.h"
-#include "Camera.h"
 
-#include <glm/vec3.hpp>
-#include <glm/geometric.hpp>
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include "spdlog/spdlog.h"
 
 GLuint shaderCompileFromString(GLenum type, const std::string& source);
@@ -29,8 +23,7 @@ std::string createShaderFromFile(const std::string& filename);
 class GobanShader {
 public:
     explicit GobanShader(const GobanView& view): shadersReady(false), currentProgram(-1),
-        width(0), height(0), gamma(1.0f), contrast(0.0f), view(view), animT(0.5f),
-        currentProgramH(.0), eof(0.0075), dof(0.01)
+        width(0), height(0), gamma(1.0f), contrast(0.0f), eof(0.0725), dof(0.0925), view(view), animT(0.5f)
     {
         init();
     }
@@ -38,24 +31,61 @@ public:
     void setMetrics(const Metrics &) const;
     void init();
     void destroy() const;
-    void draw(const GobanModel&, int, float);
+    void draw(const GobanModel&, int, float) const;
     int choose(int idx);
     void use() const;
     static void unuse() ;
     void setTime(float) const;
-    void setPan(glm::vec3) const;
+    void setCameraPan(glm::vec2) const;
+    void setCameraDistance(float) const;
+    void setStereoBase(float) const;
+    /// Which eye the next draw renders: 0 left, 1 right. A no-op under a mono
+    /// shader, which has no such uniform — the location is simply -1.
+    void setEye(int) const;
+    /// How the two eyes are combined; see Stereo::Anaglyph. Also a no-op in mono.
+    void setAnaglyph(Stereo::Anaglyph) const;
+    /// How much of each eye's own colour survives against its brightness.
+    void setAnaglyphStrength(float) const;
+    /// Per-channel crosstalk cancellation; see Stereo::Crosstalk.
+    void setAnaglyphLeak(const Stereo::Crosstalk&) const;
+    /// Per-eye gain, for filters that pass different amounts of light.
+    void setAnaglyphBalance(const Stereo::EyeBalance&) const;
+    /// Which channels reach which eye; see Stereo::Glasses.
+    void setGlasses(Stereo::Glasses) const;
+    /// How much green the colour modes use; see Stereo::DEFAULT_GREEN.
+    void setAnaglyphGreen(float) const;
     void setRotation(glm::mat4x4) const;
     void setResolution(float, float);
     void setGamma(float);
     void setContrast(float);
     void setEof(float);
     void setDof(float);
-    float getEof();
-    float getDof();
+    float getEof() const;
+    float getDof() const;
     [[nodiscard]] float getGamma() const { return gamma;}
     [[nodiscard]] float getContrast() const { return contrast;}
     [[nodiscard]] bool isReady() const { return shadersReady;}
+    /// Whether the selected shader renders an anaglyph, from the shader's own
+    /// `"stereo"` entry in the config rather than from its file name: it is a
+    /// property of the shader, and everything that has to follow it — the eye
+    /// offset the overlay draws with, the greyscale its ink collapses to — is
+    /// out here rather than in GLSL.
+    [[nodiscard]] bool isStereo() const { return currentProgramStereo; }
     [[nodiscard]] float getStoneHeight() const { return currentProgramH; }
+    /// The move-quality ink for the selected shader: the global `annotations`
+    /// block with this shader's own laid over it.
+    ///
+    /// Here for the same reason `isStereo()` is — the palette is a property of
+    /// the shader, but its consumer is the overlay, which bakes colour into the
+    /// glyph buffers on the CPU. A `const vec3` in a GLSL partial could never
+    /// reach it; the ray-traced board draws no letters, so the constant would
+    /// sit unused in six fragment shaders. So it is declared in the shader's
+    /// config entry beside `stereo` and `height`, and resolved out here.
+    ///
+    /// No invalidation of its own: `GobanView::switchShader()` already raises
+    /// `UPDATE_ALL`, which rebuilds the glyph buffers — the mechanism that makes
+    /// the anaglyph greyscale work is the one that repaints a new palette.
+    [[nodiscard]] const QualityPalette& qualityPalette() const { return currentPalette; }
     void setReady() { shadersReady = true; }
     [[nodiscard]] int getCurrentProgram() const {return currentProgram;}
     bool shaderAttachFromString(GLuint program, GLenum type, const std::string& source);
@@ -101,6 +131,13 @@ private:
 
     GLint vsu_eof = -1;
     GLint vsu_dof = -1;
+    GLint fsu_eye = -1;
+    GLint fsu_anaglyph = -1;
+    GLint fsu_anaglyphStrength = -1;
+    GLint fsu_anaglyphLeak = -1;
+    GLint fsu_anaglyphBalance = -1;
+    GLint fsu_glasses = -1;
+    GLint fsu_anaglyphGreen = -1;
 
     GLint iWhiteCapturedCount = -1;
     GLint iBlackCapturedCount = -1;
@@ -108,11 +145,13 @@ private:
     GLint iBlackReservoirCount = -1;
     GLint iddc = -1;
     GLint fsu_cursor = -1;
+    GLint fsu_cursorMark = -1;
 
     static const std::array<GLfloat, 16> vertexBufferData;
     static const GLushort elementBufferData[];
 
-    GLint iTranslate = -1;
+    GLint iCameraPan = -1;
+    GLint iCameraDistance = -1;
     GLint iTime = -1;
     GLint iAnimT = -1;
 
@@ -123,6 +162,8 @@ private:
 
     int currentProgram;
     float currentProgramH{};
+    bool currentProgramStereo{false};
+    QualityPalette currentPalette{};
 
     float width, height;
     float gamma, contrast;

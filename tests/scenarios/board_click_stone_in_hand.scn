@@ -1,0 +1,115 @@
+# Placing a stone takes two clicks: one to take it out of the bowl, one to put
+# it down. Every other scenario plays through `pass`, so the single most common
+# thing a user does had no end-to-end coverage at all.
+#
+# The regression pinned here: model.start() used to run before boardClick
+# decided whether it was placing or picking up, so merely reaching for a stone
+# flipped the phase to Playing with nothing recorded. The phase is what the rest
+# of the UI reads, so an empty board silently locked its own komi dropdown
+# (setKomi accepts Setup and Paused only) and greyed out Start.
+#
+# Both players are human, so nothing advances on its own.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect phase setup
+expect holds_stone false
+expect move_count 0
+
+# Komi is editable before play begins.
+komi 5.5
+wait_idle
+expect komi 5.5
+
+# --- 1. Picking up is not playing -------------------------------------------
+click 4 4
+wait_idle
+expect holds_stone true
+# The record is untouched and the game has not begun.
+expect phase setup
+expect move_count 0
+expect black_stones 0
+
+# Which is the point: komi is still editable with a stone in hand.
+komi 0.5
+wait_idle
+expect komi 0.5
+
+# --- 2. The second click places it, and that starts the game ----------------
+click 4 4
+wait_until move_count >= 1
+wait_idle
+expect holds_stone false
+expect phase playing
+expect black_stones 1
+expect color_to_move W
+
+# And now komi is refused, because play has begun.
+komi 7.5
+wait_idle
+expect komi 0.5
+
+# --- 3. The click that places decides the point ------------------------------
+# Not the click that picked up. White reaches for a stone over 2,2 but puts it
+# down on 6,6.
+click 2 2
+wait_idle
+expect holds_stone true
+expect move_count 1          # still nothing recorded
+
+click 6 6
+wait_until move_count >= 2
+wait_idle
+expect white_stones 1
+expect holds_stone false
+expect color_to_move B
+
+# 2,2 must therefore be empty. Proving it indirectly, since dumpState reports
+# counts rather than points: black can legally play there. Were White's stone
+# sitting on 2,2, this move would be rejected and move_count would stay at 2.
+click 2 2
+wait_idle
+click 2 2
+wait_until move_count >= 3
+wait_idle
+expect move_count 3
+expect black_stones 2
+expect white_stones 1
+
+# Prisoners reach the renderer, not just the board.
+#
+# `captured_white` is what the Board counted; `prisoners_drawn_white` is what the
+# shader was handed, and that is the number deciding how many stones sit in the
+# bowls. They were not the same thing: the renderer was fed
+# GameState::capturedWhite, which was initialised to zero and never assigned
+# anywhere in the program, so the bowls stayed empty and the prisoner labels read
+# 0 for the whole of every game — while every assertion on captured_white passed,
+# because the Board was right all along. Same distinction as sounds_played.
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+# Black B1, White A1, Black A2 — which takes the corner stone. Black moves
+# first, so the colours fall out of the order.
+click 1 0
+click 1 0
+wait_until move_count >= 1
+click 0 0
+click 0 0
+wait_until move_count >= 2
+click 0 1
+click 0 1
+wait_until move_count >= 3
+
+expect captured_white 1
+expect captured_black 0
+# wait_until, not expect: this reports what reached the renderer, so it needs a
+# frame — and that frame has to carry UPDATE_STONES, which is the other half of
+# the bug. A bare repaint copied the count into the view and never uploaded it.
+wait_until prisoners_drawn_white 1
+expect prisoners_drawn_black 0

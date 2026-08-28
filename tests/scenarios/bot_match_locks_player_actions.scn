@@ -1,0 +1,89 @@
+# In a bot-versus-bot match outside analysis mode the human is a spectator, and
+# the toolbar has always said so: Pass, Undo, Kibitz and all four navigation
+# buttons are greyed. The commands behind them tested only isThinking(), which
+# is a different question — the game loop clears playerToMove *before* its 500 ms
+# inter-move sleep, so isThinking() is false for that window and every one of
+# these keys was quietly accepted mid-match. Left and Home even called
+# enterReview(), pausing a running match the buttons had refused to let anyone
+# touch.
+#
+# match_mode_blocks_navigation.scn covers the same rule with two live engines,
+# where it holds only because an engine usually happens to be thinking. This one
+# is deterministic: the lock is set explicitly with `toggle ai vs ai` on a paused
+# loaded game, so nothing is thinking at any point and the isThinking() term
+# cannot mask a missing aiVsAiLocked term.
+
+load_sgf tests/data/simple.sgf
+wait_idle
+expect main_line_moves 4
+expect at_end true
+expect phase paused
+
+# Black human, White an engine: not both human, so analysis mode is available
+# at the end. The loaded game stays paused, so neither ever gets to think.
+switch_player black human
+switch_player white mock
+wait_idle
+expect thinking false
+
+# --- Baseline: unlocked, navigation works -----------------------------------
+navigate_back
+wait_idle
+expect view_position 3
+expect ai_vs_ai false
+
+# --- Locked: every player action is refused ---------------------------------
+toggle ai vs ai
+wait_idle
+expect ai_vs_ai true
+expect mode match
+expect thinking false          # the point: the lock is doing the work, not isThinking
+
+navigate_back
+wait_idle
+expect view_position 3
+
+navigate_start
+wait_idle
+expect view_position 3
+
+navigate_forward
+wait_idle
+expect view_position 3
+
+navigate_end
+wait_idle
+expect view_position 3
+
+undo move
+wait_idle
+expect view_position 3
+
+# Pass would create a pass variation here, since the cursor is mid-tree. Refused
+# for the same reason, and the record must be untouched.
+pass
+wait_idle
+expect view_position 3
+expect main_line_moves 4
+expect variations 1
+
+play once
+wait_idle
+expect view_position 3
+expect main_line_moves 4
+
+# --- Analysis mode is the supported way in ----------------------------------
+toggle_analysis_mode
+wait_idle
+expect mode analysis
+# The toggle itself survives — only entering MATCH clears it. What lifts is the
+# *lock*, which is the toggle and the mode together: aiVsAiLocked is
+# (ai_vs_ai || both players are engines) && mode != analysis. Asserting the flag
+# went false here would be asserting the wrong half of the rule.
+expect ai_vs_ai true
+
+navigate_start
+wait_idle
+expect view_position 0
+expect black_stones 0
+expect white_stones 0

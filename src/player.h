@@ -1,25 +1,36 @@
+/** \file
+ *  \brief The player abstraction: human, SGF replay, and GTP engine.
+ *
+ * One interface — `genmove()` plus the board-manipulating GTP verbs — behind
+ * which the game loop cannot tell a human from an engine. LocalHumanPlayer
+ * blocks in `genmove()` on a condition variable until the UI hands it a move;
+ * GtpEngine blocks on a pipe read. That symmetry is the design, and also its
+ * sharpest edge: a `genmove()` in flight cannot be aborted, so only the game
+ * thread may ever call one (ADR-0001).
+ *
+ * Constructed on the loader threads, used from the game thread, owned by
+ * PlayerManager. `Engine` adds what only a real engine can answer — final score
+ * and territory.
+ */
 #ifndef PLAYER_H
 #define PLAYER_H
 
 #include <string>
 #include "gtpclient.h"
 #include "Board.h"
-#include <sstream>
-#include <thread>
 #include <condition_variable>
 #include <mutex>
 #include <algorithm>
-#include <iterator>
 #include <memory>
+#include <optional>
 #include <utility>
 
 class Player
 {
 public:
-    enum Role { NONE = 0, WHITE = 1, BLACK = 2, COACH = 4, SPECTATOR = 8, KIBITZ = 16};
-    enum Type { LOCAL = 1, HUMAN = 2, ENGINE = 4 };
+    enum Type { LOCAL = 1, HUMAN = 2, ENGINE = 4, SGF_PLAYER = 8 };
 
-    Player(std::string  name, int role, int type) : name(std::move(name)), role(role), type(type) {
+    Player(std::string  name, int type) : name(std::move(name)), type(type) {
 
     }
     virtual Move genmove(const Color& colorToMove) = 0;
@@ -31,41 +42,46 @@ public:
     virtual bool clear() { return true; }
     virtual bool undo() { return true; }
     virtual std::string getName() { return name; }
-    [[nodiscard]] bool hasRole(int r) const { return (role & r) != 0;  }
-    void setRole(int r, bool add = true) {
-        if(add) role |=  r;
-        else role &= ~r;
-    }
-    [[nodiscard]] int getRole() const {return role;}
     virtual void suggestMove(const Move& move) { (void)move; }
-    [[nodiscard]] bool isTypeOf(int t) const { return (type & t) != 0;}
+    [[nodiscard]] bool isTypeOf(int t) const { return (type & t) != 0; }
+    void addType(int t) { type |= t; }
     virtual ~Player() = default;
 protected:
     std::string name;
-    int role;
     int type;
 };
 
 class LocalHumanPlayer: public Player {
 public:
-    explicit LocalHumanPlayer(const std::string& name): Player(name, NONE, LOCAL | HUMAN) {}
+    explicit LocalHumanPlayer(const std::string& name): Player(name, LOCAL | HUMAN) {}
     Move genmove(const Color& ) override {
+        std::unique_lock<std::mutex> lock(mut);
+        cond.wait(lock, [this]() { return move != Move::INVALID; });
         Move ret(move);
-        if(move == Move::INVALID) {
-            spdlog::debug("LOCK human genmove");
-            std::unique_lock<std::mutex> lock(mut);
-            cond.wait(lock);
-            ret = move;
-        }
         move = Move();
         return ret;
     }
 
+    /// Hand the waiting genmove() a move.
+    ///
+    /// An INVALID move is ignored rather than stored. "Suggest nothing" is not a
+    /// thing anyone means, and treating it as one silently discarded real moves:
+    /// the game loop reads `queuedMove` (usually INVALID), sets `playerToMove`,
+    /// and only then calls suggestMove. A click landing in that gap reaches
+    /// GameThread::playLocalMove(), which sees `playerToMove` already set and
+    /// delivers the move here — and the loop's own suggestMove(INVALID),
+    /// arriving microseconds later, overwrote it. genmove() then waited for a
+    /// move that had already been made.
+    ///
+    /// Rare, because the window is a few instructions wide, and invisible in
+    /// interactive use: a stone fails to appear and the player clicks again. In
+    /// a scripted run it is a scenario that hangs until its wait times out,
+    /// which is how it was found.
     void suggestMove(const Move& m) override {
-        this->move = m;
+        if (m == Move::INVALID) return;
         {
-            spdlog::debug("LOCK suggest move = {}", m.toString());
             std::lock_guard<std::mutex> lock(mut);
+            this->move = m;
         }
         cond.notify_one();
     }
@@ -78,56 +94,34 @@ protected:
 class Engine: public Player
 {
 public:
-    explicit Engine(const std::string& name) : Player(name, NONE, LOCAL | ENGINE), board(19)  {}
+    explicit Engine(const std::string& name) : Player(name, LOCAL | ENGINE), board(19)  {}
     Move genmove(const Color& colorToMove) override = 0;
-    virtual const Board& showboard() = 0;
-    virtual const Board& showterritory(bool final, Color colorToMove) = 0;
-    virtual float final_score() = 0;
+
+    /// The score from the engine's point of view, positive for Black, or
+    /// nullopt when it could not produce one.
+    ///
+    /// The distinction is not pedantry: 0.0 is a legitimate result (jigo), so a
+    /// float alone cannot say "failed". Reading a failure as a score of zero is
+    /// what sent scoring off to interrogate a second engine, and from there into
+    /// a multi-minute stall — see GameThread::processScoring().
+    virtual std::optional<float> final_score() = 0;
+
+    /// Territory shading from the engine's dead-stone list, applied to a board
+    /// built locally from the SGF. Returns whether a *score* was also obtained;
+    /// the shading may be valid when the score is not, in which case
+    /// `targetBoard.showTerritory` is set but `territoryReady` is not.
+    virtual bool applyTerritory(Board& targetBoard) = 0;
     ~Engine() override = default;
 protected:
     Board board;
-    //TODO GTP API
 };
 
-class SGFPlayer : public Player {
-public:
-    explicit SGFPlayer(const std::string& name = "SGF Player") : Player(name, NONE, LOCAL), currentMoveIndex(0) {}
-    
-    void setMoves(const std::vector<Move>& moves) {
-        sgfMoves = moves;
-        currentMoveIndex = 0;
-    }
-    
-    Move genmove(const Color& colorToMove) override {
-        if (currentMoveIndex >= sgfMoves.size()) {
-            return Move(Move::INVALID, colorToMove);
-        }
-        
-        Move move = sgfMoves[currentMoveIndex];
-        if (move.col == colorToMove) {
-            currentMoveIndex++;
-            return move;
-        }
-        
-        return Move(Move::INVALID, colorToMove);
-    }
-    
-    bool hasMoreMoves() const {
-        return currentMoveIndex < sgfMoves.size();
-    }
-    
-    void reset() {
-        currentMoveIndex = 0;
-    }
-    
-    size_t getCurrentMoveIndex() const {
-        return currentMoveIndex;
-    }
-    
-private:
-    std::vector<Move> sgfMoves;
-    size_t currentMoveIndex;
-};
+// There is no SGFPlayer class. `Player::SGF_PLAYER` is a *type flag*, and the
+// players it marks are plain LocalHumanPlayers created by
+// GameThread::matchSgfPlayers() for names an SGF mentions that no configured
+// player matches — a loaded game's moves come from the record, not from a
+// player that replays them. A separate class that walked a move list existed and
+// was never instantiated by anything.
 
 class GtpEngine : public Engine, public GtpClient {
 public:
@@ -141,20 +135,22 @@ public:
     ~GtpEngine() override = default;
 
     Move genmove(const Color& colorToMove) override;
-    const Board& showboard() override;
     bool fixed_handicap(int handicap, std::vector<Position>& stones) override;
     bool komi(float komi) override;
     bool play(const Move& m) override;
     bool boardsize(unsigned boardSize) override;
     bool clear() override;
     bool undo() override;
-    virtual bool estimateTerritory(bool final, const Color& colorToMove);
-    const Board& showterritory(bool final, Color colorToMove) override;
-    float final_score() override;
+    std::optional<float> final_score() override;
+    bool applyTerritory(Board& targetBoard) override;
 
-protected:
-
-    static bool setTerritory(const GtpClient::CommandOutput& ret, Board& b, const Color& color);
+    // No kata-analyze here. An earlier attempt at a score estimate issued
+    // `kata-analyze` and then a second command to stop it, reading whatever had
+    // accumulated — on the game thread, down the playing engine's own pipe. That
+    // is the thing ADR-0007 says must not happen, and AnalysisService now does
+    // it properly: its own process, its own thread, streamCommand/stopStreaming
+    // with a drain so the next command cannot read the stream's tail. It was
+    // never called by anything.
 };
 
 #endif // PLAYER_H

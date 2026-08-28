@@ -1,55 +1,110 @@
-//
-// Created by jan on 7.5.17.
-//
-
+/** \file
+ *  \brief The state everyone agrees on: board, GameState, the record, the
+ *         lifecycle phase, and the snapshot the UI reads.
+ *
+ * Also a GameObserver, which is where a played move is appended to the record,
+ * where a finished game is finalized and autosaved, and where
+ * `publishSnapshot()` runs. `onBoardChange()` is the funnel every position
+ * change passes through, which is exactly why it is the publish point;
+ * `createNewRecord()` and `onBoardSized()` bypass it and so publish for
+ * themselves.
+ *
+ * Written by the game thread, read every frame by the UI thread — hence the
+ * atomic `gamePhase`. The phase may only change through the named transitions
+ * (start, pause, enterReview, endGame, createNewRecord), which all funnel into
+ * the single private writer `transitionTo()`; do not add a second one. And do
+ * not use `state.reason` as a lifecycle test: it outlives the phase by design.
+ * See ADR-0002.
+ */
 #ifndef GOBAN_GOBANMODEL_H
 #define GOBAN_GOBANMODEL_H
 
 #include "Metrics.h"
 #include "Board.h"
+#include "GamePhase.h"
 #include "GameState.h"
+#include "GameSnapshot.h"
 #include <spdlog/spdlog.h>
-#include "AudioPlayer.hpp"
+#include <atomic>
+#include <memory>
+#include <mutex>
 #include "GameObserver.h"
 #include "GameRecord.h"
 
-class ElementGame;
-
 class GobanModel: public GameObserver {
 public:
-    GobanModel(ElementGame *p, int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
-            : parent(p), isGameOver(true), invalidated(false),
-            calcCapturedBlack(0), calcCapturedWhite(0), cursor({0,0}) {
-        spdlog::info("Preloading sounds...");
-        //newGame(boardSize, handicap, komi);
+    explicit GobanModel(int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
+        : invalidated(true),
+          calcCapturedBlack(0), calcCapturedWhite(0), ddc{}, metrics(), cursor({0, 0}), board(boardSize) {
+        // Initialize metrics so board can render before engine initialization
+        metrics.calc(boardSize);
+        state.metricsReady = true;  // Metrics are valid after calc()
+        // These were previously accepted and then silently dropped, so any
+        // caller passing them got the GameState defaults instead.
+        state.handicap = handicap;
+        state.komi = komi;
     }
-    ~GobanModel();
-    virtual void onGameMove(const Move&, const std::string& comment);
-    virtual void onKomiChange(float);
-    virtual void onHandicapChange(const std::vector<Position>&);
-    virtual void onPlayerChange(int, const std::string&);
 
-    virtual void onBoardSized(int);
+    ~GobanModel() override;
+    void onGameMove(const Move&, const std::string& comment) override;
 
-    virtual void onBoardChange(const Board&);
+    void onStonePlaced(const Move &move) override;
 
-	//void newGame(int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f);
+    void onKomiChange(float) override;
+    void onHandicapChange(const std::vector<Position>&) override;
+    void onPlayerChange(int, const std::string&) override;
 
-    bool isPointOnBoard(const Position& coord) const;
+    void onBoardSized(int) override;
 
+    void onBoardChange(const Board&) override;
+
+	bool isPointOnBoard(const Position& coord) const;
+
+    // --- Lifecycle transitions (ADR-0002 step 2) -----------------------------
+    // These are the only ways the phase moves. Each names an intent rather than
+    // a flag write, so "who ended the game?" is answerable by grepping for
+    // endGame() instead of reading three files.
+
+    /// Begin or resume active play. Clears any stale end-of-game reason, so it
+    /// doubles as "this game is no longer over".
     void start() {
-        started = true;
-        isGameOver = false;
-    }
-    
-    void createNewRecord() {
-        game.initGame(board.getSize(), state.komi, handicapStones.size(), state.black, state.white);
-        game.setHandicapStones(handicapStones);
-        start();
+        state.reason = GameState::NO_REASON;
+        transitionTo(GamePhase::Playing, "start");
     }
 
+    /// Stop active play without abandoning the game. A no-op on a finished
+    /// game: something has to un-finish it first, which is enterReview().
     void pause() {
-        started = false;
+        if (phase() == GamePhase::Finished) return;
+        transitionTo(restingPhase(), "pause");
+    }
+
+    /// Leave a game — finished or in progress — for review. This is what
+    /// navigating backwards does: unlike pause() it clears the finished state,
+    /// because the position being shown is no longer the end of the game.
+    void enterReview() {
+        transitionTo(restingPhase(), "enterReview");
+    }
+
+    /// The game ended. `reason` is DOUBLE_PASS or RESIGNATION; NO_REASON is
+    /// rejected, since a finished game always has a result to show.
+    void endGame(GameState::Reason reason) {
+        if (reason == GameState::NO_REASON) {
+            spdlog::error("endGame(NO_REASON) refused — a game cannot end for no reason");
+            return;
+        }
+        state.reason = reason;
+        transitionTo(GamePhase::Finished, "endGame");
+    }
+
+    void createNewRecord() {
+        game.initGame(board.getSize(), state.komi, setupBlackStones.size(), state.black, state.white);
+        game.setHandicapStones(setupBlackStones);
+        transitionTo(GamePhase::Setup, "createNewRecord");
+        // Replacing the record is a change the UI must see, and it does not go
+        // through onBoardChange: the new-game path notifies onBoardSized, which
+        // runs *before* this. See GameSnapshot.
+        publishSnapshot();
     }
 
     Color changeTurn() {
@@ -61,39 +116,146 @@ public:
 
     unsigned getBoardSize() const;
 
-    Move getUndoMove() const;
-
     float result(const Move& lastMove);
 
     void calcCaptured(Metrics& m, int capturedBlack, int capturedWhite);
+    void updateReservoirs();
 
-    operator bool() { return !isGameOver && started; }
+    /// True exactly while the game loop may call genmove.
+    explicit operator bool() const { return phase() == GamePhase::Playing; }
+
+    /// The authoritative lifecycle state (ADR-0002 step 2).
+    [[nodiscard]] GamePhase phase() const { return gamePhase.load(); }
+
+    /// True when replacing the game on screen would discard something the user
+    /// would miss, and so should be confirmed first. A finished game has
+    /// nothing left to lose, an empty board has nothing to discard, and a
+    /// tsumego is a puzzle rather than a game in progress.
+    ///
+    /// Note the second half of the record test: moveCount() is the *view*
+    /// position, so it reads 0 while reviewing from the root of a real game.
+    [[nodiscard]] bool hasGameWorthKeeping() const {
+        if (tsumegoMode) return false;
+        if (phase() == GamePhase::Finished) return false;
+        return game.moveCount() > 0 || game.getLoadedMovesCount() > 0;
+    }
+
+    /// Do the rules of Go accept this stone at this point? Asked of our own
+    /// board, and asked *before* anybody sends the move to an engine.
+    ///
+    /// The engine used to be the only referee. Every click left as
+    /// `play <colour> <point>` and whatever GNU Go answered decided it, so an
+    /// ordinary misclick onto an occupied point came back as `? illegal move` —
+    /// which the message-log sink takes at error level, raising a red badge for
+    /// a fat-fingered endgame click, and which in one recorded session was the
+    /// entire contents of `last_run.log` (2026-08-16, `play B M10` onto White's
+    /// stone from ten moves earlier). We know the rules; there is nothing to ask.
+    ///
+    /// It is also what keeps an illegal move out of the record: `GameRecord::
+    /// move()` appends whatever it is handed, so an engine with different rules
+    /// — or one that has drifted out of sync — could write a move that
+    /// `Board::replayMoves()` then refuses, silently truncating every later
+    /// reconstruction of the position.
+    ///
+    /// Only a placed stone has a point to test; a pass, a resignation and the
+    /// internal sentinels are legal by construction. Locked, because the game
+    /// thread rebuilds `board` in onBoardChange(); a click is a user event
+    /// rather than a frame, so the cost does not matter.
+    [[nodiscard]] bool isLegalMove(const Move& m) const {
+        if (m != Move::NORMAL) return true;
+        std::lock_guard<std::mutex> lock(mutex);
+        return board.isValidMove(m.pos, m.col);
+    }
 
     void setCursor(const Position& p) { cursor = p;}
 
 public:
-    ElementGame* parent;
-
     Board board;
 
-    volatile bool isGameOver;
-    bool started;
+    std::atomic<bool> tsumegoMode{false};
+
+    /// Recompute the published snapshot from the record. Must be called by
+    /// whoever currently owns the record exclusively — the game thread during
+    /// play and navigation, or the UI thread while the game loop is stopped.
+    /// onBoardChange() is the funnel every position change already passes
+    /// through, so that is where it happens; anything that changes what the UI
+    /// displays without going through it must publish for itself.
+    void publishSnapshot();
+
+    /// The UI thread's view of the record. Never reads the SGF tree — see
+    /// GameSnapshot and ADR-0006. Returns a value that stays valid however the
+    /// record changes afterwards, so a caller can read several fields without
+    /// them shifting underneath it.
+    [[nodiscard]] std::shared_ptr<const GameSnapshot> snapshot() const;
+
+    std::string tsumegoHintBlack;  // Localized "Black to move", set on UI thread
+    std::string tsumegoHintWhite;  // Localized "White to move", set on UI thread
     GameState state;
 
     GameRecord game;
 
     bool invalidated;
 
-    static const int maxCaptured = 191;
+    static constexpr int maxCaptured = 191;
     int calcCapturedBlack, calcCapturedWhite;
     float ddc[8 * maxCaptured];
 
     Metrics metrics;
 
-	std::mutex mutex;
+	/// Guards `board` and `state` against the game thread's onGameMove() /
+	/// onBoardChange() rebuilds. Mutable so that the const questions the UI
+	/// thread asks about the position — isLegalMove() — can take it.
+	mutable std::mutex mutex;
 
     Position cursor;
-    std::vector<Position> handicapStones;
+    std::vector<Position> setupBlackStones;
+    std::vector<Position> setupWhiteStones;
+
+private:
+    /// True when there is no game to resume: the cursor is at the root and the
+    /// root has no continuation. Note that `moveCount()` is the *view* position,
+    /// so it is 0 at the root of a loaded game too — hence the second half.
+    [[nodiscard]] bool hasEmptyRecord() const {
+        return game.moveCount() == 0 && !game.hasNextMove();
+    }
+
+    /// Where "not playing, not finished" lands: an empty record is a board being
+    /// configured, anything else is a game being reviewed.
+    [[nodiscard]] GamePhase restingPhase() const {
+        return hasEmptyRecord() ? GamePhase::Setup : GamePhase::Paused;
+    }
+
+    /// The single writer. Every phase change in the program goes through here,
+    /// which is what makes "who ended the game?" a one-line grep and gives the
+    /// lifecycle one log stream instead of three files' worth of flag writes.
+    ///
+    /// There is deliberately no rejection table: every ordered pair of phases
+    /// turns out to be reachable through some supported user action (see the
+    /// ADR-0002 implementation log). What the type buys is that the states are
+    /// now mutually exclusive — the old `started && isGameOver` combination is
+    /// unrepresentable — not that some pairs are forbidden.
+    void transitionTo(GamePhase next, const char* via) {
+        const GamePhase prev = gamePhase.exchange(next);
+        if (prev != next) {
+            spdlog::debug("phase: {} -> {} ({})", phaseName(prev), phaseName(next), via);
+        }
+    }
+
+    /// Guards only the snapshot pointer swap — never held across anything that
+    /// can block, which is the whole reason the snapshot exists rather than a
+    /// lock over GameRecord itself.
+    mutable std::mutex snapshotMutex;
+    std::shared_ptr<const GameSnapshot> gameSnapshot{std::make_shared<const GameSnapshot>()};
+
+    /// Source of GameSnapshot::positionId. Only ever incremented inside
+    /// publishSnapshot(), which by contract runs on whoever owns the record, so
+    /// it needs no synchronisation of its own — the snapshot pointer swap is
+    /// what publishes it.
+    unsigned long long positionCounter{0};
+
+    /// Authoritative lifecycle state. Atomic because the game thread ends games
+    /// while the UI thread reads the phase every frame.
+    std::atomic<GamePhase> gamePhase{GamePhase::Setup};
 };
 
 

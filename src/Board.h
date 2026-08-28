@@ -1,15 +1,31 @@
+/** \file
+ *  \brief Board geometry and the value types the whole program speaks:
+ *         Color, Position, Move, Board.
+ *
+ * `Board` is a *position* — stones, captures, territory, and the fuzzy
+ * per-stone placement the renderer uses — not a rules engine; legality lives in
+ * GameRecord's replay. Deliberately free of RmlUi and OpenGL dependencies so
+ * goban_core builds and tests without a graphics context.
+ *
+ * Copied freely across threads by value: the game thread builds a fresh Board in
+ * `GameThread::notifyMoveComplete()` and hands it to the observers, which merge
+ * it into the model's own with `updateStones()` so existing fuzzy positions
+ * survive. `positionNumber` is atomic and is the UI's "something changed" edge —
+ * but an atomic edge grants visibility, not exclusion, so it is not a licence to
+ * read anything else unguarded across it.
+ */
 #ifndef BOARD_H
 #define BOARD_H
 
 #include <spdlog/spdlog.h>
 #include <array>
 #include <sstream>
-#include <stdexcept>
 #include <vector>
 #include <iostream>
 #include <random>
-#include <mutex>
+#include <atomic>
 #include <glm/glm.hpp>
+#include <optional>
 #include "Metrics.h"
 
 class Color {
@@ -50,7 +66,7 @@ public:
     [[nodiscard]] std::string toString() const;
 
 private:
-    volatile Value col;
+    Value col;  // Value type - no volatile needed (copied by value)
 
 };
 
@@ -74,6 +90,17 @@ public:
     [[nodiscard]] int col() const { return c; }
     [[nodiscard]] int row() const { return r; }
 
+    /// The displayed column letter. `I` is skipped, as Go and GTP both require.
+    /// The board's coordinate labels and `operator<<` share this so they cannot
+    /// disagree about what a point is called — and board rows run opposite to
+    /// SGF rows, so a second copy of the convention would drift silently.
+    static char columnLabel(int col) {
+        return col < 8 ? static_cast<char>('A' + col)
+                       : static_cast<char>('I' + col - 7);
+    }
+    /// The displayed row number. Board row 0 is row 1, nearest the viewer.
+    static int rowLabel(int row) { return row + 1; }
+
     [[nodiscard]] std::string toSgf(int boardSize) const {
         std::ostringstream ss;
         ss << static_cast<char>('a' + c) << static_cast<char>('a' + boardSize - r - 1);
@@ -86,6 +113,15 @@ public:
         }
         int col = sgfPoint[0] - 'a';
         int row = boardSize - (sgfPoint[1] - 'a') - 1;
+        // Reject out-of-range points rather than returning a Position that
+        // satisfies operator bool. Callers index straight into the points array
+        // (GameRecord::buildBoardFromMoves, getMoveAt), so an unchecked column
+        // from a malformed record would write past the end of the board.
+        // Pass moves never reach here — libsgfcplusplus reports those via
+        // IsPassMove() before the point is parsed.
+        if (col < 0 || col >= boardSize || row < 0 || row >= boardSize) {
+            return Position(-1, -1);
+        }
         return Position(col, row);
     }
 
@@ -98,7 +134,7 @@ class Move {
 
 public:
 
-    enum Special { INVALID, INTERRUPT, NORMAL, PASS, UNDO, RESIGN, KIBITZED};
+    enum Special { INVALID, INTERRUPT, NORMAL, PASS, RESIGN, KIBITZED};
 
     Move(): spec(INVALID), col(Color::EMPTY) {}
 
@@ -118,6 +154,15 @@ public:
     bool operator== (const Color::Value & b) const { return col == b; }
 
     bool operator== (const Position& p) const { return pos == p; }
+
+    /// Full identity, vertex included. The overloads above each compare one
+    /// field, which is what their call sites want; diffing two move *paths*
+    /// needs all of them at once — see AnalysisService.
+    bool operator== (const Move& b) const {
+        return spec == b.spec && col == b.col && (spec != NORMAL || pos == b.pos);
+    }
+
+    bool operator!= (const Move& b) const { return !(*this == b); }
 
     static Move parseGtp(const std::string& s, const Color& col) {
         std::istringstream ss(s); Move m(Move::INVALID, col); ss >> m; return m;
@@ -141,6 +186,14 @@ public:
 struct Overlay {
     std::string text;
 	unsigned layer;
+	/// An explicit colour for this label, or none to take the layer's.
+	///
+	/// The layer array is still the palette every ordinary label draws from;
+	/// this exists so the evaluation overlay can tint one label — including a
+	/// label somebody else wrote — without needing a layer of its own. Possible
+	/// only since glyphy started carrying colour per glyph rather than per draw
+	/// call.
+	std::optional<glm::vec4> color;
 };
 
 //stonePlace
@@ -156,10 +209,10 @@ public:
 class Board
 {
 public:
-    static const int MAX_BOARD = 19;
-    static const int MIN_BOARD = 9;
-    static const int BOARD_SIZE = MAX_BOARD * MAX_BOARD;
-    static const int DEFAULT_SIZE = 19;
+    static constexpr int MAX_BOARD = 19;
+    static constexpr int MIN_BOARD = 9;
+    static constexpr int BOARD_SIZE = MAX_BOARD * MAX_BOARD;
+    static constexpr int DEFAULT_SIZE = 19;
 
     enum Change { NO_CHANGE = 0, STONE_PLACED = 1, STONE_REMOVED = 2, TERRITORY_CHANGED = 4, SIZE_CHANGED = 8};
 
@@ -197,6 +250,11 @@ public:
     }
 
     [[nodiscard]] int capturedCount(const Color::Value& whose) const;
+    [[nodiscard]] int stonesOnBoard(const Color::Value& whose) const;
+
+    // Returns bounding rect of all stones (grid coords), with margin clamped to board.
+    // Returns false if no stones on board.
+    bool stoneBounds(Position& minPos, Position& maxPos, int margin = 1) const;
 
     void clear(int boardSize = DEFAULT_SIZE);
     void clearTerritory() {
@@ -205,15 +263,55 @@ public:
         }
     };
 
-    // Calculate territory using flood-fill from dead stones
-    // This is GTP-standard compliant (only needs 'dead' status, not gnugo extensions)
-    void calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones);
+    /// Shade territory by flood fill, given the engine's life-and-death verdict.
+    ///
+    /// Both lists come from `final_status_list`, which is GTP 2 standard — and so
+    /// are all three of its statuses (`alive`, `seki`, `dead`). Only GNU Go's
+    /// `dame` / `black_territory` / `white_territory` are extensions, and none is
+    /// used here.
+    ///
+    /// **Seki is not territory.** An empty region enclosed by a group that is
+    /// alive-in-seki belongs to nobody, in every ruleset that has the concept —
+    /// and a flood fill cannot tell it from an ordinary eye, because it reaches
+    /// exactly the same stones. Passing an empty `sekiStones` therefore *over*
+    /// counts, which is what this did for as long as it only asked for `dead`.
+    /// An engine that will not answer the seki query is no worse off than before,
+    /// so the caller treats a refusal as "no seki here" rather than as an error.
+    void calculateTerritoryFromDeadStones(const std::vector<Position>& deadStones,
+                                          const std::vector<Position>& sekiStones = {});
+
+    // Go rule implementation - apply move with capture processing
+    // Returns number of opponent stones captured (0 if none)
+    // Updates internal koPosition if exactly 1 stone captured
+    // Does NOT validate the move - caller should check isValidMove() beforehand
+    int applyMoveWithCaptures(const Move& move);
+
+    // Check if a move would be valid (not ko, not suicide unless captures)
+    // Uses internal koPosition for ko rule checking
+    bool isValidMove(const Position& pos, const Color& color) const;
+
+    // Build board state by replaying moves (stops on illegal move, returns count applied)
+    int replayMoves(const std::vector<Move>& moves);
+
+    // Sync glStones visual array from points logical state (call after replayMoves)
+    void syncVisualState();
+
+    // Get current ko position (for display or debugging)
+    [[nodiscard]] Position getKoPosition() const { return koPosition; }
 
     explicit Board(int size = DEFAULT_SIZE);
 
-    bool parseGtp(const std::vector<std::string>& lines);
+private:
+    // Find all stones connected to the given position (same color flood-fill)
+    std::vector<Position> findGroup(const Position& pos) const;
 
-    bool parseGtpInfluence(const std::vector<std::string>& lines);
+    // Count liberties (unique empty adjacent positions) for a group
+    int countLiberties(const std::vector<Position>& group) const;
+
+    // Remove a group of stones from the board, returns count removed
+    int removeGroup(const std::vector<Position>& group);
+
+public:
 
     void invalidate();
 
@@ -228,11 +326,55 @@ public:
     bool toggleTerritoryAuto(bool);
 
     int placeCursor(const Position& p, const Color& col);
+
+    /// How far a stone being placed sits from the intersection it will land on,
+    /// in grid units — the "imprecise hand" that keeps a stone in hand from
+    /// snapping rigidly to the point. Derived from where inside the cell the ray
+    /// actually fell, so it slides as the mouse does and only then jumps a point.
+    ///
+    /// Shared rather than copied: the drawn pointer offsets by exactly this, so
+    /// the mark and the stone it precedes move as one thing. Two implementations
+    /// would drift, and the drift would be visible — the mark sitting off the
+    /// stone that lands on it.
+    [[nodiscard]] glm::vec2 fuzzyOffset(const Position& coord) const;
     double placeFuzzy(const Position& p, bool noFix = false);
 
-    bool collides(int i, int j, int i0, int j0);
+    bool collides(int i, int j, int i0, int j0) const;
     void removeOverlay(const Position& p);
     void setOverlay(const Position& p, const std::string& text, const Color& c);
+    /// Board-level overlay (layer 0). `color` overrides the layer's default.
+    void setBoardOverlay(const Position& p, const std::string& text,
+                         const std::optional<glm::vec4>& color = std::nullopt);
+    void removeBoardOverlay(const Position& p);
+
+    /// Whether an annotation patch has been added or removed since this was last
+    /// asked, and clears the record in the asking.
+    ///
+    /// `setBoardOverlay()` and `removeBoardOverlay()` write the annotation
+    /// material straight into `glStones` — the buffer that reaches the GPU only
+    /// under `UPDATE_STONES`, in `GobanShader::shadeIt()`. The glyphs are built
+    /// into the overlay's *own* buffers, which are rebuilt under
+    /// `UPDATE_OVERLAY`. So the two halves of one annotation travel on different
+    /// flags, and a repaint carrying only the second draws a label with no patch
+    /// under it, or leaves a patch behind whose label is gone.
+    ///
+    /// That trap was documented and still caught the wait indicator, which asks
+    /// for a bare `UPDATE_OVERLAY` twice a second — continuously, and precisely
+    /// while an engine is thinking and the suggestions are churning. Relying on
+    /// every caller to remember an implicit coupling had one job and lost it, so
+    /// `GobanView::Update()` now asks *the board* whether the stones need
+    /// uploading rather than asking the caller to have known.
+    [[nodiscard]] bool takeAnnotationDirty() {
+        const bool dirty = annotationDirty;
+        annotationDirty = false;
+        return dirty;
+    }
+
+    /// Recolour a label that is already there, leaving its text alone. Nothing
+    /// happens if the point carries no label — the evaluation overlay tints
+    /// what the navigation overlay wrote, and the two are rebuilt in the same
+    /// pass, but a point can legitimately have been dropped in between.
+    void setOverlayTint(const Position& p, const std::optional<glm::vec4>& color);
     void setRandomStoneRotation() {
     	randomStoneRotation = 3.1415f * uDist(generator);
     }
@@ -266,6 +408,7 @@ private:
     int capturedBlack;
     int capturedWhite;
     int boardSize;
+    Position koPosition{-1, -1};  // Ko position (invalid if no ko)
 
     float r1, rStone;
 
@@ -276,18 +419,33 @@ private:
     bool invalidated;
 
     const static float mEmpty;
+    const static float mAnnotation;  // Empty point with hidden grid (for overlays)
     double randomStoneRotation{};
 
     double squareYtoXRatio;
 
 public:
-    volatile unsigned long positionNumber;
+    std::atomic<unsigned long> positionNumber{0};
     bool showTerritory;
     bool showTerritoryAuto;
     bool territoryReady;
+    /// Scoring was attempted for *this* position, with every engine in sync,
+    /// and could not produce a result. It stops GameThread::processScoring()
+    /// retrying ten times a second forever, which is what an honest
+    /// `territoryReady = false` would otherwise cause.
+    ///
+    /// It clears itself: every position change builds a fresh Board (see
+    /// GameRecord::buildBoardFromMoves) whose flag is false, and updateStones()
+    /// copies it in, so moving anywhere gives scoring another chance. Do not
+    /// clear it by hand — that reintroduces the retry storm.
+    bool territoryFailed;
+
+    /// See takeAnnotationDirty(). Not copied by updateStones(): it describes
+    /// this board's own unflushed writes, not any property of the position.
+    bool annotationDirty = false;
 private:
     Position cursor;
-    volatile long moveNumber;
+    std::atomic<long> moveNumber{0};
 public:
     double collision;
     float score;

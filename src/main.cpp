@@ -1,14 +1,3 @@
-/*
- * Copyright (c) 2006 - 2008
- * Wandering Monster Studios Limited
- *
- * Any use of this program is governed by the terms of Wandering Monster
- * Studios Limited's Licence Agreement included with this program, a copy
- * of which can be obtained by contacting Wandering Monster Studios
- * Limited at info@wanderingmonster.co.nz.
- *
- */
-
 // Windows headers must come first to avoid conflicts
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -17,6 +6,7 @@
 #include <process.h>
 #else
 #include <unistd.h>
+#include <csignal>
 #endif
 
 #include <clipp.h>
@@ -33,6 +23,10 @@
 
 // GLFW and RmlUi backends
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 #include <RmlUi_Platform_GLFW.h>
 #include <RmlUi_Renderer_GL2.h>
 
@@ -47,17 +41,68 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <nlohmann/json.hpp>
 
+#include <cstdio>
 #include <memory>
 #include <fstream>
+#include <set>
+#include <optional>
 
+#include "version.h"
+#include "MessageLog.h"
 #include "UserSettings.h"
+#include "ScenarioRunner.h"
+#include "ScenarioRecorder.h"
 
 Rml::Context* context = nullptr;
+
+// Global hover listener that triggers repaint for any document
+// This ensures hover states work correctly with event-driven rendering
+class HoverRepaintListener : public Rml::EventListener {
+public:
+    void ProcessEvent(Rml::Event& event) override {
+        (void)event;
+        // Trigger repaint on CSS state changes from ANY document
+        // The repaint trigger (ElementGame) lives in game_window
+        if (context) {
+            if (auto doc = context->GetDocument("game_window")) {
+                if (auto gameElement = dynamic_cast<ElementGame*>(doc->GetElementById("game"))) {
+                    gameElement->requestRepaint();
+                }
+            }
+        }
+    }
+};
+
+static HoverRepaintListener g_hoverListener;
+static std::set<Rml::ElementDocument*> g_documentsWithHoverListener;
 std::shared_ptr<Configuration> config;
+
+// Add hover listeners to any new documents in the context
+// This ensures all dialogs (current and future) have hover responsiveness
+static void EnsureHoverListenersForAllDocuments() {
+    if (!context) return;
+
+    for (int i = 0; i < context->GetNumDocuments(); ++i) {
+        auto doc = context->GetDocument(i);
+        if (doc && g_documentsWithHoverListener.find(doc) == g_documentsWithHoverListener.end()) {
+            // Events that can change CSS visual state and need repaint:
+            // :hover -> mouseover/mouseout (shows submenus via CSS)
+            // click  -> complete click cycle (RmlUi select dropdowns, buttons with onmouseup)
+            // change -> dropdown selection changes (from syncDropdown in OnUpdate)
+            doc->AddEventListener(Rml::EventId::Mouseover, &g_hoverListener);
+            doc->AddEventListener(Rml::EventId::Mouseout, &g_hoverListener);
+            doc->AddEventListener(Rml::EventId::Click, &g_hoverListener);
+            doc->AddEventListener(Rml::EventId::Change, &g_hoverListener);
+            g_documentsWithHoverListener.insert(doc);
+            spdlog::debug("Added hover listeners to document: {}", doc->GetSourceURL().c_str());
+        }
+    }
+}
 
 // For application restart with different config
 static char* g_executable_path = nullptr;
 static std::string g_pending_restart_config;
+static std::string g_log_level;
 
 void RequestRestart(const std::string& configFile) {
     g_pending_restart_config = configFile;
@@ -80,6 +125,10 @@ void ExecuteRestart() {
     args.push_back(g_executable_path);
     args.push_back("--config");
     args.push_back(g_pending_restart_config.c_str());
+    if (!g_log_level.empty() && g_log_level != "warning") {
+        args.push_back("--verbosity");
+        args.push_back(g_log_level.c_str());
+    }
     args.push_back(nullptr);
 
     intptr_t result = _spawnv(_P_NOWAIT, g_executable_path, args.data());
@@ -92,9 +141,15 @@ void ExecuteRestart() {
     std::vector<char*> args;
     args.push_back(g_executable_path);
     char config_flag[] = "--config";
+    char verbosity_flag[] = "--verbosity";
     args.push_back(config_flag);
     char* config_path = strdup(g_pending_restart_config.c_str());
     args.push_back(config_path);
+    if (!g_log_level.empty() && g_log_level != "warning") {
+        args.push_back(verbosity_flag);
+        char* log_level = strdup(g_log_level.c_str());
+        args.push_back(log_level);
+    }
     args.push_back(nullptr);
 
     execv(g_executable_path, args.data());
@@ -107,6 +162,13 @@ void ExecuteRestart() {
 // Custom SystemInterface to route RmlUi logs to spdlog
 class GobanSystemInterface : public SystemInterface_GLFW {
 public:
+    // RmlUi 6.3 made the backend's system interface take the window at
+    // construction, where 6.2 was default-constructible. Inheriting the
+    // constructor is the whole adaptation; the consequence is that this can no
+    // longer be a file-scope static, because there is no window until main()
+    // has made one — see `system_interface` below.
+    using SystemInterface_GLFW::SystemInterface_GLFW;
+
     bool LogMessage(Rml::Log::Type type, const Rml::String& message) override {
         switch (type) {
             case Rml::Log::LT_ERROR:
@@ -132,18 +194,111 @@ public:
     }
 };
 
-static GobanSystemInterface system_interface;
+// Constructed once the window exists, and destroyed before GLFW is terminated —
+// ~SystemInterface_GLFW() gives GLFW back the cursors it created. A file-scope
+// object would instead be destroyed during static destruction, after
+// glfwTerminate() has already run.
+static std::optional<GobanSystemInterface> system_interface;
 static RenderInterface_GL2 render_interface;
+
+// Centralized cleanup for graceful exit on errors
+// Safe to call multiple times or with partially initialized resources
+static void CleanupResources(GLFWwindow* window) {
+    // Flush logs first to ensure all error messages are written
+    if (spdlog::default_logger()) {
+        spdlog::default_logger()->flush();
+    }
+
+    // Clear all GLFW callbacks to prevent accessing freed resources during cleanup
+    // This is critical: callbacks can fire during glfwTerminate() and access spdlog
+    glfwSetErrorCallback(nullptr);
+    if (window) {
+        glfwSetWindowSizeCallback(window, nullptr);
+        glfwSetKeyCallback(window, nullptr);
+        glfwSetCharCallback(window, nullptr);
+        glfwSetCursorPosCallback(window, nullptr);
+        glfwSetMouseButtonCallback(window, nullptr);
+        glfwSetScrollCallback(window, nullptr);
+    }
+
+    // Cleanup RmlUi if it was initialized
+    if (context) {
+        context = nullptr;  // Will be destroyed by Rml::Shutdown()
+    }
+    Rml::Shutdown();  // Safe to call even if not initialized
+
+    // Before glfwTerminate(): the destructor calls into GLFW to release the
+    // cursors. Safe if never constructed, and safe twice — CleanupResources()
+    // is deliberately re-entrant.
+    system_interface.reset();
+
+    // Cleanup GLFW
+    if (window) {
+        glfwDestroyWindow(window);
+    }
+    glfwTerminate();  // Safe to call even if not initialized
+}
+
+// Reads the finished back buffer and writes it as binary PPM (P6). Called
+// between rendering and the swap: the front buffer of a hidden window never
+// receives the frame, so this is the only reliable capture point.
+static void WriteScreenshotPPM(GLFWwindow* window, const std::string& path) {
+    int w = 0, h = 0;
+    glfwGetFramebufferSize(window, &w, &h);
+    if (w <= 0 || h <= 0) {
+        spdlog::error("screenshot: framebuffer has no size");
+        return;
+    }
+    std::vector<unsigned char> pixels(static_cast<size_t>(w) * h * 3);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_BACK);
+    glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        spdlog::error("screenshot: cannot write '{}'", path);
+        return;
+    }
+    out << "P6\n" << w << " " << h << "\n255\n";
+    for (int row = h - 1; row >= 0; --row) {  // GL rows are bottom-up
+        out.write(reinterpret_cast<const char*>(pixels.data() + static_cast<size_t>(row) * w * 3),
+                  static_cast<std::streamsize>(w) * 3);
+    }
+    spdlog::info("screenshot: wrote {}x{} to {}", w, h, path);
+}
 
 // GLFW callbacks
 static void GlfwErrorCallback(int error, const char* description) {
-    spdlog::error("GLFW Error {}: {}", error, description);
+    // Two GLFW conditions are "this platform cannot do that", not faults, and
+    // there is nothing a user could do about either. Everything else warns, and
+    // reaches the message panel through the log sink.
+    //
+    //  * FEATURE_UNAVAILABLE — Wayland does not support window positioning.
+    //  * CURSOR_UNAVAILABLE — X11 cursor themes need not carry the shapes GLFW
+    //    3.4 added, and RmlUi's backend creates all six up front. It asks for
+    //    RESIZE_ALL, RESIZE_NWSE and NOT_ALLOWED, none of which any stylesheet
+    //    here references — the only cursor this interface asks for is `pointer`,
+    //    which is always available. GLFW returns null and the backend then sets
+    //    no cursor, so the effect is nil; without this the effect was two
+    //    warnings and a badge on the message panel at every startup, which is
+    //    noise in the one place a user is meant to trust.
+    if (error == GLFW_FEATURE_UNAVAILABLE || error == GLFW_CURSOR_UNAVAILABLE) {
+        spdlog::debug("GLFW: {}", description);
+    } else {
+        spdlog::warn("GLFW Error {}: {}", error, description);
+    }
 }
 
 static void GlfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
     (void)window;
     if (context) {
         context->SetDimensions(Rml::Vector2i(width, height));
+        // Trigger repaint on window resize
+        if (auto gameDoc = context->GetDocument("game_window")) {
+            if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
+                gameElement->requestRepaint();
+            }
+        }
     }
     render_interface.SetViewport(width, height);
 }
@@ -189,7 +344,6 @@ static void GlfwCursorPosCallback(GLFWwindow* window, double xpos, double ypos) 
 static void GlfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     (void)window;
     if (!context) return;
-
     RmlGLFW::ProcessMouseButtonCallback(context, button, action, mods);
 }
 
@@ -268,6 +422,17 @@ int APIENTRY WinMain(HINSTANCE instance_handle, HINSTANCE previous_instance_hand
 int main(int argc, char** argv)
 #endif
 {
+#ifndef _WIN32
+    // Writing to a pipe nobody is reading must be an error, not a death
+    // sentence. Two places need it: an engine that dies mid-command leaves
+    // GtpClient writing into a closed pipe, and it is written to handle a failed
+    // write — but only gets the chance if the default SIGPIPE disposition is not
+    // killing the process first. And under X11 the display connection closing
+    // during shutdown raises it too, which killed every scripted run with signal
+    // 13 *after* the scenario had already passed.
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     // Store executable path for potential restart
 #ifdef RMLUI_PLATFORM_WIN32
     static char exe_path[MAX_PATH];
@@ -280,15 +445,61 @@ int main(int argc, char** argv)
 
     using namespace clipp;
     std::string logLevel("warning");
+    std::string scenarioFile;
+    std::string userSettingsFile;
+    std::string platform;
+    bool forceRecord = false;
+    bool showVersion = false;
+
+    // Parse the CLI before touching UserSettings: a scenario run redirects
+    // persistence so it cannot overwrite the developer's real session.
+    std::string configurationFileArg;
+    auto preCli = (
+        option("-v", "--verbosity") & word("level", logLevel),
+        option("-c", "--config") & value("file", configurationFileArg),
+        option("-s", "--script") & value("file", scenarioFile),
+        option("--user-settings") & value("file", userSettingsFile),
+        option("--platform") & word("name", platform),
+        option("--record").set(forceRecord),
+        // So a bug report can say which build it came from. The About dialog has
+        // it too, but asking someone to open a dialog to read a version number
+        // is a worse question than asking them to run one command.
+        option("--version").set(showVersion)
+    );
+#ifdef RMLUI_PLATFORM_WIN32
+    parse(__argc, __argv, preCli);
+#else
+    parse(argc, argv, preCli);
+#endif
+
+    if (showVersion) {
+        std::printf("goban %s\n", GOBAN_VERSION);
+        return 0;
+    }
+
+    // A scripted run defaults to a throwaway settings file, so that driving the
+    // app from a scenario never mutates user.json.
+    if (userSettingsFile.empty() && !scenarioFile.empty()) {
+        userSettingsFile = "scenario-user.json";
+    }
+    if (!userSettingsFile.empty()) {
+        UserSettings::instance().setSettingsFile(userSettingsFile);
+    }
 
     // Load user preferences
     UserSettings::instance().load();
-    std::string configurationFile = UserSettings::instance().getLastConfig();
-    bool startFullscreen = UserSettings::instance().getFullscreen();
+    std::string configurationFile = configurationFileArg.empty()
+        ? UserSettings::instance().getLastConfig()
+        : configurationFileArg;
+    // Never take over the screen during a scripted run.
+    bool startFullscreen = scenarioFile.empty() && UserSettings::instance().getFullscreen();
 
     auto cli = (
         option("-v", "--verbosity") & word("level", logLevel),
-        option("-c", "--config") & value("file", configurationFile)
+        option("-c", "--config") & value("file", configurationFile),
+        option("-s", "--script") & value("file", scenarioFile),
+        option("--user-settings") & value("file", userSettingsFile),
+        option("--platform") & word("name", platform)
     );
 #ifdef RMLUI_PLATFORM_WIN32
     (void)instance_handle;
@@ -299,6 +510,8 @@ int main(int argc, char** argv)
 #else
     parse(argc, argv, cli);
 #endif
+
+    g_log_level = logLevel;
 
     const char* WINDOW_NAME = "Goban";
 
@@ -314,30 +527,116 @@ int main(int argc, char** argv)
     logger->set_level(spdlog::level::from_str(logLevel));
     logger->flush_on(spdlog::level::from_str(logLevel));  // Flush immediately for crash debugging
 
+    // Third sink: the tail the user can actually read. Everything goban already
+    // logs at info and worse is now reachable from the interface, without a
+    // single call site changing — which is the point, since the diagnostics that
+    // matter most (an engine that will not start) are in code nobody would think
+    // to route through the UI. See src/MessageLog.h.
+    installMessageLogSink();
+
     int window_width = 1024;
     int window_height = 768;
 
     // Initialize GLFW
     glfwSetErrorCallback(GlfwErrorCallback);
+
+    // Windowing backend. Both are compiled into GLFW, so this is a runtime
+    // choice rather than something to decide when building: by default GLFW
+    // picks Wayland when a compositor is running and X11 otherwise.
+    //
+    // It is worth being able to override, because the two are not equivalent
+    // here. Wayland deliberately exposes no global window position, so
+    // AppState's "fullscreen on the monitor the window is on" cannot work — on
+    // a multi-head Wayland session fullscreen lands on whichever output GLFW
+    // enumerated first. Running under X11 (XWayland is fine) restores it.
+    // And it is worth choosing *for* a scripted run. A window hidden under
+    // Wayland is never mapped, so its surface has no buffer attached and
+    // everything rendered into it is discarded — including into a framebuffer
+    // object of our own, which was the first thing tried. `glReadPixels` then
+    // returns black with no GL error, which is exactly what every screenshot
+    // this feature ever took produced. Under X11, XWayland included, a hidden
+    // window renders normally and the capture works.
+    //
+    // Only when an X server is actually reachable: forcing X11 without one
+    // makes glfwInit() fail outright, and a scenario suite that cannot start is
+    // worse than one that cannot screenshot.
+    if (!scenarioFile.empty() && platform.empty() && getenv("DISPLAY") != nullptr) {
+        platform = "x11";
+        spdlog::debug("scripted run: preferring X11, since a hidden Wayland "
+                      "surface renders nothing");
+    }
+
+    if (!platform.empty()) {
+#ifdef GLFW_PLATFORM
+        if (platform == "x11") {
+            glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+        } else if (platform == "wayland") {
+            glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+        } else if (platform == "auto") {
+            glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
+        } else {
+            spdlog::warn("Unknown --platform '{}'; expected auto, wayland or x11", platform);
+        }
+#else
+        spdlog::warn("--platform needs GLFW 3.4 or newer; ignoring '{}'", platform);
+#endif
+    }
+
     if (!glfwInit()) {
-        spdlog::critical("Failed to initialize GLFW");
-        return -1;
+        // A forced platform is a preference, not a requirement — most of all
+        // when this process chose it rather than the user. Let GLFW decide and
+        // try once more before giving up.
+#ifdef GLFW_PLATFORM
+        if (!platform.empty()) {
+            spdlog::warn("GLFW could not start on '{}'; retrying with whatever "
+                         "it finds", platform);
+            glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
+        }
+#endif
+        if (platform.empty() || !glfwInit()) {
+            spdlog::critical("Failed to initialize GLFW");
+            CleanupResources(nullptr);
+            return -1;
+        }
     }
 
     // Request OpenGL 2.1 compatibility profile for GL2 renderer
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 
+    // A scripted run still needs a real GL context (shaders compile, the board
+    // renders), but it must not pop a window in front of whatever the developer
+    // is doing. Under Xvfb in CI this makes no difference.
+    // GOBAN_SCENARIO_VISIBLE overrides this for benchmark runs: a hidden
+    // window's swap never presents, so frame timings measured there are fiction.
+    if (!scenarioFile.empty() && getenv("GOBAN_SCENARIO_VISIBLE") == nullptr) {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    }
+
     // Create GLFW window
     GLFWwindow* window = glfwCreateWindow(window_width, window_height, WINDOW_NAME, nullptr, nullptr);
     if (!window) {
         spdlog::critical("Failed to create GLFW window");
-        glfwTerminate();
+        CleanupResources(nullptr);
         return -1;
     }
 
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
+    // Vsync paces interactive use; a scripted run wants frames as fast as the
+    // GPU can produce them, both for benchmarks and to keep CI runs brisk.
+    const bool vsyncWanted = scenarioFile.empty();
+    bool vsyncOn = vsyncWanted;
+    glfwSwapInterval(vsyncOn ? 1 : 0);
+
+    // Set window icon from executable resource (Windows only)
+#ifdef _WIN32
+    HWND hwnd = glfwGetWin32Window(window);
+    HICON icon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(101));
+    if (icon) {
+        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
+        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+    }
+#endif
 
     // Store window in AppState for fullscreen toggle etc.
     AppState::SetWindow(window);
@@ -350,14 +649,18 @@ int main(int argc, char** argv)
     }
 
     // Initialize glad
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
         spdlog::critical("Failed to initialize GLAD");
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        CleanupResources(window);
         return -1;
     }
 
-    spdlog::info("OpenGL version: {}", (const char*)glGetString(GL_VERSION));
+    spdlog::info("OpenGL version: {}", reinterpret_cast<const char *>(glGetString(GL_VERSION)));
+
+    // Show window immediately with black screen (before shader compilation)
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glfwSwapBuffers(window);
 
     // Set up GLFW callbacks
     glfwSetWindowSizeCallback(window, GlfwWindowSizeCallback);
@@ -370,20 +673,52 @@ int main(int argc, char** argv)
     // Initialize RmlUi
     render_interface.SetViewport(window_width, window_height);
     Rml::SetRenderInterface(&render_interface);
-    Rml::SetSystemInterface(&system_interface);
+    system_interface.emplace(window);
+    Rml::SetSystemInterface(&*system_interface);
 
     Rml::Initialise();
 
     config = std::make_shared<Configuration>(configurationFile);
+    if (!config->valid) {
+        spdlog::critical("Failed to load configuration from '{}'. Cannot continue.", configurationFile);
+        CleanupResources(window);
+        return -1;
+    }
+
+    // The view a fresh install opens on, and what `reset camera` falls back to.
+    // It ships in the application config rather than in user.json, which the
+    // application rewrites on every settings change — see UserSettings.h.
+    {
+        using nlohmann::json;
+        const auto cam = config->data.value("camera", json::object());
+        if (!cam.empty()) {
+            const auto rot = cam.value("rotation", json::object());
+            const auto pan = cam.value("pan", json::object());
+            CameraState def;
+            def.rotX = rot.value("x", def.rotX);
+            def.rotY = rot.value("y", def.rotY);
+            def.rotZ = rot.value("z", def.rotZ);
+            def.rotW = rot.value("w", def.rotW);
+            def.panX = pan.value("x", def.panX);
+            def.panY = pan.value("y", def.panY);
+            def.distance = cam.value("distance", def.distance);
+            UserSettings::instance().setDefaultCamera(def);
+        }
+    }
 
     // Create the main RmlUi context
     context = Rml::CreateContext("main", Rml::Vector2i(window_width, window_height));
     if (context == nullptr) {
         spdlog::critical("Failed to create RmlUi context");
-        Rml::Shutdown();
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        CleanupResources(window);
         return -1;
+    }
+
+    // Ensure dimensions are set correctly at startup (callback not called on init)
+    {
+        int w, h;
+        glfwGetWindowSize(window, &w, &h);
+        GlfwWindowSizeCallback(window, w, h);
     }
 
     Rml::Debugger::Initialise(context);
@@ -408,67 +743,162 @@ int main(int argc, char** argv)
     EventManager::RegisterEventHandler("open", fileChooserHandler);
     fileChooserHandler->LoadDialog(context);
 
-    auto windowLoaded = EventManager::LoadWindow("goban", context);
+    ScenarioRunner scenario;
+    bool scenarioActive = false;
+    if (!scenarioFile.empty()) {
+        // Recording a replay of a recording is noise, unless we are explicitly
+        // testing the recorder itself.
+        ScenarioRecorder::instance().setEnabled(forceRecord);
+        if (!scenario.load(scenarioFile)) {
+            CleanupResources(window);
+            return 2;
+        }
+        scenarioActive = true;
+    }
 
-    if (windowLoaded) {
+    if (EventManager::LoadWindow("goban", context)) {
         // Main loop
         while (!glfwWindowShouldClose(window) && !AppState::ExitRequested()) {
+            // Get game element
+            auto gameDoc = context->GetDocument("game_window");
+            ElementGame* gameElement = nullptr;
+            if (gameDoc) {
+                gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
+            }
+
+            // Process events
             glfwPollEvents();
 
-            // Get game element and run game loop
-            auto gameDoc = context->GetDocument("game_window");
-            if (gameDoc) {
-                auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
-                if (gameElement) {
-                    gameElement->gameLoop();
+            // Ensure all documents have hover listeners for proper repaint triggering
+            EnsureHoverListenersForAllDocuments();
+
+            // Run game loop (processes RmlUi events)
+            if (gameElement) {
+                gameElement->gameLoop();
+            }
+
+            // Advance the scenario after the game loop, so state observed by
+            // `expect` reflects everything this frame already processed.
+            if (scenarioActive && gameElement) {
+                scenario.pump(gameElement->getController(), gameElement->areEnginesLoaded());
+                if (scenario.finished()) {
+                    scenarioActive = false;
+                    AppState::RequestExit();
                 }
             }
 
-            // Clear and render
-            int fb_width, fb_height;
-            glfwGetFramebufferSize(window, &fb_width, &fb_height);
-            glViewport(0, 0, fb_width, fb_height);
+            // Vsync is dropped while the window is unfocused, and this is not a
+            // performance tweak — it is the whole of a freeze.
+            //
+            // Under Wayland a surface that is not being presented receives no
+            // frame callbacks, and with vsync on `eglSwapBuffers` waits for one.
+            // The wait is unbounded: the main thread stops reading the Wayland
+            // socket, so the compositor's `xdg_wm_base.ping` goes unanswered and
+            // it offers to kill us. Measured on Hyprland, moving goban to an
+            // inactive workspace: 12.1 s parked in the swap, eight pings queued
+            // and then all answered in a 36 microsecond burst the instant the
+            // window came back. Nothing was broken — the app was in a swap.
+            //
+            // There is nothing better to test. Hyprland sends no
+            // `wl_surface.leave` and no configure when a window stops being
+            // shown; it simply stops sending frame callbacks, so neither GLFW
+            // nor we can ask whether the surface is visible. Focus is the one
+            // signal that does arrive, and it arrives in time: `wl_keyboard.leave`
+            // landed 262 ms before the swap blocked.
+            //
+            // Unfocused is not the same as hidden, so this costs vsync on a
+            // window that is merely in the background — tearing nobody is
+            // looking at, on frames this event-driven loop only produces when
+            // something actually changed.
+            if (vsyncWanted) {
+                const bool focused = glfwGetWindowAttrib(window, GLFW_FOCUSED) != 0;
+                if (focused != vsyncOn) {
+                    vsyncOn = focused;
+                    glfwSwapInterval(vsyncOn ? 1 : 0);
+                }
+            }
 
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            // RmlUi rendering
-            render_interface.BeginFrame();
-            context->Render();
-            render_interface.EndFrame();
-
-            glfwSwapBuffers(window);
+            // Render if needed (check AFTER event processing)
+            if (!gameElement || gameElement->needsRender()) {
+                render_interface.BeginFrame();
+                context->Render();
+                render_interface.EndFrame();
+                if (gameElement) {
+                    const std::string shot = gameElement->takeScreenshotRequest();
+                    if (!shot.empty()) {
+                        WriteScreenshotPPM(window, shot);
+                    }
+                }
+                glfwSwapBuffers(window);
+            } else if (scenarioActive) {
+                // A scenario generates no input events, so blocking in
+                // glfwWaitEvents() would stall it forever. Poll on a short tick
+                // instead — long enough not to spin, short enough to keep the
+                // run brisk.
+                glfwWaitEventsTimeout(0.005);
+            } else if (!AppState::ExitRequested() && !glfwWindowShouldClose(window)) {
+                // Nothing to render - wait for next event instead of busy-polling
+                // Use timeout if FPS display needs one more update to show "0"
+                //
+                // The exit check is not redundant with the loop condition above.
+                // RequestExit() is set from *inside* this iteration — by a
+                // finished scenario a few lines up, or by the quit command — and
+                // the condition is not re-evaluated until we come back round. So
+                // an unconditional wait here blocks for an event that will never
+                // arrive, and the process hangs on the way out.
+                //
+                // It stayed latent because the thing that ends a run normally
+                // dirties the view, making needsRender() true. A scenario that
+                // ends on a clean frame does not, and the live evaluation overlay
+                // produces exactly that: its publish gate deliberately requests no
+                // repaint when the displayed values have not changed.
+                double timeout = gameElement ? gameElement->getIdleTimeout() : -1.0;
+                if (timeout > 0) {
+                    glfwWaitEventsTimeout(timeout);
+                } else {
+                    glfwWaitEvents();
+                }
+            }
         }
     } else {
         spdlog::critical("Cannot create window, exiting immediately");
         fileChooserHandler->UnloadDialog(context);
         EventManager::Shutdown();
-        Rml::Shutdown();
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        CleanupResources(window);
         return 13;
     }
 
     fileChooserHandler->UnloadDialog(context);
 
-    // Stop game thread before destroying RmlUi elements
+    // Save current game and stop thread before destroying RmlUi elements
     spdlog::debug("Stopping game thread");
-    auto gameDoc = context->GetDocument("game_window");
-    if (gameDoc) {
-        auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"));
-        if (gameElement) {
-            gameElement->getGameThread().interrupt();
+    spdlog::default_logger()->flush();
+    if (auto gameDoc = context->GetDocument("game_window")) {
+        if (auto gameElement = dynamic_cast<ElementGame*>(gameDoc->GetElementById("game"))) {
+            gameElement->getController().saveCurrentGame();
+            spdlog::debug("Saved, calling shutdown");
+            spdlog::default_logger()->flush();
+            gameElement->getGameThread().shutdown();
+            spdlog::debug("Shutdown complete");
+            spdlog::default_logger()->flush();
         }
     }
 
+    spdlog::debug("EventManager::Shutdown");
+    spdlog::default_logger()->flush();
     EventManager::Shutdown();
 
+    // Clear document tracking before RmlUi cleanup
+    g_documentsWithHoverListener.clear();
+
     spdlog::debug("Before context destroy");
+    spdlog::default_logger()->flush();
 
     // Context is cleaned up by Rml::Shutdown()
     context = nullptr;
 
-    spdlog::debug("Before RmlUi shutdown");
+    spdlog::debug("Before RmlUi shutdown (engine destructors run here)");
+    spdlog::default_logger()->flush();
 
     Rml::ReleaseTextures();
     Rml::Shutdown();
@@ -492,6 +922,10 @@ int main(int argc, char** argv)
     // If restart was requested, execute it now (after cleanup)
     if (HasPendingRestart()) {
         ExecuteRestart();
+    }
+
+    if (!scenarioFile.empty()) {
+        return scenario.report(scenarioFile);
     }
 
     return 0;

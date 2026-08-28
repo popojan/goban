@@ -1,0 +1,73 @@
+# One of the images on hraj.si and in the README, regenerated per release by
+# tools/make-screenshot.sh rather than captured by hand. The page's previous set
+# was six years old and two of them showed a menu bar that no longer exists.
+#
+# The camera and the shader are pinned in the matching *-user.json, passed with
+# --user-settings, so the shot cannot drift with the session and the real
+# user.json is never touched.
+#
+# Stones on wood, close enough to see the fuzzy placement and the shadow each
+# stone casts. The equivalent shot is the oldest image on the site and the only
+# one still worth keeping: it is about the rendering rather than a feature, so
+# it does not go stale.
+load_sgf res/screenshot/hero-13x13.sgf
+wait_idle
+navigate_start
+wait_idle
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+wait_idle
+expect view_position 47
+
+toggle_next_move_overlay
+toggle_last_move_overlay
+expect last_move_shown false
+
+toggle_fullscreen
+wait 1500
+screenshot res/screenshot/closeup.ppm

@@ -1,0 +1,74 @@
+# config: mock-twoengine.json
+#
+# The same kibitz-while-reviewing workflow, but with the coach and the kibitz
+# engine as *different processes* — which is what a real configuration looks
+# like (GNU Go carrying "main", KataGo carrying "kibitz").
+#
+# It is a distinct code path, not a variation on the other one:
+# NavCommand::KIBITZ_NAV short-circuits `kibitz == coach || coach->play(...)`,
+# so a config where one engine carries both flags never asks the coach to accept
+# the suggestion at all. Every other scenario uses such a config.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/kibitz_two_engines.scn
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white coachmock
+wait_idle
+
+click 2 2
+click 2 2
+wait_until move_count >= 2
+click 4 4
+click 4 4
+wait_until move_count >= 4
+
+undo move
+wait_idle
+undo move
+wait_idle
+expect at_end false
+expect phase paused
+
+# The kibitz engine thinks for 2 s here, which is the point: a real one on a CPU
+# backend takes far longer, and a nav-queue genmove used not to set
+# `playerToMove` at all. `isThinking()` therefore stayed false for the whole
+# search — the toolbar did not grey, no engine was named, navigation was not
+# blocked, and a bug report described the silence as "nothing happened".
+play once
+wait 400
+expect thinking true
+expect can_navigate false
+expect can_kibitz false
+
+# And the wait is *visible*. Greying the toolbar was the whole of what the user
+# got: nothing in the UI read isThinking(), so a genmove was the third silent
+# wait in this program after engine loading and the post-resize resync, and by
+# far the longest — 30.9 seconds measured for one kibitz from the stock 9x9
+# KataGo on a CPU backend, which was duly reported as "nothing happens".
+#
+# Two things are needed and neither works alone: getIdleTimeout() has to keep
+# waking the main loop, or no frame is drawn and nothing can appear however well
+# it is written — and there has to be something to draw.
+#
+# It is drawn on the board now rather than written across the top of it: a
+# blinking mark and an elapsed count in the wood margin, through the overlay's
+# glyph pass, so it reaches every shader and each eye of a stereo one. The wide
+# status banner it replaced spoiled the thing the program is for.
+expect wait_indicator thinking
+# What was actually *composed and placed*, not merely the condition behind it —
+# same argument as status_text before it, and as sounds_played. The count is not
+# pinned to a value because it is a clock; that it is there at all is the claim.
+expect_not wait_text ""
+# The status line is left to the tenants that are about the application rather
+# than the game: which engine is still loading, and the message badge.
+expect status_text ""
+
+wait_until move_count >= 3
+expect at_end true
+expect phase paused
+expect thinking false
+# It stands down again. A mark that stayed would be worse than none.
+expect wait_indicator none
+expect wait_text ""

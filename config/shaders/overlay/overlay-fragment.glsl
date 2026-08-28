@@ -8,6 +8,7 @@ uniform float u_boldness;
 uniform bool  u_debug;
 
 varying vec4 v_glyph;
+varying vec4 v_color;
 
 
 #define SQRT2_2 0.70710678118654757 /* 1 / sqrt(2.) */
@@ -45,7 +46,9 @@ main()
   vec2 dpdy = dFdy (p);
   float m = length (vec2 (length (dpdx), length (dpdy))) * SQRT2_2;
 
-  vec4 color = u_color;
+  // Per-glyph colour, tinted by the uniform. u_color stays a global multiplier
+  // so a caller that wants one colour for a whole buffer still has one.
+  vec4 color = v_color * u_color;
 
   float gsdist = glyphy_sdf (p, gi.nominal_size GLYPHY_DEMO_EXTRA_ARGS);
   float sdist = gsdist / m * u_contrast;

@@ -9,6 +9,7 @@
 #include <ISgfcPropertyFactory.h>
 #include <ISgfcPropertyValueFactory.h>
 #include <ISgfcPropertyValue.h>
+#include <ISgfcComposedPropertyValue.h>
 #include <SgfcPlusPlusFactory.h>
 #include <SgfcPlusPlusExport.h>
 #include <SgfcConstants.h>

@@ -1,9 +1,5 @@
-//
-// Created by jan on 7.5.17.
-//
-
-#include "ElementGame.h"
 #include "GobanModel.h"
+#include "UserSettings.h"
 #include <glm/glm.hpp>
 
 void GobanModel::onBoardSized(int boardSize) {
@@ -15,27 +11,41 @@ void GobanModel::onBoardSized(int boardSize) {
 	board.toggleTerritoryAuto(false);
     board.positionNumber += 1;
 
-	isGameOver    = false;
-	started = false;
+	// Resizing the board abandons whatever was on it. The record is replaced
+	// separately, by createNewRecord() — until it is, restingPhase() still sees
+	// the old one, so this can land in Paused rather than Setup.
+	enterReview();
 
     auto black = state.black;
     auto white = state.white;
+    auto komi = state.komi;
+    auto handicap = state.handicap;
 
 	state = GameState();
     state.black = black;
     state.white = white;
+    state.komi = komi;
+    state.handicap = handicap;
+    state.boardSize = boardSize;
 
     state.reservoirBlack = state.reservoirWhite = (boardSize*boardSize - 1)/2 + 1;
 	calcCapturedBlack = 0;
 	calcCapturedWhite = 0;
 
-    if(!state.metricsReady) {
-        metrics.calc(boardSize);
-        calcCaptured(metrics, state.capturedBlack, state.capturedWhite);
-        state.metricsReady = true;
-    }
+    metrics.calc(boardSize);
+    // The arguments are overwritten with Metrics::maxc on entry: this lays out
+    // bowl positions for every slot, and the *count* uniforms decide how many
+    // are drawn. It never depended on a live capture count.
+    calcCaptured(metrics, 0, 0);
+    state.metricsReady = true;
 
+    // The record was replaced or resized out from under the UI. onBoardChange
+    // is the usual publish point, but the new-game path notifies onBoardSized
+    // instead — and createNewRecord() has not even run yet at this point, so
+    // this publish is refreshed again there.
+    publishSnapshot();
 }
+
 GobanModel::~GobanModel() = default;
 
 float GobanModel::result(const Move& lastMove) {
@@ -44,9 +54,13 @@ float GobanModel::result(const Move& lastMove) {
         state.winner = Color(state.scoreDelta < 0.0 ? Color::WHITE : Color::BLACK);
         state.msg = state.winner == Color::WHITE ? GameState::WHITE_WON : GameState::BLACK_WON;
     }
-    else if(state.reason == GameState::RESIGNATION){
-        bool blackResigned = lastMove == Color::BLACK;
-        state.winner = Color(blackResigned ? Color::WHITE : Color::BLACK);
+    else if (state.reason == GameState::RESIGNATION) {
+        // Winner may be set in onGameMove (live game) or derived from lastMove (SGF loading)
+        if (state.winner == Color::EMPTY) {
+            // SGF loading path: derive from the resignation move color
+            state.winner = (lastMove.col == Color::BLACK) ? Color::WHITE : Color::BLACK;
+        }
+        bool blackResigned = (state.winner == Color::WHITE);
         state.msg = blackResigned ? GameState::BLACK_RESIGNED : GameState::WHITE_RESIGNED;
         state.scoreDelta = blackResigned ? -1.0 : 1.0;
     }
@@ -65,22 +79,11 @@ bool GobanModel::isPointOnBoard(const Position& p) const {
 void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) {
     using namespace glm;
     capturedBlack = capturedWhite = Metrics::maxc;
-    float cc0x = 0.0f;
-    float cc0z = 0.0f;
-    float cc1x = 0.0f;
-    float cc1z = 0.0f;
-    float magic = 0.0f;
-    float factor = 1.00f;
-    float ddcy = 0.5f * m.h - factor * m.innerBowlRadius - magic;
-
-    vec3 s0a(cc0x, -magic, cc0z);
-    vec3 s1a(cc0x, ddcy, cc0z);
-    vec3 s0b(cc1x, -magic, cc1z);
-    vec3 s1b(cc1x, ddcy, cc1z);
-    vec3 sy(0.0f, m.stoneSphereRadius - 0.5 * m.h, 0.0f);
-
 
     for (int i = 0; i < 2 * maxCaptured; ++i) {
+        float factor = 1.00f;
+        float cc0z = 0.0f;
+        float cc0x = 0.0f;
         float ccx = cc0x;
         float ccz = cc0z;
         float rr = factor * m.innerBowlRadius;
@@ -89,6 +92,8 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         bool white = false;
 
         if (i + calcCapturedBlack >= capturedBlack) {
+            float cc1z = 0.0f;
+            float cc1x = 0.0f;
             ccx = cc1x;
             ccz = cc1z;
             di = calcCapturedWhite;
@@ -96,11 +101,12 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         }
 
         float mindy = 1e6, mindx = 0, mindz = 0;
-        const int ITERS = 500;
+        constexpr int ITERS = 500;
         for (int k = 0; k < ITERS; ++k) {
-            const int turns = int(sqrt(ITERS));
-            const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * (float)turns);
-            const float phi = (float)turns * 2.0f * 3.1415926f * (float)k / float(ITERS);
+            const int turns = static_cast<int>(sqrt(ITERS));
+            const float a = (rr - m.stoneRadius) / (2.0f * 3.1415926f * static_cast<float>(turns));
+            const float phi = static_cast<float>(turns)
+                * 2.0f * 3.1415926f * static_cast<float>(k) / static_cast<float>(ITERS);
             const float r = a * phi;
             float dx = cos(phi) * r;
             float dz = sin(phi) * r;
@@ -133,7 +139,7 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
         ddc[4 * (i + di) + 0] = ccx + mindx;
         ddc[4 * (i + di) + 1] = ccy + mindy;
         ddc[4 * (i + di) + 2] = ccz + mindz;
-        ddc[4 * (i + di) + 3] = (float)board.getRandomStoneRotation();
+        ddc[4 * (i + di) + 3] = static_cast<float>(board.getRandomStoneRotation());
     }
     calcCapturedBlack = capturedBlack;
     calcCapturedWhite = capturedWhite;
@@ -153,12 +159,8 @@ void GobanModel::calcCaptured(Metrics& m, int capturedBlack, int capturedWhite) 
 
 }
 
-Move GobanModel::getUndoMove() const {
-    return {Move::UNDO, state.colorToMove};
-}
-
 void GobanModel::onHandicapChange(const std::vector<Position>& stones) {
-    handicapStones = stones;
+    setupBlackStones = stones;
 }
 
 void GobanModel::onGameMove(const Move& move, const std::string& comment) {
@@ -174,9 +176,17 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     }
     
     if (isDoublePass || move == Move::RESIGN) {
-        state.reason = move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS;
-        board.toggleTerritoryAuto(true);
-        isGameOver = true;
+        if (move == Move::RESIGN) {
+            // Set winner immediately - opposite of who resigned
+            state.winner = (move.col == Color::BLACK) ? Color::WHITE : Color::BLACK;
+        }
+        // Only show territory for double pass (scoring needed).
+        // Resignation has a known winner - no territory calculation needed,
+        // and gnugo's final_status can freeze on nearly empty boards.
+        if (isDoublePass) {
+            board.toggleTerritoryAuto(true);
+        }
+        endGame(move == Move::RESIGN ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
         spdlog::debug("Main Over! Reason {}", static_cast<int>(state.reason));
     }
     else if (move == Move::PASS) {
@@ -186,61 +196,183 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     }
     else {
         state.msg = GameState::NONE;
-        if(state.holdsStone == false) {
-            if (state.colorToMove == Color::BLACK)
-                state.reservoirBlack -= 1;
-            else
-                state.reservoirWhite -= 1;
-        }
+        // Reservoir counts now calculated in updateReservoirs(), called from onBoardChange()
     }
-    if(!(move == Move::UNDO)) {
-        game.move(move);
-        if(!comment.empty()) {
-            game.annotate(comment);
-        }
+    // On first move, update PB/PW to capture actual players after setup
+    if (game.moveCount() == 0 && !state.black.empty() && !state.white.empty()) {
+        game.updatePlayers(state.black, state.white);
+    } else if (game.moveCount() == 0) {
+        spdlog::warn("onGameMove: state.black or state.white empty at first move — skipping updatePlayers");
     }
+    game.move(move);
+    // Set pass label after game.move() so moveCount() reflects this move
+    if (move == Move::PASS && !isDoublePass) {
+        state.passVariationLabel = std::to_string(game.moveCount());
+    }
+    if(!comment.empty()) {
+        game.annotate(comment);
+    }
+    state.comment = game.getComment();
     state.holdsStone = false;
     changeTurn();
+}
+
+void GobanModel::onStonePlaced(const Move& move) {
+    state.holdsStone = false;
+}
+
+void GobanModel::updateReservoirs() {
+    // Calculate reservoir from board state: initial - on_board - captured - in_hand
+    int initialStones = (board.getSize() * board.getSize() - 1) / 2 + 1;
+    int blackInHand = (state.holdsStone && state.colorToMove == Color::BLACK) ? 1 : 0;
+    int whiteInHand = (state.holdsStone && state.colorToMove == Color::WHITE) ? 1 : 0;
+    state.reservoirBlack = initialStones - board.stonesOnBoard(Color::BLACK) - board.capturedCount(Color::BLACK) - blackInHand;
+    state.reservoirWhite = initialStones - board.stonesOnBoard(Color::WHITE) - board.capturedCount(Color::WHITE) - whiteInHand;
 }
 
 void GobanModel::onBoardChange(const Board& result) {
     spdlog::debug("LOCK board");
     std::lock_guard<std::mutex> lock(mutex);
 
-    board.copyStateFrom(result);
+    // Use updateStones to preserve existing fuzzy positions
+    // Only changed stones get new fuzzy positions
+    board.updateStones(result);
     board.positionNumber += 1;
+    updateReservoirs();
 
-    state.capturedBlack = board.capturedCount(Color::BLACK);
-    state.capturedWhite = board.capturedCount(Color::WHITE);
+    spdlog::debug("phase {} ready {} score {} showTerritory={}",
+        phaseName(phase()), result.territoryReady, result.score, board.showTerritory);
 
-    spdlog::debug("over {} ready {}", isGameOver, result.territoryReady);
+    bool shouldShow = game.shouldShowTerritory();
+    spdlog::debug("onBoardChange: territoryReady={}, shouldShowTerritory={}", result.territoryReady, shouldShow);
 
-    if(isGameOver && result.territoryReady) {
+    if (phase() == GamePhase::Finished && result.territoryReady && shouldShow) {
+        // At end of scored game - compute result message
+        spdlog::debug("onBoardChange: ENTERING result block, score={}", result.score);
+        board.score = result.score;  // Copy score from result board
+        state.reason = GameState::DOUBLE_PASS;
         this->result(game.lastMove());
-        game.finalizeGame(state.scoreDelta);
-        game.saveAs("");
+        spdlog::debug("onBoardChange: after result(), msg={}", static_cast<int>(state.msg));
+        // Trigger repaint to show territory
+        board.positionNumber += 1;
+        // Finalize and save only once (live game ending, result not yet written).
+        // Already inside the Finished branch, so only the record needs checking.
+        if (!game.hasGameResult()) {
+            game.finalizeGame(state.scoreDelta);
+            game.saveAs("");
+        }
+    } else if (phase() == GamePhase::Finished && game.isAtEndOfNavigation()
+               && game.isResignationResult()) {
+        // At end of resigned game - show resignation message
+        state.msg = game.getResultMessage();
+        // Auto-save resigned game (RE property already set by GameRecord::move)
+        if (!game.hasGameResult()) {
+            // Shouldn't happen — RE was set during move(RESIGN) — but guard anyway
+            spdlog::warn("onBoardChange: resignation detected but no RE property found");
+        }
+        if (game.hasUnsavedChanges()) {
+            game.saveAs("");
+        }
     }
+
+    // Last, so it reflects everything above — finalizeGame() writes RE, and the
+    // snapshot carries hasResult. Every position change in the program funnels
+    // through onBoardChange, which is what makes this the one publish point.
+    publishSnapshot();
+}
+
+void GobanModel::publishSnapshot() {
+    // Reads the SGF tree, so the caller must own the record: the game thread
+    // during play and navigation, or the UI thread while the game loop is
+    // stopped. See GameSnapshot.
+    auto next = std::make_shared<GameSnapshot>();
+    next->moveCount     = game.moveCount();
+    next->viewPosition  = game.getViewPosition();
+    next->mainLineMoves = game.getLoadedMovesCount();
+    next->navigating    = game.isNavigating();
+    next->atEnd         = game.isAtEndOfNavigation();
+    next->hasResult     = game.hasGameResult();
+    next->scoredEnd     = game.shouldShowTerritory();
+    next->resultMessage = game.getResultMessage();
+    // From the Board, which is the only thing that counts captures.
+    next->capturedBlack = board.capturedCount(Color::BLACK);
+    next->capturedWhite = board.capturedCount(Color::WHITE);
+    next->colorToMove   = game.getColorToMove();
+    next->variationMoves = game.getVariations();
+    next->variations    = next->variationMoves.size();
+    next->onBadMovePath = game.isOnBadMovePath();
+    next->atFinishedGame = game.isAtFinishedGame();
+    next->loadedGameCount = game.getLoadedGameCount();
+    // From state, not from the record: applyTsumegoHint() writes a hint into
+    // state.comment that is not in the SGF, and the hint is part of what the
+    // user sees. Every writer sets these before the notify that lands here.
+    next->comment       = state.comment;
+    next->markup        = state.markup;
+    next->scoringError  = state.scoringError;
+    next->passVariationLabel = state.passVariationLabel;
+    next->boardSize     = game.getBoardSize();
+    next->sgfFile       = game.hasLoadedExternalDoc() ? game.getLoadedFilePath() : std::string();
+    next->gameIndex     = game.getLoadedGameIndex();
+    // The board overlays' share (ADR-0006 stage 4). lastStoneMoveIndex() walks
+    // from the cursor to the root, so publishing it also removes a per-repaint
+    // cost proportional to the length of the game.
+    if (next->moveCount > 0) {
+        auto [lastStone, lastStoneNumber] = game.lastStoneMoveIndex();
+        next->lastStoneMove       = lastStone;
+        next->lastStoneMoveNumber = lastStoneNumber;
+    }
+    // The analysis thread's share (ADR-0007). getPathFromRoot() walks the same
+    // cursor-to-root chain moveCount() already does, so this costs one more
+    // traversal per position change and nothing per frame.
+    next->positionId = ++positionCounter;
+    next->pathMoves  = game.getPathFromRoot();
+    next->komi       = state.komi;
+    next->setupBlack = setupBlackStones;
+    next->setupWhite = setupWhiteStones;
+
+    std::lock_guard<std::mutex> lock(snapshotMutex);
+    gameSnapshot = std::move(next);
+}
+
+std::shared_ptr<const GameSnapshot> GobanModel::snapshot() const {
+    std::lock_guard<std::mutex> lock(snapshotMutex);
+    return gameSnapshot;
 }
 
 void GobanModel::onKomiChange(float newKomi) {
-    if (!started) {
+    // Setup or Paused only. The old guard was `!started`, which also let komi
+    // through on a *loaded* finished game — RE was scored with the old value,
+    // so that was a hole rather than a feature. See the ADR-0002 step 2 log.
+    if (phase() == GamePhase::Setup || phase() == GamePhase::Paused) {
         spdlog::debug("setting komi {}", newKomi);
         state.komi = newKomi;
+        // Komi is not a position change, so nothing else republishes it — and
+        // the snapshot is where the analysis thread reads it from. Without this
+        // the analysis engine keeps the komi it was told at its last *board*
+        // change, and a game whose komi was set before the first move is scored
+        // by the overlay against the wrong one. Same obligation as
+        // onBoardSized(): whoever changes what a reader sees must publish it.
+        publishSnapshot();
     }
 }
 
-void GobanModel::onPlayerChange(int role, const std::string& name) {
-    std::ostringstream val;
-    val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
-    if(role & Player::BLACK) {
+void GobanModel::onPlayerChange(int which, const std::string& name) {
+    if (which == 0) {
         state.black = name;
-        val << "black=" << name;
-
-    }
-    if(role & Player::WHITE) {
+    } else {
         state.white = name;
-        val << "white=" << name;
     }
-    val << " ";
-    game.annotate(val.str());
+
+    // Only annotate player switches after first move, and not on finished games
+    if (phase() == GamePhase::Playing && game.moveCount() > 0 && !game.hasGameResult()) {
+        std::ostringstream val;
+        val << GameRecord::eventNames[GameRecord::PLAYER_SWITCHED];
+        if (which == 0) {
+            val << "black=" << name;
+        } else {
+            val << "white=" << name;
+        }
+        val << " ";
+        game.annotate(val.str());
+    }
 }

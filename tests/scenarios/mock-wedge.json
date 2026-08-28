@@ -1,0 +1,11 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "The coach wedges on final_status_list, which is GNU Go's real failure on a sparse 19x19: it never answers, the client kills it to keep the GTP stream honest, and before revive() existed the engine was then gone for the whole session. scoring_timeout_ms is short so the scenario does not spend the default 30 s waiting for it.",
+  "bots": [
+    { "name": "wedgemock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "--hang-on final_status_list", "enabled": 1, "main": 1, "kibitz": 1,
+      "scoring_timeout_ms": 800 }
+  ],
+  "humans": [ "Human" ],
+  "sgf_dialog": { "games_path": "./tests/scenarios/.games" }
+}

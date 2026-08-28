@@ -14,7 +14,13 @@
                         <div class="grp">
                             <div class="hr">SGF</div>
                             <div class="cmd" onmouseup="load">Load game...</div>
-                            <div class="cmd" onmouseup="save">Save now</div>
+                            <div class="cmd" id="cmdSave" onmouseup="save">Save now</div>
+                            <div class="cmd" onmouseup="archive">Archive</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">Game</div>
+                            <div class="cmd" id="cmdPrevGame" onmouseup="prev_game">Previous</div>
+                            <div class="cmd" id="cmdNextGame" onmouseup="next_game">Next</div>
                         </div>
                         <div class="grp">
                             <div class="hr">System</div>
@@ -38,7 +44,12 @@
                         </div>
                         <div class="grp">
                             <div class="hr">Overlay</div>
-                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">Last move</div>
+                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">Last Move</div>
+                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">Next Move</div>
+                            <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">Best Moves</div>
+                            <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">Score Readout</div>
+                            <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">Elapsed Time</div>
+                            <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">Coordinates</div>
                         </div>
                         <!--
                         <div class="grp">
@@ -55,6 +66,7 @@
                             <!--<div class="cmd" onmouseup="free camera toggle">Toggle free</div>-->
                             <div class="cmd" onmouseup="reset camera">Reset</div>
                             <div class="cmd" onmouseup="animate">Animate</div>
+                            <div class="cmd" onmouseup="zoom stones">Zoom to Stones</div>
                             <div class="hr">Camera Preset</div>
                             <div class="cmd" onmouseup="save camera">Save</div>
                             <div class="cmd" onmouseup="delete camera">Clear</div>
@@ -65,13 +77,13 @@
                     <span>Game</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr" id="blackMoves">Black player</div>
-                            <div class="cmd">
+                            <div class="hr">Black player</div>
+                            <div class="cmd toggle_black_player unselected">
                                 <select id="selectBlack"
                                         onchange="engine" onmousedown="nop"/>
                             </div>
-                            <div class="hr"  id="whiteMoves">White player</div>
-                            <div class="cmd">
+                            <div class="hr">White player</div>
+                            <div class="cmd toggle_white_player unselected">
                                 <select id="selectWhite" onchange="engine" onmousedown="nop"/>
                             </div>
                             <div class="hr">Board size</div>
@@ -128,15 +140,18 @@
                             <div class="template" id="templateBlackWon">Black wins by %.1f</div>
                             <div class="template" id="templateWhiteResigns">White resigns</div>
                             <div class="template" id="templateBlackResigns">Black resigns</div>
-                            <div class="template" id="templateWhitePasses">White passes</div>
-                            <div class="template" id="templateBlackPasses">Black passes</div>
+                            <div class="template" id="templateWhitePasses">({0}) White passes</div>
+                            <div class="template" id="templateBlackPasses">({0}) Black passes</div>
                             <div class="template" id="templateCalculatingScore">Calculating score...</div>
+                            <div class="template" id="templateClearBoard">Clear board?</div>
+                            <div class="template" id="templateQuitWithoutFinishing">Quit without finishing?</div>
+                            <div class="template" id="templateStartNewGame">Start a new game?</div>
                             </div>
                             <div id="grpMoves">
-                            <div class="hr">Move</div>
+                            <div class="hr">Play</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">Pass</div>
-                            <div class="cmd" onmouseup="play once">Kibitz move</div>
-                            <div class="cmd" onmouseup="undo move">Undo</div>
+                            <div class="cmd" id="cmdKibitz" onmouseup="play once">Kibitz move</div>
+                            <div class="cmd" id="cmdUndo" onmouseup="undo move">Undo</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">Resign</div>
                             </div>
                         </div>
@@ -149,9 +164,17 @@
                             <div class="hr">Mode</div>
                             <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">Analysis Mode</div>
                         </div>
+                        <div class="grp" id="grpReplay">
+                            <div class="hr">Replay</div>
+                            <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">First</div>
+                            <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">Previous</div>
+                            <div class="cmd" id="cmdNavForward" onmouseup="navigate_forward">Next</div>
+                            <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">Last</div>
+                        </div>
                         <div class="grp">
-                            <div class="hr">GnuGo</div>
-                            <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">Territory</div>
+                            <div class="hr">Score</div>
+                            <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">Territory</div>
+                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">Evaluation</div>
                         </div>
                         <div class="grp">
                             <div class="hr">Prisoners</div>
@@ -159,15 +182,6 @@
                             <div class="template" id="templatePrisonersBlack">Black: %d</div>
                             <div class="cmd" id="lblPrisonersWhite">White: 0</div>
                             <div class="cmd" id="lblPrisonersBlack">Black: 0</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="menuitem hoverable right">
-                    <span>About</span>
-                    <div class="menuitem show">
-                        <div class="grp">
-                            <div class="hr">Version</div>
-                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
                         </div>
                     </div>
                 </div>
@@ -182,9 +196,19 @@
                             </div>
                         </div>
                         <div class="grp">
+                            <div class="hr">Sound</div>
+                            <div class="cmd toggle_sound selected" id="cmdSound" onmouseup="toggle_sound">Sound</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">Framerate</div>
                             <div class="template" id="templateFPS">%.1f fps</div>
-                            <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                            <div class="cmd toggle_fps unselected" id="lblFPS" onmouseup="toggle_fps"></div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">Version</div>
+                            <div class="cmd" id="lblVersion" onmouseup="nop">Goban %s</div>
+                            <div class="cmd" onmouseup="toggle_log">Messages</div>
+                            <div class="cmd" onmouseup="report_bug">Report bug</div>
                         </div>
                     </div>
                 </div>
@@ -194,18 +218,66 @@
         <div id="grpPlayers">
             <div id="grpBlack" class="hoverable bottom left">
                 <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="black">Black: 0</div>
+                  <div class="cmd" id="cntBlack" onmouseup="nop">Black: 0</div>
                 </div>
             </div>
             <div id="grpWhite" class="hoverable top right">
                 <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="white">White: 0</div>
+                  <div class="cmd" id="cntWhite" onmouseup="nop">White: 0</div>
                 </div>
             </div>
         </div>
-        <div class="bottom">
-            <div class="cmd bottom center" id="lblMessage" onmouseup="msg"></div>
+        <div class="bottom message-container">
+            <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
+        </div>
+
+
+        <!-- Status indicator and the log behind it. Placement is one rule in
+             base.rcss (#grpStatus); nothing here depends on where it sits. -->
+        <div id="grpStatus" class="top left">
+            <div class="cmd" id="lblStatus" onmouseup="toggle_log"></div>
+            <div id="pnlLog" class="hide">
+                <div id="lstLog"></div>
+                <div class="cmd" id="cmdLogClear" onmouseup="log_clear">Clear</div>
+            </div>
         </div>
     </game>
+    <!-- Mode label templates -->
+    <div class="template" id="tplAnalysisMode">Analysis Mode</div>
+    <div class="template" id="tplTsumegoMode">Tsumego Mode</div>
+    <div class="template" id="tplTsumegoSolved">Solved!</div>
+    <div class="template" id="tplTsumegoWrong">Wrong!</div>
+    <div class="template" id="tplBlackToMove">Black to move</div>
+    <div class="template" id="tplWhiteToMove">White to move</div>
+
+    <!-- Status indicator templates. %s is the engine name for the loading case,
+         and the unseen-message count for the warning and error cases. -->
+    <div class="template" id="tplStatusLoading">Loading %s…</div>
+    <div class="template" id="tplStatusMessages">× Messages</div>
+    <div class="template" id="tplStatusWarning">⚠ Messages (%d)</div>
+    <div class="template" id="tplStatusError">⚠ Messages (%d)</div>
+
+    <!-- Live evaluation. Everything is in Black's frame of reference:
+         engines report for the side to move, so raw numbers flip every
+         move and read as noise. -->
+
+    <!-- Status and command feedback -->
+    <div class="template" id="templateKomi">Komi: %.1f</div>
+    <div class="template" id="templateHandicap">Handicap: %d</div>
+    <div class="template" id="tplWaitingFor">Waiting for %s...</div>
+    <div class="template" id="tplSaveFailed">Save failed: %s</div>
+    <div class="template" id="tplNothingToSave">Nothing to save</div>
+    <div class="template" id="tplNothingRecorded">Nothing recorded yet</div>
+    <div class="template" id="tplNothingToArchive">Nothing to archive</div>
+    <div class="template" id="tplArchiveFailed">Archive failed</div>
+    <div class="template" id="tplScoringFailed">Scoring failed: %s</div>
+    <div class="template" id="tplAnalysisAnswersEveryMove">Analysis mode answers every move — use Kibitz in match mode instead</div>
+    <div class="template" id="tplResignAtEndOnly">Navigate to the end of the game to resign</div>
+    <div class="template" id="tplKomiBeforePlayOnly">Komi can only be changed before play starts</div>
+
+    <!-- Message templates -->
+    <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
+    <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">Yes</span> <span class="prompt-btn" onmouseup="prompt_no">No</span></div>
+    <div class="template" id="tplPromptOkCancel">%MSG% <span class="prompt-btn" onmouseup="prompt_ok">OK</span> <span class="prompt-btn" onmouseup="prompt_cancel">Cancel</span></div>
 </body>
 </rml>

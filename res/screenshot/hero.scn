@@ -1,0 +1,136 @@
+# The release screenshot. Not a test — it asserts almost nothing and it needs a
+# real analysis engine — so it lives here rather than in tests/scenarios, and
+# run_scenarios.sh never sees it. Drive it with tools/make-screenshot.sh.
+#
+# The point is that the hero image is *reproducible*: the same game, the same
+# move, the same camera and the same overlays, every release, instead of being
+# hunted down by hand each time.
+#
+# The position: games/2026-02-07.sgf game 3 at move 47, extracted alongside this
+# file so it survives (games/ is gitignored wholesale). 13x13 because the overlay
+# font is 0.8/N of a square, so annotations are about 1.5x larger here than on
+# 19x19 while the board still reads as a real game. 47 stones across all four
+# quadrants, and prisoners in *both* lids — one empty lid looks like an oversight.
+
+load_sgf res/screenshot/hero-13x13.sgf
+wait_idle
+expect board_size 13
+
+# Loading lands at the *end* of the record — position 141, phase finished, with
+# the territory shading up, because the game has a result. So rewind first; the
+# 47 forwards below were walking from the end and going nowhere.
+navigate_start
+wait_idle
+expect view_position 0
+
+# No "go to move N" command exists, so the path is walked explicitly. Done before
+# the evaluation is switched on: the analysis engine follows the review cursor,
+# and 47 navigations with it running is 47 resyncs for nothing.
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+wait_idle
+expect view_position 47
+# Prisoners in both lids, which is why this position was chosen. These also
+# catch a silently truncated replay: buildBoardFromMoves() stops at the first
+# move it rejects, and a short count would show up here as the wrong counts
+# rather than as an error.
+expect captured_black 2
+expect captured_white 1
+# Off the end of the game, so the result and its territory shading are gone.
+expect show_territory false
+
+# Both sides to Human, and this is not cosmetic. The record is GNU Go vs KataGo,
+# so at move 47 it is an *engine's* turn — and analysisMayRun() stands the
+# analysis down whenever the game loop is running and the player to move is an
+# engine (ADR-0007 decision 6, to keep two searches off one device). The state
+# then reads eval_state=yielded with a frozen report: numbers still composed,
+# but stale, and stale ink ships fully transparent, so the readout would be
+# invisible and no suggestion would be drawn at all.
+#
+# Reviewing a record is precisely the case where nobody is to move, which is
+# also when the evaluation is worth most.
+switch_player black Human
+switch_player white Human
+wait_idle
+
+# The three parts of the on-board display, set explicitly rather than inherited
+# from the settings file, so the shot cannot drift if a default changes.
+toggle_coordinates on
+toggle_evaluation_readout on
+toggle_evaluation_moves on
+# The recorded continuation is switched off: "48" and the engine's A-E are two
+# different kinds of "play here" and reading them on one board is confusing. The
+# last-move marker stays — that is context, not a suggestion.
+#
+# A bare toggle, because this one takes no on|off argument. That is only
+# deterministic because the marker is not persisted and so always starts on in a
+# fresh process; the assertions either side say so, rather than trusting it.
+expect next_move_shown true
+toggle_next_move_overlay
+expect next_move_shown false
+expect last_move_shown true
+# The clock says "waiting" and would be caught mid-analysis. Off for the shot.
+toggle_wait_clock off
+
+# Full screen last, so the framebuffer the capture reads is the monitor's.
+toggle_fullscreen
+wait 1500
+
+# Switching the evaluation on is what spawns the analysis process, and it loads
+# its own weights — tens of seconds on a CPU backend. `wait_until` is capped at
+# 10 s with no per-step override, so the load is absorbed by an unconditional
+# wait and only *then* asserted. Overshooting costs nothing in a script that runs
+# once a release; undershooting captures a board with no annotations on it, which
+# is precisely the shot we do not want.
+toggle_evaluation on
+wait 45000
+wait_until eval_state running
+wait_until eval_labels >= 3
+expect_not eval_board_text ""
+
+screenshot res/screenshot/hero.ppm

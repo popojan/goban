@@ -1,13 +1,9 @@
-//
-// Created by jan on 7.5.17.
-//
-
 #include "GobanShader.h"
 
-#include <iostream>
 #include <fstream>
 #include "GobanView.h"
 #include "Shadinclude.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
 const GLushort GobanShader::elementBufferData[] = {0, 1, 2, 3};
 const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
@@ -18,11 +14,10 @@ const std::array<GLfloat, 16> GobanShader::vertexBufferData = { {
 } };
 
 GLuint shaderCompileFromString(GLenum type, const std::string& source) {
-    GLuint shader;
     GLint length;
     GLint result;
 
-    shader = glCreateShader(type);
+    GLuint shader = glCreateShader(type);
     length = static_cast<GLint>(source.length());
     const char * psource = source.c_str();
     glShaderSource(shader, 1, &psource, &length);
@@ -30,10 +25,8 @@ GLuint shaderCompileFromString(GLenum type, const std::string& source) {
 
     glGetShaderiv(shader, GL_COMPILE_STATUS, &result);
     if (result == GL_FALSE) {
-        char *log;
-
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
-        log = new char[length];
+        char *log = new char[length];
         glGetShaderInfoLog(shader, length, &result, log);
 
         spdlog::error("shaderCompileFromString(): Unable to compile: {}", log);
@@ -96,10 +89,9 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
 
     if (result == GL_FALSE) {
         GLint length;
-        char *log;
 
         glGetProgramiv(gobanProgram, GL_INFO_LOG_LENGTH, &length);
-        log = (char*)malloc(static_cast<std::size_t>(length));
+        char *log = static_cast<char *>(malloc(static_cast<size_t>(length)));
         glGetProgramInfoLog(gobanProgram, length, &result, log);
 
         spdlog::error("sceneInit(): Program linking failed: {0}", log);
@@ -117,7 +109,8 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     glBindBufferRange(GL_UNIFORM_BUFFER, blockBindingPoint, bufStones, 0, 4 * sizeof(float)* Board::BOARD_SIZE);
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     iDim = glGetUniformLocation(gobanProgram, "NDIM");
-    iTranslate = glGetUniformLocation(gobanProgram, "iTranslate");
+    iCameraPan = glGetUniformLocation(gobanProgram, "cameraPan");
+    iCameraDistance = glGetUniformLocation(gobanProgram, "cameraDistance");
     iTime = glGetUniformLocation(gobanProgram, "iTime");
     iResolution = glGetUniformLocation(gobanProgram, "iResolution");
     iGamma = glGetUniformLocation(gobanProgram, "gamma");
@@ -159,13 +152,36 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     fsu_cc = glGetUniformLocation(gobanProgram, "cc");
     iddc = glGetUniformLocation(gobanProgram, "ddc");
     fsu_cursor = glGetUniformLocation(gobanProgram, "cursor");
+    fsu_cursorMark = glGetUniformLocation(gobanProgram, "cursorMark");
 
     vsu_eof = glGetUniformLocation(gobanProgram, "eof");
     vsu_dof = glGetUniformLocation(gobanProgram, "dof");
+    fsu_eye = glGetUniformLocation(gobanProgram, "eye");
+    fsu_anaglyph = glGetUniformLocation(gobanProgram, "anaglyph");
+    fsu_anaglyphStrength = glGetUniformLocation(gobanProgram, "anaglyphStrength");
+    fsu_anaglyphLeak = glGetUniformLocation(gobanProgram, "anaglyphLeak");
+    fsu_anaglyphBalance = glGetUniformLocation(gobanProgram, "anaglyphBalance");
+    fsu_glasses = glGetUniformLocation(gobanProgram, "glasses");
+    fsu_anaglyphGreen = glGetUniformLocation(gobanProgram, "anaglyphGreen");
 
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
     glUseProgram(0);
+}
+
+// Half the stereo base, in world units, computed on the CPU (Stereo.h) — not
+// the raw `eof` preference. The shader used to scale that preference by the
+// camera distance itself, which is the wrong quantity: the depth budget is set
+// by the *near point*, and the board is a fixed-size object, so zooming in
+// shrinks the near point far faster than the distance does.
+//
+// Uploaded from shadeIt() on every frame, beside the camera it depends on. It
+// spent one afternoon in setMetrics(), which runs only on a board or shader
+// change: the board's stereo base then froze at whatever the camera was when
+// the shader was last switched, while the overlay's followed the camera — so
+// the two agreed until the first zoom and never again.
+void GobanShader::setStereoBase(float halfBase) const {
+    glUniform1f(vsu_eof, halfBase);
 }
 
 void GobanShader::setGamma(float value) {
@@ -242,7 +258,6 @@ void GobanShader::setMetrics(const Metrics &m) const {
     glUniform1f(fsu_bowlRadius2, br2);
     glUniform3fv(fsu_cc, 4, m.bowlsCenters);
     glUniform1f(vsu_dof, dof);
-    glUniform1f(vsu_eof, eof);
 }
 
 void GobanShader::destroy() const {
@@ -261,7 +276,7 @@ void GobanShader::init() {
     glEnable(GL_BLEND);
 }
 
-void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
+void GobanShader::draw(const GobanModel& model, int updateFlag, float time) const {
     if(!shadersReady)
         return;
 #ifndef DEBUG_NVIDIA
@@ -278,7 +293,7 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
         setMetrics(model.metrics);
     }
 
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
 
     if (view.animationRunning) {
         glUniform1f(iTime, view.lastTime + time - view.startTime);
@@ -288,37 +303,52 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) {
     glUniform2fv(iResolution, 1, glm::value_ptr(view.resolution));
     if (updateFlag & GobanView::UPDATE_STONES) {
         spdlog::debug("place stones via glBufferData()");
-        glUniform1i(iBlackCapturedCount,  view.state.capturedBlack);
-        glUniform1i(iWhiteCapturedCount, view.state.capturedWhite);
+        glUniform1i(iBlackCapturedCount,  view.capturedBlackShown);
+        glUniform1i(iWhiteCapturedCount, view.capturedWhiteShown);
         glUniform1i(iBlackReservoirCount,  static_cast<int>(view.state.reservoirBlack / 2));
         glUniform1i(iWhiteReservoirCount, static_cast<int>(view.state.reservoirWhite / 2));
-		glUniform4fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);
+        glUniform4fv(iddc, 2 * Metrics::maxc, model.metrics.tmpc);
 
         glBindBuffer(GL_UNIFORM_BUFFER, bufStones);
         glBufferData(GL_UNIFORM_BUFFER, view.board.getSizeOf(), view.board.getStones(), GL_DYNAMIC_DRAW);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        Position coord = view.getBoardCoordinate(view.lastX, view.lastY);
-        float cur[2];
-        int size = view.board.getSize();
-        cur[0] = (float)(coord.x - (float)size/2.0);
-        cur[1] = (float)(coord.y - (float)size/2.0);
-        glUniform2fv(fsu_cursor, 1, cur);
-        //if (boardChanged > 1) { //TODO sound
-            //stoneSound();
-            //stoneSound(true);
-        //}
     }
-    glUniform3fv(iTranslate, 1, glm::value_ptr(view.newTranslate));
 
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, (void*)nullptr);
-	glEnableVertexAttribArray(iVertex);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
-	glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, (void*)nullptr);
+    // Outside UPDATE_STONES, beside the camera. It used to live inside that
+    // branch, and the mouse-move path raises the flag only while a stone is in
+    // hand — so the one case the pointer mark exists for is exactly the case in
+    // which the uniform went stale and the mark stayed where the mouse had last
+    // been holding something.
+    {
+        const Position coord = view.getBoardCoordinate(view.lastX, view.lastY);
+        const int size = view.board.getSize();
+        // The point it names, plus the same imprecise-hand offset a stone in
+        // hand gets — Board::fuzzyOffset(), not a second copy of the arithmetic.
+        // Snapping rigidly was the first version and read as a cursor stuck to a
+        // lattice; drifting freely names a place the board has no name for. This
+        // does what the stone does: slides within the point, then jumps to the
+        // next one.
+        const glm::vec2 fuzz = view.board.fuzzyOffset(coord);
+        const float cur[2] = {
+            static_cast<float>(coord.col()) + fuzz.x - static_cast<float>(size) / 2.0f,
+            static_cast<float>(coord.row()) + fuzz.y - static_cast<float>(size) / 2.0f,
+        };
+        glUniform2fv(fsu_cursor, 1, cur);
+        glUniform1f(fsu_cursorMark, view.pointerMark());
+    }
+
+    glUniform2fv(iCameraPan, 1, glm::value_ptr(view.cameraPan));
+    glUniform1f(iCameraDistance, view.cameraDistance);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glVertexAttribPointer(iVertex, 4, GL_FLOAT, GL_FALSE, sizeof(GLfloat)* 4, static_cast<void *>(nullptr));
+    glEnableVertexAttribArray(iVertex);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, static_cast<void *>(nullptr));
     glDisableVertexAttribArray(iVertex);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
+    glUseProgram(0);
 
     glPopAttrib();
 }
@@ -342,7 +372,7 @@ int GobanShader::choose(int idx) {
         return -1;
     }
 
-    int newProgram = (int)(idx % shaders.size());
+    int newProgram = static_cast<int>(idx % shaders.size());
 
     json shader(shaders[newProgram]);
 
@@ -350,6 +380,17 @@ int GobanShader::choose(int idx) {
     std::string fragmentFile(shader.value("fragment", ""));
 
     currentProgramH = shader.value("height", 0.0f);
+    // Declared by the shader rather than inferred from its vertex file: the
+    // overlay has to draw the same two eyes, and a path comparison is not a
+    // fact about the shader.
+    currentProgramStereo = shader.value("stereo", 0) != 0;
+    // Same shape, and the same reason: an appearance fact the CPU has to act
+    // on, declared by the shader rather than inferred. The global block is the
+    // default and no shipped shader overrides it, so this normally resolves to
+    // exactly what `annotations` says.
+    currentPalette = resolveQualityPalette(
+            config->data.value("annotations", json::object()),
+            shader.value("annotations", json::object()));
     if(!vertexFile.empty() && !fragmentFile.empty()) {
         initProgram(vertexFile, fragmentFile);
         currentProgram = newProgram;
@@ -371,8 +412,12 @@ void GobanShader::setTime(float time) const {
     glUniform1f(iTime, time);
 }
 
-void GobanShader::setPan(glm::vec3 pan) const {
-    glUniform3fv(iTranslate, 1, glm::value_ptr(pan));
+void GobanShader::setCameraPan(glm::vec2 pan) const {
+    glUniform2fv(iCameraPan, 1, glm::value_ptr(pan));
+}
+
+void GobanShader::setCameraDistance(float dist) const {
+    glUniform1f(iCameraDistance, dist);
 }
 
 void GobanShader::setRotation(glm::mat4x4 m) const {
@@ -384,6 +429,34 @@ void GobanShader::setResolution(float w, float h) {
     height = h;
 }
 
+void GobanShader::setEye(int eye) const {
+    glUniform1i(fsu_eye, eye);
+}
+
+void GobanShader::setAnaglyph(Stereo::Anaglyph mode) const {
+    glUniform1i(fsu_anaglyph, Stereo::anaglyphUniform(mode));
+}
+
+void GobanShader::setAnaglyphStrength(float strength) const {
+    glUniform1f(fsu_anaglyphStrength, strength);
+}
+
+void GobanShader::setAnaglyphLeak(const Stereo::Crosstalk& leak) const {
+    glUniform3f(fsu_anaglyphLeak, leak.r, leak.g, leak.b);
+}
+
+void GobanShader::setAnaglyphBalance(const Stereo::EyeBalance& balance) const {
+    glUniform2f(fsu_anaglyphBalance, balance.left, balance.right);
+}
+
+void GobanShader::setGlasses(Stereo::Glasses g) const {
+    glUniform1i(fsu_glasses, Stereo::glassesUniform(g));
+}
+
+void GobanShader::setAnaglyphGreen(float green) const {
+    glUniform1f(fsu_anaglyphGreen, green);
+}
+
 void GobanShader::setEof(float val) {
     eof = val;
 }
@@ -392,10 +465,10 @@ void GobanShader::setDof(float val) {
     dof = val;
 }
 
-float GobanShader::getEof() {
+float GobanShader::getEof() const {
     return eof;
 }
 
-float GobanShader::getDof() {
+float GobanShader::getDof() const {
     return dof;
 }

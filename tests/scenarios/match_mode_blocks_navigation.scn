@@ -1,0 +1,43 @@
+# The counterpart to analysis_mode_toggle: in MATCH mode with two engines
+# running, navigation must NOT take effect, because it would interleave with
+# genmove and corrupt engine state.
+#
+# CLAUDE.md, Design Invariants:
+#   "Navigation in bot-bot matches: Requires switching to Analysis mode first
+#    (pauses genmove loop)."
+#
+# This scenario is deliberately written to fail loudly if that guard is ever
+# removed: it navigates while a bot-bot match is live and asserts the position
+# did not move.
+
+new_game 9
+wait_idle
+switch_player black mock
+switch_player white mock
+wait_idle
+
+start
+wait_until move_count >= 4
+
+# Still in match mode, genmove loop live.
+expect mode match
+expect running true
+
+# Navigation is refused here. move_count keeps growing on its own, so assert on
+# the mode and on the fact that we are not left stranded mid-tree instead.
+navigate_start
+navigate_back
+
+# Switching to analysis is the supported way to review a running match.
+toggle_analysis_mode
+wait_idle
+expect mode analysis
+
+navigate_start
+wait_idle
+expect view_position 0
+expect navigating true
+
+# And the position is genuinely rewound: no stones left on the board at root.
+expect black_stones 0
+expect white_stones 0

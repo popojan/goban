@@ -1,0 +1,102 @@
+# config: mock.json
+#
+# The pointer drawn on the board, and the native one it replaces.
+#
+# A native mouse pointer is composited by the window system at the screen plane,
+# with no disparity at all, so under an anaglyph it can never sit at the depth of
+# the point it indicates: fuse the board and you see two pointers. There is no
+# value to tune — a 2D overlay has no depth — so the pointer has to be drawn
+# *in* the scene, where it inherits each eye's disparity and occlusion.
+#
+# `pointer_mark` is what the shader was actually told to draw, so it folds every
+# gate into one number: the mode, over-the-wood rather than over-a-widget, and
+# whether a stone in hand is already saying the same thing.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/board_pointer.scn
+
+new_game 9
+wait_idle
+
+# Both sides human: after the stone below is placed it becomes White's turn, and
+# an engine there would leave nothing to pick up on the next click.
+switch_player white Human
+wait_idle
+
+# The mouse is addressed in window pixels, so the view has to be the same one
+# every run — a scenario left over from an earlier run saves its camera.
+reset camera
+wait_until camera_animating false
+
+# Mono first. On `auto` the native pointer already sits where it points, so
+# nothing is drawn and nothing is taken away.
+expect stereo false
+expect pointer_mode auto
+mouse_move 512 400
+expect pointer_mark 0
+
+# ...but the drawn pointer is worth having in mono too, so it can be asked for.
+# `always` is not the default because it also takes the native pointer away over
+# the board, which is a change nobody asked for.
+pointer always
+expect pointer_mode always
+expect pointer_mark 1
+pointer never
+expect pointer_mark 0
+pointer auto
+expect pointer_mark 0
+
+# Four steps along the shader list is [stereo] Red Carpet.
+cycle shaders
+cycle shaders
+cycle shaders
+cycle shaders
+expect stereo true
+
+# On the wood: the mark is drawn, and the native pointer is hidden under it.
+# Which intersection these pixels land on is deliberately not asserted — it
+# depends on the window size, and nothing below needs to know it.
+mouse_move 512 400
+expect pointer_mark 1
+
+# Off the board there is no intersection to name, so the mark stands down and
+# the native pointer comes back. Well outside the window, so this cannot be a
+# near miss on the margin.
+mouse_move 5000 5000
+expect pointer_mark 0
+
+# ...and back, because it follows the pointer rather than latching.
+mouse_move 512 400
+expect pointer_mark 1
+
+# A stone in hand already shows where the click will land, so the mark stands
+# down rather than drawing two indicators for one point. The first click takes a
+# stone out of the bowl.
+mouse_click 512 400
+expect holds_stone true
+mouse_move 512 400
+expect pointer_mark 0
+
+# But it does not stand down merely because a stone is *held*. Place that stone,
+# take another, and hover the point the first one now occupies: the rules refuse
+# it, so there is no ghost stone, and with the native pointer hidden this is the
+# only thing left saying where the mouse is. Its presence there means "not here".
+#
+# Clicked in pixels rather than board coordinates, so the stone lands on exactly
+# the point the pointer is over without this test having to know which it is.
+mouse_click 512 400
+expect holds_stone false
+wait_until move_count >= 1
+wait_idle
+# Also in pixels, and a different point from the one just filled: a board
+# coordinate would have to guess one the engine's reply had not taken.
+mouse_click 400 400
+expect holds_stone true
+mouse_move 512 400
+expect pointer_mark 1
+
+# Switching back to mono retires it: on `auto` the whole reason it exists is the
+# parallax mismatch, and in mono there is none.
+cycle shaders
+cycle shaders
+expect stereo false
+expect pointer_mark 0

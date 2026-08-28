@@ -11,8 +11,8 @@ void Metrics::calc(unsigned NDIM) {
     d = stoneSphereRadius-0.5f*h;
     y = b / 2.0f + d;
     px = sqrtf(stoneSphereRadius*stoneSphereRadius - y*y);
-    float r1 = 0.5f*sqrtf(4.0f*px*px + b*(2.0f*b-h+2.0f*stoneSphereRadius));
-    float br = sqrtf(0.12f * 9.0f/ fNDIM );
+    const float r1 = 0.5f*sqrtf(4.0f*px*px + b*(2.0f*b-h+2.0f*stoneSphereRadius));
+    const float br = sqrtf(0.12f * 9.0f/ fNDIM );
     br2 = br + sqrtf(0.15f) - sqrtf(0.12f);
     dbr = - sqrtf(0.15f) + br2;
     stoneRadius = r1;

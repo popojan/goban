@@ -14,7 +14,13 @@
                         <div class="grp">
                             <div class="hr">SGF</div>
                             <div class="cmd" onmouseup="load">加载棋谱...</div>
-                            <div class="cmd" onmouseup="save">保存棋谱</div>
+                            <div class="cmd" id="cmdSave" onmouseup="save">保存棋谱</div>
+                            <div class="cmd" onmouseup="archive">归档</div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">对局</div>
+                            <div class="cmd" id="cmdPrevGame" onmouseup="prev_game">上一局</div>
+                            <div class="cmd" id="cmdNextGame" onmouseup="next_game">下一局</div>
                         </div>
                         <div class="grp">
                             <div class="hr">系统</div>
@@ -37,8 +43,13 @@
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">全屏</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">显示手数</div>
-                            <div class="cmd toggle_overlay selected" id="cmdOverlay" onmouseup="toggle_overlay">最后一手</div>
+                            <div class="hr">标注</div>
+                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">上一手</div>
+                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">下一手</div>
+                            <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">推荐手</div>
+                            <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">胜率数值</div>
+                            <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">用时</div>
+                            <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">坐标</div>
                         </div>
                         <!--
                         <div class="grp">
@@ -55,6 +66,7 @@
                             <!--<div class="cmd" onmouseup="free camera toggle">Toggle free</div>-->
                             <div class="cmd" onmouseup="reset camera">复位</div>
                             <div class="cmd" onmouseup="animate">播放动画</div>
+                            <div class="cmd" onmouseup="zoom stones">聚焦棋子</div>
                             <div class="hr">视角预设</div>
                             <div class="cmd" onmouseup="save camera">保存</div>
                             <div class="cmd" onmouseup="delete camera">还原</div>
@@ -65,13 +77,13 @@
                     <span>游戏</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr" id="blackMoves">黑棋</div>
-                            <div class="cmd">
+                            <div class="hr">黑棋</div>
+                            <div class="cmd toggle_black_player unselected">
                                 <select id="selectBlack"
                                         onchange="engine" onmousedown="nop"/>
                             </div>
-                            <div class="hr"  id="whiteMoves">白棋</div>
-                            <div class="cmd">
+                            <div class="hr">白棋</div>
+                            <div class="cmd toggle_white_player unselected">
                                 <select id="selectWhite" onchange="engine" onmousedown="nop"/>
                             </div>
                             <div class="hr">棋盘大小</div>
@@ -128,15 +140,18 @@
                             <div class="template" id="templateBlackWon">黑胜%.1f目</div>
                             <div class="template" id="templateWhiteResigns">白方认输</div>
                             <div class="template" id="templateBlackResigns">黑方认输</div>
-                            <div class="template" id="templateWhitePasses">白方虚着</div>
-                            <div class="template" id="templateBlackPasses">黑方虚着</div>
+                            <div class="template" id="templateWhitePasses">({0}) 白方虚着</div>
+                            <div class="template" id="templateBlackPasses">({0}) 黑方虚着</div>
                             <div class="template" id="templateCalculatingScore">计算得分中...</div>
+                            <div class="template" id="templateClearBoard">清空棋盘？</div>
+                            <div class="template" id="templateQuitWithoutFinishing">退出未完成的对局？</div>
+                            <div class="template" id="templateStartNewGame">开始新对局？</div>
                             </div>
                             <div id="grpMoves">
                             <div class="hr">落子</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">停一手</div>
-                            <div class="cmd" onmouseup="play once">提示</div>
-                            <div class="cmd" onmouseup="undo move">悔棋</div>
+                            <div class="cmd" id="cmdKibitz" onmouseup="play once">提示</div>
+                            <div class="cmd" id="cmdUndo" onmouseup="undo move">悔棋</div>
                             <div class="cmd" id="cmdResign" onmouseup="resign">认输</div>
                             </div>
                         </div>
@@ -149,9 +164,17 @@
                             <div class="hr">模式</div>
                             <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">分析模式</div>
                         </div>
+                        <div class="grp" id="grpReplay">
+                            <div class="hr">回放</div>
+                            <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">第一手</div>
+                            <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">上一手</div>
+                            <div class="cmd" id="cmdNavForward" onmouseup="navigate_forward">下一手</div>
+                            <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">最后一手</div>
+                        </div>
                         <div class="grp">
-                            <div class="hr">GnuGo</div>
-                            <div class="cmd toggle_territory unselected" onmouseup="toggle_territory">形势判断</div>
+                            <div class="hr">得分</div>
+                            <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">形势判断</div>
+                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">胜率</div>
                         </div>
                         <div class="grp">
                             <div class="hr">提子</div>
@@ -159,15 +182,6 @@
                             <div class="template" id="templatePrisonersBlack">黑: %d</div>
                             <div class="cmd" id="lblPrisonersWhite">白: 0</div>
                             <div class="cmd" id="lblPrisonersBlack">黑: 0</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="menuitem hoverable right">
-                    <span>关于我们</span>
-                    <div class="menuitem show">
-                        <div class="grp">
-                            <div class="hr">版本</div>
-                            <div class="cmd" id="lblVersion" onmouseup="about">Goban %s</div>
                         </div>
                     </div>
                 </div>
@@ -182,9 +196,19 @@
                             </div>
                         </div>
                         <div class="grp">
+                            <div class="hr">声音</div>
+                            <div class="cmd toggle_sound selected" id="cmdSound" onmouseup="toggle_sound">声音</div>
+                        </div>
+                        <div class="grp">
                             <div class="hr">帧率</div>
                             <div class="template" id="templateFPS">%.1f 帧/秒</div>
-                            <div class="cmd" id="lblFPS" onmouseup="fps"></div>
+                            <div class="cmd toggle_fps unselected" id="lblFPS" onmouseup="toggle_fps"></div>
+                        </div>
+                        <div class="grp">
+                            <div class="hr">版本</div>
+                            <div class="cmd" id="lblVersion" onmouseup="nop">Goban %s</div>
+                            <div class="cmd" onmouseup="toggle_log">消息</div>
+                            <div class="cmd" onmouseup="report_bug">报告错误</div>
                         </div>
                     </div>
                 </div>
@@ -194,18 +218,65 @@
         <div id="grpPlayers">
             <div id="grpBlack" class="hoverable bottom left">
                 <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="black">Black: 0</div>
+                  <div class="cmd" id="cntBlack" onmouseup="nop">Black: 0</div>
                 </div>
             </div>
             <div id="grpWhite" class="hoverable top right">
                 <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="white">White: 0</div>
+                  <div class="cmd" id="cntWhite" onmouseup="nop">White: 0</div>
                 </div>
             </div>
         </div>
-        <div class="bottom">
-            <div class="cmd bottom center" id="lblMessage" onmouseup="msg"></div>
+        <div class="bottom message-container">
+            <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
+        </div>
+
+        <!-- Status indicator and the log behind it. Placement is one rule in
+             base.rcss (#grpStatus); nothing here depends on where it sits. -->
+        <div id="grpStatus" class="top left">
+            <div class="cmd" id="lblStatus" onmouseup="toggle_log"></div>
+            <div id="pnlLog" class="hide">
+                <div id="lstLog"></div>
+                <div class="cmd" id="cmdLogClear" onmouseup="log_clear">清除</div>
+            </div>
         </div>
     </game>
+    <!-- Mode label templates -->
+    <div class="template" id="tplAnalysisMode">分析模式</div>
+    <div class="template" id="tplTsumegoMode">诘棋模式</div>
+    <div class="template" id="tplTsumegoSolved">解答正确！</div>
+    <div class="template" id="tplTsumegoWrong">错误！</div>
+    <div class="template" id="tplBlackToMove">黑先</div>
+    <div class="template" id="tplWhiteToMove">白先</div>
+
+    <!-- Status indicator templates. %s is the engine name for the loading case,
+         and the unseen-message count for the warning and error cases. -->
+    <div class="template" id="tplStatusLoading">正在加载 %s…</div>
+    <div class="template" id="tplStatusMessages">× 消息</div>
+    <div class="template" id="tplStatusWarning">⚠ 消息 (%d)</div>
+    <div class="template" id="tplStatusError">⚠ 消息 (%d)</div>
+
+    <!-- Live evaluation. Everything is in Black's frame of reference:
+         engines report for the side to move, so raw numbers flip every
+         move and read as noise. -->
+
+    <!-- Status and command feedback -->
+    <div class="template" id="templateKomi">贴目: %.1f</div>
+    <div class="template" id="templateHandicap">让子: %d</div>
+    <div class="template" id="tplWaitingFor">正在等待 %s...</div>
+    <div class="template" id="tplSaveFailed">保存失败: %s</div>
+    <div class="template" id="tplNothingToSave">没有可保存的内容</div>
+    <div class="template" id="tplNothingRecorded">尚无记录</div>
+    <div class="template" id="tplNothingToArchive">没有可存档的内容</div>
+    <div class="template" id="tplArchiveFailed">存档失败</div>
+    <div class="template" id="tplScoringFailed">计分失败: %s</div>
+    <div class="template" id="tplAnalysisAnswersEveryMove">分析模式会回应每一手 — 对局中请使用形势判断</div>
+    <div class="template" id="tplResignAtEndOnly">请移动到棋局末尾才能认输</div>
+    <div class="template" id="tplKomiBeforePlayOnly">贴目只能在开局前修改</div>
+
+    <!-- Message templates -->
+    <div class="template" id="tplMessage"><span class="dismissable">%MSG%</span></div>
+    <div class="template" id="tplPromptYesNo">%MSG% <span class="prompt-btn" onmouseup="prompt_yes">是</span> <span class="prompt-btn" onmouseup="prompt_no">否</span></div>
+    <div class="template" id="tplPromptOkCancel">%MSG% <span class="prompt-btn" onmouseup="prompt_ok">确定</span> <span class="prompt-btn" onmouseup="prompt_cancel">取消</span></div>
 </body>
 </rml>

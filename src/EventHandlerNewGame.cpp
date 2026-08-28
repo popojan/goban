@@ -3,12 +3,9 @@
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
 #include <RmlUi/Core/ElementDocument.h>
-#include <RmlUi/Core/ElementUtilities.h>
 #include <RmlUi/Core/Event.h>
-#include "EventManager.h"
 #include "AppState.h"
 #include "Configuration.h"
-#include <iostream>
 
 extern std::shared_ptr<Configuration> config;
 
@@ -25,19 +22,32 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
     spdlog::debug("EventHandlerNewGame recieved event");
     auto doc = event.GetCurrentElement()->GetContext()->GetDocument("game_window");
     if(!doc) return;
-    GobanControl& controller = dynamic_cast<ElementGame*>(doc->GetElementById("game"))->getController();
+    auto* gameElement = dynamic_cast<ElementGame*>(doc->GetElementById("game"));
+    GobanControl& controller = gameElement->getController();
+    const auto& model = gameElement->getModel();
 
     if (value == "boardsize") {
         std::istringstream ss(event.GetParameter<Rml::String>("value", "19").c_str());
-        float boardSize = 19;
+        int boardSize = 19;
         ss >> boardSize;
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selBoard"));
-        if(!controller.newGame(boardSize)) {
-            spdlog::error("setting boardsize failed");
-            select->SetSelection(lastBoardSelection);
+        if (!controller.acceptsUiEvents()) {
+            if (select) lastBoardSelection = select->GetSelection();
+        } else if (static_cast<int>(model.getBoardSize()) == boardSize) {
+            if (select) lastBoardSelection = select->GetSelection();
         } else {
-            lastBoardSelection = select->GetSelection();
+            // Changing the board size replaces the game, so it asks first —
+            // the answer arrives later, hence the callback rather than a
+            // return value.
+            controller.requestNewGame(boardSize, [this, select](bool changed) {
+                if (!select) return;
+                if (changed) {
+                    lastBoardSelection = select->GetSelection();
+                } else {
+                    select->SetSelection(lastBoardSelection);
+                }
+            });
         }
     }
     else if(value == "mdown" || value == "mup") {
@@ -53,28 +63,42 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         }
         // If event came from a menu element, don't forward to board controller
     }
-      else if (value == "handicap") {
+    else if (value == "handicap") {
         std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
-        float handicap = 0;
+        int handicap = 0;
         ss >> handicap;
 
         auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectHandicap"));
-        if(!controller.setHandicap(handicap)) {
-            spdlog::error("setting handicap failed");
-            select->SetSelection(lastHandicapSelection);
+        if (!controller.acceptsUiEvents()) {
+            if (select) lastHandicapSelection = select->GetSelection();
+        } else if (model.state.handicap == handicap) {
+            if (select) lastHandicapSelection = select->GetSelection();
         } else {
-            lastHandicapSelection = select->GetSelection();
+            // Handicap restarts the game too, so it takes the same route.
+            controller.requestHandicap(handicap, [this, select](bool changed) {
+                if (!select) return;
+                if (changed) {
+                    lastHandicapSelection = select->GetSelection();
+                } else {
+                    select->SetSelection(lastHandicapSelection);
+                }
+            });
         }
     }
     else if(value == "engine") {
-        std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
-        int index = 0;
-        ss >> index;
-        if(event.GetCurrentElement()->GetId() == "selectBlack") {
-            controller.switchPlayer(0, index);
-        }
-        else if(event.GetCurrentElement()->GetId() == "selectWhite") {
-            controller.switchPlayer(1, index);
+        if (controller.acceptsUiEvents()) {
+            std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
+            int index = 0;
+            ss >> index;
+            auto& engine = gameElement->getGameThread();
+            if(event.GetCurrentElement()->GetId() == "selectBlack") {
+                if (static_cast<int>(engine.getActivePlayer(0)) != index)
+                    controller.switchPlayer(0, index);
+            }
+            else if(event.GetCurrentElement()->GetId() == "selectWhite") {
+                if (static_cast<int>(engine.getActivePlayer(1)) != index)
+                    controller.switchPlayer(1, index);
+            }
         }
     }
     else if(value == "shader") {
@@ -85,17 +109,21 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         controller.switchShader(index);
     }
     else if (value == "komi") {
-      std::istringstream ss(event.GetParameter<Rml::String>("value", "0.5").c_str());
-      float komi = 0.5;
-      ss >> komi;
+        std::istringstream ss(event.GetParameter<Rml::String>("value", "0.5").c_str());
+        float komi = 0.5;
+        ss >> komi;
 
-      auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
-      if(!controller.setKomi(komi)) {
-          spdlog::error("setting komi failed");
-          select->SetSelection(lastKomiSelection);
-      } else {
-          lastKomiSelection = select->GetSelection();
-      }
+        auto select = dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById("selectKomi"));
+        if (!controller.acceptsUiEvents()) {
+            if (select) lastKomiSelection = select->GetSelection();
+        } else if (model.state.komi == komi) {
+            if (select) lastKomiSelection = select->GetSelection();
+        } else if(!controller.setKomi(komi)) {
+            spdlog::error("setting komi failed");
+            select->SetSelection(lastKomiSelection);
+        } else {
+            lastKomiSelection = select->GetSelection();
+        }
     }
     else if (value == "language") {
         // Get selected language from select element
@@ -111,6 +139,7 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         }
 
         spdlog::info("Switching to language: {} (config: {})", lang, configFile);
+        controller.saveCurrentGame();
         RequestRestart(configFile);
     }
     else {

@@ -1,0 +1,41 @@
+# sound: on
+# config: mock.json
+#
+# A placed stone must actually be heard, not merely requested.
+#
+# "Sometimes there is no sound when I place a stone" had no symptom anything
+# could assert on: GobanView logged "Playing stone sound in repaint" either way,
+# and whether the mixer ever saw the request was invisible. `sounds_played`
+# counts playbacks mixed all the way to their end, incremented by the audio
+# callback itself, so this fails if a sound is swallowed rather than played.
+#
+# The gaps matter. Sounds arriving back to back keep the stream running and hide
+# every defect in this path; the one that goes missing is the first after a
+# quiet spell, which is exactly the stone a human places after thinking.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+click 2 2
+wait_idle
+click 2 2
+wait_until move_count >= 1
+wait 3000
+
+click 6 6
+wait_idle
+click 6 6
+wait_until move_count >= 2
+wait 3000
+
+click 4 4
+wait_idle
+click 4 4
+wait_until move_count >= 3
+wait 2000
+
+expect move_count 3
+expect sounds_played 3

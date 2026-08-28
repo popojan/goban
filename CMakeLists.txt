@@ -3,14 +3,29 @@ cmake_minimum_required(VERSION 3.10)
 cmake_policy(SET CMP0072 NEW)
 cmake_policy(SET CMP0167 OLD)
 
-project(goban LANGUAGES C CXX VERSION 0.1.0)
+project(goban LANGUAGES C CXX VERSION 0.2.0)
 
 include(GNUInstallDirs)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-set_property(GLOBAL PROPERTY CMAKE_CXX_FLAGS_RELEASE "-O3 -s")
-set_property(GLOBAL PROPERTY CMAKE_CXX_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
+# Hard pin the language standard. target_compile_features(cxx_std_17) is a *minimum*,
+# so a compiler defaulting to C++20 or later (GCC 16 does) satisfies it without emitting
+# any -std flag — which breaks std::filesystem::path::u8string() call sites that expect
+# the C++17 std::string return type.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# These were previously set via set_property(GLOBAL PROPERTY ...), which sets an unrelated
+# global property rather than the variable — so they never reached the compiler.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+    # Applied per-target below so that FetchContent dependencies stay quiet.
+    set(GOBAN_WARNING_FLAGS -Wall -Wextra)
+else()
+    set(GOBAN_WARNING_FLAGS "")
+endif()
 
 INCLUDE(ExternalProject)
 INCLUDE(FetchContent)
@@ -19,6 +34,7 @@ function(build_glyphy)
     if(WIN32)
         ExternalProject_Add(project_glyphy
             GIT_REPOSITORY  https://github.com/behdad/glyphy.git
+            GIT_TAG 68a5f8d8ae64e0158d776b21581d0ecb70ec8304
             SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/glyphy
             BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/glyphy/build
             CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy
@@ -36,6 +52,7 @@ function(build_glyphy)
     else()
         ExternalProject_Add(project_glyphy
             GIT_REPOSITORY  https://github.com/behdad/glyphy.git
+            GIT_TAG 68a5f8d8ae64e0158d776b21581d0ecb70ec8304
             SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/glyphy
             BINARY_DIR    ${PROJECT_BINARY_DIR}/deps/glyphy/build
             CONFIGURE_COMMAND
@@ -58,15 +75,18 @@ function(build_libsgfcplusplus)
     MESSAGE("build type = ${CMAKE_BUILD_TYPE}")
     ExternalProject_Add(project_libsgfcplusplus
             GIT_REPOSITORY  https://github.com/herzbube/libsgfcplusplus.git
-            GIT_TAG master
+            GIT_TAG 2.0.1
             CMAKE_ARGS  ${CL_ARGS}
             BUILD_COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus -DENABLE_TESTS=0
-            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE}
+            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/deps/libsgfcplusplus --config ${CMAKE_BUILD_TYPE} --parallel 1
             SOURCE_DIR	${CMAKE_SOURCE_DIR}/deps/libsgfcplusplus
             BINARY_DIR	${CMAKE_BINARY_DIR}/deps/libsgfcplusplus
             STEP_TARGETS build
             UPDATE_COMMAND ""
-            PATCH_COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch || true
+            PATCH_COMMAND git checkout -- .
+            COMMAND git -C sgfc checkout -- .
+            COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch
+            COMMAND git -C sgfc -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/sgfc-save-buffer-uninitialised-byte.patch
             INSTALL_COMMAND ""
             )
 
@@ -158,9 +178,22 @@ function(fetch_rmlui)
     set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
     set(RMLUI_TESTS OFF CACHE BOOL "" FORCE)
 
+    # 6.3 rather than 6.2 for one line: the GL2 backend's macOS branch included
+    # <AGL/agl.h>, a framework Apple removed, so every macOS build failed at
+    # "'AGL/agl.h' file not found" on any recent SDK. Nothing in the file uses
+    # AGL — the include was the only occurrence — and upstream deleted it in 6.3.
+    #
+    # The bump costs two things, both dealt with rather than worked around.
+    # SystemInterface_GLFW now takes the window at construction, so it can no
+    # longer be a file-scope static (see main.cpp). And it creates all six
+    # standard cursors up front, which on X11 raises GLFW_CURSOR_UNAVAILABLE for
+    # any the theme lacks; the three that can fail are `move`, `resize` and
+    # `unavailable`, and no stylesheet here asks for any of them — the only
+    # cursor this interface uses is `pointer`. GlfwErrorCallback demotes that
+    # code, so it no longer opens every session with a warning badge.
     FetchContent_Declare(rmlui
             GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
-            GIT_TAG master)  # Using master for GCC 15 fix (PR #766)
+            GIT_TAG 6.3)
 
     FetchContent_MakeAvailable(rmlui)
 
@@ -168,28 +201,54 @@ function(fetch_rmlui)
     set(RMLUI_BACKENDS_DIR "${rmlui_SOURCE_DIR}/Backends" PARENT_SCOPE)
 endfunction()
 
+function(fetch_doctest)
+    set(DOCTEST_WITH_TESTS OFF CACHE BOOL "" FORCE)
+    set(DOCTEST_NO_INSTALL ON CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(doctest
+            GIT_REPOSITORY https://github.com/doctest/doctest.git
+            GIT_TAG v2.4.12)
+
+    FetchContent_MakeAvailable(doctest)
+
+    # Needed by the caller to include doctest's CTest integration script.
+    set(doctest_SOURCE_DIR "${doctest_SOURCE_DIR}" PARENT_SCOPE)
+endfunction()
+
 function(download_fonts)
     set(FONT_DIR "${PROJECT_SOURCE_DIR}/config/fonts")
-    set(FONT_FILE "${FONT_DIR}/NotoSansCJKsc-Regular.otf")
-    set(FONT_URL "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf")
 
-    if(NOT EXISTS "${FONT_FILE}")
-        message(STATUS "Downloading Noto Sans CJK SC font...")
-        file(DOWNLOAD
-            "${FONT_URL}"
-            "${FONT_FILE}"
-            SHOW_PROGRESS
-            STATUS DOWNLOAD_STATUS
-        )
-        list(GET DOWNLOAD_STATUS 0 STATUS_CODE)
-        if(NOT STATUS_CODE EQUAL 0)
-            message(WARNING "Failed to download font: ${DOWNLOAD_STATUS}")
+    # Every font a shipped config actually names. NotoSans-Regular used to be
+    # missing from this list while every language config referenced it, so a
+    # fresh clone built an application pointing at a font that was not there —
+    # invisible on a machine that happened to have it, and a hole in any bundle
+    # built from a clean checkout.
+    #
+    # default-font.ttf is tracked in git rather than fetched: it is 18 KB and the
+    # overlay cannot draw a single glyph without it.
+    set(FONT_NAMES
+        NotoSans-Regular.ttf
+        NotoSansCJKsc-Regular.otf)
+    set(FONT_URLS
+        "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf"
+        "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf")
+
+    list(LENGTH FONT_NAMES n)
+    math(EXPR last "${n} - 1")
+    foreach(i RANGE ${last})
+        list(GET FONT_NAMES ${i} name)
+        list(GET FONT_URLS ${i} url)
+        if(NOT EXISTS "${FONT_DIR}/${name}")
+            message(STATUS "Downloading ${name}...")
+            file(DOWNLOAD "${url}" "${FONT_DIR}/${name}" SHOW_PROGRESS STATUS st)
+            list(GET st 0 code)
+            if(NOT code EQUAL 0)
+                message(WARNING "Failed to download ${name}: ${st}")
+            endif()
         else()
-            message(STATUS "Font downloaded successfully: ${FONT_FILE}")
+            message(STATUS "Font already present: ${name}")
         endif()
-    else()
-        message(STATUS "Font already exists: ${FONT_FILE}")
-    endif()
+    endforeach()
 endfunction()
 
 function(generate_glad_headers)
@@ -239,6 +298,7 @@ else()
 endif()
 
 option(BuildPrerequisites "BuildPrerequisites" OFF)
+option(GOBAN_BUILD_TESTS "Build goban_core unit tests" ON)
 
 find_package(LibGlyphy)
 if(BuildPrerequisites OR NOT LibGlyphy_FOUND)
@@ -258,12 +318,17 @@ else()
 
     cmake_language(CALL find_libsgfcplusplus)
 
-    add_executable(${PROJECT_NAME}
-            src/FileChooserDataSource.cpp)
-
     if(WIN32)
-        # WIN32_LEAN_AND_MEAN prevents windows.h from including winsock.h
-        add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN)
+        # WIN32_LEAN_AND_MEAN prevents windows.h from including winsock.h.
+        #
+        # NOMINMAX is not optional: windows.h defines `min` and `max` as macros,
+        # which turn every `std::min(...)` / `std::numeric_limits<T>::max()` into
+        # a syntax error — "C2589: '(': illegal token on right side of '::'".
+        # main.cpp defined it for itself, so the failure hid until something in
+        # a *header* used them: GtpClient::scoringTimeout(), the move-quality
+        # ramp in AnalysisService, and libsgfcplusplus's own SgfcMessageID.h.
+        # It belongs here, once, for every target.
+        add_definitions(-DWIN32 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN -DNOMINMAX)
     endif()
 
     # RmlUi backend files (Platform + Renderer)
@@ -273,9 +338,16 @@ else()
     )
 
     if(WIN32)
-        # Windows: vcpkg dependencies
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
-        set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+        # Windows: vcpkg dependencies.
+        #
+        # /SUBSYSTEM:WINDOWS used to be set here, in CMAKE_EXE_LINKER_FLAGS —
+        # which is global, so it applied to *every* executable. The application
+        # wants it and says so properly a few hundred lines down
+        # (WIN32_EXECUTABLE TRUE, which is what CMake reads to pick the
+        # subsystem and the entry point). mock_gtp_engine is a console program
+        # with a plain main(), and the global flag sent the linker looking for
+        # WinMain in it: "LNK2019: unresolved external symbol WinMain".
+        # One target's linking is not a project-wide setting.
     elseif(APPLE)
         # iconv is needed by libsgfcplusplus for SGF encoding conversion
         find_library(ICONV_LIBRARY iconv REQUIRED)
@@ -307,84 +379,152 @@ else()
         src/glyphy/GlyphyShader.cc
     )
 
-    set(GOBAN_HDR_FILES
+    # ------------------------------------------------------------------
+    # goban_core — game logic with no OpenGL, GLFW or RmlUi rendering
+    # dependency. Linkable into unit tests without a graphics context.
+    # The only RmlUi contact is Rml::Input::KeyIdentifier, used as the
+    # keybinding key type in Configuration.h (a header-only enum).
+    # ------------------------------------------------------------------
+    set(GOBAN_CORE_HDR_FILES
         src/Board.h
         src/Camera.h
+        src/Configuration.h
+        src/FileChooserDataSource.h
+        src/GameSnapshot.h
+        src/GameNavigator.h
+        src/GameObserver.h
+        src/GameRecord.h
+        src/GameState.h
+        src/GameThread.h
+        src/GobanModel.h
+        src/MessageLog.h
+        src/Metrics.h
+        src/PlayerManager.h
+        src/player.h
+        src/Quaternion.h
+        src/ScenarioRecorder.h
+        src/SGF.h
+        src/UserSettings.h
+        src/Vector.h
+        src/UiActions.h
+        src/gtpclient.h
+    )
+
+    set(GOBAN_CORE_SRC_FILES
+        src/AnalysisService.cpp
+        src/Board.cpp
+        src/Camera.cpp
+        src/Configuration.cpp
+        src/FileChooserDataSource.cpp
+        src/GameNavigator.cpp
+        src/GameRecord.cpp
+        src/GameThread.cpp
+        src/GobanModel.cpp
+        src/MessageLog.cpp
+        src/Metrics.cpp
+        src/PlayerManager.cpp
+        src/player.cpp
+        src/Quaternion.cpp
+        src/ScenarioRecorder.cpp
+        src/UiActions.cpp
+        src/UserSettings.cpp
+        src/Vector.cpp
+        src/gtpclient.cpp
+    )
+
+    add_library(goban_core STATIC
+        ${GOBAN_CORE_SRC_FILES}
+        ${GOBAN_CORE_HDR_FILES}
+    )
+
+    target_include_directories(goban_core PUBLIC
+            src
+            ${glm_SOURCE_DIR}
+            ${libsgfcplusplus_inc_dir}
+            ${PROJECT_BINARY_DIR}/generated
+    )
+
+    add_dependencies(goban_core project_libsgfcplusplus)
+
+    target_link_libraries(goban_core PUBLIC
+        libsgfcplusplus
+        spdlog
+        rmlui
+        nlohmann_json::nlohmann_json
+        ${CMAKE_THREAD_LIBS_INIT}
+    )
+
+    # libsgfcplusplus calls iconv for SGF encoding conversion, and on macOS that
+    # is a separate library rather than part of libc. It was linked into the
+    # application through EXTRA_LIBS, which goban_tests does not use — so the
+    # tests failed to link (`_iconv_open`, `_OpenIconV`, arm64) while the app
+    # built. It belongs on goban_core, PUBLIC, because that is the target that
+    # pulls in libsgfcplusplus; everything linking it then gets iconv too.
+    if(APPLE)
+        find_library(ICONV_LIBRARY iconv REQUIRED)
+        target_link_libraries(goban_core PUBLIC ${ICONV_LIBRARY})
+    endif()
+
+    target_compile_options(goban_core PRIVATE ${GOBAN_WARNING_FLAGS})
+
+    # ------------------------------------------------------------------
+    # goban — the application: rendering, UI, audio, platform glue
+    # ------------------------------------------------------------------
+    set(GOBAN_APP_HDR_FILES
+        src/AppState.h
         src/ElementGame.h
         src/Event.h
         src/EventHandler.h
-        src/EventHandlerNewGame.h
         src/EventHandlerFileChooser.h
+        src/EventHandlerNewGame.h
         src/EventInstancer.h
         src/EventManager.h
-        src/GameThread.h
-        src/GameObserver.h
-        src/GameThread.h
-        src/gtpclient.h
-        src/player.h
-        src/Quaternion.h
-        src/Vector.h
-        src/GobanView.h
-        src/GobanModel.h
         src/GobanControl.h
-        src/Shadinclude.hpp
-        src/GobanShader.h
-        src/Metrics.h
         src/GobanOverlay.h
-        src/GameState.h
-        src/Configuration.h
-        src/GameRecord.h
-        src/FileChooserDataSource.h
-        src/AppState.h
+        src/GobanShader.h
+        src/StereoComposite.h
+        src/GobanView.h
+        src/OpenGL.h
+        src/ScenarioRunner.h
+        src/Shadinclude.hpp
     )
 
-    set(GOBAN_SRC_FILES
-        src/Board.cpp
-        src/Camera.cpp
+    set(GOBAN_APP_SRC_FILES
+        src/AppState.cpp
         src/ElementGame.cpp
         src/Event.cpp
         src/EventHandler.cpp
-        src/EventHandlerNewGame.cpp
         src/EventHandlerFileChooser.cpp
+        src/EventHandlerNewGame.cpp
         src/EventInstancer.cpp
         src/EventManager.cpp
-        src/GameThread.cpp
-        src/gtpclient.cpp
-        src/main.cpp
-        src/player.cpp
-        src/Quaternion.cpp
-        src/Vector.cpp
-        src/GobanView.cpp
-        src/GobanModel.cpp
-        src/FileChooserDataSource.cpp
         src/GobanControl.cpp
-        src/GobanShader.cpp
-        src/Metrics.cpp
         src/GobanOverlay.cpp
+        src/GobanShader.cpp
+        src/StereoComposite.cpp
+        src/GobanView.cpp
+        src/ScenarioRunner.cpp
+        src/main.cpp
         src/sound/AudioFile.cpp
         src/sound/AudioPlayer.cpp
         src/sound/FileHandler.cpp
         src/sound/StreamHandler.cpp
-        src/sound/util.cpp src/Configuration.cpp
         src/glad/src/glad.c
-        src/GameRecord.cpp
-        src/AppState.cpp
-        src/UserSettings.cpp
     )
-    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
-    target_sources(${PROJECT_NAME} PRIVATE
-        ${GOBAN_SRC_FILES}
-        ${GOBAN_HDR_FILES}
+    add_executable(${PROJECT_NAME}
+        ${GOBAN_APP_SRC_FILES}
+        ${GOBAN_APP_HDR_FILES}
         ${GLYPHY_SRC_FILES}
         ${RMLUI_BACKEND_SRC_FILES}
     )
+
     if(WIN32)
         target_sources(${PROJECT_NAME} PRIVATE src/goban.rc)
+        set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
     endif()
+
     target_include_directories(${PROJECT_NAME} PRIVATE
-            ${glm_SOURCE_DIR}
-            src
             src/glyphy
             src/sound/
             src/glad/include
@@ -394,7 +534,6 @@ else()
             ${FREETYPE_INCLUDE_DIRS}
             ${LIBSNDFILE_INCLUDE_DIR}
             ${PORTAUDIO_INCLUDE_DIRS}
-            ${libsgfcplusplus_inc_dir}
     )
 
     add_dependencies(${PROJECT_NAME}
@@ -404,7 +543,10 @@ else()
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE HAVE_CONFIG_H=1)
 
+    target_compile_options(${PROJECT_NAME} PRIVATE ${GOBAN_WARNING_FLAGS})
+
     target_link_libraries(${PROJECT_NAME}
+        goban_core
         ${CMAKE_DL_LIBS}
         ${OPENGL_LIBRARIES}
         libglyphy
@@ -419,5 +561,49 @@ else()
         nlohmann_json::nlohmann_json
         ${EXTRA_LIBS}
     )
+
+    # ------------------------------------------------------------------
+    # goban_tests — unit tests over goban_core (no graphics context)
+    # ------------------------------------------------------------------
+    if(GOBAN_BUILD_TESTS)
+        cmake_language(CALL fetch_doctest)
+        enable_testing()
+
+        # Deterministic GTP engine used as a test double. Intentionally does not
+        # link goban_core: a mock that shared Board's rules implementation could
+        # not catch a bug in it.
+        add_executable(mock_gtp_engine tests/mock_gtp_engine.cpp)
+        target_compile_options(mock_gtp_engine PRIVATE ${GOBAN_WARNING_FLAGS})
+
+        # CONFIGURE_DEPENDS so newly added test files are picked up without
+        # having to edit this file for every new suite.
+        file(GLOB GOBAN_TEST_SRC_FILES CONFIGURE_DEPENDS
+            ${PROJECT_SOURCE_DIR}/tests/*.cpp
+        )
+        # The mock engine is a separate executable with its own main().
+        list(REMOVE_ITEM GOBAN_TEST_SRC_FILES
+            ${PROJECT_SOURCE_DIR}/tests/mock_gtp_engine.cpp
+        )
+
+        if(GOBAN_TEST_SRC_FILES)
+            add_executable(goban_tests ${GOBAN_TEST_SRC_FILES})
+            target_link_libraries(goban_tests PRIVATE goban_core doctest::doctest)
+            target_include_directories(goban_tests PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+            target_compile_options(goban_tests PRIVATE ${GOBAN_WARNING_FLAGS})
+
+            add_dependencies(goban_tests mock_gtp_engine)
+
+            target_compile_definitions(goban_tests PRIVATE
+                GOBAN_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data"
+                GOBAN_TEST_BIN_DIR="${PROJECT_BINARY_DIR}"
+                GOBAN_MOCK_ENGINE="$<TARGET_FILE:mock_gtp_engine>"
+            )
+
+            include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
+            doctest_discover_tests(goban_tests)
+        else()
+            message(STATUS "GOBAN_BUILD_TESTS is ON but tests/*.cpp is empty")
+        endif()
+    endif()
 
 endif()

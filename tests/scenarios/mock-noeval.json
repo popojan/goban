@@ -1,0 +1,21 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "An engine that carries \"kibitz\" — and so is nominated for the analysis role by default — but cannot analyse. GNU Go is exactly this, and \"kibitz\" defaults to the coach, so it is the common real configuration rather than a contrived one. No analysis_parameters override, so the analysis instance inherits --no-analyze too.",
+  "bots": [
+    {
+      "name": "mock",
+      "path": "./cmake-build-release",
+      "command": "mock_gtp_engine",
+      "parameters": "--no-analyze",
+      "enabled": 1,
+      "main": 1,
+      "kibitz": 1
+    }
+  ],
+  "humans": [
+    "Human"
+  ],
+  "sgf_dialog": {
+    "games_path": "./tests/scenarios/.games"
+  }
+}

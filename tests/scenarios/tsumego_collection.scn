@@ -1,0 +1,93 @@
+# The two ways into a tsumego that nothing exercised: an SGF whose PL names the
+# side to *keep alive* rather than the side to move, and a file holding more
+# than one problem. Both paths worked; both were invisible to the suite, which
+# is how the promotion and stale-snapshot defects next door survived so long.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/tsumego_collection.scn
+
+# --- PL says one side, the first recorded move is the other's ---------------
+# Per the SGF spec PL is "player to move first", but problem collections
+# routinely use it for "the side to save". autoPlayTsumegoSetup() reads the
+# contradiction — PL[W] with a B move ahead — and plays that move as setup, so
+# the solver is handed the position PL meant rather than the one recorded.
+load_tsumego tests/data/tsumego_pl.sgf
+wait_idle
+expect tsumego true
+expect board_size 9
+expect main_line_moves 2
+# One move in, not at the root: the B move was consumed as setup.
+expect view_position 1
+expect color_to_move W
+expect phase paused
+
+# Note what is *not* asserted here: the "White to move" hint. applyTsumegoHint()
+# only fires at view position 0, so an auto-played setup move leaves the solver
+# with no statement of whose turn it is — in exactly the case where the SGF was
+# ambiguous enough to need one. autoPlayTsumegoSetup()'s own comment says the
+# hint is applied after the forward step, so the intent is there; the guard
+# refuses it. Left as it is rather than pinned either way.
+
+# W[bh] is the recorded answer: SGF row 'h' = 7, so board row 9-1-7 = 1.
+click 1 1
+wait_idle
+expect holds_stone true
+click 1 1
+wait_until msg tsumego_solved
+wait_idle
+expect view_position 2
+expect at_end true
+
+# --- A file of several problems ---------------------------------------------
+# Both games are the same shape, the second mirrored into the opposite corner,
+# so a switch that quietly kept the first board would still look plausible —
+# only the player name and the solution's coordinates give it away.
+load_tsumego tests/data/tsumego_two.sgf
+wait_idle
+expect tsumego true
+expect game_index 0
+expect black_player One
+expect view_position 0
+expect comment Black to move
+
+# Stepping to the next problem keeps tsumego mode: switchGame() re-arms it and
+# re-applies suppressSessionCopy, because loading is not what set them here.
+next_game
+wait_idle
+expect tsumego true
+expect game_index 1
+expect view_position 0
+expect main_line_moves 2
+expect comment Black to move
+
+# The name does *not* follow the switch: switchGame() calls finalizeGameLoad()
+# with matchPlayers=false, so the players matched when the file was opened stay
+# put and the label still reads the first problem's PB. Harmless where nobody
+# is playing, and pinned here so that changing it is a decision rather than an
+# accident — the board underneath did switch, which is what the mirrored
+# solution below proves.
+expect black_player One
+
+# The second problem's solution is B[bb] — SGF row 'b' = 1, board row 9-1-1 = 7.
+# Getting the mirror wrong lands on an empty point and marks a wrong move, so
+# the verdict below is what distinguishes the two boards.
+click 1 7
+wait_idle
+click 1 7
+wait_until msg tsumego_solved
+wait_idle
+expect at_end true
+
+# And back. A solved problem is not a game worth keeping, so nothing prompts.
+prev_game
+wait_idle
+expect prompt_active false
+expect tsumego true
+expect game_index 0
+expect black_player One
+expect view_position 0
+
+# Leaving tsumego mode still takes an explicit new game.
+new_game 9
+wait_idle
+expect tsumego false
+expect phase setup

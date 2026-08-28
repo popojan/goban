@@ -1,0 +1,57 @@
+# Regression: starting a new game while a slow engine is thinking.
+#
+# Same ADR-0001 route as load_while_engine_thinking.scn — new_game discards the
+# current game, so it is deferred to the game thread rather than refused — but a
+# different action at the end of it. `newGameNow()` runs *on the game thread*
+# there, and it must not try to stop or restart the loop it is running inside.
+#
+# Uses the slow-mock bot (--think-ms) so an engine really is mid-genmove when
+# the new game is requested.
+
+new_game 9
+wait_idle
+switch_player black slowmock
+switch_player white slowmock
+wait_idle
+
+start
+wait_until move_count >= 1
+# Not just "a move has been played": the loop clears playerToMove before its
+# 500 ms inter-move sleep, so move_count alone lands in the window where nobody
+# is thinking and the action would run on the UI thread instead — which is the
+# path this scenario is *not* about.
+wait_until thinking true
+expect running true
+
+# Request the new game mid-genmove. This must return immediately, and the work
+# lands on the game thread once the engine's move arrives and is discarded.
+new_game 13
+
+wait_until board_size 13
+wait_idle
+expect board_size 13
+expect move_count 0
+expect main_line_moves 0
+expect black_stones 0
+expect white_stones 0
+
+# And the application is still alive and responsive afterwards: the loop must
+# still be able to run, and the engines must be synced to the *new*, empty
+# board — a replay of the discarded game into them would make this move land on
+# an occupied point and come back "illegal move".
+switch_player black human
+wait_idle
+click 3 3
+wait_idle
+expect holds_stone true
+# `wait_idle` alone, deliberately: the placing click leaves the move in
+# `queuedMove` for the loop to take up, and until isIdle() counted that, this
+# read the board before the stone had landed. Every other scenario works around
+# it with `wait_until move_count >= N`.
+click 3 3
+wait_idle
+expect black_stones 1
+# White is still the slow engine, so a reply proves the loop is turning.
+wait_until white_stones 1
+wait_idle
+expect move_count 2

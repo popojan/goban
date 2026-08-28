@@ -1,16 +1,31 @@
 {
+  "_comment_camera": "The view a fresh install opens on, and what `reset camera` returns to when the user has not saved a preset of their own. It lives here, in the file that ships with the application and is never written at runtime, rather than in user.json — that file is the runtime scratchpad, rewritten on every settings change, and keeping the shipped default in it leaked local paths and language into the repository once already (5fe4d48).",
+  "camera": {
+    "distance": 3.1,
+    "pan": {
+      "x": 0.0,
+      "y": -0.2
+    },
+    "rotation": {
+      "w": 0.0,
+      "x": -0.9,
+      "y": 0.5,
+      "z": 0.0
+    }
+  },
   "bots": [
     {
       "name": "GNU Go 3.8",
       "path": "./engine/gnugo",
       "command": "gnugo",
       "parameters": "--mode gtp --japanese-rules",
-      "main": 1
+      "main": 1,
+      "kibitz": 1
     },
     {
       "name": "Pachi 12.60",
-      "path": "./engine/Pachi-12.60",
-      "command": "pachi.exe",
+      "path": "./engine/Pachi",
+      "command": "pachi-12.60-amd64",
       "parameters": "-r japanese --smart-pass",
       "enabled": 0
     },
@@ -22,19 +37,19 @@
       "enabled": 0,
       "kibitz": 0,
       "messages": [
-          {
-            "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
-            "output": "$1",
-            "var": "$primaryMove"
-          },
-          {
-            "regex": "^$primaryMove.*(W\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+L)",
-            "output": "$1 $2"
-          },
-          {
-            "regex": "Controller:",
-            "output": " "
-          }
+        {
+          "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
+          "output": "$1",
+          "var": "$primaryMove"
+        },
+        {
+          "regex": "^$primaryMove.*(W\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+L)",
+          "output": "$1 $2"
+        },
+        {
+          "regex": "Controller:",
+          "output": " "
+        }
       ]
     },
     {
@@ -42,22 +57,24 @@
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata9x9-b18c384nbt-20231025.bin.gz -config ./default_gtp.cfg",
+      "_comment_enabled": "Off in the shipped configuration: the bundle carries GNU Go and nothing else, and an engine that is configured but not installed fails to start and puts a red badge on the message panel the first time the program is opened. Set to 1 once KataGo is in engine/katago.",
       "enabled": 0,
       "kibitz": 0,
+      "analysis": 1,
       "messages": [
-          {
-            "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
-            "output": "$1",
-            "var": "$primaryMove"
-          },
-          {
-            "regex": "^$primaryMove.*(W\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+L)",
-            "output": "$1 $2"
-          },
-          {
-            "regex": "Controller:",
-            "output": " "
-          }
+        {
+          "regex": "^:\\s+T.*--\\s*([A-Z0-9]+)",
+          "output": "$1",
+          "var": "$primaryMove"
+        },
+        {
+          "regex": "^$primaryMove.*(W\\s+[^\\s]+).*\\(\\s*([^\\s]+\\s+L)",
+          "output": "$1 $2"
+        },
+        {
+          "regex": "Controller:",
+          "output": " "
+        }
       ]
     },
     {
@@ -80,35 +97,172 @@
     }
   ],
   "controls": [
-    {"key": 1, "command": "play once"},
-    {"key": 81, "command": "quit"},
-    {"key": 17, "command": "toggle_fullscreen"},
-    {"key": 35, "command": "fps"},
-    {"key": 26, "command": "animate"},
-    {"key": 31, "command": "toggle_territory"},
-    {"key": 25, "command": "toggle_overlay"},
-    {"key": 29, "command": "resign"},
-    {"key": 27, "command": "pass"},
-    {"key": 14, "command": "reset camera"},
-    {"key": 32, "command": "undo move"},
-    {"key": 15, "command": "pan camera"},
-    {"key": 12, "command": "rotate camera"},
-    {"key": 30, "command": "zoom camera"},
-    {"key": 33, "command": "cycle shaders"},
-    {"key": 92, "command": "increase gamma"},
-    {"key": 90, "command": "decrease gamma"},
-    {"key": 91, "command": "increase contrast"},
-    {"key": 93, "command": "decrease contrast"},
-    {"key": 89, "command": "reset contrast and gamma"},
-    {"key": 19, "command": "increase eof"},
-    {"key": 23, "command": "decrease eof"},
-    {"key": 21, "command": "increase dof"},
-    {"key": 22, "command": "decrease dof"},
-    {"key": 72, "command": "toggle_analysis_mode"}
+    {
+      "key": 1,
+      "command": "play once"
+    },
+    {
+      "_comment": "Space is a navigation key first: keyPress() handles it before this table and only lets it through at the end of an unfinished branch. Ctrl+Space is not intercepted, so it reaches play once at any cursor position.",
+      "key": 1,
+      "ctrl": true,
+      "command": "play once"
+    },
+    {
+      "key": 81,
+      "command": "quit"
+    },
+    {
+      "key": 17,
+      "command": "toggle_fullscreen"
+    },
+    {
+      "key": 35,
+      "command": "toggle_fps"
+    },
+    {
+      "key": 26,
+      "command": "animate"
+    },
+    {
+      "key": 31,
+      "command": "toggle_territory"
+    },
+    {
+      "key": 25,
+      "command": "toggle_last_move_overlay"
+    },
+    {
+      "key": 24,
+      "command": "toggle_next_move_overlay"
+    },
+    {
+      "key": 29,
+      "command": "resign"
+    },
+    {
+      "key": 27,
+      "command": "pass"
+    },
+    {
+      "key": 14,
+      "command": "reset camera"
+    },
+    {
+      "key": 32,
+      "command": "undo move"
+    },
+    {
+      "key": 15,
+      "command": "pan camera"
+    },
+    {
+      "key": 12,
+      "command": "rotate camera"
+    },
+    {
+      "key": 30,
+      "command": "zoom camera"
+    },
+    {
+      "key": 33,
+      "command": "cycle shaders"
+    },
+    {
+      "key": 47,
+      "command": "increase gamma"
+    },
+    {
+      "key": 45,
+      "command": "decrease gamma"
+    },
+    {
+      "key": 39,
+      "command": "increase contrast"
+    },
+    {
+      "key": 41,
+      "command": "decrease contrast"
+    },
+    {
+      "key": 46,
+      "command": "reset contrast and gamma"
+    },
+    {
+      "key": 19,
+      "command": "increase eof"
+    },
+    {
+      "key": 23,
+      "command": "decrease eof"
+    },
+    {
+      "key": 21,
+      "command": "increase dof"
+    },
+    {
+      "key": 22,
+      "command": "decrease dof"
+    },
+    {
+      "key": 72,
+      "command": "toggle_analysis_mode"
+    },
+    {
+      "key": 86,
+      "command": "prev_game"
+    },
+    {
+      "key": 87,
+      "command": "next_game"
+    },
+    {
+      "key": 89,
+      "command": "navigate_start"
+    },
+    {
+      "key": 88,
+      "command": "navigate_end"
+    },
+    {
+      "key": 13,
+      "command": "zoom stones"
+    },
+    {
+      "key": 30,
+      "ctrl": true,
+      "command": "save"
+    },
+    {
+      "key": 26,
+      "ctrl": true,
+      "command": "load"
+    },
+    {
+      "key": 25,
+      "ctrl": true,
+      "command": "clear"
+    },
+    {
+      "key": 37,
+      "ctrl": true,
+      "command": "undo move"
+    },
+    {
+      "key": 13,
+      "ctrl": true,
+      "command": "toggle ai vs ai"
+    },
+    {
+      "key": 24,
+      "ctrl": true,
+      "command": "toggle_log"
+    }
   ],
   "sounds": {
     "move": "./config/sound/stone.wav",
-    "clash": "./config/sound/collision.wav"
+    "clash": "./config/sound/collision.wav",
+    "error": "./config/sound/error.wav",
+    "correct": "./config/sound/correct.wav"
   },
   "fonts": {
     "gui": [
@@ -144,42 +298,60 @@
     },
     {
       "name": "[stereo] Red Carpet",
+      "stereo": 1,
       "vertex": "./config/shaders/vertex/stereo.glsl",
       "fragment": "./config/shaders/fragment/red_carpet_stereo.glsl",
       "height": 0.85
     },
     {
       "name": "[stereo] Minimal Thin",
+      "stereo": 1,
       "vertex": "./config/shaders/vertex/stereo.glsl",
       "fragment": "./config/shaders/fragment/thin_stereo.glsl",
       "height": 0.85
-    },
-    {
-      "name": "(legacy) Red Carpet",
-      "vertex": "./config/shaders/vertex/mono.glsl",
-      "fragment": "./config/shaders/legacy/fragment.glsl",
-      "height": 0.85
-    },
-    {
-      "name": "(legacy) Minimal Thin",
-      "vertex": "./config/shaders/vertex/mono.glsl",
-      "fragment": "./config/shaders/legacy/fragment.25D.glsl",
-      "height": 0.85
-    },
-    {
-      "name": "(legacy) Minimal Flat",
-      "vertex": "./config/shaders/vertex/mono.glsl",
-      "fragment": "./config/shaders/legacy/fragment.2D.glsl",
-      "height": 0.0
     }
   ],
+  "_comment_anaglyph": "How a stereo shader combines the two eyes, for red/cyan glasses: gray (both eyes reduced to brightness - no colour, and no retinal rivalry, which is the discomfort of showing each eye a differently coloured version of one object), half-color (the right eye keeps its colour, the left stays grey), color (each eye keeps its own channels - most colour, most rivalry) or dubois (a least-squares optimal mix that keeps recognisable colour with much less rivalry than color). More colour is not simply better; judge it through the glasses. The `anaglyph` command switches live and cycles with no argument, and writes the choice to user.json. Not a per-shader setting like annotations: every stereo shader here is red/cyan, and the choice is about the glasses and the eyes behind them rather than about the board.",
+  "_comment_glasses": "Which channels reach which eye, which is a property of the glasses and not of the picture. Red and blue are never in doubt - a red lens passes red and blocks blue, the other lens does the reverse. Green is the whole question. A cyan lens passes green, so with red-cyan glasses green belongs to the RIGHT eye. A blue lens BLOCKS green while the red lens leaks it, so with red-blue glasses green belongs to the LEFT eye. Whichever eye gets green has two channels and is therefore the only eye that can carry hue - colour vision needs two, so exactly one eye can be the coloured one and which eye that is flips with the glasses. Getting this backwards delivers one eye's image to the other eye, which shows up as a second picture rather than a wrong colour: if the colour modes double up and gray does not, this is the setting to change. Set live with the glasses command.",
+  "_comment_pointer_mark": "The pointer drawn on the board itself, 0..1, where 0 keeps the native mouse pointer everywhere. Stereo shaders only. A native pointer is composited by the window system at the screen plane with no disparity at all, so under an anaglyph it can never sit at the depth of the point it indicates - fuse the board and you see two pointers, fuse the pointer and the board doubles. There is no value to tune: a 2D overlay has no depth. A mark ray-traced with the board inherits that eye's disparity and its occlusion for free. It is four ticks turned a quarter turn from the grid, so no arm parallels a line, and gapped at the centre so it never covers the intersection it names - on this board a disc already means a stone and an upright cross already means grid. The native pointer is hidden only while it is over the wood: over the interface it is correct, that interface being flat at the screen plane itself.",
+  "pointer_mark": 1.0,
+  "_comment_pointer_mode": "When the board draws its own pointer instead of the window system's: auto, always or never. auto is where the native pointer is genuinely wrong - under a stereo shader, where it is composited at the screen plane and so cannot sit at the depth of the point it indicates. always extends it to mono, where the native pointer is merely ordinary and a mark lying on the wood is nicer; note that it also hides the native pointer over the board there, which is why it is not the default. never keeps the window system's pointer everywhere. The pointer command sets it live and writes it to user.json.",
+  "pointer_mode": "auto",
+  "anaglyph": "gray",
+  "glasses": "red-cyan",
+  "_comment_anaglyph_tuning": "Two dials for glasses that leak. anaglyph_strength (0..1) is how much of each eye's own colour survives against its plain brightness: 1 is the mode as published, 0 collapses any mode to gray. It works because ghosting and retinal rivalry both scale with how different the two eyes' images are, so it is one continuous dial between colour you can enjoy and colour you can fuse - but it reduces the leak rather than cancelling it. anaglyph_leak [r, g, b] does cancel it: each eye pre-subtracts its own image from the channels the other eye reads, so what gets through an imperfect filter is met by a matching hole. Each number names the channel being corrected, so g is the one to raise first - a red filter blocks blue well and green badly, which is also why the gray mode puts the right eye in blue alone. Tune it by eye at a value where the double image just disappears, typically well under 0.1; too much draws a dark hole where the other eye's image is. Both default to doing nothing, and both are written to user.json by the anaglyph_strength and anaglyph_leak commands.",
+  "anaglyph_strength": 1.0,
+  "anaglyph_leak": [0.0, 0.0, 0.0],
+  "_comment_anaglyph_green": "How much of the green channel the colour modes use, 0..1. Green is the one channel real lenses disagree about: the clean model says a cyan lens passes it and a blue lens blocks it, so it belongs to one eye or the other, but cheap dyed lenses have broad overlapping passbands and green sits in the middle of the spectrum. Measured on one such pair, giving green to the right eye put a second picture in the RED lens and giving it to the left put a second picture in the BLUE lens - both, symmetrically, because green was reaching both eyes whoever owned it. That kills the clean split but not the picture: ghosting is proportional to how much green is there, so lowering this trades colour against the double image continuously, and on a wooden board the loss is mild since suppressing green only skews the image warm. Not the same as anaglyph_strength, which desaturates toward grey - and grey has FULL green, so it does nothing to this ghost. Inert in the gray mode, which is the mode defined by leaving green out.",
+  "anaglyph_green": 1.0,
+  "_comment_anaglyph_balance": "Per-eye gain [left, right], for glasses whose two filters do not pass the same amount of light - and they rarely do: a blue lens is markedly darker than a red one, so the right eye gets a dimmer picture of the same scene. The eyes do not average that away; a sustained brightness mismatch is its own source of rivalry and strain, quite apart from colour. Raise the right eye rather than lowering the left, so the picture does not sink. Set live with the anaglyph_balance command.",
+  "anaglyph_balance": [1.0, 1.0],
+  "_comment_annotations": "Text drawn on the board itself. Colours are #rgb, #rrggbb or #rrggbbaa; alpha is the interesting part, since a dark part-transparent ink reads as part of the wood rather than printed on top of it. readout_color is the evaluation readout on the near margin and readout_stale_color is the same while it describes a position you have navigated away from - equal to readout_color means no marking at all. coordinate_color is the column letters and row numbers. coordinate_offset is how far out into the margin they sit, in grid spacings from the outermost line: the wood extends 0.85, so 0.425 centres them in it and about 0.7 is as far as they go before hanging off the edge. Live overrides: evaluation_color, coordinate_color, coordinate_offset. These sit here rather than in a shader entry because every shader currently draws the same wood, so per-shader ink would be six copies of one value; a shader that redefines the board dark gets an annotations block of its own in its shaders[] entry, which is laid over this one - only move_quality is read from there so far, and no shipped shader overrides it.",
+  "_comment_move_quality": "The best-moves overlay ramp: [best, middle, worst], with move_quality_loss the win-rate losses those last two sit at - a move is a concession by 0.015 and a blunder by 0.10, interpolated linearly between. The thresholds are a Go judgement and stay global; the colours are an appearance judgement about this wood and are what a shader entry may override. These are INK on a lit wooden board (0.824, 0.635, 0.282, mean brightness 0.58), so every stop sits below the wood - and their mean brightness rises across the ramp on purpose (0.17, 0.28, 0.37), because a stereo shader collapses every label to (r+g+b)/3 and the ramp is read as ink density there rather than as hue. The best move is the most firmly printed; a blunder fades toward the wood. A dark-board shader overriding these must invert that ordering, and nothing in a hex string will say so.",
+  "_comment_wait": "The board's own report that it is waiting: a blinking mark and an elapsed second count in the wood margin, replacing the status-line banners. Just an elapsed second count, right-aligned in the margin: the right end is program status, the left end is an action (the recommended pass). atlas_extra adds characters to the glyph atlas for a custom fonts.overlay; anything the font cannot supply is warned about at startup rather than silently not drawn.",
+  "annotations": {
+    "wait_grace": 0.5,
+    "readout_color": "#00000040",
+    "readout_stale_color": "#00000000",
+    "coordinate_color": "#00000040",
+    "coordinate_offset": 0.425,
+    "move_quality": ["#0f521f", "#7a4d0d", "#a83d38"],
+    "move_quality_loss": [0.015, 0.10]
+  },
   "overlay_shaders": {
     "vertex": "./config/shaders/overlay/overlay-vertex.glsl",
     "fragment": "./config/shaders/overlay/overlay-fragment.glsl",
     "atlas": "./config/shaders/overlay/overlay-atlas.glsl"
   },
   "sgf_dialog": {
-    "game_columns": ["index", "board", "black", "white", "moves", "result"],
+    "game_columns": [
+      "index",
+      "board",
+      "black",
+      "white",
+      "moves",
+      "result"
+    ],
     "games_path": "./games"
   }
 }

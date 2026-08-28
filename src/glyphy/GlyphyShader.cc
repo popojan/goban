@@ -65,7 +65,8 @@ demo_shader_add_glyph_vertices (const glyphy_point_t        &p,
 				glyph_info_t                *gi,
 				std::vector<glyph_vertex_t> *vertices,
 				glyphy_extents_t            *extents,
-				bool extents_only)
+				bool extents_only,
+				const GLfloat               *color)
 {
   if (gi->is_empty)
     return;
@@ -83,6 +84,16 @@ demo_shader_add_glyph_vertices (const glyphy_point_t        &p,
   ENCODE_CORNER (1, 0);
   ENCODE_CORNER (1, 1);
 #undef ENCODE_CORNER
+
+  /* Flat across the quad: the fragment shader interpolates it, and four equal
+   * corners interpolate to a constant. A per-corner gradient would come free
+   * here if anyone ever wants one. */
+  for (auto &vertex : v) {
+    vertex.r = color[0];
+    vertex.g = color[1];
+    vertex.b = color[2];
+    vertex.a = color[3];
+  }
 
   if (!extents_only) {
 	  vertices->push_back(v[0]);
@@ -222,5 +233,20 @@ demo_shader_create_program()
    fshader = compile_shader (GL_FRAGMENT_SHADER, fshader_sources.size(), fshader_sources.data());
 
   program = link_program (vshader, fshader);
+
+  /* Report the per-glyph colour attribute once, at link time.
+   *
+   * A replaced overlay shader need not declare it, and the fallback is silent
+   * and looks like working software: every glyph then takes u_color, which is
+   * white since colour moved onto the vertex — so labels go from black to
+   * invisible on a light board rather than obviously broken. Checked here
+   * rather than in draw() because this runs at startup, which a headless run
+   * reaches and rendering does not. */
+  if (glGetAttribLocation (program, "a_glyph_color") < 0) {
+    spdlog::warn ("overlay shader declares no a_glyph_color attribute; "
+                  "per-glyph colour is off and every label falls back to u_color");
+  } else {
+    spdlog::debug ("overlay: per-glyph colour active");
+  }
   return program;
 }

@@ -1,0 +1,77 @@
+# One of the images on hraj.si and in the README, regenerated per release by
+# tools/make-screenshot.sh rather than captured by hand. The page's previous set
+# was six years old and two of them showed a menu bar that no longer exists.
+#
+# The camera and the shader are pinned in the matching *-user.json, passed with
+# --user-settings, so the shot cannot drift with the session and the real
+# user.json is never touched.
+#
+# Under a stereo shader. Everything on the board is drawn twice, once per eye,
+# each pass tested against its own depth — which is why the annotations do not
+# clip along a stone's silhouette. Needs red/cyan glasses to fuse, and the
+# caption on the page has to say so or it reads as a rendering fault.
+load_sgf res/screenshot/hero-13x13.sgf
+wait_idle
+navigate_start
+wait_idle
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+navigate_forward
+wait_idle
+expect view_position 47
+expect stereo true
+
+toggle_coordinates on
+toggle_next_move_overlay
+# The anaglyph mode comes from stereo-user.json, not from the `anaglyph` command:
+# the command reports what it did into #lblMessage, and that caption then sits
+# across the middle of the picture.
+expect anaglyph gray
+
+toggle_fullscreen
+wait 1500
+screenshot res/screenshot/stereo.ppm

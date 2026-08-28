@@ -1,0 +1,14 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "Coach and kibitz are DIFFERENT processes, as a real config with GNU Go plus KataGo is. That path is not the same as one engine carrying both flags: KIBITZ_NAV short-circuits `kibitz == coach || coach->play(response)`, so a single-engine config never exercises coach->play() at all.",
+  "bots": [
+    { "name": "coachmock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "", "enabled": 1, "main": 1 },
+    { "name": "kibitzmock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "--think-ms 2000", "enabled": 1, "kibitz": 1 }
+  ],
+  "humans": [ "Human" ],
+  "_comment_wait": "No grace period. It ships at 0.5 s so that GNU Go answering a genmove in 13 ms does not flash the mark for a single frame on every move of a bot match; here the point is to assert that the mark was placed, so it should be there as soon as the wait is.",
+  "annotations": { "wait_grace": 0 },
+  "sgf_dialog": { "games_path": "./tests/scenarios/.games" }
+}

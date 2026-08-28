@@ -1,0 +1,57 @@
+{
+  "anaglyph": "gray",
+  "camera": {
+    "distance": 3.0999999046325684,
+    "pan": {
+      "x": 0.0,
+      "y": -0.20000000298023224
+    },
+    "rotation": {
+      "w": 0.0,
+      "x": -0.8741572499275208,
+      "y": 0.4856429398059845,
+      "z": 0.0
+    }
+  },
+  "camera_current": {
+    "distance": 3.0999999046325684,
+    "pan": {
+      "x": 0.0,
+      "y": -0.20000000298023224
+    },
+    "rotation": {
+      "w": 0.0,
+      "x": -0.8741572499275208,
+      "y": 0.4856429398059845,
+      "z": 0.0
+    }
+  },
+  "coordinates": true,
+  "evaluation_align": "center",
+  "evaluation_enabled": false,
+  "evaluation_moves": false,
+  "evaluation_readout": false,
+  "fullscreen": true,
+  "glasses": "red-cyan",
+  "last_config": "./config/en.json",
+  "last_sgf_path": "./games/2026-08-28.sgf",
+  "session": {
+    "analysis_mode": true,
+    "file": "res/screenshot/hero-13x13.sgf",
+    "game_index": 0,
+    "is_external": true,
+    "tree_path": [],
+    "tree_path_length": 47,
+    "tsumego_mode": false
+  },
+  "shader": {
+    "contrast": 0.0,
+    "dof": 0.0925000011920929,
+    "eof": 0.07249999791383743,
+    "gamma": 1.0,
+    "name": "[stereo] Red Carpet"
+  },
+  "sound_enabled": false,
+  "start_fresh": false,
+  "wait_clock": false
+}

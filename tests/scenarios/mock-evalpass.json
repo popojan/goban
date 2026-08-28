@@ -1,0 +1,22 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "mock-eval.json with the analysis instance recommending a pass ahead of every board move — the settled endgame, where a real engine says stop playing. The overlay used to drop that candidate before taking its quality baseline, so the best remaining board move was measured against itself, came out at zero loss, and was drawn green and labelled A: the display advised filling your own territory.",
+  "bots": [
+    {
+      "name": "mock",
+      "path": "./cmake-build-release",
+      "command": "mock_gtp_engine",
+      "parameters": "--no-analyze",
+      "enabled": 1,
+      "main": 1,
+      "kibitz": 1,
+      "analysis_parameters": "--analyze-interval-ms 50 --analyze-pass"
+    }
+  ],
+  "humans": [
+    "Human"
+  ],
+  "sgf_dialog": {
+    "games_path": "./tests/scenarios/.games"
+  }
+}

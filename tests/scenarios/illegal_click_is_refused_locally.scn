@@ -1,0 +1,115 @@
+# A click the rules will not take is refused here, not by the engine.
+#
+# The bug this pins, from a real 13x13 endgame (2026-08-16): the app had no
+# legality check of its own on the way out. Every click left as
+# `play <colour> <point>` and whatever GNU Go answered decided it, so a misclick
+# onto a stone that had been sitting there for ten moves came back as
+#
+#   gnugo >> ? illegal move (command: play B M10)
+#
+# — an *error*, which the message-log sink takes and puts a red badge in front
+# of the user. Two of them, in fact: the blank line that ends every GTP response
+# was logged as a second, empty error. Those two lines were the entire contents
+# of last_run.log for that session.
+#
+# So the assertion that matters here is `log_badge none`. Everything else about
+# a refused click was already invisible — the record does not move either way —
+# and asserting only move_count would pass with the engine still being asked and
+# still complaining. The mock engine implements the rules, so it answers
+# `? illegal move` exactly as GNU Go did.
+#
+# Both players are human, so nothing advances on its own and every click below
+# is the user's.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect log_badge none
+
+# Black plays 4,4. Two clicks: one to take the stone out of the bowl, one to put
+# it down.
+click 4 4
+click 4 4
+wait_until move_count >= 1
+wait_idle
+expect move_count 1
+expect black_stones 1
+expect color_to_move W
+
+# --- 1. An occupied point ----------------------------------------------------
+# White reaches for a stone and puts it down on Black's.
+click 2 2
+wait_idle
+expect holds_stone true
+
+click 4 4
+wait_idle
+# Nothing recorded, nothing on the board, nobody asked.
+expect move_count 1
+expect white_stones 0
+expect color_to_move W
+expect log_badge none
+# And the stone is still in hand, which is the whole of the feedback: it is what
+# a real board does when you try to put a stone where one already is. It used to
+# be dropped back into the bowl by the review path and held here, for no reason
+# either way.
+expect holds_stone true
+
+# The same stone then goes down on a legal point, so the refusal cost the user
+# nothing — one more click, not a new turn.
+click 6 6
+wait_until move_count >= 2
+wait_idle
+expect move_count 2
+expect white_stones 1
+expect holds_stone false
+expect color_to_move B
+expect log_badge none
+
+# --- 2. Self-capture ---------------------------------------------------------
+# The rule is the board's, not the engine's, so it covers more than occupancy.
+# Black surrounds the 0,0 corner; White then tries to play into it.
+click 0 1
+click 0 1
+wait_until move_count >= 3
+wait_idle
+
+click 8 0
+click 8 0
+wait_until move_count >= 4
+wait_idle
+
+click 1 0
+click 1 0
+wait_until move_count >= 5
+wait_idle
+expect move_count 5
+expect black_stones 3
+
+# White into the corner: no liberties, no capture. Refused.
+click 0 0
+wait_idle
+expect holds_stone true
+click 0 0
+wait_idle
+expect move_count 5
+expect holds_stone true
+expect color_to_move W
+expect log_badge none
+
+# --- 3. The refusal is a rules answer, not a policy one ----------------------
+# availableActions() still says White may play — it is this point that is
+# closed, not the turn. Keeping the two apart is why the check lives next to the
+# board rather than in availableActions(), which knows nothing about points.
+expect can_play true
+expect phase playing
+
+# And White can still play elsewhere.
+click 4 0
+wait_until move_count >= 6
+wait_idle
+expect move_count 6
+expect white_stones 3       # 6,6 and 8,0 from before, plus this one
+expect log_badge none

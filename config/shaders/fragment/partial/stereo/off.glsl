@@ -3,4 +3,5 @@ flat in vec3 roo;
 
 void main(void) {
     glFragColor =  render(roo, normalize(rdb));
+    gl_FragDepth = sceneDepth;
 }

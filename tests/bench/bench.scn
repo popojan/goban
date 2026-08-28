@@ -1,0 +1,19 @@
+# Rendering benchmark, not part of the scenario suite (run_scenarios.sh only
+# sweeps tests/scenarios/). Run it headfully — a hidden window's swap never
+# presents, so frame timings measured headless are fiction:
+#
+#   GOBAN_SCENARIO_VISIBLE=1 ./cmake-build-release/goban \
+#       --script tests/bench/bench.scn --config tests/scenarios/mock.json \
+#       --verbosity debug 2>&1 | grep -o "[0-9.]* fps"
+#
+# Loads a 19x19 position with 140 stones (checkerboard parity, no captures,
+# so the layout is deterministic), leaves the game Paused, then renders
+# continuously via the MAX_FPS toggle. The per-second averages land in the
+# debug log; discard the first sample, it straddles the toggle.
+load_sgf ./tests/bench/bench19.sgf
+wait_idle
+navigate_end
+wait_idle
+toggle_fps
+wait 7000
+quit_when_done

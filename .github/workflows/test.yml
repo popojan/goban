@@ -1,0 +1,63 @@
+name: Tests
+
+# Deliberately a separate workflow from build.yml: releases are built on version
+# tags, whereas tests should run on every push and pull request. Adding branch
+# triggers to build.yml would make all three platform release builds fire on
+# every commit.
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - 'v*'      # build.yml already covers tags
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # goban_tests only links goban_core, but CMake's find_package calls run
+      # unconditionally at configure time, so the app's dependencies must be
+      # present even though the application itself is not built here.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config \
+            autoconf automake libtool \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev wayland-protocols \
+            libasound2-dev \
+            libportaudio2 portaudio19-dev \
+            libsndfile1-dev \
+            libfreetype6-dev
+
+      - name: Build prerequisites (glyphy, etc.)
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=ON
+          make -j$(nproc)
+
+      - name: Configure
+        run: |
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DGOBAN_BUILD_TESTS=ON
+
+      # Building only the test target skips the renderer, RmlUi backends and
+      # audio, which the unit tests do not touch.
+      - name: Build tests
+        run: |
+          cd build
+          make -j$(nproc) goban_tests mock_gtp_engine
+
+      - name: Run tests
+        run: |
+          cd build
+          ctest --output-on-failure --timeout 120

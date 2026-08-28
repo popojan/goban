@@ -27,6 +27,9 @@
 #include "GlyphyShader.h"
 
 
+/// Where the point passed to `move_to()` sits relative to the text.
+enum class TextAlign { Center, Left, Right };
+
 class GlyphyBuffer {
 public:
 	GlyphyBuffer();
@@ -45,10 +48,15 @@ public:
 
 	void current_point (glyphy_point_t *p);
 
+	/// `color` is four floats, RGBA, applied to every glyph in this call. Text
+	/// added in separate calls may differ, so one buffer can hold many colours
+	/// — which is the whole reason it is here rather than in `u_color`.
 	void add_text (
 			const char *utf8,
 			std::shared_ptr<GlyphyFont> font,
-			double font_size
+			double font_size,
+			const GLfloat *color,
+			TextAlign align = TextAlign::Center
 	);
 
 	void draw ();

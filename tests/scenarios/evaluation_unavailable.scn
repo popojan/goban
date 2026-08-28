@@ -1,0 +1,51 @@
+# config: mock-noeval.json
+#
+# An engine nominated itself for the analysis role and turns out to be unable to
+# analyse. This is not an error case invented for the test: GNU Go has neither
+# kata-analyze nor lz-analyze, and "kibitz" is inherited by default, so on plenty
+# of real configurations this *is* what happens.
+#
+# The overlay must degrade to absent — no numbers, no placeholder, no retry loop
+# hammering the engine — and say so once.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/evaluation_unavailable.scn
+
+new_game 9
+wait_idle
+
+# The toggle is still offered: an engine did nominate itself, and whether it can
+# actually answer is not known until one has been started. Offering it and then
+# reporting failure is more honest than hiding a feature the configuration asks
+# for.
+expect can_evaluation true
+expect eval_state disabled
+
+toggle_evaluation on
+expect eval_enabled true
+
+# Probed with list_commands and found incapable. Latched, so the process is not
+# respawned ten times a second for the rest of the session.
+wait_until eval_state unavailable
+
+# Nothing is displayed. -1 rather than 50 is the point: an empty bar at the
+# midpoint cannot be told from a genuine even game.
+expect eval_winrate -1
+expect eval_has_score false
+expect eval_moves 0
+
+# The user was told, through the ordinary spdlog sink rather than a bespoke
+# "show this error" path.
+expect log_badge warning
+
+# The game itself is untouched — the analysis engine never shared a pipe with
+# the playing one, so its failure cannot reach the board.
+#
+# `wait_until`, not `wait_idle` then `expect`: a click hands the move to a
+# LocalHumanPlayer blocked in genmove(), and until the game loop wakes and picks
+# it up nothing is thinking, queued or deferred — so isIdle() is momentarily true
+# with the move not yet in the record. And White is the mock here, so the count
+# does not stop at 1 either.
+click 2 2
+click 2 2
+wait_until move_count >= 1
+expect phase playing

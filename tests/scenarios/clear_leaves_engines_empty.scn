@@ -1,0 +1,56 @@
+# config: mock.json
+#
+# Clearing a game must leave the engines holding the *cleared* board, not the
+# game just discarded.
+#
+# From a real session, 2026-08-16. The player cleared a finished 9x9 and played
+# their first stone; GNU Go answered `? illegal move (command: play B F5)` on a
+# board that was visibly empty. F5 was move **1** of the game just discarded —
+# the engines still held all 37 of its stones.
+#
+# The eager sync (ADR-0008) replays whatever record the model holds, and
+# newGameNow() installs the empty one *after* clearGame() returns. Starting the
+# loop inside clearGame() therefore raced the replay against createNewRecord().
+#
+# **This scenario does not deterministically catch that race**, and it is worth
+# knowing why rather than trusting it: the window is a few instructions wide,
+# and it stayed shut here through 3 runs against real GNU Go replaying the
+# actual recorded game. It fired in the original session, which had KataGo
+# analysing alongside. What guards the ordering is the split itself — the sync
+# lives in startSyncingNewGame(), whose only call site is after the new record —
+# and the moveCount check inside it, which turns a recurrence into a logged
+# error instead of an engine that quietly disagrees with the board.
+#
+# What this *does* pin is the user-visible behaviour, on the point that failed:
+# the mock rejects a play on an occupied point exactly as GNU Go did, so if the
+# engines ever hold the discarded game again, the move below stops landing.
+#
+# finished_9x9.sgf is that session's game: 9x9, 37 moves, B+16.5 by double pass,
+# opening at F5. Board rows run opposite to SGF rows, so F5 is click 5 4.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/clear_leaves_engines_empty.scn
+
+load_sgf tests/data/finished_9x9.sgf
+wait_idle
+switch_player black human
+wait_idle
+expect board_size 9
+expect move_count 37
+expect phase finished
+
+# A click on a finished game routes to `clear` rather than placing a stone,
+# which is how the clear was reached in the session being reproduced.
+click 0 0
+prompt_yes
+wait_idle
+expect move_count 0
+expect black_stones 0
+expect engine_sync synced
+
+# F5 — the discarded game's first move, and the one that came back illegal.
+click 5 4
+expect holds_stone true
+click 5 4
+wait_until move_count >= 1
+expect move_count 1
+expect black_stones 1

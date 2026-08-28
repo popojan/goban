@@ -1,0 +1,59 @@
+# Stepping through the games in a multi-game SGF collection, which had no
+# coverage at all. Switching game replaces the one on screen, so it takes the
+# deferred route through GameThread::runWhenEngineFree() rather than refusing —
+# and it changes the board size, the komi and the players underneath the UI,
+# which is the part most likely to come apart.
+#
+# tests/data/two_games.sgf holds two: a 9x9 of two moves, and a 13x13 of three.
+
+load_sgf tests/data/two_games.sgf
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect game_index 0
+expect board_size 9
+expect main_line_moves 2
+expect komi 0.5
+
+# Previous from the first game is refused: there is nowhere to go, and the game
+# on screen must survive being asked.
+prev_game
+wait_idle
+expect game_index 0
+expect board_size 9
+expect main_line_moves 2
+
+# --- Forward to the second game ---------------------------------------------
+next_game
+wait_idle
+expect game_index 1
+expect board_size 13
+expect main_line_moves 3
+expect komi 5.5
+expect at_end true
+
+# Next from the last game is refused too.
+next_game
+wait_idle
+expect game_index 1
+expect board_size 13
+expect main_line_moves 3
+
+# --- And back ---------------------------------------------------------------
+prev_game
+wait_idle
+expect game_index 0
+expect board_size 9
+expect main_line_moves 2
+expect komi 0.5
+
+# The board really is the first game's position again, not a stale 13x13 one.
+expect black_stones 1
+expect white_stones 1
+
+navigate_start
+wait_idle
+expect view_position 0
+expect black_stones 0
+expect white_stones 0

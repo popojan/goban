@@ -37,6 +37,7 @@
             </div>
             <div class="bottomleft">
                 <span class="cmd button" onmouseup="refresh">새로고침</span>
+                <label class="checkbox_label"><input type="checkbox" id="cmdTsumego" name="tsumego"/>사활</label>
             </div>
         </div>
     </div>

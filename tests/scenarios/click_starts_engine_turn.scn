@@ -1,0 +1,51 @@
+# Clicking the board when it is an engine's turn starts the game.
+#
+# It did for years — boardClick() called model.start() + run() unconditionally —
+# and then stopped, twice over and unremarked. 4c5dcfc moved start() behind "a
+# stone is actually being placed", correctly, because merely picking a stone out
+# of the bowl was flipping the phase to Playing on an empty board; the
+# bot-to-move case went with it. 2d6b222 then refused the click outright, since
+# `a.play` requires the turn to be the human's.
+#
+# It is back by asking availableActions() a *different* question — `a.start`,
+# which is true exactly when the Start button lights — and dispatching the
+# `start` command, so there is no second path into model.start() and run().
+
+new_game 9
+wait_idle
+switch_player black mock
+switch_player white human
+wait_idle
+
+# Black is the engine and it is Black's turn, so the game is startable and a
+# stone cannot be placed by hand.
+expect phase setup
+expect can_start true
+expect can_play false
+# `running` is the game *loop*, which ADR-0008 starts at new_game so the engines
+# can sync on an empty board — it is not "the match is under way". The phase is.
+
+# The click that used to do nothing.
+click 4 4
+wait_until move_count >= 1
+wait_idle
+
+expect phase playing
+expect black_stones 1
+# ...and the point clicked is irrelevant: the engine chose the move, this was a
+# Start. The engine plays 4,4 itself only by coincidence, so assert the turn
+# passed rather than where the stone landed.
+expect color_to_move W
+
+# And it really was Start, not a stone placed by hand: nothing is in hand.
+expect holds_stone false
+
+# The other half of the rule — with a human to move the click still places a
+# stone, in two clicks, and does not dispatch start.
+click 6 6
+wait_idle
+expect holds_stone true
+click 6 6
+wait_until move_count >= 2
+wait_idle
+expect white_stones 1

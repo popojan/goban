@@ -162,6 +162,11 @@ void rBoard(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
                                     dd = min(dd, 1.0 + dd0 / boardaa);
                                 }
                             }
+
+                            // The pointer, on the wood. pointerCoverage() is
+                            // shared with the annotation patch in stones.glsl,
+                            // which has to draw the same mark or it hides it.
+                            dd = min(dd, 1.0 - pointerCoverage(ro, ip));
                         }
                     }
                 }

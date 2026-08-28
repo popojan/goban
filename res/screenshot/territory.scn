@@ -1,0 +1,26 @@
+# One of the images on hraj.si and in the README, regenerated per release by
+# tools/make-screenshot.sh rather than captured by hand. The page's previous set
+# was six years old and two of them showed a menu bar that no longer exists.
+#
+# The camera and the shader are pinned in the matching *-user.json, passed with
+# --user-settings, so the shot cannot drift with the session and the real
+# user.json is never touched.
+#
+# A counted 19x19 ending: territory shading, and both bowls full of prisoners
+# (16 and 20). Loading lands at the end of the record, which is exactly where
+# this shot wants to be — the result is on the board.
+load_sgf res/screenshot/territory-19x19.sgf
+wait_idle
+expect board_size 19
+expect at_end true
+expect has_result true
+
+toggle_coordinates on
+toggle_next_move_overlay
+expect next_move_shown false
+
+toggle_fullscreen
+wait 1500
+# Territory needs the coach to name the dead stones, which is a GTP round trip.
+wait_until show_territory true
+screenshot res/screenshot/territory.ppm
