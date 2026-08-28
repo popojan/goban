@@ -142,9 +142,12 @@ def main() -> int:
     ap.add_argument("--binary", required=True, help="the built goban executable")
     ap.add_argument("--platform", required=True,
                     help="name for the archive, e.g. linux-x64, windows-x86, macos-x64")
-    ap.add_argument("--with-engine", action="append", default=[], metavar="DIR",
-                    help="fold a local engine folder into engine/ (repeatable). "
-                         "Used for the hraj.si bundle; CI never passes it.")
+    ap.add_argument("--with-engine", action="append", default=[], metavar="DIR|NAME=PATH",
+                    help="fold an engine into engine/ (repeatable). A directory is "
+                         "copied under its own name; NAME=PATH takes a single "
+                         "executable and installs it as engine/NAME/NAME<ext>, which "
+                         "is what config/base.json's \"command\" expects. Used for "
+                         "the hraj.si bundle; CI never passes it.")
     ap.add_argument("--out", default="dist", help="where to write the archive")
     ap.add_argument("--format", choices=["tar", "zip"], default=None,
                     help="default: zip for windows, tar for everything else")
@@ -183,11 +186,28 @@ def main() -> int:
     (staging / "engine" / "README.txt").write_text(ENGINE_README, encoding="utf-8")
 
     for eng in args.with_engine:
-        src = Path(eng)
-        if not src.is_dir():
-            sys.exit("error: --with-engine %s is not a directory" % eng)
-        copy_tree(src, staging / "engine" / src.name)
-        print("engine: %s" % src.name)
+        if "=" in eng:
+            # NAME=PATH: one executable, installed under the name base.json calls
+            # it by. The cross-compiled GNU Go binaries are named gnugo-x64.exe
+            # and gnugo-x86.exe, but the configuration says `"command": "gnugo"`,
+            # so the file has to arrive as engine/gnugo/gnugo.exe. Renaming it by
+            # hand before every release is exactly the step that gets forgotten.
+            name, _, path = eng.partition("=")
+            src = Path(os.path.expanduser(path))
+            if not src.is_file():
+                sys.exit("error: --with-engine %s: %s is not a file" % (eng, src))
+            dest = staging / "engine" / name
+            dest.mkdir(parents=True, exist_ok=True)
+            target = dest / (name + src.suffix)
+            shutil.copy2(src, target)
+            os.chmod(target, 0o755)
+            print("engine: %s -> engine/%s/%s" % (src.name, name, target.name))
+        else:
+            src = Path(os.path.expanduser(eng))
+            if not src.is_dir():
+                sys.exit("error: --with-engine %s is not a directory" % eng)
+            copy_tree(src, staging / "engine" / src.name)
+            print("engine: %s" % src.name)
 
     problems = check_assets(staging, bool(args.with_engine))
     for p in problems:
