@@ -22,7 +22,7 @@ jobs:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -63,7 +63,7 @@ jobs:
         run: python3 tools/package.py --binary build/goban --platform linux-x64
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: goban-linux-x64
           path: dist/*.tar.gz
@@ -72,7 +72,7 @@ jobs:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos' }}
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -99,7 +99,7 @@ jobs:
 
       - name: Upload artifact
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: goban-macos-x64
           path: dist/*.tar.gz
@@ -122,12 +122,12 @@ jobs:
             cmake_arch: x64
             triplet: x64-windows-static
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Install dependencies via vcpkg
         run: vcpkg install freetype portaudio libsndfile --triplet ${{ matrix.triplet }}
@@ -155,7 +155,7 @@ jobs:
 
       - name: Upload artifact
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: goban-windows-${{ matrix.arch }}
           path: dist/*.zip
@@ -167,7 +167,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The tag and the version compiled into the About dialog must agree. They
       # are set in two different places by two different hands, and a release
@@ -184,19 +184,33 @@ jobs:
           fi
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
+      # Each artifact is our archive inside GitHub's own artifact zip — zip
+      # inside zip, which looks odd when downloading from the Actions page. It is
+      # inherent: GitHub always zips an artifact, and we must upload a real
+      # archive rather than the bare folder because **artifact zips do not carry
+      # the executable bit**, so an uploaded directory arrives with a `goban`
+      # nobody can run. Downloading here unwraps the outer layer and leaves our
+      # archives, which is what gets published — a released asset has no extra
+      # wrapping.
       - name: Collect
         run: |
           mkdir -p release
           find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
           ls -la release/
 
+      # `gh` rather than a third-party action: it is GitHub's own CLI,
+      # preinstalled on every runner, it is what tools/release-hrajsi.sh and
+      # tools/release-gallery.sh already use, and it removes both a supply-chain
+      # dependency and a Node deprecation surface from the release path.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release/*
-          body_path: RELEASE_NOTES.md
-          draft: false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            release/*
