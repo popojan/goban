@@ -8,6 +8,12 @@
 # again. This runs res/screenshot/hero.scn, which fixes all of it.
 #
 #   tools/make-screenshot.sh [preview-width]
+#   tools/make-screenshot.sh --derive [preview-width]
+#
+# --derive re-cuts the preview and the detail crop from the hero PNG already on
+# disk, without launching anything. The derived images are just resamples of that
+# file, so changing a width costs no capture — and a capture takes the screen
+# fullscreen for a minute, which is worth not doing by accident.
 #
 # Needs a real analysis engine — the suggestions and the win rate in the shot are
 # genuine, not illustrative — so it runs against the shipped config rather than
@@ -20,40 +26,54 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-PREVIEW_W="${1:-640}"
+DERIVE_ONLY=0
+if [ "${1:-}" = "--derive" ]; then
+    DERIVE_ONLY=1
+    shift
+fi
+PREVIEW_W="${1:-880}"
 OUT_DIR="res/screenshot"
 PPM="$OUT_DIR/hero.ppm"
 HERO="$OUT_DIR/hero.png"
 PREVIEW="res/screenshot.png"      # what README.md references
 DETAIL="$OUT_DIR/detail.png"      # 1:1 crop, for hraj.si
 
-if [ ! -x ./goban ]; then
-    echo "error: ./goban not built" >&2
-    exit 1
+if [ "$DERIVE_ONLY" = "0" ]; then
+    if [ ! -x ./goban ]; then
+        echo "error: ./goban not built" >&2
+        exit 1
+    fi
+
+    rm -f "$PPM"
+
+    # --user-settings keeps the pinned camera out of the real user.json, and the
+    # real user.json out of the screenshot.
+    GOBAN_SCENARIO_VISIBLE=1 ./goban \
+        --verbosity warn \
+        --config config/en.json \
+        --user-settings "$OUT_DIR/hero-user.json" \
+        --script "$OUT_DIR/hero.scn"
+
+    if [ ! -f "$PPM" ]; then
+        echo "error: no capture was written — see last_run.log" >&2
+        exit 1
+    fi
+    SOURCE="$PPM"
+else
+    if [ ! -f "$HERO" ]; then
+        echo "error: --derive needs $HERO, which does not exist" >&2
+        exit 1
+    fi
+    SOURCE="$HERO"
 fi
 
-rm -f "$PPM"
-
-# --user-settings keeps the pinned camera out of the real user.json, and the real
-# user.json out of the screenshot.
-GOBAN_SCENARIO_VISIBLE=1 ./goban \
-    --verbosity warn \
-    --config config/en.json \
-    --user-settings "$OUT_DIR/hero-user.json" \
-    --script "$OUT_DIR/hero.scn"
-
-if [ ! -f "$PPM" ]; then
-    echo "error: no capture was written — see last_run.log" >&2
-    exit 1
-fi
-
-python3 - "$PPM" "$HERO" "$PREVIEW" "$PREVIEW_W" "$DETAIL" <<'PY'
+python3 - "$SOURCE" "$HERO" "$PREVIEW" "$PREVIEW_W" "$DETAIL" <<'PY'
 import sys
 from PIL import Image
 
-ppm, hero, preview, width, detail = (sys.argv[1], sys.argv[2], sys.argv[3],
+src, hero, preview, width, detail = (sys.argv[1], sys.argv[2], sys.argv[3],
                                      int(sys.argv[4]), sys.argv[5])
-im = Image.open(ppm)
+im = Image.open(src)
 im.save(hero)
 print("hero    %s  %dx%d" % (hero, im.size[0], im.size[1]))
 
