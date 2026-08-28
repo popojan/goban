@@ -45,17 +45,20 @@ Concretely:
    along the edge it sits, because that is taste rather than a choice between
    two implementations of the same thing.
 
-2. **The two game waits are drawn on the board**: a static mark and an elapsed
+2. **The two game waits are drawn on the board**: a blinking mark and an elapsed
    second count in the wood margin, through the overlay's glyph pass.
    `#lblStatus` keeps engine loading (which names a specific engine, at startup,
    before the board means anything) and the message badge (a notification, and
    the log panel's only close affordance).
 
-3. **Annotations are carved, not lit.** No pulsing, no fading, no dimming. A
-   board annotation is present or it is absent; an animated opacity reads as a
-   screen effect laid over the scene rather than as part of it. The count
-   ticking over once a second is the whole animation, and it is the physical
-   kind — what a clock beside a board does.
+3. **Annotations are carved, not lit — and the rule is about opacity, not
+   motion.** No fading, no pulsing, no dimming: an animated alpha reads as a
+   screen effect laid over the scene rather than as part of it. *Discrete*
+   change is how these things move instead. The mark blinks — fully printed for
+   half its period, fully absent for the other half — and the count ticks; both
+   are only ever in one state at a time, which is what a clock's colon does.
+   `Wait::markVisible()` returns a `bool`, and there is no alpha anywhere in
+   `WaitIndicator.h`.
 
 ## Alternatives rejected
 
@@ -67,8 +70,14 @@ one fact is not a feature; it is a failure to decide, and it doubles the
 surface that every later change to the evaluation has to be correct in.
 
 **A pulsing mark for "thinking"** (the original sketch, and the first
-implementation). Rejected on the rule in decision 3. It was built, looked at,
-and taken out; the blink curve and its tests went with it.
+implementation). Rejected on the rule in decision 3 — but the rejection was
+initially over-read as "the mark must not move at all", which produced a
+completely static mark, and that was wrong in the other direction: a wait needs
+something moving or it cannot be told from a freeze, and the count alone is easy
+to miss. The distinction that resolves it is *fade versus blink*. A fade is a
+lit screen effect; a blink is the annotation being there and not being there,
+which is exactly what "carved or not" describes. The alpha ramp and its tests
+are gone; a boolean `markVisible()` replaced them.
 
 **Naming the thinking engine on the board.** The banner did name it, and with
 several engines configured "thinking" does not say which. Dropped for now: the

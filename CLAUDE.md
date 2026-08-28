@@ -551,15 +551,21 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   shipping the worse surface as the default, and a choice between two renderings
   of one fact is a failure to decide rather than a feature. Anything new that
   wants to show continuous state has no panel to join, which is the point.
-- **A board annotation is carved, not lit.** No pulsing, no fading, no dimming
-  anywhere in the margin. An animated opacity reads as a screen effect laid over
-  the scene rather than as part of it, which is the one quality the diegetic
-  display exists to have. This killed a pulsing thinking-mark that had been
-  built and tested, and it is why `annotations.readout_stale_color` ships fully
-  transparent (below). Motion is allowed when it is *physical*: the wait
-  indicator's second count ticking over is what a clock beside a board does, and
-  it doubles as the repaint gate, so a wait costs one frame per second rather
-  than the twenty `getIdleTimeout()` offers.
+- **A board annotation is carved, not lit — the rule is about *opacity*, not
+  about motion.** No fading, no pulsing, no dimming anywhere in the margin: an
+  animated alpha reads as a screen effect laid over the scene rather than as part
+  of it, which is the one quality the diegetic display exists to have. It is also
+  why `annotations.readout_stale_color` ships fully transparent (below).
+  **Discrete change is fine and is how these things move**: the wait mark
+  *blinks*, fully printed for half its period and fully absent for the other
+  half, and the second count ticks. Both are only ever in one state at a time, so
+  neither breaks the rule — a clock's colon is the precedent. This distinction
+  was learned the hard way: the first mark faded, was rightly rejected, and was
+  then rebuilt as a hard blink, which was what had been wanted all along.
+  `Wait::markVisible()` returns a `bool` and there is no alpha in
+  `WaitIndicator.h` at all, which is the enforcement. The two together are also
+  the repaint gate, so a wait costs two frames per second rather than the twenty
+  `getIdleTimeout()` offers.
 - **The wait indicator is what `#lblStatus` used to say in words.** `WaitKind`
   is `None` / `Thinking` / `Syncing`, told to the view once per frame by
   `ElementGame::syncStatusIndicator()`, which is where both conditions were

@@ -331,6 +331,7 @@
   "annotations": {
     "wait_glyph": "O",
     "wait_grace": 0.5,
+    "wait_blink_period": 1.0,
     "readout_color": "#00000040",
     "readout_stale_color": "#00000000",
     "coordinate_color": "#00000040",

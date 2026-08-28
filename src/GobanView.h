@@ -529,9 +529,14 @@ public:
     /// in milliseconds; without this every move in a bot match flashes the mark
     /// for one frame.
     float waitGrace = 0.5f;
-    /// The count last drawn, so a frame is asked for when it changes and not
-    /// once per idle tick. Wait::NOT_SHOWN while inside the grace period.
+    /// The count and the mark state last drawn, so a frame is asked for when
+    /// either changes and not once per idle tick. Wait::NOT_SHOWN while inside
+    /// the grace period.
     int waitSecondShown = Wait::NOT_SHOWN;
+    bool waitMarkShown = false;
+    /// How long one on/off cycle of the mark takes. Not an opacity ramp — the
+    /// mark is fully printed for half of it and absent for the other half.
+    float waitBlinkPeriod = 1.0f;
 
     const AnalysisService* analysis = nullptr;
     /// Kept apart because they are undone differently: a label this overlay

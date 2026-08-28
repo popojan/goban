@@ -47,16 +47,14 @@ constexpr int NOT_SHOWN = -1;
 /// What the indicator shows for a given elapsed time: NOT_SHOWN while it is not
 /// worth mentioning yet, otherwise whole seconds.
 ///
-/// This is the whole animation, and it is deliberately the only one. The mark
-/// does not pulse: a board annotation is *carved*, or it is not there — an
-/// opacity that breathes reads as a screen effect laid over the scene rather
-/// than as part of it, which is exactly the quality the diegetic version exists
-/// to have. The count ticking over once a second is the liveness signal, and it
-/// is the physical kind of motion, the kind a clock beside a board has.
+/// Together with markVisible() this is the whole animation, and both are
+/// deliberately discrete: the count ticks and the mark blinks on and off. No
+/// opacity anywhere moves, because a board annotation is *carved* or it is not
+/// there, and a half-faded one reads as a screen effect laid over the scene.
 ///
-/// It doubles as the repaint gate. A frame is worth drawing when this value
-/// changes and not otherwise, so a wait costs one frame per second rather than
-/// the twenty `getIdleTimeout()` makes available.
+/// It doubles as the repaint gate. A frame is worth drawing when this value or
+/// markVisible() changes and not otherwise, so a wait costs two frames per
+/// second rather than the twenty `getIdleTimeout()` makes available.
 ///
 /// The grace period is not decoration either: GNU Go answers a genmove in 13 ms,
 /// so without it every move of a bot-versus-bot match puts the mark on screen
@@ -67,6 +65,32 @@ inline int displayedSecond(float elapsedSeconds, float graceSeconds) {
     if (!(graceSeconds >= 0.0f)) graceSeconds = 0.0f;      // NaN-safe
     if (!(elapsedSeconds >= graceSeconds)) return NOT_SHOWN;
     return static_cast<int>(elapsedSeconds);
+}
+
+/// A blink period below this is a strobe rather than a heartbeat, and zero would
+/// divide by it.
+constexpr float MIN_BLINK_PERIOD = 0.2f;
+
+/// Whether the mark is on the board at this instant.
+///
+/// A **hard on/off**, never a fade. That distinction is the whole rule: an
+/// annotation that is half present reads as a screen effect laid over the scene,
+/// where one that is either fully carved or absent stays part of it. The first
+/// attempt at this animated the alpha and was rightly thrown out; blinking the
+/// *presence* was never the objection.
+///
+/// Half the period on, half off, phase measured from the moment the mark first
+/// appears, so with the default 1 s period it is on as each second turns over —
+/// the mark and the count keep step instead of drifting against each other. The
+/// same idiom as the colon on a digital clock, and it is the only other moving
+/// thing on the board.
+inline bool markVisible(float elapsedSeconds, float graceSeconds, float period) {
+    if (displayedSecond(elapsedSeconds, graceSeconds) == NOT_SHOWN) return false;
+    if (!(period >= MIN_BLINK_PERIOD)) period = MIN_BLINK_PERIOD;   // NaN-safe
+    if (!(graceSeconds >= 0.0f)) graceSeconds = 0.0f;
+    const float t = elapsedSeconds - graceSeconds;
+    const float phase = t - period * std::floor(t / period);
+    return phase < 0.5f * period;
 }
 
 /// The characters every build can draw. Digits and letters for move numbers,

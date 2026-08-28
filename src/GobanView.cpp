@@ -107,6 +107,17 @@ GobanView::GobanView(GobanModel& m)
         const std::string glyph = annotations.value("wait_glyph", std::string());
         if (!glyph.empty()) waitGlyph = glyph;
         waitGlyphSyncing = annotations.value("wait_glyph_syncing", std::string());
+        if (annotations.contains("wait_blink_period")) {
+            const float period = annotations.value("wait_blink_period", 1.0f);
+            // Not a fade: this is how long one fully-printed / fully-absent
+            // cycle takes. Below a fifth of a second it is a strobe.
+            if (period < Wait::MIN_BLINK_PERIOD) {
+                spdlog::warn("annotations.wait_blink_period {} is too fast to read; "
+                             "keeping {}", period, waitBlinkPeriod);
+            } else {
+                waitBlinkPeriod = period;
+            }
+        }
         if (annotations.contains("wait_grace")) {
             const float grace = annotations.value("wait_grace", 0.5f);
             // Zero is meaningful — a scenario wants the mark on the first frame —
@@ -1345,11 +1356,12 @@ void GobanView::updateFloatingLabels() {
 	}
 	// The wait indicator: a mark and how long it has been waiting.
 	//
-	// The mark does not pulse. A board annotation is carved or it is not there;
-	// an opacity that breathes reads as a screen effect laid over the scene
-	// rather than as part of it, which is the one quality this is here to have.
-	// The count ticking over is the whole animation, and it is the physical kind
-	// — what a clock beside a board does. See Wait::displayedSecond().
+	// The mark blinks and the count ticks, and both are discrete. Nothing here
+	// fades: a board annotation is carved or it is not there, and an opacity
+	// that breathes reads as a screen effect laid over the scene rather than as
+	// part of it. Blinking the *presence* keeps that rule — the mark is only
+	// ever fully printed or fully absent, one state at a time, which is what a
+	// clock's colon does. See Wait::markVisible().
 	//
 	// Two labels rather than one string, laid out left to right from a single
 	// anchor: the mark left-aligned on it, the count left-aligned a fixed gap
@@ -1375,13 +1387,20 @@ void GobanView::updateFloatingLabels() {
 			                           ? waitGlyphSyncing : waitGlyph;
 			const std::string count = std::to_string(second) + "s";
 
-			labels.push_back({glm::vec2(anchor, MARGIN_ROW), glyph, size,
-			                  waitInk, 0u, TextAlign::Left});
+			// The count holds its place whether the mark is showing or not, so
+			// nothing slides sideways twice a second.
+			if (Wait::markVisible(elapsed, waitGrace, waitBlinkPeriod)) {
+				labels.push_back({glm::vec2(anchor, MARGIN_ROW), glyph, size,
+				                  waitInk, 0u, TextAlign::Left});
+			}
 			labels.push_back({glm::vec2(anchor + GAP, MARGIN_ROW), count, size,
 			                  waitInk, 0u, TextAlign::Left});
 			// What a scenario can assert on, since the glyphs themselves are
-			// unreachable from a headless run. Written as it reads.
-			waitText = glyph + " " + count;
+			// unreachable from a headless run. The count is always part of it;
+			// the mark comes and goes, which is why an assertion on this key
+			// should not pin the whole string.
+			waitText = Wait::markVisible(elapsed, waitGrace, waitBlinkPeriod)
+			           ? glyph + " " + count : count;
 		}
 	}
 	if (showCoordinates) {
@@ -1421,16 +1440,18 @@ void GobanView::setWaitIndicator(WaitKind kind) {
 	}
 	if (kind == WaitKind::None) return;
 
-	// Still waiting. A frame is worth drawing when the count would change and
-	// not otherwise — the mark itself is static, so twenty identical frames a
-	// second would be twenty rebuilds of every glyph buffer for no visible
-	// difference. getIdleTimeout() offers the ticks; this decides which of them
-	// are worth anything. Same shape as the evaluation's publish gate, which
-	// deliberately asks for no repaint when the displayed values have not moved.
+	// Still waiting. A frame is worth drawing when the count changes or the mark
+	// blinks, and not otherwise — twenty identical frames a second would be
+	// twenty rebuilds of every glyph buffer for no visible difference.
+	// getIdleTimeout() offers the ticks; this decides which of them are worth
+	// anything. Same shape as the evaluation's publish gate, which deliberately
+	// asks for no repaint when the displayed values have not moved.
 	const float elapsed = static_cast<float>(glfwGetTime()) - waitStarted;
 	const int second = Wait::displayedSecond(elapsed, waitGrace);
-	if (second != waitSecondShown) {
+	const bool mark = Wait::markVisible(elapsed, waitGrace, waitBlinkPeriod);
+	if (second != waitSecondShown || mark != waitMarkShown) {
 		waitSecondShown = second;
+		waitMarkShown = mark;
 		requestRepaint(UPDATE_OVERLAY);
 	}
 }
