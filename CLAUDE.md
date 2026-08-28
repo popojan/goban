@@ -551,48 +551,53 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   shipping the worse surface as the default, and a choice between two renderings
   of one fact is a failure to decide rather than a feature. Anything new that
   wants to show continuous state has no panel to join, which is the point.
-- **A board annotation is carved, not lit — the rule is about *opacity*, not
-  about motion.** No fading, no pulsing, no dimming anywhere in the margin: an
-  animated alpha reads as a screen effect laid over the scene rather than as part
-  of it, which is the one quality the diegetic display exists to have. It is also
-  why `annotations.readout_stale_color` ships fully transparent (below).
-  **Discrete change is fine and is how these things move**: the wait mark
-  *blinks*, fully printed for half its period and fully absent for the other
-  half, and the second count ticks. Both are only ever in one state at a time, so
-  neither breaks the rule — a clock's colon is the precedent. This distinction
-  was learned the hard way: the first mark faded, was rightly rejected, and was
-  then rebuilt as a hard blink, which was what had been wanted all along.
-  `Wait::markVisible()` returns a `bool` and there is no alpha in
-  `WaitIndicator.h` at all, which is the enforcement. The two together are also
-  the repaint gate, so a wait costs two frames per second rather than the twenty
-  `getIdleTimeout()` offers.
-- **The wait indicator is what `#lblStatus` used to say in words.** `WaitKind`
-  is `None` / `Thinking` / `Syncing`, told to the view once per frame by
+- **A board annotation is carved, not lit, and it does not move except to change
+  what it says.** No fading, no pulsing, no dimming, no blinking: an animated
+  alpha reads as a screen effect laid over the scene rather than as part of it,
+  and a blink adds motion carrying no information. This is why
+  `annotations.readout_stale_color` ships fully transparent (below), and it was
+  arrived at by building the wrong thing twice — a mark that faded, then a mark
+  that blinked. Both went. What is left is a count that turns over once a second,
+  which is the physical kind of change, the kind a clock beside a board makes.
+  It is also the repaint gate, so a wait costs one frame per second rather than
+  the twenty `getIdleTimeout()` offers.
+- **The margin's two ends have meanings: left is an action, right is program
+  status.** The recommended pass is a move the player might make, so it sits at
+  the left; the wait clock is the program reporting on itself, so it sits at the
+  right. They were the other way round for no reason but the order they were
+  written. The readout is centred by default and its alignment is the user's.
+- **The wait indicator is what `#lblStatus` used to say in words.** `WaitKind` is
+  `None` / `Thinking` / `Syncing`, told to the view once per frame by
   `ElementGame::syncStatusIndicator()`, which is where both conditions were
-  already computed. Two labels — a configurable mark and an elapsed count — laid
-  out left to right from one anchor at the free end of the bottom margin, so
-  they cannot drift apart. `dumpState()` reports `wait_indicator` (the kind) and
-  `wait_text` (what was actually composed and placed); they are different
-  questions, because during the grace period the wait is real and deliberately
-  unmentioned. **The 0.5 s grace is not decoration**: GNU Go answers a genmove in
-  13 ms, so without it every move of a bot match flashes the mark for one frame,
-  which is the "something is broken" reading the indicator exists to prevent.
-  The clock runs from the true start, so the first count shown is honest.
-- **The mark is anonymous, and that is a known cost.** The banner named the
-  engine, and with several configured "thinking" does not say which. Colour
+  already computed. What it draws is one right-aligned label reading `12s`, and
+  nothing else — it carried a configurable mark beside the count for a while and
+  the mark was pure waste, since lapsing seconds already say "working, this
+  long". `dumpState()` reports `wait_indicator` (the kind) and `wait_text` (what
+  was actually composed and placed); they are different questions, because during
+  the grace period the wait is real and deliberately unmentioned. **The 0.5 s
+  grace is not decoration**: GNU Go answers a genmove in 13 ms, so without it
+  every move of a bot match flashes the clock for one frame, which is the
+  "something is broken" reading the indicator exists to prevent. The clock runs
+  from the true start, so the first count shown is honest.
+- **The wait indicator is anonymous, and that is a known cost.** The banner named
+  the engine, and with several configured "thinking" does not say which. Colour
   cannot carry it — `GobanOverlay::eyeInk()` flattens hue to brightness under any
-  stereo shader — so the name lives only in the log for now. Open question in
-  ADR-0012; do not treat the omission as settled.
+  stereo shader — and a name does not fit: at roughly 0.35 grid units per
+  character the bottom margin has about ten characters free beside a centred
+  readout on 19x19 and **two** on 9x9. The name lives in the log for now. Open
+  question in ADR-0012; do not treat the omission as settled.
 - **The glyph atlas is composed, and a missing glyph is now loud.**
   `Wait::atlasWith()` folds every character the configuration asks to be drawn
   into `Wait::BASE_ATLAS`, and `GobanOverlay::atlasString()` asks the font about
   each one. The atlas used to be a string literal, which made it a *silent* gate
   — a character not in it simply does not appear. That was survivable while every
   drawable string was written in C++ and stopped being so with
-  `annotations.wait_glyph`. **The shipped overlay font is Roboto: 98 glyphs,
-  ASCII only** — no `●`, no `○`, not even `•`. Only the CJK font that ships for
-  zh/ja/ko has them, so the default mark is `O` and a real stone glyph needs
-  `fonts.overlay` pointed at a font that has one.
+  `fonts.overlay`, which is a setting: the font is whatever the user pointed at,
+  and nothing ever checked that it could supply what the atlas listed. **The
+  shipped overlay font is Roboto: 98 glyphs, ASCII only** — no `●`, no `○`, not
+  even `•`. Only the CJK font that ships for zh/ja/ko has them, which is worth
+  knowing before designing anything that wants a symbol. `annotations.atlas_extra`
+  adds characters for a richer font.
 - **Diagnostics reach the user through a spdlog sink, not through call sites.**
   `installMessageLogSink()` feeds `MessageLog`, so every existing
   `spdlog::warn`/`error` surfaces without being touched, and a new one surfaces

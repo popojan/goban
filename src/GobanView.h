@@ -517,13 +517,6 @@ public:
     WaitKind waitKind = WaitKind::None;
     float waitStarted = 0.0f;
     std::string waitText;
-    /// Configurable because the shipped overlay font decides what is drawable at
-    /// all, and it is Roboto: 98 glyphs, ASCII only. A stone (● / ○) needs a
-    /// font that has one — the CJK font that ships for zh/ja/ko does — so the
-    /// default has to be a character that exists everywhere, and the better
-    /// character has to be reachable without a code change.
-    std::string waitGlyph = "O";
-    std::string waitGlyphSyncing;   ///< Falls back to waitGlyph when unset.
     glm::vec4 waitInk{0.0f, 0.0f, 0.0f, 1.0f};
     /// How long a wait has to last before it is worth mentioning. GNU Go answers
     /// in milliseconds; without this every move in a bot match flashes the mark
@@ -533,10 +526,6 @@ public:
     /// either changes and not once per idle tick. Wait::NOT_SHOWN while inside
     /// the grace period.
     int waitSecondShown = Wait::NOT_SHOWN;
-    bool waitMarkShown = false;
-    /// How long one on/off cycle of the mark takes. Not an opacity ramp — the
-    /// mark is fully printed for half of it and absent for the other half.
-    float waitBlinkPeriod = 1.0f;
 
     const AnalysisService* analysis = nullptr;
     /// Kept apart because they are undone differently: a label this overlay

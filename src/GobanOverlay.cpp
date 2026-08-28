@@ -16,17 +16,18 @@ static std::array<std::shared_ptr<GlyphyBuffer>, 3> buffer;
 // The atlas the font is warmed with: the fixed set plus whatever the
 // configuration asks to be drawn, with the font asked about every character.
 //
-// The check matters more than the folding. The *shipped* overlay font is Roboto:
-// 98 glyphs, ASCII only — no ●, no ○, not even •. Only the CJK font that ships
-// for zh/ja/ko has them. So someone configuring a stone glyph against the
-// default font would otherwise get a blank margin and nothing anywhere to
-// explain it, which is exactly the silent failure the atlas has always been
-// capable of and never reported.
+// The check is the valuable half, and it is not tied to any one feature.
+// `fonts.overlay` is a setting, so the font drawing the board's text is whatever
+// the user pointed at — and a character the atlas lists but the font lacks
+// simply does not appear, silently, which is a failure this code was always
+// capable of and never once reported. The shipped font is Roboto: 98 glyphs,
+// ASCII only, with no ●, no ○ and not even a bullet. `atlas_extra` is how
+// somebody pointing at a richer font adds the characters they want to use.
 std::string GobanOverlay::atlasString(FT_Face face) {
 	std::vector<std::string> extra;
 	if (config) {
 		const auto annotations = config->data.value("annotations", nlohmann::json::object());
-		for (const char* key : {"wait_glyph", "wait_glyph_syncing", "atlas_extra"}) {
+		for (const char* key : {"atlas_extra"}) {
 			const std::string s = annotations.value(key, std::string());
 			if (!s.empty()) extra.push_back(s);
 		}

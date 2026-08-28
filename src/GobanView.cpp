@@ -104,20 +104,6 @@ GobanView::GobanView(GobanModel& m)
                              "or #rrggbbaa", waitConfigured);
             }
         }
-        const std::string glyph = annotations.value("wait_glyph", std::string());
-        if (!glyph.empty()) waitGlyph = glyph;
-        waitGlyphSyncing = annotations.value("wait_glyph_syncing", std::string());
-        if (annotations.contains("wait_blink_period")) {
-            const float period = annotations.value("wait_blink_period", 1.0f);
-            // Not a fade: this is how long one fully-printed / fully-absent
-            // cycle takes. Below a fifth of a second it is a strobe.
-            if (period < Wait::MIN_BLINK_PERIOD) {
-                spdlog::warn("annotations.wait_blink_period {} is too fast to read; "
-                             "keeping {}", period, waitBlinkPeriod);
-            } else {
-                waitBlinkPeriod = period;
-            }
-        }
         if (annotations.contains("wait_grace")) {
             const float grace = annotations.value("wait_grace", 0.5f);
             // Zero is meaningful — a scenario wants the mark on the first frame —
@@ -1358,64 +1344,44 @@ void GobanView::updateFloatingLabels() {
 	if (!passSuggestion.empty()) {
 		constexpr float MARGIN_ROW = -0.425f;
 		const float size = 0.8f / static_cast<float>(model.getBoardSize());
-		const float lastCol = static_cast<float>(model.getBoardSize()) - 1.0f;
-		// The end of the margin the readout is not using. Right by default,
-		// because the readout is centred by default and the eye finds the end of
-		// a line there; left when the user has pushed the readout right, since
-		// two right-aligned strings share one anchor and would overprint.
-		const bool readoutOnTheRight = !readoutText.empty()
-		                               && readoutAlign == TextAlign::Right;
-		labels.push_back({glm::vec2(readoutOnTheRight ? 0.0f : lastCol, MARGIN_ROW),
+		// The left end, because that end means *an action*: this is a move the
+		// engine is recommending, in the same sense as the lettered suggestions
+		// on the grid. The right end is program status, and the wait indicator
+		// has it. The two were the other way round, which put a recommendation
+		// and a clock in each other's natural places.
+		labels.push_back({glm::vec2(0.0f, MARGIN_ROW),
 		                  passSuggestion, size, passSuggestionInk, 0u,
-		                  readoutOnTheRight ? TextAlign::Left : TextAlign::Right});
+		                  TextAlign::Left});
 	}
-	// The wait indicator: a mark and how long it has been waiting.
+	// The wait indicator: how long the program has been busy, at the right end of
+	// the margin.
 	//
-	// The mark blinks and the count ticks, and both are discrete. Nothing here
-	// fades: a board annotation is carved or it is not there, and an opacity
-	// that breathes reads as a screen effect laid over the scene rather than as
-	// part of it. Blinking the *presence* keeps that rule — the mark is only
-	// ever fully printed or fully absent, one state at a time, which is what a
-	// clock's colon does. See Wait::markVisible().
+	// **The margin's two ends have meanings**: left is an *action* — something the
+	// player might do, which is why the recommended pass sits there — and right is
+	// *status about the program*, which is what a wait is. The two used to be the
+	// other way round for no reason beyond the order they were written, and an
+	// elapsed clock reads naturally right-aligned.
 	//
-	// Two labels rather than one string, laid out left to right from a single
-	// anchor: the mark left-aligned on it, the count left-aligned a fixed gap
-	// along. The gap is in grid units, so it scales with the board exactly as
-	// the glyph size (0.8/N of a square) does, and they cannot drift apart.
+	// Just the count. It carried a mark beside it — configurable, defaulting to
+	// "O" — first static, then blinking, and both were waste: the seconds visibly
+	// lapsing already say "working, this long", and the mark added a symbol the
+	// board has no other use for and no way to explain. What is left reads as what
+	// it is, a clock in the corner, which is a thing that belongs beside a board.
+	//
+	// Nothing fades and nothing blinks. A board annotation is carved or it is not
+	// there; the count turning over is the whole animation, and it is the physical
+	// kind.
 	waitText.clear();
 	if (waitKind != WaitKind::None) {
 		const float elapsed = static_cast<float>(glfwGetTime()) - waitStarted;
 		const int second = Wait::displayedSecond(elapsed, waitGrace);
 		if (second != Wait::NOT_SHOWN) {
 			constexpr float MARGIN_ROW = -0.425f;
-			constexpr float GAP = 0.7f;
 			const float size = 0.8f / static_cast<float>(model.getBoardSize());
 			const float lastCol = static_cast<float>(model.getBoardSize()) - 1.0f;
-			// The end of the margin nothing else is using. Left by default — the
-			// readout is centred and the pass suggestion is right — and moved to
-			// the right only when the user has pulled the readout left onto it.
-			const bool readoutOnTheLeft = !readoutText.empty()
-			                              && readoutAlign == TextAlign::Left;
-			const float anchor = readoutOnTheLeft ? lastCol - 2.0f : 0.0f;
-
-			const std::string& glyph = (waitKind == WaitKind::Syncing && !waitGlyphSyncing.empty())
-			                           ? waitGlyphSyncing : waitGlyph;
-			const std::string count = std::to_string(second) + "s";
-
-			// The count holds its place whether the mark is showing or not, so
-			// nothing slides sideways twice a second.
-			if (Wait::markVisible(elapsed, waitGrace, waitBlinkPeriod)) {
-				labels.push_back({glm::vec2(anchor, MARGIN_ROW), glyph, size,
-				                  waitInk, 0u, TextAlign::Left});
-			}
-			labels.push_back({glm::vec2(anchor + GAP, MARGIN_ROW), count, size,
-			                  waitInk, 0u, TextAlign::Left});
-			// What a scenario can assert on, since the glyphs themselves are
-			// unreachable from a headless run. The count is always part of it;
-			// the mark comes and goes, which is why an assertion on this key
-			// should not pin the whole string.
-			waitText = Wait::markVisible(elapsed, waitGrace, waitBlinkPeriod)
-			           ? glyph + " " + count : count;
+			waitText = std::to_string(second) + "s";
+			labels.push_back({glm::vec2(lastCol, MARGIN_ROW), waitText, size,
+			                  waitInk, 0u, TextAlign::Right});
 		}
 	}
 	if (showCoordinates) {
@@ -1455,18 +1421,16 @@ void GobanView::setWaitIndicator(WaitKind kind) {
 	}
 	if (kind == WaitKind::None) return;
 
-	// Still waiting. A frame is worth drawing when the count changes or the mark
-	// blinks, and not otherwise — twenty identical frames a second would be
-	// twenty rebuilds of every glyph buffer for no visible difference.
+	// Still waiting. A frame is worth drawing when the count changes and not
+	// otherwise — twenty identical frames a second would be twenty rebuilds of
+	// every glyph buffer for no visible difference.
 	// getIdleTimeout() offers the ticks; this decides which of them are worth
 	// anything. Same shape as the evaluation's publish gate, which deliberately
 	// asks for no repaint when the displayed values have not moved.
 	const float elapsed = static_cast<float>(glfwGetTime()) - waitStarted;
 	const int second = Wait::displayedSecond(elapsed, waitGrace);
-	const bool mark = Wait::markVisible(elapsed, waitGrace, waitBlinkPeriod);
-	if (second != waitSecondShown || mark != waitMarkShown) {
+	if (second != waitSecondShown) {
 		waitSecondShown = second;
-		waitMarkShown = mark;
 		requestRepaint(UPDATE_OVERLAY);
 	}
 }

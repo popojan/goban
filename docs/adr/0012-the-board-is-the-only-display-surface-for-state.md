@@ -45,20 +45,22 @@ Concretely:
    along the edge it sits, because that is taste rather than a choice between
    two implementations of the same thing.
 
-2. **The two game waits are drawn on the board**: a blinking mark and an elapsed
-   second count in the wood margin, through the overlay's glyph pass.
+2. **The two game waits are drawn on the board**: an elapsed second count in the
+   wood margin, right-aligned, through the overlay's glyph pass.
    `#lblStatus` keeps engine loading (which names a specific engine, at startup,
    before the board means anything) and the message badge (a notification, and
    the log panel's only close affordance).
 
-3. **Annotations are carved, not lit — and the rule is about opacity, not
-   motion.** No fading, no pulsing, no dimming: an animated alpha reads as a
-   screen effect laid over the scene rather than as part of it. *Discrete*
-   change is how these things move instead. The mark blinks — fully printed for
-   half its period, fully absent for the other half — and the count ticks; both
-   are only ever in one state at a time, which is what a clock's colon does.
-   `Wait::markVisible()` returns a `bool`, and there is no alpha anywhere in
-   `WaitIndicator.h`.
+3. **Annotations are carved, not lit, and they do not move except to change what
+   they say.** No fading, no pulsing, no dimming, no blinking. An animated alpha
+   reads as a screen effect laid over the scene rather than as part of it; a
+   blink adds motion that carries no information. The count turning over once a
+   second is the only change, and it is the physical kind — the kind a clock
+   beside a board makes.
+
+4. **The margin's two ends carry meanings**: left is an *action* the player might
+   take (the recommended pass), right is *program status* (the wait clock). The
+   readout is centred by default, and its alignment stays the user's choice.
 
 ## Alternatives rejected
 
@@ -69,22 +71,38 @@ screenshot and every new user got the panel. A choice between two renderings of
 one fact is not a feature; it is a failure to decide, and it doubles the
 surface that every later change to the evaluation has to be correct in.
 
-**A pulsing mark for "thinking"** (the original sketch, and the first
-implementation). Rejected on the rule in decision 3 — but the rejection was
-initially over-read as "the mark must not move at all", which produced a
-completely static mark, and that was wrong in the other direction: a wait needs
-something moving or it cannot be told from a freeze, and the count alone is easy
-to miss. The distinction that resolves it is *fade versus blink*. A fade is a
-lit screen effect; a blink is the annotation being there and not being there,
-which is exactly what "carved or not" describes. The alpha ramp and its tests
-are gone; a boolean `markVisible()` replaced them.
+**A mark beside the count.** Three versions were built and all three removed,
+which is worth recording because each removal taught the rule above. A *pulsing*
+mark went first: an annotation at half alpha is lit rather than carved. A
+*static* mark replaced it and was wrong the other way — a wait with nothing
+moving cannot be told from a freeze, which is the one failure this exists to
+prevent. A *blinking* mark fixed that and was then redundant: the seconds are
+already visibly lapsing, so the blink carried no information and cost the quiet.
+What is left is the count alone, which says "working, this long" without
+introducing a symbol the board has no other use for and no way to explain.
 
 **Naming the thinking engine on the board.** The banner did name it, and with
-several engines configured "thinking" does not say which. Dropped for now: the
-mark is anonymous, and the engine name remains in the log. Colour-coding the
-mark by side was considered and rejected separately — it would put the mark's
-meaning in its hue, which `GobanOverlay::eyeInk()` flattens to brightness under
-any stereo shader. **This is the one open question left by this ADR.**
+several engines configured "thinking" does not say which. Dropped for now, and
+the reason is measured rather than aesthetic: at roughly 0.35 grid units per
+character the bottom margin has about ten characters free beside a centred
+readout on 19x19 and **two** on 9x9 — and 9x9 is where a slow engine is most
+likely to be running. Colour-coding by side was rejected separately: it would put
+the meaning in a hue that `GobanOverlay::eyeInk()` flattens to brightness under
+any stereo shader.
+
+One mechanism was found and deliberately *not* built on. The analysis service
+yields while a playing engine searches (`GameThread::analysisMayRun()`), keeping
+its last report frozen — so making the readout treat "yielded" as stale would,
+with the shipped transparent stale ink, blank it during every genmove and free
+the whole margin for a name. That works, but the yield is *policy* — it exists to
+avoid GPU contention (issue #45), not because a separate process cannot evaluate
+— so a layout resting on it would break the day the policy is relaxed. The
+left-is-action / right-is-status split does not depend on it.
+
+**This is the one open question left by this ADR**, along with the readout's own
+staleness: it currently tests only the position id, where the retired panel also
+tested whether the search was still running. That is a real inconsistency, left
+alone because fixing it changes what is on screen during every engine move.
 
 **Dimming the readout when it is stale** (ADR-0007 decision 13, "stale is
 dimmed rather than blanked, because blanking would flicker once per move"). The

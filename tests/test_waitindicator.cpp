@@ -1,9 +1,10 @@
 // The two pure halves of the board's wait indicator (see src/WaitIndicator.h):
-// the blink curve, and the glyph atlas the overlay is warmed with.
+// what it shows at a given moment, and the glyph atlas the overlay is warmed
+// with.
 //
 // Both are free functions over plain data for the same reason availableActions()
 // is — so they test without a GL context, a font, or a thread. The placement and
-// the wiring are covered end to end in tests/scenarios/wait_indicator.scn.
+// the wiring are covered end to end in tests/scenarios/kibitz_two_engines.scn.
 
 #include <doctest/doctest.h>
 
@@ -50,48 +51,6 @@ TEST_CASE("the count is the repaint gate, so it must be stable within a second")
     CHECK(Wait::displayedSecond(4.0f, 0.5f) == 4);
 }
 
-TEST_CASE("the mark blinks hard, never partially") {
-    // The rule the first attempt broke. markVisible() returns a bool and there
-    // is no alpha anywhere in this file: a board annotation is fully carved or
-    // absent. Half the period on, half off.
-    const float p = 1.0f;
-    CHECK(Wait::markVisible(0.0f, 0.0f, p) == true);
-    CHECK(Wait::markVisible(0.49f, 0.0f, p) == true);
-    CHECK(Wait::markVisible(0.51f, 0.0f, p) == false);
-    CHECK(Wait::markVisible(0.99f, 0.0f, p) == false);
-    // ...and back on as the next second turns over, so the mark and the count
-    // keep step rather than drifting against each other.
-    CHECK(Wait::markVisible(1.0f, 0.0f, p) == true);
-    CHECK(Wait::markVisible(1.4f, 0.0f, p) == true);
-    CHECK(Wait::markVisible(1.6f, 0.0f, p) == false);
-}
-
-TEST_CASE("the mark is absent for the whole grace period") {
-    // Nothing at all is drawn before the wait is worth mentioning — not a faint
-    // mark, not a placeholder.
-    CHECK(Wait::markVisible(0.0f, 0.5f, 1.0f) == false);
-    CHECK(Wait::markVisible(0.49f, 0.5f, 1.0f) == false);
-    // Phase is measured from the moment it appears, so it comes up printed
-    // rather than arriving mid-cycle and blinking straight out again.
-    CHECK(Wait::markVisible(0.5f, 0.5f, 1.0f) == true);
-}
-
-TEST_CASE("a degenerate blink period does not divide by zero or wedge on") {
-    // annotations.wait_blink_period is a user knob; GobanView warns and keeps
-    // its own value, but the pure function must not depend on that.
-    for (float bad : {0.0f, -1.0f, 0.001f}) {
-        // Whatever it clamps to, it must still be a blink: on somewhere,
-        // off somewhere, and never NaN.
-        bool sawOn = false, sawOff = false;
-        for (int i = 0; i < 200; ++i) {
-            const float t = static_cast<float>(i) * 0.01f;
-            (Wait::markVisible(t, 0.0f, bad) ? sawOn : sawOff) = true;
-        }
-        CHECK(sawOn);
-        CHECK(sawOff);
-    }
-}
-
 TEST_CASE("a degenerate grace does not produce a nonsense count") {
     // annotations.wait_grace is a user knob; GobanView refuses a negative one,
     // but the pure function must not depend on that having happened.
@@ -105,7 +64,7 @@ TEST_CASE("the atlas contains every character the ordinary overlays draw") {
     for (char c : std::string("0123456789ABCDEFGHJKLMNOPQRST")) {
         CHECK(atlas.find(c) != std::string::npos);
     }
-    // The evaluation readout ("B 62% B+4.5") and this indicator's count ("12s").
+    // The evaluation readout ("B 62% B+4.5") and the wait clock ("12s").
     for (char c : std::string("BW+-.%s")) {
         CHECK(atlas.find(c) != std::string::npos);
     }
@@ -122,8 +81,6 @@ TEST_CASE("a configured glyph is folded into the atlas") {
 
 TEST_CASE("folding in a glyph the atlas already has does not duplicate it") {
     const std::string base = Wait::atlasWith({});
-    // "O" is the shipped default precisely because it is already there — the
-    // shipped overlay font is Roboto, 98 glyphs, ASCII only.
     CHECK(Wait::atlasWith({"O"}) == base);
     CHECK(Wait::atlasWith({"O", "O", "12s"}) == base);
 }
