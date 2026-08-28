@@ -628,6 +628,22 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   even `•`. Only the CJK font that ships for zh/ja/ko has them, which is worth
   knowing before designing anything that wants a symbol. `annotations.atlas_extra`
   adds characters for a richer font.
+- **A prompt is a question, and only an answer may cancel it.**
+  `ElementGame::clearMessage()` clears `#lblMessage` *and* drops
+  `pendingPromptCallback`, so it does not hide a confirmation, it cancels one.
+  It therefore refuses while `hasActivePrompt()`, exactly as `showMessage()`
+  already did — the guard was on one of a pair and not the other, the same shape
+  as the prisoner labels and the annotation patch. Without it, **quitting a
+  bot-versus-bot match was impossible**: `OnUpdate()`'s tail clears the message
+  on every position change that carries no comment, so each move cancelled the
+  confirmation, and with GNU Go answering in milliseconds it was gone before it
+  could be clicked. The deliberate path is unaffected —
+  `handlePromptResponse()` takes the callback and nulls it *before* clearing —
+  and nothing can orphan a prompt, because while one is up clicks and keys are
+  routed to it. Pinned by the last block of `discard_prompts.scn`, which had to
+  put an *engine* on the board to see it: every earlier case in that file keeps
+  both players human and passes, so "nothing advances on its own", which is
+  precisely the condition that hides this.
 - **Diagnostics reach the user through a spdlog sink, not through call sites.**
   `installMessageLogSink()` feeds `MessageLog`, so every existing
   `spdlog::warn`/`error` surfaces without being touched, and a new one surfaces

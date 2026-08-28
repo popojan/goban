@@ -961,7 +961,28 @@ void ElementGame::handlePromptResponse(bool affirmative) {
 }
 
 void ElementGame::clearMessage() {
-    pendingPromptCallback = nullptr;
+    // A prompt is a question the user has not answered yet, and clearing the
+    // message *cancels* it — the callback used to be dropped here along with the
+    // text. So routine clearing must not touch one.
+    //
+    // Without this it was impossible to quit a bot-versus-bot match: the tail of
+    // OnUpdate() clears the message on every position change with an empty
+    // comment, so each move dismissed the confirmation. With GNU Go answering in
+    // milliseconds the prompt vanished before it could be clicked, and the only
+    // way out was to kill the process. Reported from a Windows bundle test.
+    //
+    // showMessage() has had this guard all along; its opposite number did not,
+    // which is the same one-of-a-pair shape as the prisoner labels and the
+    // annotation patch. Guarding here rather than at the call sites because
+    // there are five of them and the two that mattered were the ones nobody
+    // thought about.
+    //
+    // The deliberate path is unaffected: handlePromptResponse() takes the
+    // callback and nulls it *before* calling this, so a prompt that has been
+    // answered clears normally. Nothing else may cancel one — while a prompt is
+    // up, clicks and keys are routed to it, so it cannot be orphaned.
+    if (hasActivePrompt()) return;
+
     auto context = GetContext();
     if (!context) return;
 

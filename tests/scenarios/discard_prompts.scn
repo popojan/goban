@@ -68,3 +68,38 @@ expect prompt_active false
 expect move_count 1
 expect phase playing
 expect board_size 9
+
+# --- A prompt survives a game that is still moving --------------------------
+#
+# Everything above deliberately keeps the board still: "both players are human
+# and every move is a pass, so nothing advances on its own". That is exactly the
+# condition under which this bug is invisible.
+#
+# Reported from a Windows bundle test: in a bot-versus-bot match it was
+# impossible to quit. The tail of ElementGame::OnUpdate() clears the message on
+# every position change that carries no comment, and clearMessage() used to drop
+# pendingPromptCallback along with the text — so each move did not merely hide
+# the confirmation, it cancelled it. With GNU Go answering in milliseconds the
+# prompt was gone before it could be clicked, and the only way out was to kill
+# the process.
+#
+# White is the mock engine here, so moves keep arriving while the prompt is up.
+switch_player white mock
+wait_idle
+
+quit
+expect prompt_active true
+
+# A position change while the prompt is open — the whole point. wait_until
+# rather than a fixed delay, so this asserts a move actually landed rather than
+# that some time passed.
+wait_until move_count >= 2
+expect prompt_active true
+
+# And it is still answerable, which is the part that was really broken: the
+# callback had been dropped, so even clicking where the prompt had been did
+# nothing.
+prompt_no
+wait_idle
+expect prompt_active false
+expect phase playing
