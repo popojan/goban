@@ -11,8 +11,12 @@ dist/
 # Binary executable
 goban
 
-# Dependencies (external libraries)
-deps/
+# Dependencies (external libraries). Fetched sources are ignored; the patches
+# applied to them are not — they are the only record of what we changed, and for
+# GNU Go that record is a GPL obligation rather than a convenience. The existing
+# ones survived only by having been tracked before this rule existed.
+deps/*
+!deps/_patches/
 external/
 
 # External Go engines

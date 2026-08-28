@@ -44,11 +44,22 @@ is not part of any shipped binary.
 
 Goban plays through external GTP engines and contains none of its own.
 
-Bundles distributed from [hraj.si/goban](https://hraj.si/goban) include **GNU Go**
-for convenience. GNU Go is copyright the Free Software Foundation and licensed
-under the **GNU General Public License v3**; its source is at
-<https://www.gnu.org/software/gnugo/>. Bundles published on GitHub Releases
-contain no engine at all.
+Bundles distributed from [hraj.si/goban](https://hraj.si/goban) include **GNU Go
+3.8** for convenience. GNU Go is copyright the Free Software Foundation and
+licensed under the **GNU General Public License v3**. Bundles published on GitHub
+Releases contain no engine at all.
+
+The corresponding source for those binaries is the official tarball
+
+    https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz
+    sha256 da68d7a65f44dcf6ce6e4e630b6f6dd9897249d34425920bfdd4e07ff1866a72
+
+**plus one patch**, `deps/_patches/gnugo-3.8-implicit-int.patch` in this
+repository. Two declarations of `verifyW32()` use an implicit `int` return type,
+which C99 removed and current mingw-w64 rejects, so 3.8 cannot be cross-compiled
+for Windows without it. That patch is the whole of the difference: the build tree
+was diffed against the tarball on 2026-08-28 and 2256 files were identical, one
+differed, and nothing was added or removed.
 
 KataGo, Pachi and others are configured in `config/base.json` but never shipped;
 each carries its own licence from its own project.
