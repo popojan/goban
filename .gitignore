@@ -5,6 +5,9 @@
 cmake-build-*/
 build/
 
+# Assembled release bundles (tools/package.py)
+dist/
+
 # Binary executable
 goban
 

@@ -41,11 +41,13 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <nlohmann/json.hpp>
 
+#include <cstdio>
 #include <memory>
 #include <fstream>
 #include <set>
 #include <optional>
 
+#include "version.h"
 #include "MessageLog.h"
 #include "UserSettings.h"
 #include "ScenarioRunner.h"
@@ -447,6 +449,7 @@ int main(int argc, char** argv)
     std::string userSettingsFile;
     std::string platform;
     bool forceRecord = false;
+    bool showVersion = false;
 
     // Parse the CLI before touching UserSettings: a scenario run redirects
     // persistence so it cannot overwrite the developer's real session.
@@ -457,13 +460,22 @@ int main(int argc, char** argv)
         option("-s", "--script") & value("file", scenarioFile),
         option("--user-settings") & value("file", userSettingsFile),
         option("--platform") & word("name", platform),
-        option("--record").set(forceRecord)
+        option("--record").set(forceRecord),
+        // So a bug report can say which build it came from. The About dialog has
+        // it too, but asking someone to open a dialog to read a version number
+        // is a worse question than asking them to run one command.
+        option("--version").set(showVersion)
     );
 #ifdef RMLUI_PLATFORM_WIN32
     parse(__argc, __argv, preCli);
 #else
     parse(argc, argv, preCli);
 #endif
+
+    if (showVersion) {
+        std::printf("goban %s\n", GOBAN_VERSION);
+        return 0;
+    }
 
     // A scripted run defaults to a throwaway settings file, so that driving the
     // app from a scenario never mutates user.json.

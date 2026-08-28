@@ -53,11 +53,20 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
           make -j$(nproc)
 
+      # A release that fails its own tests should not be published. Linux only:
+      # the suite is the same everywhere and this is the platform that can run it
+      # without a display.
+      - name: Run tests
+        run: cd build && ctest --output-on-failure --timeout 120
+
+      - name: Package
+        run: python3 tools/package.py --binary build/goban --platform linux-x64
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: goban-linux-x64
-          path: build/goban
+          path: dist/*.tar.gz
 
   build-macos:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos' }}
@@ -85,12 +94,15 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF
           make -j$(sysctl -n hw.ncpu)
 
+      - name: Package
+        run: python3 tools/package.py --binary build/goban --platform macos-x64
+
       - name: Upload artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: goban-macos-x64
-          path: build/goban
+          path: dist/*.tar.gz
 
   build-windows:
     if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' }}
@@ -135,12 +147,18 @@ jobs:
           cmake .. -A ${{ matrix.cmake_arch }} -DCMAKE_BUILD_TYPE=Release -DBuildPrerequisites=OFF -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
           cmake --build . --config Release
 
+      - name: Package
+        shell: bash
+        run: |
+          exe=$(find build -name goban.exe | head -1)
+          python tools/package.py --binary "$exe" --platform windows-${{ matrix.arch }}
+
       - name: Upload artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: goban-windows-${{ matrix.arch }}
-          path: build/**/goban.exe
+          path: dist/*.zip
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -149,26 +167,35 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      # The tag and the version compiled into the About dialog must agree. They
+      # are set in two different places by two different hands, and a release
+      # whose binary reports a different number than its own tag is not
+      # something anyone can debug from a bug report.
+      - name: Check the tag matches CMakeLists
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          proj=$(sed -n 's/.*project(goban.*VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          echo "tag=$tag  CMakeLists=$proj"
+          if [ "$tag" != "$proj" ]; then
+            echo "::error::tag v$tag does not match PROJECT_VERSION $proj"
+            exit 1
+          fi
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Prepare release files
+      - name: Collect
         run: |
           mkdir -p release
-          cp artifacts/goban-linux-x64/goban release/goban-linux-x64
-          cp artifacts/goban-macos-x64/goban release/goban-macos-x64 || true
-          find artifacts/goban-windows-x64 -name "goban.exe" -exec cp {} release/goban-windows-x64.exe \;
-          find artifacts/goban-windows-x86 -name "goban.exe" -exec cp {} release/goban-windows-x86.exe \;
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
           ls -la release/
 
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: RELEASE_NOTES.md
-
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: release/*
           body_path: RELEASE_NOTES.md

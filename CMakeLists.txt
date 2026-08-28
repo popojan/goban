@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 cmake_policy(SET CMP0072 NEW)
 cmake_policy(SET CMP0167 OLD)
 
-project(goban LANGUAGES C CXX VERSION 0.1.2)
+project(goban LANGUAGES C CXX VERSION 0.2.0)
 
 include(GNUInstallDirs)
 
@@ -217,26 +217,38 @@ endfunction()
 
 function(download_fonts)
     set(FONT_DIR "${PROJECT_SOURCE_DIR}/config/fonts")
-    set(FONT_FILE "${FONT_DIR}/NotoSansCJKsc-Regular.otf")
-    set(FONT_URL "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf")
 
-    if(NOT EXISTS "${FONT_FILE}")
-        message(STATUS "Downloading Noto Sans CJK SC font...")
-        file(DOWNLOAD
-            "${FONT_URL}"
-            "${FONT_FILE}"
-            SHOW_PROGRESS
-            STATUS DOWNLOAD_STATUS
-        )
-        list(GET DOWNLOAD_STATUS 0 STATUS_CODE)
-        if(NOT STATUS_CODE EQUAL 0)
-            message(WARNING "Failed to download font: ${DOWNLOAD_STATUS}")
+    # Every font a shipped config actually names. NotoSans-Regular used to be
+    # missing from this list while every language config referenced it, so a
+    # fresh clone built an application pointing at a font that was not there —
+    # invisible on a machine that happened to have it, and a hole in any bundle
+    # built from a clean checkout.
+    #
+    # default-font.ttf is tracked in git rather than fetched: it is 18 KB and the
+    # overlay cannot draw a single glyph without it.
+    set(FONT_NAMES
+        NotoSans-Regular.ttf
+        NotoSansCJKsc-Regular.otf)
+    set(FONT_URLS
+        "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf"
+        "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf")
+
+    list(LENGTH FONT_NAMES n)
+    math(EXPR last "${n} - 1")
+    foreach(i RANGE ${last})
+        list(GET FONT_NAMES ${i} name)
+        list(GET FONT_URLS ${i} url)
+        if(NOT EXISTS "${FONT_DIR}/${name}")
+            message(STATUS "Downloading ${name}...")
+            file(DOWNLOAD "${url}" "${FONT_DIR}/${name}" SHOW_PROGRESS STATUS st)
+            list(GET st 0 code)
+            if(NOT code EQUAL 0)
+                message(WARNING "Failed to download ${name}: ${st}")
+            endif()
         else()
-            message(STATUS "Font downloaded successfully: ${FONT_FILE}")
+            message(STATUS "Font already present: ${name}")
         endif()
-    else()
-        message(STATUS "Font already exists: ${FONT_FILE}")
-    endif()
+    endforeach()
 endfunction()
 
 function(generate_glad_headers)

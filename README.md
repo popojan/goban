@@ -10,7 +10,7 @@ For Windows binaries and more screenshots see [hraj.si/goban](https://hraj.si/go
 
 Languages can be switched from within the app. Available: English, Chinese, Czech, Japanese, Korean. See [CREDITS.md](CREDITS.md) for translation credits.
 
-![screenshot](/res/screenshot.png)
+![screenshot](res/screenshot.png)
 
 ## Dependencies
 * `clipp`

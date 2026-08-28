@@ -57,7 +57,8 @@
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata9x9-b18c384nbt-20231025.bin.gz -config ./default_gtp.cfg",
-      "enabled": 1,
+      "_comment_enabled": "Off in the shipped configuration: the bundle carries GNU Go and nothing else, and an engine that is configured but not installed fails to start and puts a red badge on the message panel the first time the program is opened. Set to 1 once KataGo is in engine/katago.",
+      "enabled": 0,
       "kibitz": 0,
       "analysis": 1,
       "messages": [
