@@ -53,6 +53,12 @@ user.json
 # Test fixtures must survive the blanket *.sgf rule above
 !tests/data/*.sgf
 
+# The game record the release screenshot is taken from. Tracked deliberately:
+# it comes out of games/, which is ignored wholesale, so without this line the
+# asset the screenshot scenario depends on would be silently untracked and lost
+# on the next clean checkout.
+!res/screenshot/*.sgf
+
 # Scenario runs and recorded bug reports
 reports/
 scenario-user.json
