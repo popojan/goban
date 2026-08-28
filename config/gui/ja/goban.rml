@@ -47,6 +47,8 @@
                             <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">最後の手</div>
                             <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">次の手</div>
                             <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">候補手</div>
+                            <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">形勢の数値</div>
+                            <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">経過時間</div>
                             <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">座標</div>
                         </div>
                         <div class="grp">

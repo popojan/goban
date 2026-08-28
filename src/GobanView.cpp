@@ -1284,7 +1284,7 @@ void GobanView::updateFloatingLabels() {
 	// No placement choice any more: the evaluation is drawn on the board, or the
 	// analysis is off and there is no report to draw. The RmlUi panel that used
 	// to be the alternative is gone — see ADR-0012.
-	if (analysis && !snap->scoredEnd) {
+	if (showReadout && analysis && !snap->scoredEnd) {
 		if (const auto report = analysis->report()) {
 			// The margin runs from row -0.85 to row 0 — 0.85 grid spacings of
 			// wood on every board size, because the constant in Metrics::calc()
@@ -1372,7 +1372,7 @@ void GobanView::updateFloatingLabels() {
 	// there; the count turning over is the whole animation, and it is the physical
 	// kind.
 	waitText.clear();
-	if (waitKind != WaitKind::None) {
+	if (showWaitClock && waitKind != WaitKind::None) {
 		const float elapsed = static_cast<float>(glfwGetTime()) - waitStarted;
 		const int second = Wait::displayedSecond(elapsed, waitGrace);
 		if (second != Wait::NOT_SHOWN) {
@@ -1594,6 +1594,28 @@ std::optional<TextAlign> GobanView::parseAlign(const std::string& name) {
 void GobanView::setEvaluationAlign(TextAlign align) {
 	if (readoutAlign == align) return;
 	readoutAlign = align;
+	requestRepaint(UPDATE_OVERLAY);
+}
+
+bool GobanView::toggleEvaluationReadout() {
+	setEvaluationReadout(!showReadout);
+	return showReadout;
+}
+
+void GobanView::setEvaluationReadout(bool shown) {
+	if (showReadout == shown) return;
+	showReadout = shown;
+	requestRepaint(UPDATE_OVERLAY);
+}
+
+bool GobanView::toggleWaitClock() {
+	setWaitClock(!showWaitClock);
+	return showWaitClock;
+}
+
+void GobanView::setWaitClock(bool shown) {
+	if (showWaitClock == shown) return;
+	showWaitClock = shown;
 	requestRepaint(UPDATE_OVERLAY);
 }
 

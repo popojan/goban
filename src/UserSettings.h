@@ -58,6 +58,14 @@ public:
     bool getEvaluationMoves() const { std::lock_guard<std::mutex> lock(mutex); return evaluationMoves; }
     void setEvaluationMoves(bool value);
 
+    /// The numbers on the wood, and the elapsed-seconds clock. Both default on;
+    /// both are visibility settings for parts of one on-board display, not a
+    /// choice about where that display lives (see ADR-0012).
+    bool getEvaluationReadout() const { std::lock_guard<std::mutex> lock(mutex); return evaluationReadout; }
+    void setEvaluationReadout(bool value);
+    bool getWaitClock() const { std::lock_guard<std::mutex> lock(mutex); return waitClock; }
+    void setWaitClock(bool value);
+
     /// Where the board readout sits along the edge: "center", "left", "right".
     /// A taste question, so it is stored rather than decided.
     std::string getEvaluationAlign() const { std::lock_guard<std::mutex> lock(mutex); return evaluationAlign; }
@@ -259,6 +267,8 @@ private:
     bool evaluationEnabled = false;
     bool evaluationMoves = false;
     bool coordinates = false;
+    bool evaluationReadout = true;
+    bool waitClock = true;
     std::string evaluationAlign = "center";
     std::string anaglyph;
     float anaglyphStrength = -1.0f;

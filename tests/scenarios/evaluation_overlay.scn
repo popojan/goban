@@ -168,3 +168,40 @@ wait_until eval_board_text ""
 toggle_evaluation off
 wait_until eval_state disabled
 wait_until eval_board_text ""
+
+# The three parts of the on-board display switch independently. They used not
+# to: the readout had no toggle of its own, so the only way to see the suggested
+# moves without the numbers was to turn the engine off — which took the moves
+# with it. This is a visibility setting, not the placement setting ADR-0012
+# removed; there is still exactly one place the evaluation is drawn.
+#
+# A fresh game first: the one above ended in a double pass, and at a scored end
+# the readout stands down whatever its own toggle says.
+new_game 9
+wait_idle
+switch_player white Human
+wait_idle
+toggle_evaluation on
+wait_until eval_state running
+wait_until eval_board_text B 60% B+2.5
+expect eval_readout_shown true
+
+toggle_evaluation_readout off
+expect eval_readout_shown false
+wait_until eval_board_text ""
+# ...and the engine is still running, so this is a display choice and not an
+# off switch wearing a different hat.
+expect eval_state running
+expect eval_enabled true
+
+toggle_evaluation_readout on
+expect eval_readout_shown true
+wait_until eval_board_text B 60% B+2.5
+
+# The clock is not gated on the analysis at all — it reports on the program, and
+# it is the only thing shown during a wait when the evaluation is off.
+expect wait_clock_shown true
+toggle_wait_clock off
+expect wait_clock_shown false
+toggle_wait_clock on
+expect wait_clock_shown true

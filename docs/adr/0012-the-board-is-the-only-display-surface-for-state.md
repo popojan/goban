@@ -45,6 +45,15 @@ Concretely:
    along the edge it sits, because that is taste rather than a choice between
    two implementations of the same thing.
 
+   **A placement setting is not a visibility setting**, and removing the first
+   does not argue against the second. `toggle_evaluation_readout` and
+   `toggle_wait_clock` were added afterwards, so that the three things drawn on
+   the wood — suggested moves, the numbers, the elapsed clock — each switch on
+   their own. Before them the readout had no toggle at all, so the only way to
+   see the suggestions without the numbers was to switch the engine off, which
+   took the suggestions with it. That is one display whose parts are
+   individually visible, not two displays competing to be the one.
+
 2. **The two game waits are drawn on the board**: an elapsed second count in the
    wood margin, right-aligned, through the overlay's glyph pass.
    `#lblStatus` keeps engine loading (which names a specific engine, at startup,

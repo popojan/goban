@@ -48,6 +48,14 @@ void UserSettings::load() {
             coordinates = user["coordinates"].get<bool>();
         }
 
+        if (user.contains("evaluation_readout")) {
+            evaluationReadout = user["evaluation_readout"].get<bool>();
+        }
+
+        if (user.contains("wait_clock")) {
+            waitClock = user["wait_clock"].get<bool>();
+        }
+
         if (user.contains("evaluation_align")) {
             evaluationAlign = user["evaluation_align"].get<std::string>();
         }
@@ -246,6 +254,8 @@ std::string UserSettings::serialize() const {
     user["evaluation_enabled"] = evaluationEnabled;
     user["evaluation_moves"] = evaluationMoves;
     user["coordinates"] = coordinates;
+    user["evaluation_readout"] = evaluationReadout;
+    user["wait_clock"] = waitClock;
     user["evaluation_align"] = evaluationAlign;
     if (!evaluationColor.empty()) {
         user["evaluation_color"] = evaluationColor;
@@ -358,6 +368,18 @@ void UserSettings::setEvaluationEnabled(bool value) {
 void UserSettings::setEvaluationMoves(bool value) {
     std::lock_guard<std::mutex> lock(mutex);
     evaluationMoves = value;
+    saveLocked();
+}
+
+void UserSettings::setEvaluationReadout(bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    evaluationReadout = value;
+    saveLocked();
+}
+
+void UserSettings::setWaitClock(bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    waitClock = value;
     saveLocked();
 }
 

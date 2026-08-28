@@ -580,6 +580,8 @@ void ElementGame::performDeferredInitialization() {
     // separate feature, and their default is off so that turning the evaluation
     // on never silently starts pointing at the board.
     view.setAnalysisOverlay(UserSettings::instance().getEvaluationMoves());
+    view.setEvaluationReadout(UserSettings::instance().getEvaluationReadout());
+    view.setWaitClock(UserSettings::instance().getWaitClock());
     view.setCoordinates(UserSettings::instance().getCoordinates());
     if (auto align = GobanView::parseAlign(UserSettings::instance().getEvaluationAlign())) {
         view.setEvaluationAlign(*align);
@@ -1150,6 +1152,16 @@ void ElementGame::OnUpdate()
         const bool movesChecked = view.isAnalysisOverlayShown();
         if (movesEl && movesEl->IsClassSet("selected") != movesChecked) {
             OnMenuToggle("toggle_evaluation_moves", movesChecked);
+        }
+        auto* readoutEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationReadout");
+        const bool readoutChecked = view.isEvaluationReadoutShown();
+        if (readoutEl && readoutEl->IsClassSet("selected") != readoutChecked) {
+            OnMenuToggle("toggle_evaluation_readout", readoutChecked);
+        }
+        auto* clockEl = context->GetDocument("game_window")->GetElementById("cmdWaitClock");
+        const bool clockChecked = view.isWaitClockShown();
+        if (clockEl && clockEl->IsClassSet("selected") != clockChecked) {
+            OnMenuToggle("toggle_wait_clock", clockChecked);
         }
         auto* coordEl = context->GetDocument("game_window")->GetElementById("cmdCoordinates");
         const bool coordChecked = view.areCoordinatesShown();

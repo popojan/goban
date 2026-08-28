@@ -232,6 +232,24 @@ public:
     /// evaluation readout, the wait indicator and, when shown, the coordinate
     /// labels. One function because setFloatingLabels() replaces the whole list.
     void updateFloatingLabels();
+
+    /// The numbers on the wood — win rate and score estimate. Separate from
+    /// `toggle_evaluation`, which decides whether the analysis engine runs at
+    /// all: with one switch for both, the only way to see the suggested moves
+    /// without the numbers was to turn the engine off, which also took the
+    /// moves. This is a *visibility* setting and not the placement setting
+    /// ADR-0012 removed — there is still exactly one place the evaluation is
+    /// drawn; this says whether that part of it is drawn.
+    bool toggleEvaluationReadout();
+    [[nodiscard]] bool isEvaluationReadoutShown() const { return showReadout; }
+    void setEvaluationReadout(bool shown);
+
+    /// The elapsed-seconds clock in the margin. On by default and deliberately
+    /// so: it exists because a genmove used to be completely silent, and a user
+    /// who hides it is choosing to give that back. Sticky, like its siblings.
+    bool toggleWaitClock();
+    [[nodiscard]] bool isWaitClockShown() const { return showWaitClock; }
+    void setWaitClock(bool shown);
     /// What the board readout currently says, empty when it says nothing. The
     /// glyphs themselves are unreachable from a headless run, so this is the
     /// only way a scenario can check that the text was composed correctly —
@@ -517,6 +535,8 @@ public:
     WaitKind waitKind = WaitKind::None;
     float waitStarted = 0.0f;
     std::string waitText;
+    bool showReadout = true;
+    bool showWaitClock = true;
     glm::vec4 waitInk{0.0f, 0.0f, 0.0f, 1.0f};
     /// How long a wait has to last before it is worth mentioning. GNU Go answers
     /// in milliseconds; without this every move in a bot match flashes the mark

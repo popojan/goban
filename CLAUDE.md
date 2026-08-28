@@ -561,6 +561,15 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   which is the physical kind of change, the kind a clock beside a board makes.
   It is also the repaint gate, so a wait costs one frame per second rather than
   the twenty `getIdleTimeout()` offers.
+- **The three things on the wood switch independently, and that is not the
+  placement setting ADR-0012 removed.** `toggle_evaluation` decides whether the
+  analysis engine runs at all; `toggle_evaluation_moves`,
+  `toggle_evaluation_readout` and `toggle_wait_clock` decide which of the
+  suggestions, the numbers and the clock are drawn. All three are sticky. The
+  clock's toggle is deliberately *not* gated on `actions().evaluation` — it
+  reports on the program rather than on the analysis, and it is the only thing
+  shown during a genmove or a resync when the evaluation is off. It defaults on
+  for the reason the whole indicator exists: a silent wait reads as a freeze.
 - **The margin's two ends have meanings: left is an action, right is program
   status.** The recommended pass is a move the player might make, so it sits at
   the left; the wait clock is the program reporting on itself, so it sits at the

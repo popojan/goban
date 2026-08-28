@@ -684,6 +684,56 @@ void GobanControl::buildRegistry() {
         ctx.checked = next;
     });
 
+    add("toggle_evaluation_readout", 0, 1,
+        "[on|off] — show or hide the win rate and score estimate on the board's edge",
+        [this](CommandContext& ctx) {
+        // Same availability as the suggestions: an analysis engine exists and
+        // this is not a tsumego.
+        if (!actions().evaluation) {
+            spdlog::debug("toggle_evaluation_readout refused by availableActions()");
+            ctx.notifyMenu = false;
+            return;
+        }
+        bool next = !view.isEvaluationReadoutShown();
+        if (!ctx.args.empty()) {
+            const std::string arg = toLower(ctx.args[0]);
+            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
+                && arg != "1" && arg != "0") {
+                spdlog::warn("toggle_evaluation_readout: expected on or off, got '{}'",
+                             ctx.args[0]);
+                ctx.notifyMenu = false;
+                return;
+            }
+            next = (arg == "on" || arg == "true" || arg == "1");
+        }
+        view.setEvaluationReadout(next);
+        UserSettings::instance().setEvaluationReadout(next);
+        ctx.checked = next;
+    });
+
+    add("toggle_wait_clock", 0, 1,
+        "[on|off] — show or hide the elapsed-seconds clock while the program is busy",
+        [this](CommandContext& ctx) {
+        // Deliberately not gated on actions().evaluation: this reports on the
+        // *program*, not on the analysis, and it is the only thing that shows
+        // during an engine's turn or a resync when the evaluation is off.
+        bool next = !view.isWaitClockShown();
+        if (!ctx.args.empty()) {
+            const std::string arg = toLower(ctx.args[0]);
+            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
+                && arg != "1" && arg != "0") {
+                spdlog::warn("toggle_wait_clock: expected on or off, got '{}'",
+                             ctx.args[0]);
+                ctx.notifyMenu = false;
+                return;
+            }
+            next = (arg == "on" || arg == "true" || arg == "1");
+        }
+        view.setWaitClock(next);
+        UserSettings::instance().setWaitClock(next);
+        ctx.checked = next;
+    });
+
     add("evaluation_align", 0, 1,
         "[left|center|right] — where the board readout sits along the edge; "
         "with no argument, cycles through them",
@@ -2118,6 +2168,7 @@ nlohmann::json GobanControl::dumpState() const {
     // that is what a scenario asserts. `wait_text` is empty during the grace
     // period, when the wait is real but deliberately not yet mentioned — so the
     // kind and the text are both reported, and they are not the same question.
+    s["wait_clock_shown"] = view.isWaitClockShown();
     s["wait_indicator"] = waitKindName(view.waitIndicator());
     s["wait_text"] = view.waitIndicatorText();
 
@@ -2208,6 +2259,7 @@ nlohmann::json GobanControl::dumpState() const {
         // the normal case, not a fault.
         s["eval_moves_shown"] = view.isAnalysisOverlayShown();
         s["eval_board_text"] = view.evaluationReadoutText();
+        s["eval_readout_shown"] = view.isEvaluationReadoutShown();
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());
         s["coordinates_shown"] = view.areCoordinatesShown();
         s["coord_color"] = hexFromColor(view.coordinateColor());
