@@ -33,7 +33,12 @@ ROOT = Path(__file__).resolve().parent.parent
 EXCLUDE_NAMES = {"NotoSansSC-Regular.otf"}
 EXCLUDE_SUFFIXES = {".swp", ".bak", ".pyc"}
 
-DOCS = ["LICENSE", "README.md", "RELEASE_NOTES.md", "CREDITS.md", "THIRD-PARTY.md"]
+# Source paths. LICENSE and README.md stay at the repository root because GitHub
+# looks for them there; the rest live in docs/. The bundle flattens all of them
+# to its own root — someone who unpacks a zip should not have to open a folder to
+# find the licence.
+DOCS = ["LICENSE", "README.md", "docs/RELEASE_NOTES.md", "docs/CREDITS.md",
+        "docs/THIRD-PARTY.md"]
 
 GAMES_README = """\
 Games you play are saved here.
@@ -174,7 +179,7 @@ def main() -> int:
     for doc in DOCS:
         src = ROOT / doc
         if src.is_file():
-            shutil.copy2(src, staging / doc)
+            shutil.copy2(src, staging / Path(doc).name)
         else:
             print("warning: %s is missing and will not be in the bundle" % doc)
 

@@ -38,7 +38,7 @@ function(build_glyphy)
             SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/glyphy
             BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/glyphy/build
             CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy
-                ${PROJECT_SOURCE_DIR}/deps/_patches/goban_glyphy.vcxproj
+                ${PROJECT_SOURCE_DIR}/cmake/patches/goban_glyphy.vcxproj
                 ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/
             BUILD_COMMAND ${CMAKE_VS_MSBUILD_COMMAND} ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/goban_glyphy.vcxproj
                 /t:Build /p:Configuration=${CMAKE_BUILD_TYPE}
@@ -85,8 +85,8 @@ function(build_libsgfcplusplus)
             UPDATE_COMMAND ""
             PATCH_COMMAND git checkout -- .
             COMMAND git -C sgfc checkout -- .
-            COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch
-            COMMAND git -C sgfc -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/sgfc-save-buffer-uninitialised-byte.patch
+            COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/cmake/patches/libsgfcplusplus-static-init-fix.patch
+            COMMAND git -C sgfc -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/cmake/patches/sgfc-save-buffer-uninitialised-byte.patch
             INSTALL_COMMAND ""
             )
 

@@ -126,9 +126,10 @@ Debug output is written to `last_run.log` in the working directory.
 goban/
 ├── src/           # Main source code
 ├── config/        # Configuration, shaders, GUI, sounds, fonts
-├── deps/          # Dependency build scripts and patches
-├── games/         # SGF game storage
-├── cmake/         # CMake find modules
+├── deps/          # Fetched dependency sources (not tracked)
+├── games/         # SGF game storage (created on first save)
+├── cmake/         # CMake find modules, and the patches they apply
+├── tests/         # Unit tests, scenarios, the mock GTP engine
 └── docs/          # Documentation
 ```
 

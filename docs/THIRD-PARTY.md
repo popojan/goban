@@ -54,7 +54,7 @@ The corresponding source for those binaries is the official tarball
     https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz
     sha256 da68d7a65f44dcf6ce6e4e630b6f6dd9897249d34425920bfdd4e07ff1866a72
 
-**plus one patch**, `deps/_patches/gnugo-3.8-implicit-int.patch` in this
+**plus one patch**, `cmake/patches/gnugo-3.8-implicit-int.patch` in this
 repository. Two declarations of `verifyW32()` use an implicit `int` return type,
 which C99 removed and current mingw-w64 rejects, so 3.8 cannot be cross-compiled
 for Windows without it. That patch is the whole of the difference: the build tree
