@@ -1,5 +1,6 @@
 #include "GobanShader.h"
 
+#include <chrono>
 #include <fstream>
 #include "GobanView.h"
 #include "Shadinclude.hpp"
@@ -58,6 +59,12 @@ std::string createShaderFromFile(const std::string& filename) {
 
 void GobanShader::initProgram(const std::string& vertexProgram, const std::string& fragmentProgram) {
 
+    using Clock = std::chrono::steady_clock;
+    const auto t0 = Clock::now();
+    auto ms = [](Clock::time_point a, Clock::time_point b) {
+        return std::chrono::duration<double, std::milli>(b - a).count();
+    };
+
     shadersReady = false;
     if (gobanProgram != 0) {
         glDeleteProgram(gobanProgram);
@@ -66,6 +73,7 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
 
     const std::string sVertexShader = createShaderFromFile(vertexProgram);
     const std::string sFragmentShader = createShaderFromFile(fragmentProgram);
+    const auto tRead = Clock::now();
 
     /*
     std::ofstream fout("./debug_fragment_shader.glsl");
@@ -75,17 +83,29 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
 
     if(!shaderAttachFromString(gobanProgram, GL_VERTEX_SHADER, sVertexShader))
         spdlog::error("Vertex shader [{}] failed to compile. Err {}", vertexProgram, glGetError());
+    const auto tVert = Clock::now();
     if(!shaderAttachFromString(gobanProgram, GL_FRAGMENT_SHADER, sFragmentShader))
         spdlog::error("Fragment Shader [{}] failed to compile. Err {}", fragmentProgram, glGetError());
+    const auto tFrag = Clock::now();
 
     glLinkProgram(gobanProgram);
+
+    // Querying the link status is what makes the driver finish the link, so the
+    // timing below is only meaningful on this side of it — and the link is where
+    // essentially the whole cost is. Measured on Intel/Mesa with a cold driver
+    // cache: 16 ms to compile the fragment shader, **1969 ms** to link it. That
+    // is the frozen first launch users report, and it is worth one line in
+    // last_run.log, which is what a bug report is read from.
+    GLint result;
+    glGetProgramiv(gobanProgram, GL_LINK_STATUS, &result);
+    const auto tLink = Clock::now();
+    spdlog::info("shader [{}] built: read {:.0f} ms, vertex {:.0f} ms, fragment {:.0f} ms, link {:.0f} ms",
+                 fragmentProgram, ms(t0, tRead), ms(tRead, tVert), ms(tVert, tFrag), ms(tFrag, tLink));
+
     glDetachShader(gobanProgram, vertexShader);
     glDeleteShader(vertexShader);
     glDetachShader(gobanProgram, fragmentShader);
     glDeleteShader(fragmentShader);
-
-    GLint result;
-    glGetProgramiv(gobanProgram, GL_LINK_STATUS, &result);
 
     if (result == GL_FALSE) {
         GLint length;
@@ -269,9 +289,13 @@ void GobanShader::init() {
 	vertexBuffer = make_buffer(GL_ARRAY_BUFFER, &vertexBufferData[0], sizeof(GLfloat)*vertexBufferData.size());
 	elementBuffer = make_buffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferData, sizeof(elementBufferData));
 
-	currentProgram = 0;
-
-	choose(currentProgram);
+	// Deliberately does *not* build a program. This runs from the constructor,
+	// which is before anybody has read which shader the user actually saved, so
+	// it could only ever link number 0 — and GobanView's own constructor then
+	// links the real one a few lines later. On a cold driver cache that made the
+	// wasted link the expensive one: measured 1969 ms to link, against 17 ms to
+	// compile the fragment shader it discards. `currentProgram` stays -1, which
+	// is what choose() reads as "nothing built yet".
 
     glEnable(GL_BLEND);
 }
@@ -392,7 +416,21 @@ int GobanShader::choose(int idx) {
             config->data.value("annotations", json::object()),
             shader.value("annotations", json::object()));
     if(!vertexFile.empty() && !fragmentFile.empty()) {
-        initProgram(vertexFile, fragmentFile);
+        // Link only when we are not already holding this very program. Linking
+        // is where a shader costs — measured 1969 ms cold on Intel/Mesa against
+        // 17 ms to compile the fragment shader — and the same program used to be
+        // linked three times on the way to the first frame: from GobanShader's
+        // constructor, from GobanView's constructor for the saved shader, and
+        // again when the shader dropdown syncs itself to what is already
+        // selected. The driver's own cache made repeats cheap (90 ms) rather
+        // than free, and warm that was still 278 ms of every launch.
+        //
+        // The metadata above is re-read either way: it is nearly free, and it
+        // comes from the configuration rather than from the program object, so
+        // a reload with the same index must still be able to change it.
+        if (newProgram != currentProgram || gobanProgram == 0) {
+            initProgram(vertexFile, fragmentFile);
+        }
         currentProgram = newProgram;
     } else {
         spdlog::warn("Shader [{}] must comprise both vertex and fragment programs.", newProgram);
