@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -73,6 +74,28 @@ inline float deviation(float halfBase, float aspect, float nearPoint,
 inline float halfBase(float deviation, float aspect, float nearPoint, float focal) {
     if (focal <= 0.0f || nearPoint <= 0.0f) return 0.0f;
     return std::min(deviation, MAX_DEVIATION) * aspect * nearPoint / focal;
+}
+
+/// Camera-space depth of the **zero-parallax plane**: where the two eyes' images
+/// of a point coincide, and so where the scene meets the glass. Nearer than this
+/// is negative parallax — in front of the screen, out toward the viewer; further
+/// is positive parallax, behind it.
+///
+/// From the same image model as everything above. The vertex shader shifts each
+/// eye's image by `dof`, so the right eye sees a point at
+/// `q0.x = dof + f·(x−e)/z` and the left at `q0.x = −dof + f·(x+e)/z`. Their
+/// separation is `2·dof − 2·f·e/z`, which vanishes at `z = f·e/dof`.
+///
+/// This is the quantity `dof` decides and `halfBase()` deliberately does not.
+/// It cancels in near-minus-far, so it changes nothing about how much depth the
+/// eyes are asked to accept — only where that depth sits relative to the screen.
+/// The two must not be traded against each other.
+///
+/// `dof == 0` means parallel cameras with no image shift, which converges only
+/// at infinity: the whole scene then sits in front of the glass.
+inline float convergence(float halfBase, float dof, float focal) {
+    if (dof <= 0.0f) return std::numeric_limits<float>::infinity();
+    return focal * halfBase / dof;
 }
 
 /** How the two eyes are combined into one anaglyph image.

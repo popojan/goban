@@ -2198,6 +2198,15 @@ nlohmann::json GobanControl::dumpState() const {
     s["stereo_base"]      = view.stereoHalfBase();
     s["stereo_near"]      = view.stereoNearPoint();
     s["stereo_deviation"] = view.stereoDeviation();
+    // Where the scene meets the glass — what `dof` decides, and the one thing
+    // none of the three above can answer. Reported with the board's own depth
+    // range beside it, because the question anybody asks of it ("is the screen
+    // plane at the back of the board?") is a comparison, not a distance.
+    float boardNear = 0.0f, boardFar = 0.0f;
+    view.stereoBoardDepth(boardNear, boardFar);
+    s["stereo_convergence"] = view.stereoConvergence();
+    s["stereo_board_near"]  = boardNear;
+    s["stereo_board_far"]   = boardFar;
     // Reported whatever shader is selected, for the same reason: it is a
     // property of the viewer, not of the shader, and it outlives a switch to
     // mono and back.

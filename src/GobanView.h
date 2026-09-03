@@ -139,6 +139,31 @@ public:
     [[nodiscard]] Position getBoardCoordinate(float x, float y)const ;
     [[nodiscard]] glm::vec2 boardCoordinate(float x, float y) const;
 
+    /// The camera model the vertex shaders build — origin plus the right, up and
+    /// forward axes — in one place. It was written out longhand in three
+    /// functions here, each claiming in a comment to match the other two, which
+    /// is the arrangement that eventually disagrees.
+    struct CameraBasis {
+        glm::vec3 roo;   ///< Camera position (the centre camera, not either eye)
+        glm::vec3 cu;    ///< Right
+        glm::vec3 cv;    ///< Up
+        glm::vec3 cw;    ///< Forward, toward the board
+    };
+    [[nodiscard]] CameraBasis cameraBasis() const;
+
+    /// Depth range of the board box alone, along the view axis. Unlike
+    /// stereoNearPoint() the table is not consulted: this exists to make
+    /// stereoConvergence() readable, and "the screen plane is at the back of the
+    /// board" is a claim about exactly these two numbers.
+    void stereoBoardDepth(float& nearZ, float& farZ) const;
+
+    /// Depth of the zero-parallax plane — where the scene meets the glass.
+    /// Everything nearer is in front of the screen, everything further behind.
+    /// This is what `dof` decides; see Stereo::convergence(). Reported by
+    /// dumpState() because there was no way to ask it, and so no way to check a
+    /// suspicion about it except by looking at a screenshot through glasses.
+    [[nodiscard]] float stereoConvergence() const;
+
     /// Depth of the nearest thing in frame, along the view axis. The board is a
     /// fixed-size box and the table runs under it toward the viewer, so both are
     /// asked: the board binds at ordinary zoom, the table's bottom edge binds

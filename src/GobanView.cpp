@@ -899,52 +899,66 @@ Position GobanView::getBoardCoordinate(float x, float y) const {
     return ret;
 }
 
+GobanView::CameraBasis GobanView::cameraBasis() const {
+    using namespace glm;
+    const mat4 m = cam.setView();
+    // Match shader camera model: ta = pan on board plane, camera behind along viewDir
+    const vec3 ta(cameraPan.x, 0.0f, cameraPan.y);
+    const vec3 cw = normalize(vec3(m * vec4(0, 0, 1, 0)));  // forward = toward board
+    const vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
+    const vec3 cu = normalize(cross(up, cw));
+    return {ta - cameraDistance * cw, cu, cross(cw, cu), cw};
+}
+
 glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     using namespace glm;
-    mat4 m = cam.setView();
-    // Match shader camera model: ta = pan on board plane, camera behind along viewDir
-    vec3 ta = vec3(cameraPan.x, 0.0f, cameraPan.y);
-    vec3 viewDir = normalize(vec3(m * vec4(0, 0, 1, 0)));
-    vec3 roo = ta - cameraDistance * viewDir;
-    vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
-    vec3 cw = viewDir;  // forward = toward board
-    vec3 cu = normalize(cross(up, cw));
-    vec3 cv = cross(cw, cu);
+    const CameraBasis c = cameraBasis();
     float ratio = resolution.x / resolution.y;
     vec2 q0 = vec2(ratio * 2.0f * (x / resolution.x - 0.5f), 2.0f * (0.5f - y / resolution.y));
-    vec3 rdb = q0.x * cu + q0.y * cv + FOCAL_LENGTH * cw;
+    vec3 rdb = q0.x * c.cu + q0.y * c.cv + FOCAL_LENGTH * c.cw;
     // Intersect ray with board plane (y=0)
-    auto t = -roo.y / rdb.y;
-    vec3 ip = roo + rdb * t;
+    auto t = -c.roo.y / rdb.y;
+    vec3 ip = c.roo + rdb * t;
     return {ip.x, ip.z};
 }
 
-float GobanView::stereoNearPoint() const {
+void GobanView::stereoBoardDepth(float& nearZ, float& farZ) const {
     using namespace glm;
-    // Same camera model as boardCoordinate() above and as the vertex shaders.
-    const mat4 m = cam.setView();
-    const vec3 ta(cameraPan.x, 0.0f, cameraPan.y);
-    const vec3 cw = normalize(vec3(m * vec4(0, 0, 1, 0)));
-    const vec3 roo = ta - cameraDistance * cw;
-    const vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
-    const vec3 cu = normalize(cross(up, cw));
-    const vec3 cv = cross(cw, cu);
-    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
-
-    float nearest = std::numeric_limits<float>::max();
+    const CameraBasis c = cameraBasis();
 
     // The board box, as the scene shaders build it: half-extents (1, 0.25,
     // squareSizeY/squareSizeX) about the origin.
     const float halfZ = model.metrics.squareSizeX > 0.0f
                       ? model.metrics.squareSizeY / model.metrics.squareSizeX : 1.0f;
     const vec3 half(1.0f, 0.25f, halfZ);
+    nearZ = std::numeric_limits<float>::max();
+    farZ = 0.0f;
     for (int i = 0; i < 8; ++i) {
         const vec3 corner((i & 1) ? half.x : -half.x,
                           (i & 2) ? half.y : -half.y,
                           (i & 4) ? half.z : -half.z);
-        const float z = dot(corner - roo, cw);
-        if (z > 0.0f) nearest = std::min(nearest, z);
+        const float z = dot(corner - c.roo, c.cw);
+        if (z > 0.0f) {
+            nearZ = std::min(nearZ, z);
+            farZ = std::max(farZ, z);
+        }
     }
+    if (farZ <= 0.0f) nearZ = farZ = 0.0f;   // the whole box is behind the camera
+}
+
+float GobanView::stereoConvergence() const {
+    return Stereo::convergence(stereoHalfBase(), gobanShader.getDof(), FOCAL_LENGTH);
+}
+
+float GobanView::stereoNearPoint() const {
+    using namespace glm;
+    const CameraBasis c = cameraBasis();
+    const vec3 roo = c.roo, cu = c.cu, cv = c.cv, cw = c.cw;
+    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
+
+    float boardNear = 0.0f, boardFar = 0.0f;
+    stereoBoardDepth(boardNear, boardFar);
+    float nearest = boardFar > 0.0f ? boardNear : std::numeric_limits<float>::max();
 
     // ...and the table, which passes under the board and continues toward the
     // viewer. Its nearest visible point is where the bottom edge of the frame

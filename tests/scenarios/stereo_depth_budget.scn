@@ -58,6 +58,19 @@ expect stereo true
 expect overlay_glyphs 38
 expect stereo_deviation <= 0.0334
 
+# Where the scene meets the glass. `dof` decides this and the deviation above
+# says nothing about it — the two cancel in near-minus-far — so it needs its own
+# assertion. At the shipped window the convergence plane sits in front of the
+# board's near corner, which is what puts the whole board behind the screen and
+# makes the flat RmlUi interface look like it floats in front of it. Bounded
+# rather than pinned to a value: whether 0.0925 is the right window is an open
+# judgement (docs/stereo.md), and both it and the dev*aspect alternative satisfy
+# this.
+expect stereo_convergence > 0.5
+expect stereo_convergence <= 2.42
+expect stereo_board_near >= 2.4
+expect stereo_board_far >= 3.9
+
 # --- The zoom that used to break it ------------------------------------------
 # `zoom stones` frames the two stones, which is a much closer camera: the near
 # point roughly halves. Under the old rule the deviation would have grown with
@@ -70,6 +83,11 @@ wait 400
 expect stereo_near <= 2.0          # the camera really did come in
 expect stereo_base <= 0.03         # ...and the base came in with it
 expect stereo_deviation <= 0.0334  # which is the whole point
+
+# The window comes in with them. convergence/near is dev*aspect/dof, which has
+# no camera term in it, so the plane keeps its place in the scene rather than
+# staying put in world units while the board advances through it.
+expect stereo_convergence <= 1.0
 
 # The overlay is still drawing both eyes at the new camera — the base it uses is
 # the same value the shader is handed, so there is nothing to drift.
