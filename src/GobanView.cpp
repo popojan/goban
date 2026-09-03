@@ -231,10 +231,17 @@ GobanView::GobanView(GobanModel& m)
             }
         }
     }
-    gobanShader.choose(shaderIdx);
+    // Asynchronous, so the several seconds this takes on a machine that has not
+    // linked this shader before are spent with the interface up and a message on
+    // screen rather than with a frozen window. Update() takes delivery and calls
+    // setReady() then. Without a shared GL context it falls back to linking here,
+    // which is what it always did.
+    gobanShader.chooseAsync(shaderIdx);
 
     updateFlag |= GobanView::UPDATE_ALL;  // Ensure full render on startup
-    gobanShader.setReady();
+    if (!gobanShader.isBuilding()) {
+        gobanShader.setReady();
+    }
     gobanOverlay.setReady();
 
     // Sync initial state from model to prevent stale default values (e.g., reservoir counts)
@@ -325,9 +332,16 @@ void GobanView::resetView() {
 
 void GobanView::switchShader(int idx) {
     updateFlag |= GobanView::UPDATE_ALL;
-    gobanShader.choose(idx);
+    // Asynchronous for the same reason as at startup, and it matters as much
+    // here: every shader links the first time it is selected, so cycling through
+    // the list on a fresh machine froze the window once per shader. The previous
+    // program keeps drawing until the new one lands (adoptProgram), so the board
+    // does not blank meanwhile.
+    gobanShader.chooseAsync(idx);
     state.metricsReady = false;
-    gobanShader.setReady();
+    if (!gobanShader.isBuilding()) {
+        gobanShader.setReady();
+    }
     // Force OnUpdate to re-evaluate the game state message
     state.msg = GameState::NONE;
 }
@@ -990,6 +1004,17 @@ float GobanView::stereoDeviation() const {
 float GobanView::stereoHalfBase() const {
     const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
     return Stereo::halfBase(gobanShader.getEof(), aspect, stereoNearPoint(), FOCAL_LENGTH);
+}
+
+bool GobanView::takeShaderBuild() {
+	if (!gobanShader.pollBuild()) return false;
+	// A shader linked in the background becomes current here — on the UI thread,
+	// and on the UI thread's context, which is the half of the build that cannot
+	// happen anywhere else (see GobanShader::adoptProgram).
+	gobanShader.setReady();
+	state.metricsReady = false;
+	updateFlag |= UPDATE_ALL;
+	return true;
 }
 
 void GobanView::animateIntro() {

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <fstream>
+#include "AppState.h"
 #include "GobanView.h"
 #include "Shadinclude.hpp"
 #include <glm/gtc/type_ptr.hpp>
@@ -57,7 +58,11 @@ std::string createShaderFromFile(const std::string& filename) {
     return Shadinclude::load(filename);
 }
 
-void GobanShader::initProgram(const std::string& vertexProgram, const std::string& fragmentProgram) {
+/// Compile and link. Locals and shared objects only — it writes no member and
+/// sets no context state, which is exactly what makes it safe to run on the
+/// worker's context. Returns 0 if anything failed.
+GLuint GobanShader::buildProgram(const std::string& vertexProgram,
+                                 const std::string& fragmentProgram) {
 
     using Clock = std::chrono::steady_clock;
     const auto t0 = Clock::now();
@@ -65,61 +70,69 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
         return std::chrono::duration<double, std::milli>(b - a).count();
     };
 
-    shadersReady = false;
-    if (gobanProgram != 0) {
-        glDeleteProgram(gobanProgram);
-    }
-    gobanProgram = glCreateProgram();
+    const GLuint program = glCreateProgram();
 
     const std::string sVertexShader = createShaderFromFile(vertexProgram);
     const std::string sFragmentShader = createShaderFromFile(fragmentProgram);
     const auto tRead = Clock::now();
 
-    /*
-    std::ofstream fout("./debug_fragment_shader.glsl");
-    fout << sFragmentShader << std::endl;
-    fout.close();
-    */
-
-    if(!shaderAttachFromString(gobanProgram, GL_VERTEX_SHADER, sVertexShader))
+    const GLuint vs = shaderCompileFromString(GL_VERTEX_SHADER, sVertexShader);
+    if (vs == 0)
         spdlog::error("Vertex shader [{}] failed to compile. Err {}", vertexProgram, glGetError());
+    else
+        glAttachShader(program, vs);
     const auto tVert = Clock::now();
-    if(!shaderAttachFromString(gobanProgram, GL_FRAGMENT_SHADER, sFragmentShader))
+
+    const GLuint fs = shaderCompileFromString(GL_FRAGMENT_SHADER, sFragmentShader);
+    if (fs == 0)
         spdlog::error("Fragment Shader [{}] failed to compile. Err {}", fragmentProgram, glGetError());
+    else
+        glAttachShader(program, fs);
     const auto tFrag = Clock::now();
 
-    glLinkProgram(gobanProgram);
+    glLinkProgram(program);
 
     // Querying the link status is what makes the driver finish the link, so the
     // timing below is only meaningful on this side of it — and the link is where
     // essentially the whole cost is. Measured on Intel/Mesa with a cold driver
-    // cache: 16 ms to compile the fragment shader, **1969 ms** to link it. That
-    // is the frozen first launch users report, and it is worth one line in
-    // last_run.log, which is what a bug report is read from.
-    GLint result;
-    glGetProgramiv(gobanProgram, GL_LINK_STATUS, &result);
+    // cache: 19 ms to compile the fragment shader, 2019 ms to link it. That is
+    // the frozen launch users report, and it is worth one line in last_run.log,
+    // which is what a bug report is read from.
+    GLint result = GL_FALSE;
+    glGetProgramiv(program, GL_LINK_STATUS, &result);
     const auto tLink = Clock::now();
     spdlog::info("shader [{}] built: read {:.0f} ms, vertex {:.0f} ms, fragment {:.0f} ms, link {:.0f} ms",
                  fragmentProgram, ms(t0, tRead), ms(tRead, tVert), ms(tVert, tFrag), ms(tFrag, tLink));
 
-    glDetachShader(gobanProgram, vertexShader);
-    glDeleteShader(vertexShader);
-    glDetachShader(gobanProgram, fragmentShader);
-    glDeleteShader(fragmentShader);
+    if (vs != 0) { glDetachShader(program, vs); glDeleteShader(vs); }
+    if (fs != 0) { glDetachShader(program, fs); glDeleteShader(fs); }
 
     if (result == GL_FALSE) {
-        GLint length;
-
-        glGetProgramiv(gobanProgram, GL_INFO_LOG_LENGTH, &length);
-        char *log = static_cast<char *>(malloc(static_cast<size_t>(length)));
-        glGetProgramInfoLog(gobanProgram, length, &result, log);
-
-        spdlog::error("sceneInit(): Program linking failed: {0}", log);
-        free(log);
-
-        glDeleteProgram(gobanProgram);
-        gobanProgram = 0;
+        GLint length = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+        std::string log(static_cast<size_t>(length > 0 ? length : 1), '\0');
+        glGetProgramInfoLog(program, length, &result, log.data());
+        spdlog::error("sceneInit(): Program linking failed: {0}", log.c_str());
+        glDeleteProgram(program);
+        return 0;
     }
+    return program;
+}
+
+/// Install a linked program: its buffers, its binding point and every uniform
+/// location. **UI thread only.** glBindBufferRange() below binds to the context
+/// rather than to the program or the buffer, so doing this on the worker would
+/// leave the drawing context with no uniform buffer bound at all — the board
+/// would render from whatever happened to be there.
+void GobanShader::adoptProgram(GLuint program) {
+    if (program == 0) return;
+    // The old program is kept alive until the new one is in hand, which is what
+    // lets a shader switch keep drawing the previous board for the seconds the
+    // link takes instead of blanking.
+    if (gobanProgram != 0 && gobanProgram != program) {
+        glDeleteProgram(gobanProgram);
+    }
+    gobanProgram = program;
 
     uBlockIndex = glGetUniformBlockIndex(gobanProgram, "iStoneBlock");
     glGenBuffers(1, &bufStones);
@@ -187,6 +200,129 @@ void GobanShader::initProgram(const std::string& vertexProgram, const std::strin
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
     glUseProgram(0);
+}
+
+/// The synchronous path, unchanged in effect: build, then install. Still used
+/// when there is no shared context, and by the fallback inside chooseAsync().
+void GobanShader::initProgram(const std::string& vertexProgram, const std::string& fragmentProgram) {
+    const GLuint program = buildProgram(vertexProgram, fragmentProgram);
+    shadersReady = false;
+    if (program == 0) {
+        gobanProgram = 0;
+        return;
+    }
+    adoptProgram(program);
+}
+
+int GobanShader::chooseAsync(int idx) {
+    GLFWwindow* shared = AppState::GetShaderContext();
+    if (shared == nullptr) {
+        // No shared context: exactly the old behaviour, freeze included. Better
+        // than not selecting the shader at all.
+        return choose(idx);
+    }
+
+    PendingShader s;
+    if (!resolveShader(idx, s)) return currentProgram;
+
+    // Already holding it — the same dedupe choose() does, and the reason the
+    // startup path links once rather than three times.
+    if (s.index == currentProgram && gobanProgram != 0 && !buildRunning) {
+        applyShaderMetadata(s);
+        return currentProgram;
+    }
+
+    if (buildRunning) {
+        // One link at a time. Remember the last thing asked for rather than
+        // dropping it: a build takes seconds, and cycling shaders with the
+        // keyboard is exactly how several requests arrive inside one. Only the
+        // most recent matters — the ones in between were never seen.
+        queued = s;
+        hasQueued = true;
+        return currentProgram;
+    }
+
+    startBuild(s);
+    return currentProgram;
+}
+
+void GobanShader::startBuild(const PendingShader& s) {
+    GLFWwindow* shared = AppState::GetShaderContext();
+    if (shared == nullptr) return;
+
+    pending = s;
+    buildTarget = s.index;
+    buildResult = 0;
+    buildFinished.store(false, std::memory_order_relaxed);
+    buildRunning = true;
+    buildStarted = std::chrono::steady_clock::now();
+
+    buildThread = std::thread([this, shared]() {
+        // The worker owns this context for its whole life; nothing else ever
+        // makes it current, so there is no handover to get wrong.
+        glfwMakeContextCurrent(shared);
+        const GLuint program = buildProgram(pending.vertex, pending.fragment);
+        // The UI thread is about to use this program on its own context. Shared
+        // objects need the producing context to have finished before the
+        // consuming one may rely on them, and glFinish is the blunt instrument
+        // that guarantees it without a sync object.
+        glFinish();
+        glfwMakeContextCurrent(nullptr);
+        buildResult = program;
+        buildFinished.store(true, std::memory_order_release);
+    });
+}
+
+void GobanShader::joinBuild() {
+    if (buildThread.joinable()) buildThread.join();
+    buildRunning = false;
+}
+
+double GobanShader::buildElapsed() const {
+    if (!buildRunning) return 0.0;
+    return std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - buildStarted).count();
+}
+
+bool GobanShader::pollBuild() {
+    if (!buildRunning || !buildFinished.load(std::memory_order_acquire)) return false;
+
+    joinBuild();
+    const GLuint program = buildResult;
+    buildResult = 0;
+    buildFinished.store(false, std::memory_order_relaxed);
+
+    const double took = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - buildStarted).count();
+
+    bool adopted = false;
+    if (program == 0) {
+        // The link failed and said so in the log. Leave whatever was already
+        // current alone rather than dropping to a blank board — on a shader
+        // switch that is the previous shader, which is the better answer than
+        // nothing, and at startup there is nothing to lose.
+        spdlog::error("Shader {} could not be built; keeping the current one.", buildTarget);
+    } else {
+        // The appearance facts land with the program, not when it was asked
+        // for. Applying them at the request would flip isStereo() — and with it
+        // the overlay's two eyes and its ink — seconds before the shader that
+        // needs them is actually drawing.
+        applyShaderMetadata(pending);
+        adoptProgram(program);
+        currentProgram = buildTarget;
+        spdlog::info("shader {} ready after {:.1f} s", buildTarget, took);
+        adopted = true;
+    }
+
+    // Whatever was asked for while this one was linking.
+    if (hasQueued) {
+        const PendingShader next = queued;
+        hasQueued = false;
+        if (next.index != currentProgram || gobanProgram == 0) {
+            startBuild(next);
+        }
+    }
+    return adopted;
 }
 
 // Half the stereo base, in world units, computed on the CPU (Stereo.h) — not
@@ -386,55 +522,69 @@ GLuint make_buffer(GLenum target, const void *buffer_data, GLsizei buffer_size) 
     return buffer;
 }
 
-int GobanShader::choose(int idx) {
-
+bool GobanShader::resolveShader(int idx, PendingShader& out) const {
     using nlohmann::json;
     json shaders(config->data.value("shaders", json::array()));
 
     if(shaders.empty()) {
         spdlog::critical("No shader definition found.");
-        return -1;
+        return false;
     }
 
-    int newProgram = static_cast<int>(idx % shaders.size());
+    out.index = static_cast<int>(idx % shaders.size());
+    json shader(shaders[out.index]);
 
-    json shader(shaders[newProgram]);
+    out.vertex = shader.value("vertex", "");
+    out.fragment = shader.value("fragment", "");
 
-    std::string vertexFile(shader.value("vertex", ""));
-    std::string fragmentFile(shader.value("fragment", ""));
-
-    currentProgramH = shader.value("height", 0.0f);
+    out.height = shader.value("height", 0.0f);
     // Declared by the shader rather than inferred from its vertex file: the
     // overlay has to draw the same two eyes, and a path comparison is not a
     // fact about the shader.
-    currentProgramStereo = shader.value("stereo", 0) != 0;
+    out.stereo = shader.value("stereo", 0) != 0;
     // Same shape, and the same reason: an appearance fact the CPU has to act
     // on, declared by the shader rather than inferred. The global block is the
     // default and no shipped shader overrides it, so this normally resolves to
     // exactly what `annotations` says.
-    currentPalette = resolveQualityPalette(
+    out.palette = resolveQualityPalette(
             config->data.value("annotations", json::object()),
             shader.value("annotations", json::object()));
-    if(!vertexFile.empty() && !fragmentFile.empty()) {
-        // Link only when we are not already holding this very program. Linking
-        // is where a shader costs — measured 1969 ms cold on Intel/Mesa against
-        // 17 ms to compile the fragment shader — and the same program used to be
-        // linked three times on the way to the first frame: from GobanShader's
-        // constructor, from GobanView's constructor for the saved shader, and
-        // again when the shader dropdown syncs itself to what is already
-        // selected. The driver's own cache made repeats cheap (90 ms) rather
-        // than free, and warm that was still 278 ms of every launch.
-        //
-        // The metadata above is re-read either way: it is nearly free, and it
-        // comes from the configuration rather than from the program object, so
-        // a reload with the same index must still be able to change it.
-        if (newProgram != currentProgram || gobanProgram == 0) {
-            initProgram(vertexFile, fragmentFile);
-        }
-        currentProgram = newProgram;
-    } else {
-        spdlog::warn("Shader [{}] must comprise both vertex and fragment programs.", newProgram);
+
+    if(out.vertex.empty() || out.fragment.empty()) {
+        spdlog::warn("Shader [{}] must comprise both vertex and fragment programs.", out.index);
+        return false;
     }
+    return true;
+}
+
+void GobanShader::applyShaderMetadata(const PendingShader& s) {
+    currentProgramH = s.height;
+    currentProgramStereo = s.stereo;
+    currentPalette = s.palette;
+}
+
+int GobanShader::choose(int idx) {
+    PendingShader s;
+    if (!resolveShader(idx, s)) return currentProgram;
+
+    applyShaderMetadata(s);
+
+    // Link only when we are not already holding this very program. Linking is
+    // where a shader costs — measured 2019 ms cold on Intel/Mesa against 19 ms
+    // to compile the fragment shader — and the same program used to be linked
+    // three times on the way to the first frame: from GobanShader's constructor,
+    // from GobanView's constructor for the saved shader, and again when the
+    // shader dropdown syncs itself to what is already selected. The driver's own
+    // cache made repeats cheap (90 ms) rather than free, and warm that was still
+    // 278 ms of every launch.
+    //
+    // The metadata above is applied either way: it is nearly free, and it comes
+    // from the configuration rather than from the program object, so a reload
+    // with the same index must still be able to change it.
+    if (s.index != currentProgram || gobanProgram == 0) {
+        initProgram(s.vertex, s.fragment);
+    }
+    currentProgram = s.index;
     return currentProgram;
 }
 

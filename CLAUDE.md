@@ -521,6 +521,50 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   backwards — every finished game showed both counts swapped. Same shape as the
   buttons that disagreed with their commands before ADR-0005.
 
+### Building a Shader
+See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
+- **The cost is `glLinkProgram`, not compilation.** Measured on Intel/Mesa with
+  a cold driver cache: 19 ms to compile the fragment shader, **2019 ms** to link
+  it. Reproduce with `MESA_SHADER_CACHE_DIR=$(mktemp -d)` — faithful and
+  repeatable; `MESA_SHADER_CACHE_DISABLE=1` overstates it about 2.5x. And it is
+  paid for **every shader on first use**, not once per machine: cycling the View
+  menu on a fresh install froze the window once per shader.
+- **`KHR_parallel_shader_compile` does not work here and must not be retried
+  without re-measuring.** Mesa advertises it; measured, `glLinkProgram` itself
+  took 2065 ms and `GL_COMPLETION_STATUS_KHR` was complete on the *first* poll.
+- **The build splits by what is shared and what is context state.**
+  `buildProgram()` (create/compile/link) touches only locals and objects shared
+  between contexts, so it runs on the worker. `adoptProgram()` runs on the **UI
+  thread**, because `glBindBufferRange()` binds to the *context* — on the worker
+  it would leave the drawing context with no uniform buffer bound and the board
+  would draw its stones from whatever was there. Only the program name and a
+  finished flag cross the boundary; the ~50 uniform locations are queried on the
+  UI thread, where the lookup is free.
+- **`takeShaderBuild()` is called before `OnUpdate()`'s readiness gate**, because
+  it is what opens that gate. It used to sit at the end of `Update()`, which
+  `OnUpdate()` only reaches once the view is *already* ready — so the finished
+  program could never have been collected at all.
+- **A widget asks `selectedProgram()`, the renderer asks `getCurrentProgram()`.**
+  The latter is -1 during a build. `populateUIElements()` asked it, fell back to
+  entry 0, and the change event that fired **replaced the shader the user had
+  saved** — it was the one dropdown left out of the repopulation invariant below.
+  Fixed from both ends: the population takes a `WidgetEventGuard`, and the
+  `shader` branch in `EventHandlerNewGame` asks `acceptsUiEvents()` like its four
+  siblings.
+- **Quiescence counts a build, and `getIdleTimeout()` must cover it.** `isIdle()`
+  gained a sixth term — the first not about the game — so a scripted run cannot
+  question a view that has never drawn. Without the timeout the loop blocks in
+  `glfwWaitEvents()`, paints no message *and never collects the finished
+  program*. Third time that trap has been walked into; see the resync and the
+  genmove.
+- **Idle is not repainted.** `wait_idle` returns on the frame the program became
+  current; `overlay_glyphs` reports what the glyph pass last *drew*. Assert what
+  was rendered with `wait_until`, not `expect`.
+- **A wait with no estimate gets a count, not a bar.** Nothing can predict a
+  driver's link time, so a progress bar would be decoration — the same reasoning
+  that keeps the board's wait indicator to lapsing seconds. The message names the
+  cost as one-time, which is the fact that makes the pause acceptable.
+
 ### Rendering Across Threads
 - **A `GameObserver` callback may hand data over; it may not act on the view.**
   `GobanView`'s callbacks arrive on the game thread — and during startup on the

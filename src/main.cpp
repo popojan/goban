@@ -657,6 +657,35 @@ int main(int argc, char** argv)
 
     spdlog::info("OpenGL version: {}", reinterpret_cast<const char *>(glGetString(GL_VERSION)));
 
+    // A second context that shares objects with this one, so the board shader
+    // can be linked without blocking the UI. Linking is the whole of the frozen
+    // first launch — measured 2019 ms on Intel/Mesa with a cold driver cache and
+    // reported at ~15 s on Windows/NVIDIA — and it is not a one-off: every
+    // shader links the first time it is selected.
+    //
+    // Created here because glfwCreateWindow may only be called from the main
+    // thread, and because it must share with a context that already exists. A
+    // failure is not fatal: GobanShader falls back to linking synchronously,
+    // which is what it did before.
+    {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        GLFWwindow* shared = glfwCreateWindow(1, 1, "goban-shader-worker", nullptr, window);
+        if (shared) {
+            AppState::SetShaderContext(shared);
+        } else {
+            spdlog::warn("No shared GL context; shaders will be linked on the UI thread "
+                         "and the first use of each will pause the window.");
+        }
+        // The VISIBLE hint is left as it is: this is the last window created,
+        // and fullscreen reuses the main one via glfwSetWindowMonitor rather
+        // than making another. Anything added here later must set it again.
+        //
+        // GLFW does not make a new window's context current, but say so anyway
+        // — the cost is nothing and the failure would be every draw going to a
+        // 1x1 invisible window.
+        glfwMakeContextCurrent(window);
+    }
+
     // Show window immediately with black screen (before shader compilation)
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);

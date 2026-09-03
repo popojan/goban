@@ -51,11 +51,16 @@ cycle shaders
 cycle shaders
 cycle shaders
 cycle shaders
-wait 600
+wait_idle
 expect stereo true
 
 # Every label, once per eye. Nineteen items, thirty-eight draws.
-expect overlay_glyphs 38
+#
+# wait_until rather than expect: wait_idle above returns on the frame the shader
+# became current, and overlay_glyphs reports what the glyph pass last *drew* — so
+# the rebuild into two eyes has been asked for but need not have happened yet.
+# Quiescent is not the same as repainted.
+wait_until overlay_glyphs 38
 expect stereo_deviation <= 0.0334
 
 # Where the scene meets the glass. `dof` decides this and the deviation above
@@ -98,7 +103,7 @@ expect overlay_glyphs 38
 # is what says the doubling above was the eyes and not something else.
 cycle shaders
 cycle shaders
-wait 600
+wait_idle
 expect stereo false
-expect overlay_glyphs 19
+wait_until overlay_glyphs 19
 expect stereo_deviation <= 0.0334

@@ -102,6 +102,13 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
         }
     }
     else if(value == "shader") {
+        // Like its four siblings above and below. This branch was the one that
+        // did not ask, so filling the dropdown counted as the user choosing a
+        // shader — see populateUIElements(), which now also suppresses events
+        // while it fills. Either fix alone would do here; both, because the rule
+        // is that a programmatic repopulation is not a choice, and it should
+        // hold from both ends.
+        if (!controller.acceptsUiEvents()) return;
         std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
         int index = 0;
         ss >> index;

@@ -51,6 +51,16 @@ GLFWwindow* GetWindow() {
     return g_window;
 }
 
+static GLFWwindow* g_shaderContext = nullptr;
+
+void SetShaderContext(GLFWwindow* window) {
+    g_shaderContext = window;
+}
+
+GLFWwindow* GetShaderContext() {
+    return g_shaderContext;
+}
+
 void RequestExit() {
     g_exitRequested = true;
     if (g_window) {

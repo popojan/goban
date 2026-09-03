@@ -61,12 +61,14 @@ cycle shaders
 cycle shaders
 cycle shaders
 cycle shaders
+wait_idle
 expect stereo true
 expect anaglyph half-color
 
 anaglyph dubois
 cycle shaders
 cycle shaders
+wait_idle
 expect stereo false
 expect anaglyph dubois
 

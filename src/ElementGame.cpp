@@ -65,6 +65,18 @@ ElementGame::ElementGame(const Rml::String& tag)
 }
 
 void ElementGame::populateUIElements() {
+    // Filling a dropdown makes it fire a change event, and a change event on
+    // this one *switches the shader*. The invariant in CLAUDE.md has always said
+    // repopulation must be wrapped; the shader dropdown was simply left off the
+    // list of dropdowns it named, and it got away with it because the selection
+    // it ended up setting was the one already current.
+    //
+    // It stopped getting away with it when the shader began to be linked in the
+    // background: no program is current during the build, so the selection below
+    // fell to entry 0 and the change event replaced the shader the user had
+    // saved with the first in the list.
+    GobanControl::WidgetEventGuard suppressEvents(control);
+
     // Populate shaders dropdown (doesn't require engines)
     auto selectShader = dynamic_cast<Rml::ElementFormControlSelect*>(
             GetContext()->GetDocument("game_window")->GetElementById("selectShader"));
@@ -83,8 +95,10 @@ void ElementGame::populateUIElements() {
             std::string shaderIndex(ss.str());
             selectShader->Add(shaderName.c_str(),shaderIndex.c_str());
         }
-        // Sync shader menu to restored shader state
-        int currentShader = view.gobanShader.getCurrentProgram();
+        // Sync shader menu to restored shader state. selectedProgram(), not
+        // getCurrentProgram(): during a background link nothing is current yet,
+        // and the shader the user chose is the one being built.
+        int currentShader = view.gobanShader.selectedProgram();
         if (currentShader >= 0 && currentShader < static_cast<int>(shaders.size())) {
             selectShader->SetSelection(currentShader);
         } else {
@@ -286,6 +300,19 @@ void ElementGame::gameLoop() {
 }
 
 double ElementGame::getIdleTimeout() const {
+    // A shader being linked in the background produces no input event either,
+    // and this one is worse than the others: until it lands there is no board on
+    // screen at all, so without a wake-up the loop blocks in glfwWaitEvents(),
+    // draws nothing, and the message explaining the wait is never painted — and
+    // the finished program is never collected, because OnUpdate() is what
+    // collects it. Same trap as the resync and the genmove below; writing the
+    // message without this fixes nothing.
+    //
+    // Fast enough to turn the second count over cleanly.
+    if (view.gobanShader.isBuilding()) {
+        return 0.1;
+    }
+
     // During async engine loading, poll periodically to check completion
     if (!enginesLoaded && engineLoadingStarted) {
         return 0.1;  // 100ms polling interval during loading
@@ -652,7 +679,30 @@ void ElementGame::syncStatusIndicator() {
 
     std::string text;
     const char* severityClass = nullptr;
-    if (logPanelOpen) {
+    if (view.gobanShader.isBuilding()) {
+        // Above loading, and above the badge: while this is true there is no
+        // board on screen at all, which is the most alarming thing the window
+        // can be doing and the one that most needs explaining. Engines loading
+        // in parallel is the lesser worry and waits its turn — it is also the
+        // longer wait, so it gets the line back soon enough.
+        //
+        // A whole-second count, not a progress bar: nothing can estimate how
+        // long a driver will take to link, so a bar would have to be a
+        // decorative one, and ADR-0012 already settled that a wait is reported
+        // by a count that turns over once a second rather than by motion
+        // carrying no information. The message says it is a one-time cost
+        // because that is the fact that turns a worrying pause into an
+        // acceptable one — it does not happen again on this machine.
+        // templateText() rather than getTemplateText(): this string is new, so
+        // only the English .rml has it, and the free function returns an empty
+        // string for a missing template — a language without the entry would
+        // show a blank line during the one pause that most needs a caption.
+        text = Rml::CreateString(
+            templateText("tplStatusBuildingShader",
+                         "Preparing the board — first time only on this computer… %ds").c_str(),
+            static_cast<int>(view.gobanShader.buildElapsed())).c_str();
+        severityClass = "loading";
+    } else if (logPanelOpen) {
         // While the panel is open this line is the only way to close it again,
         // so it must always be present. It was not: opening marked the messages
         // seen, which emptied the badge, which hid the element — leaving the
@@ -1117,8 +1167,17 @@ void ElementGame::syncActionAvailability() {
 
 void ElementGame::OnUpdate()
 {
-    if(!view.gobanShader.isReady())
+    // Before the gate below, because this is what opens it.
+    view.takeShaderBuild();
+
+    if(!view.gobanShader.isReady()) {
+        // The board cannot be drawn yet, so the one thing that must still happen
+        // is saying so. #lblStatus is where application status lives (ADR-0012),
+        // and this is the most application-ish state there is: the program is
+        // not able to show you a board yet.
+        syncStatusIndicator();
         return;
+    }
 
     //view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSizeX);
     view.board.updateMetrics(model.metrics);

@@ -2070,6 +2070,12 @@ bool GobanControl::canResign() const {
 
 bool GobanControl::isIdle() const {
     if (!acceptsUiEvents()) return false;
+    // A shader still being linked in the background. Sixth term, and the only
+    // one that is not about the game: until it lands there is no board to read,
+    // so a scripted run that proceeded here would be asking questions of a view
+    // that has never drawn. It is bounded — a link finishes — so unlike
+    // EngineSync::Unsynced it is safe to wait on.
+    if (view.gobanShader.isBuilding()) return false;
     if (engine.isThinking()) return false;
     // Navigation is queued to the game thread, so it can still be outstanding
     // while no engine is thinking. Without this a script would read the board

@@ -136,6 +136,15 @@ public:
 
     void switchShader(int idx);
 
+    /// Take delivery of a shader linked in the background, if one is ready.
+    /// Returns true on the frame it became current.
+    ///
+    /// Called from ElementGame::OnUpdate() **before** its readiness gate, since
+    /// this is the thing that opens that gate — it used to sit at the end of
+    /// Update(), which OnUpdate only reaches once the view is already ready, so
+    /// the build could never be adopted at all.
+    bool takeShaderBuild();
+
     [[nodiscard]] Position getBoardCoordinate(float x, float y)const ;
     [[nodiscard]] glm::vec2 boardCoordinate(float x, float y) const;
 

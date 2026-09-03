@@ -74,3 +74,5 @@ A compact alternative for small decisions is the *Y-statement*:
 - [ADR-0009: A killed engine is restarted and resynchronised](0009-a-killed-engine-is-restarted-and-resynced.md) — *Accepted; gives the timeout kill the counterpart it never had*
 - [ADR-0010: The aftermath is negotiated, not declared](0010-the-aftermath-is-negotiated-not-declared.md) — *Proposed; a sketch only. Nothing implemented, and the ruleset question waits on it*
 - [ADR-0011: Annotation ink is data in the shader's config entry](0011-annotation-ink-is-data-on-the-cpu-side.md) — *Accepted; the palette cannot live in GLSL because the overlay bakes colour on the CPU*
+- [ADR-0012: State is shown on the board, not in a panel over it](0012-the-board-is-the-only-display-surface-for-state.md) — *Accepted; supersedes ADR-0007 decision 11. Two open questions: the anonymous wait, and naming the engine*
+- [ADR-0013: Shaders are linked on a worker thread with a shared GL context](0013-shaders-are-linked-off-the-ui-thread.md) — *Accepted; the frozen launch is glLinkProgram, and `KHR_parallel_shader_compile` measured useless*

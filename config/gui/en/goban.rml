@@ -253,6 +253,11 @@
     <!-- Status indicator templates. %s is the engine name for the loading case,
          and the unseen-message count for the warning and error cases. -->
     <div class="template" id="tplStatusLoading">Loading %s…</div>
+    <!-- %d is seconds elapsed. The driver decides how long linking a shader
+         takes and will not say, so there is no progress to show — only a count,
+         and the fact that it happens once per machine. Not yet translated; the
+         other languages fall back to the English in ElementGame.cpp. -->
+    <div class="template" id="tplStatusBuildingShader">Preparing the board — first time only on this computer… %ds</div>
     <div class="template" id="tplStatusMessages">× Messages</div>
     <div class="template" id="tplStatusWarning">⚠ Messages (%d)</div>
     <div class="template" id="tplStatusError">⚠ Messages (%d)</div>
