@@ -25,15 +25,25 @@ expect eval_moves_shown false
 expect eval_hint_waiting false
 
 # --- Reaching for a stone starts the wait, it does not end it ----------------
-click 4 4
+# (1,0) is the mock's second candidate: its own win rate is 55 where the
+# position's is 60, so the two are told apart by the number itself.
+click 1 0
 expect holds_stone true
 # Still nothing: reaching for a stone is not choosing a point.
 expect eval_moves_shown false
+# And the readout still answers about the *position* — the mode is withholding
+# the engine's opinion of the point being aimed at.
+wait_until eval_board_text B 60% B+2.5
 
 # --- ...and the dwell ends it ------------------------------------------------
 # Longer than annotations.hint_dwell_ms, which ships at 800.
 wait_until eval_moves_shown true
 expect eval_hint_waiting false
+
+# Now the readout answers about the candidate under the stone. This is where the
+# delta of a contemplated move lives: there is no room on the stone, and the
+# suggestions carry their loss as colour rather than as a printed number.
+wait_until eval_board_text B 55% B+2.5
 
 # --- The reveal survives looking around --------------------------------------
 # It closes on placing or putting the stone back, not on moving away: comparing
@@ -42,7 +52,7 @@ mouse_move 400 300
 expect eval_moves_shown true
 
 # --- Placing closes it -------------------------------------------------------
-click 4 4
+click 1 0
 wait_until move_count >= 1
 expect holds_stone false
 expect eval_moves_shown false

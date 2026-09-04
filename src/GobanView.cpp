@@ -1378,6 +1378,26 @@ void GobanView::updateFloatingLabels() {
 			if (readoutAlign == TextAlign::Left)  anchorCol = 0.0f;
 			if (readoutAlign == TextAlign::Right) anchorCol = lastCol;
 
+			// ADR-0014: while a stone is held over a point the engine has an
+			// opinion about, the readout answers about *that candidate* rather
+			// than about the position. It is the only place the delta of a
+			// contemplated move can go — there are two characters free beside a
+			// centred readout on 9x9 — and asking by aiming is how Lizzie
+			// answers the same question. Gated on the suggestions being visible:
+			// if you can see the stars you may query them, and if you cannot
+			// then this would leak the opinion the mode is withholding.
+			const AnalysisMove* aimed = nullptr;
+			if (showAnalysisOverlay && model.state.holdsStone) {
+				for (const auto& m : report->moves) {
+					if (m.move == Move::NORMAL && m.move.pos == model.cursor) {
+						aimed = &m;
+						break;
+					}
+				}
+			}
+			const double shownWinrate = aimed ? aimed->winrateBlack : report->winrateBlack;
+			const auto& shownLead = aimed ? aimed->scoreLeadBlack : report->scoreLeadBlack;
+
 			std::ostringstream text;
 			// Anchored to Black, always — the same convention the panel uses,
 			// and chess's for the same reason: a figure that keeps its side is
@@ -1385,10 +1405,10 @@ void GobanView::updateFloatingLabels() {
 			// move caused. Naming whoever leads instead never drops below 50%
 			// and hides exactly that. The score below keeps Go's own convention
 			// of naming the leader, because that is how a result is written.
-			text << "B " << static_cast<int>(std::lround(report->winrateBlack * 100.0))
+			text << "B " << static_cast<int>(std::lround(shownWinrate * 100.0))
 			     << "%";
-			if (report->scoreLeadBlack) {
-				const double lead = *report->scoreLeadBlack;
+			if (shownLead) {
+				const double lead = *shownLead;
 				// One space, not a run of them: the scenario runner re-joins an
 				// expected value with single spaces, so a wider gap could not be
 				// asserted. How this should actually be spaced on a board edge
