@@ -82,10 +82,26 @@ units per character there are about ten characters free beside a centred readout
 on 19x19 and **two** on 9x9. A beginner playing a bot is on the small board, so
 there is no room for a second item exactly where this feature is aimed.
 
-So the verdict is drawn on the stone: the last move's number tinted by the
-quality ramp, and carrying the engine's rank letter when the move was in its
-list. The suggestions already label ranked moves `A`/`B`/`C`, so a move number
-wearing an `A` says "first choice" in vocabulary the player has already learnt.
+So the verdict is drawn on the stone: tinted by the quality ramp, and carrying
+the engine's rank letter when the move was in its list. The suggestions already
+label ranked moves `A`/`B`/`C`, so a move number wearing an `A` says "first
+choice" in vocabulary the player has already learnt.
+
+**It is the evaluation's own label, not the last-move marker's.** It merely lands
+on the same point. That matters because gating it on the last-move toggle would
+make one feature vanish for a reason belonging to another — the same coupling
+that once let switching off two markers take the coordinates, the markup and the
+whole evaluation display with them. The rule that came out of that stands: a
+toggle belongs where its own labels are placed.
+
+Faking the other toggle on instead — drawing move numbers while the menu still
+says they are off — only inverts the problem into a setting that disagrees with
+the board, which is what ADR-0005 exists to prevent.
+
+The overlap has a rule already, the one the suggestions follow: where a label is
+already there, tint it rather than replace it; where there is none, draw one. So
+with the last-move number shown the verdict colours it, and without it the
+verdict draws its own mark. Both branches covered, no setting overridden.
 
 It is **additive**, not a replacement. The stone says what the move was worth;
 the readout says where the game stands now. They are different subjects, and
@@ -114,10 +130,8 @@ count.
 - A tsumego shows no evaluation at all (ADR-0007), and that is unaffected: the
   first suggestion there *is* the answer to the problem, whatever the order of
   reveal.
-- The verdict depends on the last-move overlay being drawn. With those markers
-  switched off it has nowhere to live, and must either draw its own mark or be
-  absent — a decision to make rather than inherit, given what happened when a
-  toggle was put around a whole draw pass instead of around its own labels.
+- The verdict is visible whenever the mode is on, whatever the last-move and
+  next-move markers are set to. It shares their point, never their toggle.
 - Like the suggestions and the readout, the verdict stands down at a scored end:
   the board has finished making its claim.
 
