@@ -127,7 +127,14 @@ public:
     /// `analysis_command` and `analysis_parameters` are substituted over
     /// `command` and `parameters` when present, which is what lets the analysis
     /// instance run a CPU backend while the playing engine keeps the GPU.
-    [[nodiscard]] std::optional<nlohmann::json> analysisConfig() const;
+    /// `designated` distinguishes `"analysis": 1` from the `"kibitz"` fallback.
+    /// Returned with the config rather than via a second accessor: two
+    /// accessors are two moments (see the file comment).
+    struct AnalysisChoice {
+        nlohmann::json config;
+        bool designated = false;
+    };
+    [[nodiscard]] std::optional<AnalysisChoice> analysisConfig() const;
 
     /// The human player, or nullptr if none has been registered yet. Analysis
     /// mode blocks on this one whatever colour is to move. A single lock, unlike

@@ -196,7 +196,7 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
     }
 }
 
-std::optional<nlohmann::json> PlayerManager::analysisConfig() const {
+std::optional<PlayerManager::AnalysisChoice> PlayerManager::analysisConfig() const {
     std::lock_guard<std::mutex> lock(mutex);
     if (!analysisBotSet && !kibitzBotSet) return std::nullopt;
 
@@ -207,7 +207,7 @@ std::optional<nlohmann::json> PlayerManager::analysisConfig() const {
     if (bot.contains("analysis_parameters")) {
         bot["parameters"] = bot["analysis_parameters"];
     }
-    return bot;
+    return AnalysisChoice{std::move(bot), analysisBotSet};
 }
 
 void PlayerManager::beginLoading(const std::string& name) {

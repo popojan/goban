@@ -395,7 +395,8 @@ void AnalysisService::start() {
     // Resolved once, here rather than in the constructor: the bots load on their
     // own threads and nothing has claimed the role until they have finished.
     if (auto cfg = engine.analysisConfig()) {
-        botConfig = *cfg;
+        botConfig = std::move(cfg->config);
+        designated = cfg->designated;
         configured = !botConfig.value("command", std::string()).empty();
         engineName = botConfig.value("name", botConfig.value("command", std::string()));
     }
@@ -571,8 +572,18 @@ bool AnalysisService::startEngine() {
         if (entry == "lz-analyze")   hasLz   = true;
     }
     if (!hasKata && !hasLz) {
-        spdlog::warn("analysis: [{}] supports neither kata-analyze nor "
-                     "lz-analyze; the evaluation overlay is unavailable", engineName);
+        // Warn only if someone asked for this engine: a designated one that
+        // cannot stream is a misconfiguration, a "kibitz" engine that cannot is
+        // the ordinary case and warning about it badged every stock launch.
+        if (designated) {
+            spdlog::warn("analysis: [{}] is configured as the analysis engine but supports "
+                         "neither kata-analyze nor lz-analyze; the evaluation overlay is "
+                         "unavailable", engineName);
+        } else {
+            spdlog::info("analysis: no engine carries \"analysis\", and the \"kibitz\" engine "
+                         "[{}] cannot stream one; the evaluation overlay is unavailable",
+                         engineName);
+        }
         client.reset();
         return false;
     }

@@ -33,9 +33,12 @@ expect eval_winrate -1
 expect eval_has_score false
 expect eval_moves 0
 
-# The user was told, through the ordinary spdlog sink rather than a bespoke
-# "show this error" path.
-expect log_badge warning
+# Quietly. The engine only inherited the role from "kibitz" — nobody asked it to
+# analyse — so this is the ordinary configuration, not a fault, and badging it
+# put a red mark on every launch of a stock install. The user is told by
+# eval_state above. An engine *designated* with "analysis": 1 does warn; see
+# evaluation_engine_cannot_analyse.scn.
+expect log_badge none
 
 # The game itself is untouched — the analysis engine never shared a pipe with
 # the playing one, so its failure cannot reach the board.

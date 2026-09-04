@@ -152,7 +152,7 @@ public:
 
     /// Configuration for the dedicated analysis process, or nullopt when no
     /// engine nominated itself. Forwarded from PlayerManager; see ADR-0007.
-    [[nodiscard]] std::optional<nlohmann::json> analysisConfig() const {
+    [[nodiscard]] std::optional<PlayerManager::AnalysisChoice> analysisConfig() const {
         return playerManager->analysisConfig();
     }
 

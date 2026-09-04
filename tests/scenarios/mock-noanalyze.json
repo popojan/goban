@@ -1,0 +1,21 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "An engine designated with \"analysis\": 1 that cannot analyse. Unlike mock-noeval.json, where the role is only inherited from \"kibitz\", somebody asked for this one — so it is a misconfiguration and warrants a warning.",
+  "bots": [
+    {
+      "name": "mock",
+      "path": "./cmake-build-release",
+      "command": "mock_gtp_engine",
+      "parameters": "--no-analyze",
+      "enabled": 1,
+      "main": 1,
+      "analysis": 1
+    }
+  ],
+  "humans": [
+    "Human"
+  ],
+  "sgf_dialog": {
+    "games_path": "./tests/scenarios/.games"
+  }
+}

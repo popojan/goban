@@ -161,6 +161,9 @@ private:
     std::string engineName;
     nlohmann::json botConfig;
     bool configured = false;
+    /// Designated with `"analysis": 1`, rather than inherited from `"kibitz"`.
+    /// Decides how loudly a non-streaming engine is reported; see startEngine().
+    bool designated = false;
 
     std::thread thread;
     std::atomic<bool> enabled{false};
