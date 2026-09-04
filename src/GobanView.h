@@ -478,6 +478,8 @@ public:
     /// `OnDemand` withholds them until the player has aimed at a point long
     /// enough to have chosen it, which turns the same display from a substitute
     /// for thinking into a check on it.
+    /// The order matches the three `<option>`s of #selectEvaluationMoves, which
+    /// is what the menu sync casts through.
     enum class HintMode { Off, OnDemand, Always };
 
     bool toggleAnalysisOverlay();

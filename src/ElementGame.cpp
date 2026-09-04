@@ -1245,10 +1245,16 @@ void ElementGame::OnUpdate()
         if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
             OnMenuToggle("toggle_evaluation", checked);
         }
-        auto* movesEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationMoves");
-        const bool movesChecked = view.isAnalysisOverlayShown();
-        if (movesEl && movesEl->IsClassSet("selected") != movesChecked) {
-            OnMenuToggle("toggle_evaluation_moves", movesChecked);
+        // The suggestions are a three-state select, not a toggle: it can move
+        // without the menu being touched (restored at startup, or set by the
+        // command), so the widget follows the view rather than the other way.
+        if (auto* movesEl = dynamic_cast<Rml::ElementFormControlSelect*>(
+                context->GetDocument("game_window")->GetElementById("selectEvaluationMoves"))) {
+            const int want = static_cast<int>(view.analysisOverlayMode());
+            if (movesEl->GetSelection() != want) {
+                GobanControl::WidgetEventGuard suppressEvents(control);
+                movesEl->SetSelection(want);
+            }
         }
         auto* readoutEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationReadout");
         const bool readoutChecked = view.isEvaluationReadoutShown();

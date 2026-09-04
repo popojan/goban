@@ -46,7 +46,13 @@
                             <div class="hr">표시</div>
                             <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">마지막 수</div>
                             <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">다음 수</div>
-                            <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">추천수</div>
+                            <div class="cmd">
+                                <select id="selectEvaluationMoves" onchange="evaluation_moves" onmousedown="nop">
+                                    <option value="off">추천수: 끔</option>
+                                    <option value="on_demand">추천수: 필요할 때</option>
+                                    <option value="always">추천수: 항상</option>
+                                </select>
+                            </div>
                             <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">형세 수치</div>
                             <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">경과 시간</div>
                             <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">좌표</div>

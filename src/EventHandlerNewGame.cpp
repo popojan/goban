@@ -101,6 +101,13 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
             }
         }
     }
+    else if(value == "evaluation_moves") {
+        // Three states, so a select rather than a checkbox: "on demand" and
+        // "always" both looked ticked on one item.
+        if (!controller.acceptsUiEvents()) return;
+        const std::string mode = event.GetParameter<Rml::String>("value", "off").c_str();
+        controller.command("toggle_evaluation_moves " + mode);
+    }
     else if(value == "shader") {
         // Like its four siblings above and below. This branch was the one that
         // did not ask, so filling the dropdown counted as the user choosing a
