@@ -127,14 +127,12 @@ public:
     /// `analysis_command` and `analysis_parameters` are substituted over
     /// `command` and `parameters` when present, which is what lets the analysis
     /// instance run a CPU backend while the playing engine keeps the GPU.
-    /// `designated` distinguishes `"analysis": 1` from the `"kibitz"` fallback.
-    /// Returned with the config rather than via a second accessor: two
-    /// accessors are two moments (see the file comment).
-    struct AnalysisChoice {
-        nlohmann::json config;
-        bool designated = false;
-    };
-    [[nodiscard]] std::optional<AnalysisChoice> analysisConfig() const;
+    ///
+    /// Nullopt when the role would only be *inherited* from an engine already
+    /// known to lack the analyze commands: kibitz needs `genmove`, which every
+    /// engine has, so inheriting assumes a capability it never had to possess.
+    /// Asked at load rather than by spawning a clone to rediscover it.
+    [[nodiscard]] std::optional<nlohmann::json> analysisConfig() const;
 
     /// The human player, or nullptr if none has been registered yet. Analysis
     /// mode blocks on this one whatever colour is to move. A single lock, unlike
@@ -181,6 +179,8 @@ private:
     nlohmann::json kibitzBot;
     bool analysisBotSet{false};
     bool kibitzBotSet{false};
+    /// Whether the kibitz engine listed kata-analyze or lz-analyze at load.
+    bool kibitzCanAnalyse{false};
     std::array<size_t, 2> activePlayer{0, 0};
 
     mutable std::mutex mutex;

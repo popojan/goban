@@ -1,31 +1,24 @@
 # config: mock-noeval.json
 #
-# An engine nominated itself for the analysis role and turns out to be unable to
-# analyse. This is not an error case invented for the test: GNU Go has neither
-# kata-analyze nor lz-analyze, and "kibitz" is inherited by default, so on plenty
-# of real configurations this *is* what happens.
+# The analysis role inherited from "kibitz" by an engine that cannot analyse.
+# Not an invented case: GNU Go has neither kata-analyze nor lz-analyze and
+# carries "kibitz" in the shipped config, so this is what a stock install does.
 #
-# The overlay must degrade to absent — no numbers, no placeholder, no retry loop
-# hammering the engine — and say so once.
+# kibitz needs only genmove, which every engine has, so inheriting the analysis
+# role assumes a capability it never had to possess. The engine is asked at load,
+# and the answer decides whether the feature is offered at all.
 #
 #   ./tests/run_scenarios.sh tests/scenarios/evaluation_unavailable.scn
 
 new_game 9
 wait_idle
 
-# The toggle is still offered: an engine did nominate itself, and whether it can
-# actually answer is not known until one has been started. Offering it and then
-# reporting failure is more honest than hiding a feature the configuration asks
-# for.
-expect can_evaluation true
-expect eval_state disabled
-
-toggle_evaluation on
-expect eval_enabled true
-
-# Probed with list_commands and found incapable. Latched, so the process is not
-# respawned ten times a second for the rest of the session.
-wait_until eval_state unavailable
+# Not offered. Nobody designated this engine for analysis, and it was asked at
+# load rather than by spawning a clone of it to be told the same thing — so the
+# toggle is greyed rather than inviting the user to switch on a feature that
+# cannot work.
+expect can_evaluation false
+expect eval_state unavailable
 
 # Nothing is displayed. -1 rather than 50 is the point: an empty bar at the
 # midpoint cannot be told from a genuine even game.
@@ -33,11 +26,9 @@ expect eval_winrate -1
 expect eval_has_score false
 expect eval_moves 0
 
-# Quietly. The engine only inherited the role from "kibitz" — nobody asked it to
-# analyse — so this is the ordinary configuration, not a fault, and badging it
-# put a red mark on every launch of a stock install. The user is told by
-# eval_state above. An engine *designated* with "analysis": 1 does warn; see
-# evaluation_engine_cannot_analyse.scn.
+# And quietly: nothing was asked for, so nothing failed. The log says what is
+# unavailable and why, at info. An engine *designated* with "analysis": 1 that
+# cannot analyse does warn — see evaluation_engine_cannot_analyse.scn.
 expect log_badge none
 
 # The game itself is untouched — the analysis engine never shared a pipe with

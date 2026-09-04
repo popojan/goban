@@ -2068,7 +2068,11 @@ UiInputs GobanControl::uiInputs() const {
     // "Is there an engine that could answer", not "is it answering now". The
     // overlay's own state — starting, yielded, unavailable — belongs to the
     // panel, not to whether the toggle may be pressed.
-    in.evaluationAvailable = parent->getAnalysis().isConfigured();
+    // Configured *and* not found incapable. isConfigured() alone offered a
+    // toggle that could not work — the comment on evaluationAvailable already
+    // said "has not been found incapable", which nothing implemented.
+    in.evaluationAvailable = parent->getAnalysis().isConfigured()
+                          && parent->getAnalysis().state() != AnalysisState::Unavailable;
     return in;
 }
 

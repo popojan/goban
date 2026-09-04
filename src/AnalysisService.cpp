@@ -395,14 +395,17 @@ void AnalysisService::start() {
     // Resolved once, here rather than in the constructor: the bots load on their
     // own threads and nothing has claimed the role until they have finished.
     if (auto cfg = engine.analysisConfig()) {
-        botConfig = std::move(cfg->config);
-        designated = cfg->designated;
+        botConfig = *cfg;
         configured = !botConfig.value("command", std::string()).empty();
         engineName = botConfig.value("name", botConfig.value("command", std::string()));
     }
     if (!configured) {
-        spdlog::info("analysis: no engine carries \"analysis\" or \"kibitz\"; "
-                     "the evaluation overlay is unavailable");
+        // Nobody asked for this, so it is not a fault: state the outcome, name
+        // the reason, and stop offering it (see isConfigured()).
+        spdlog::info("live evaluation unavailable: no engine is designated for analysis "
+                     "(\"analysis\": 1), and none carrying \"kibitz\" supports "
+                     "kata-analyze or lz-analyze");
+        setState(AnalysisState::Unavailable);
         running = false;
         return;
     }
@@ -572,18 +575,12 @@ bool AnalysisService::startEngine() {
         if (entry == "lz-analyze")   hasLz   = true;
     }
     if (!hasKata && !hasLz) {
-        // Warn only if someone asked for this engine: a designated one that
-        // cannot stream is a misconfiguration, a "kibitz" engine that cannot is
-        // the ordinary case and warning about it badged every stock launch.
-        if (designated) {
-            spdlog::warn("analysis: [{}] is configured as the analysis engine but supports "
-                         "neither kata-analyze nor lz-analyze; the evaluation overlay is "
-                         "unavailable", engineName);
-        } else {
-            spdlog::info("analysis: no engine carries \"analysis\", and the \"kibitz\" engine "
-                         "[{}] cannot stream one; the evaluation overlay is unavailable",
-                         engineName);
-        }
+        // Reaching here means the configuration asked for this engine — either
+        // "analysis": 1 or an analysis_command override — so it not working is
+        // worth a warning. The merely-inherited case never spawns; see
+        // PlayerManager::analysisConfig().
+        spdlog::warn("live evaluation unavailable: [{}] is configured for analysis but "
+                     "supports neither kata-analyze nor lz-analyze", engineName);
         client.reset();
         return false;
     }

@@ -144,6 +144,19 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
     try {
         auto engine = new GtpEngine(command, parameters, path, name, messages);
 
+        // Asked once, here, while nothing else owns the pipe. It is what lets
+        // analysisConfig() refuse the kibitz fallback without spawning a clone
+        // of an engine we already know cannot stream.
+        bool canAnalyse = false;
+        for (std::string line : engine->issueCommand("list_commands")) {
+            if (!line.empty() && line[0] == '=') line = line.substr(1);
+            const size_t a = line.find_first_not_of(" \t");
+            const size_t b = line.find_last_not_of(" \t\r\n");
+            if (a == std::string::npos) continue;
+            line = line.substr(a, b - a + 1);
+            if (line == "kata-analyze" || line == "lz-analyze") canAnalyse = true;
+        }
+
         // Optional per-engine response timeout. Engines differ enormously here:
         // a CPU KataGo can spend a minute loading weights, while a scripted test
         // engine should fail in seconds.
@@ -187,6 +200,7 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
         if (botConfig.value("kibitz", 0) && !kibitzBotSet) {
             kibitzBot = botConfig;
             kibitzBotSet = true;
+            kibitzCanAnalyse = canAnalyse;
         }
 
         return engine;
@@ -196,18 +210,28 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
     }
 }
 
-std::optional<PlayerManager::AnalysisChoice> PlayerManager::analysisConfig() const {
+std::optional<nlohmann::json> PlayerManager::analysisConfig() const {
     std::lock_guard<std::mutex> lock(mutex);
     if (!analysisBotSet && !kibitzBotSet) return std::nullopt;
 
     nlohmann::json bot = analysisBotSet ? analysisBot : kibitzBot;
+
+    // Inherited from kibitz, and the analysis process would be an identical
+    // clone: we asked this engine at load and it cannot stream, so spawning a
+    // copy to be told the same thing is waste. With an analysis_command override
+    // it is a different binary and only spawning can answer.
+    if (!analysisBotSet && !kibitzCanAnalyse
+        && !bot.contains("analysis_command") && !bot.contains("analysis_parameters")) {
+        return std::nullopt;
+    }
+
     if (bot.contains("analysis_command")) {
         bot["command"] = bot["analysis_command"];
     }
     if (bot.contains("analysis_parameters")) {
         bot["parameters"] = bot["analysis_parameters"];
     }
-    return AnalysisChoice{std::move(bot), analysisBotSet};
+    return bot;
 }
 
 void PlayerManager::beginLoading(const std::string& name) {

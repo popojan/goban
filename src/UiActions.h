@@ -82,8 +82,9 @@ struct UiInputs {
     bool hasUnsavedChanges = false;
     /// An engine nominated itself for the analysis role and has not been found
     /// incapable. False means the evaluation overlay is not offered at all —
-    /// which is the stock configuration, where nothing carries "kibitz" and the
-    /// only engine is a GNU Go that cannot analyse (ADR-0007 decision 3).
+    /// which is the stock configuration: GNU Go carries "kibitz", so the role is
+    /// inherited, but it supports neither kata-analyze nor lz-analyze
+    /// (ADR-0007 decision 3).
     bool evaluationAvailable = false;
 };
 
