@@ -34,9 +34,12 @@ these concerns — `toggle_evaluation` decides whether the engine runs at all,
 already streaming and holding a current report while nothing is shown. Revealing
 is immediate and needs no new plumbing.
 
-**2. The reveal happens before the stone is committed, on a dwell.** Resting the
-cursor on an intersection for a short time is the trigger: "I have been looking
-at this point" correlates with having chosen it, and it adds no gesture.
+**2. A stone in hand is the precondition, the dwell is the trigger.** Resting the
+cursor on an intersection for a short time, *while holding a stone*, is what
+reveals. Neither signal is strong alone — reaching for the board says nothing
+about where, and a parked cursor says nothing about intent — but together they
+say "I have chosen this point", which is exactly the moment being waited for.
+This also leaves the mis-click guard doing only its own job.
 
 **Not a third click.** A click that means something different in one mode than in
 another is the shape of defect ADR-0005 exists to prevent, and this codebase has
@@ -103,6 +106,31 @@ already there, tint it rather than replace it; where there is none, draw one. So
 with the last-move number shown the verdict colours it, and without it the
 verdict draws its own mark. Both branches covered, no setting overridden.
 
+**A move number is a fact about the record, so it may not appear before the move
+is in it.** An unconfirmed stone carries no number, which decides the sequence:
+
+| phase | on the stone |
+|---|---|
+| stone in hand, not committed | no number exists — its own mark, the rank letter |
+| dwell elapsed, report trustworthy | suggestions revealed; the aimed-at point takes its letter |
+| committed | the move number appears — tint it, and drop the letter |
+
+That is the same tint-or-draw rule, applied across time rather than across space:
+the number does not exist yet, then it does. After the commit the letter is
+redundant, because the colour is the verdict.
+
+**8. The delta goes in the readout, not on the stone.** While a stone is held and
+aimed at a point, the readout in the bottom margin shows *that candidate's*
+numbers instead of the position's, and returns to the position when the stone is
+placed or put back.
+
+There is nowhere else to put it — two characters beside a centred readout on 9x9
+— but the stronger reason is that the suggestions do not print their loss today,
+they are *tinted* by it. A verdict that printed a number would put two scales for
+one quantity on the board. Rank is carried by the letter, magnitude by the
+colour, and the exact figure is asked for by aiming at the point. Lizzie answers
+the same question the same way: hover a candidate to see its statistics.
+
 It is **additive**, not a replacement. The stone says what the move was worth;
 the readout says where the game stands now. They are different subjects, and
 replacing the readout would delete the win rate at the exact moment it is most
@@ -110,7 +138,7 @@ wanted. The timing divides cleanly too: after the move the engine re-analyses, s
 the readout is briefly stale and blanks, while the verdict is available instantly
 because it comes from the report already computed for the position just left.
 
-**7. Praise is honest about what it is.** Matching the engine's first choice is
+**9. Praise is honest about what it is.** Matching the engine's first choice is
 worth saying — the satisfaction is the point, and a learner needs the positive
 signal as much as the negative one. But it is the engine's opinion at a given
 search depth, not correctness: a superhuman bot with few visits is often wrong
@@ -145,3 +173,8 @@ count.
 3. **Is the after-the-stone reveal worth widening the `positionId` rule?** It is
    what was originally asked for, and it is the more natural moment — the move is
    made, now show me. Decision 3 defers it rather than refusing it.
+4. **Does praise survive the commit?** Once the move number appears the letter is
+   dropped and only the tint remains, so "this was the engine's first choice"
+   becomes the darkest ink rather than an `A` — which is subtle, and praise that
+   is not noticed is not praise. Keeping the letter for rank 1 alone is the
+   obvious exception. Not decidable on paper; it needs looking at.
