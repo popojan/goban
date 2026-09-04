@@ -834,6 +834,18 @@ of its decisions, and `tests/test_analysis.cpp` plus
   the next ordinary command read the tail of the stream as its reply — silently
   wrong results rather than an error. Bounded, on the `scoringTimeout()`
   precedent.
+- **The suggestions have three states, not two** (ADR-0014). `evaluation_moves`
+  is `off` / `on_demand` / `always`; the old boolean migrates on read. In
+  `on_demand` a stone in hand is the precondition and a dwell of
+  `annotations.hint_dwell_ms` is the trigger, and the reveal lasts until the
+  stone is placed or put back. `getIdleTimeout()` must cover a pending dwell — a
+  dwell ends with no input event by definition. While the suggestions are
+  visible and a stone is aimed at a candidate, the **readout** answers about that
+  candidate rather than the position: it is the only place a contemplated move's
+  delta fits, and the suggestions carry their loss as colour rather than a
+  printed number. A point the engine did not search says nothing about itself —
+  `minmoves` widens the list and `hint_min_visits_fraction` drops what came back
+  unreliable.
 - **The panel and the board suggestions are two features, and the board one is
   off by default.** Not for clutter — for judgement. The numbers are read *after*
   a move, so a player can invent their own and evaluate it post-hoc; stars on the

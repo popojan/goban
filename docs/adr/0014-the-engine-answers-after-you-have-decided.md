@@ -1,6 +1,6 @@
 # ADR-0014: The engine answers after you have decided
 
-**Status:** Proposed — nothing implemented
+**Status:** Accepted — implemented 2026-09-05
 **Date:** 2026-09-04
 
 Revisits ADR-0007 decision 14, which turned the board suggestions off by default.
@@ -171,6 +171,39 @@ count.
   next-move markers are set to. It shares their point, never their toggle.
 - Like the suggestions and the readout, the verdict stands down at a scored end:
   the board has finished making its claim.
+
+## Implementation log — 2026-09-05
+
+`evaluation_moves` became three-state (`off`/`on_demand`/`always`), migrated from
+the old boolean on read, and the menu item became a select because one checkbox
+cannot show three states. `annotations.hint_dwell_ms` (800) is the dwell.
+
+Two things the design did not anticipate.
+
+**A point the engine never searched has no number**, and that is most of a
+beginner's moves — the silence lands exactly where the feature was aimed. So
+`kata-analyze` is asked with `minmoves` (`hint_min_moves`, 30) for wider
+coverage, and candidates below `hint_min_visits_fraction` (0.05) of the best
+move's visits are dropped again: a win rate from a single visit is noise, and
+showing it is worse than the silence it replaces. `minmoves` is an extension, and
+an engine that rejects it would otherwise retire the evaluation for the session,
+so a refusal is caught once and the command asked plainly thereafter.
+
+**The scripted `click` did not move the cursor.** A real click always lands where
+the cursor already is; the scripted one skipped that, so the ghost stone, the
+pointer mark and this dwell all read the previous point.
+
+### Still open: the delta after the move, Fritz-style
+
+Remembering the previous readout and subtracting the new one would give the cost
+of a move that was played without waiting for the reveal — which is the gap
+decision 4 leaves open, and how infinite analysis reports move deltas elsewhere.
+
+It works in **review**: stepping through a game, each position can be compared
+with the one before it. It does **not** work live against a fast opponent — the
+position after the player's move exists for about 13 ms before GNU Go replies,
+which is not long enough for the engine to evaluate it at all, let alone for the
+difference to be read. The same measurement that decided decisions 4 and 6.
 
 ## Open questions
 
