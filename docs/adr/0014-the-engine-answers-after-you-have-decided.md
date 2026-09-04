@@ -75,7 +75,26 @@ already grades moves, and the last move already carries a number drawn on the
 stone. Grading the played move on that same scale reuses both; inventing a second
 scale would mean the same move could be described two ways.
 
-**6. Praise is honest about what it is.** Matching the engine's first choice is
+**6. The verdict rides the last-move marker; it does not touch the margin.** The
+bottom margin is full — the recommended pass at the left, the readout centred,
+the wait clock at the right — and the space is measured: at roughly 0.35 grid
+units per character there are about ten characters free beside a centred readout
+on 19x19 and **two** on 9x9. A beginner playing a bot is on the small board, so
+there is no room for a second item exactly where this feature is aimed.
+
+So the verdict is drawn on the stone: the last move's number tinted by the
+quality ramp, and carrying the engine's rank letter when the move was in its
+list. The suggestions already label ranked moves `A`/`B`/`C`, so a move number
+wearing an `A` says "first choice" in vocabulary the player has already learnt.
+
+It is **additive**, not a replacement. The stone says what the move was worth;
+the readout says where the game stands now. They are different subjects, and
+replacing the readout would delete the win rate at the exact moment it is most
+wanted. The timing divides cleanly too: after the move the engine re-analyses, so
+the readout is briefly stale and blanks, while the verdict is available instantly
+because it comes from the report already computed for the position just left.
+
+**7. Praise is honest about what it is.** Matching the engine's first choice is
 worth saying — the satisfaction is the point, and a learner needs the positive
 signal as much as the negative one. But it is the engine's opinion at a given
 search depth, not correctness: a superhuman bot with few visits is often wrong
@@ -95,6 +114,12 @@ count.
 - A tsumego shows no evaluation at all (ADR-0007), and that is unaffected: the
   first suggestion there *is* the answer to the problem, whatever the order of
   reveal.
+- The verdict depends on the last-move overlay being drawn. With those markers
+  switched off it has nowhere to live, and must either draw its own mark or be
+  absent — a decision to make rather than inherit, given what happened when a
+  toggle was put around a whole draw pass instead of around its own labels.
+- Like the suggestions and the readout, the verdict stands down at a scored end:
+  the board has finished making its claim.
 
 ## Open questions
 
