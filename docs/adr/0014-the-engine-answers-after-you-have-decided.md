@@ -78,7 +78,7 @@ already grades moves, and the last move already carries a number drawn on the
 stone. Grading the played move on that same scale reuses both; inventing a second
 scale would mean the same move could be described two ways.
 
-**6. The verdict rides the last-move marker; it does not touch the margin.** The
+**6. The verdict is drawn on the stone, not in the margin.** The
 bottom margin is full — the recommended pass at the left, the readout centred,
 the wait clock at the right — and the space is measured: at roughly 0.35 grid
 units per character there are about ten characters free beside a centred readout
@@ -119,7 +119,7 @@ That is the same tint-or-draw rule, applied across time rather than across space
 the number does not exist yet, then it does. After the commit the letter is
 redundant, because the colour is the verdict.
 
-**8. The delta goes in the readout, not on the stone.** While a stone is held and
+**7. The delta goes in the readout, not on the stone.** While a stone is held and
 aimed at a point, the readout in the bottom margin shows *that candidate's*
 numbers instead of the position's, and returns to the position when the stone is
 placed or put back.
@@ -138,7 +138,7 @@ wanted. The timing divides cleanly too: after the move the engine re-analyses, s
 the readout is briefly stale and blanks, while the verdict is available instantly
 because it comes from the report already computed for the position just left.
 
-**9. Praise is honest about what it is.** Matching the engine's first choice is
+**8. Praise is honest about what it is.** Matching the engine's first choice is
 worth saying — the satisfaction is the point, and a learner needs the positive
 signal as much as the negative one. But it is the engine's opinion at a given
 search depth, not correctness: a superhuman bot with few visits is often wrong
