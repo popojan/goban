@@ -340,6 +340,10 @@ void GobanShader::setStereoBase(float halfBase) const {
     glUniform1f(vsu_eof, halfBase);
 }
 
+void GobanShader::setStereoWindow(float window) const {
+    glUniform1f(vsu_dof, window);
+}
+
 void GobanShader::setGamma(float value) {
     spdlog::debug("setting gamma = {0}", value);
     this->gamma = value;
@@ -413,7 +417,11 @@ void GobanShader::setMetrics(const Metrics &m) const {
     glUniform1f(fsu_bowlRadius, br);
     glUniform1f(fsu_bowlRadius2, br2);
     glUniform3fv(fsu_cc, 4, m.bowlsCenters);
-    glUniform1f(vsu_dof, dof);
+    // `dof` is *not* uploaded here. It used to be, harmlessly, while it was a
+    // constant; now it is derived from the aspect ratio and the deviation, so it
+    // changes when the window is resized — and setMetrics() runs only on a board
+    // or shader change. That is exactly how the stereo base froze at the last
+    // shader switch for an afternoon. It goes up from shadeIt(), beside the base.
 }
 
 void GobanShader::destroy() const {

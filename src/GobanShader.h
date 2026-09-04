@@ -26,7 +26,8 @@ std::string createShaderFromFile(const std::string& filename);
 class GobanShader {
 public:
     explicit GobanShader(const GobanView& view): shadersReady(false), currentProgram(-1),
-        width(0), height(0), gamma(1.0f), contrast(0.0f), eof(0.0725), dof(0.0925), view(view), animT(0.5f)
+        width(0), height(0), gamma(1.0f), contrast(0.0f),
+        eof(Stereo::DEFAULT_DEVIATION), dof(0.0f), view(view), animT(0.5f)
     {
         init();
     }
@@ -90,6 +91,10 @@ public:
     void setCameraPan(glm::vec2) const;
     void setCameraDistance(float) const;
     void setStereoBase(float) const;
+    /// The horizontal image shift, computed on the CPU (Stereo::window) like the
+    /// base beside it. Uploaded every frame from shadeIt(), never from
+    /// setMetrics(): it follows the aspect ratio, so a window resize changes it.
+    void setStereoWindow(float) const;
     /// Which eye the next draw renders: 0 left, 1 right. A no-op under a mono
     /// shader, which has no such uniform — the location is simply -1.
     void setEye(int) const;

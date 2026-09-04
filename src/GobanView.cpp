@@ -214,7 +214,23 @@ GobanView::GobanView(GobanModel& m)
     // Load shader settings (separate from camera)
     if (settings.hasShaderSettings()) {
         gobanShader.setEof(settings.getShaderEof());
-        gobanShader.setDof(settings.getShaderDof());
+        // `dof` used to be the image shift itself, in q0 units, typically
+        // 0.0925. It is now an *offset* from the window resting on the near
+        // point, and a value from the old meaning read as an offset would put
+        // the whole scene a long way behind the glass — which is precisely what
+        // the change is undoing. Out of range means "written under the old
+        // meaning", so it is read as zero rather than migrated: there is nothing
+        // to migrate to, since the old number encoded no intent beyond a default
+        // nobody chose. Same hazard eof's redefinition left behind, handled
+        // where that one relied on a clamp.
+        const float storedDof = settings.getShaderDof();
+        if (std::abs(storedDof) <= Stereo::MAX_WINDOW_OFFSET) {
+            gobanShader.setDof(storedDof);
+        } else {
+            spdlog::debug("ignoring dof {} from user.json: written when it meant "
+                          "an absolute image shift", storedDof);
+            gobanShader.setDof(0.0f);
+        }
         gobanShader.setGamma(settings.getShaderGamma());
         gobanShader.setContrast(settings.getShaderContrast());
     }
@@ -319,13 +335,11 @@ void GobanView::resetView() {
         targetDist = preset.distance;
     }
 
-    if (settings.hasShaderSettings()) {
-        gobanShader.setEof(settings.getShaderEof());
-        gobanShader.setDof(settings.getShaderDof());
-        gobanShader.setGamma(settings.getShaderGamma());
-        gobanShader.setContrast(settings.getShaderContrast());
-    }
-
+    // Deliberately does *not* touch eof, dof, gamma or contrast. They are not
+    // camera state — they describe the screen and the glasses in front of it —
+    // and re-reading them here meant that tuning an anaglyph and then reframing
+    // the board silently threw the tuning away. They are sticky now, saved by
+    // the commands that change them, like every other display setting.
     updateFlag |= UPDATE_SHADER;
     animateCamera(targetRot, targetPan, targetDist);
 }
@@ -359,11 +373,9 @@ void GobanView::saveView() {
     camState.distance = cameraDistance;
     settings.setSavedCamera(camState);
 
-    settings.setShaderEof(gobanShader.getEof());
-    settings.setShaderDof(gobanShader.getDof());
-    settings.setShaderGamma(gobanShader.getGamma());
-    settings.setShaderContrast(gobanShader.getContrast());
-
+    // The appearance settings are saved by the commands that change them, not
+    // here: `save camera` saves a camera. Writing them from both places is how
+    // `reset camera` came to be able to revert them.
     settings.save();
 }
 
@@ -397,8 +409,8 @@ void GobanView::clearView() {
 
     gobanShader.setGamma(1.0);
     gobanShader.setContrast(0.0);
-    gobanShader.setEof(0.0725);
-    gobanShader.setDof(0.0925);
+    gobanShader.setEof(Stereo::DEFAULT_DEVIATION);
+    gobanShader.setDof(0.0f);   // the window rests on the near point
     updateFlag |= UPDATE_SHADER;
 
     animateCamera(targetRot, targetPan, targetDist);
@@ -520,6 +532,9 @@ void GobanView::shadeIt(float time, const GobanShader& shader, int flags, int ey
 	// Every frame, with the camera: the base is a function of where the camera
 	// is, and the overlay recomputes it every frame too. See setStereoBase().
 	shader.setStereoBase(stereoHalfBase());
+	// And the window with it, for the same reason one rung along: it follows the
+	// aspect ratio, so it changes on a resize.
+	shader.setStereoWindow(stereoWindow());
 
 	if (flags & UPDATE_SHADER) {
 		spdlog::debug("setMetrics");
@@ -961,7 +976,10 @@ void GobanView::stereoBoardDepth(float& nearZ, float& farZ) const {
 }
 
 float GobanView::stereoConvergence() const {
-    return Stereo::convergence(stereoHalfBase(), gobanShader.getDof(), FOCAL_LENGTH);
+    // stereoWindow(), not the raw `dof` — that is the user's *offset* from the
+    // window now, and passing it here reported the plane at infinity whenever
+    // the offset was zero, which is the default.
+    return Stereo::convergence(stereoHalfBase(), stereoWindow(), FOCAL_LENGTH);
 }
 
 float GobanView::stereoNearPoint() const {
@@ -1004,6 +1022,20 @@ float GobanView::stereoDeviation() const {
 float GobanView::stereoHalfBase() const {
     const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
     return Stereo::halfBase(gobanShader.getEof(), aspect, stereoNearPoint(), FOCAL_LENGTH);
+}
+
+float GobanView::stereoWindow() const {
+    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
+    return Stereo::window(gobanShader.getEof(), aspect, gobanShader.getDof());
+}
+
+void GobanView::saveShaderSettings() {
+    auto& settings = UserSettings::instance();
+    settings.setShaderEof(gobanShader.getEof());
+    settings.setShaderDof(gobanShader.getDof());
+    settings.setShaderGamma(gobanShader.getGamma());
+    settings.setShaderContrast(gobanShader.getContrast());
+    settings.save();
 }
 
 bool GobanView::takeShaderBuild() {

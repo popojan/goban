@@ -1117,6 +1117,26 @@ argues for, each enforced by `tests/test_stereo.cpp` or
   times over. The shipped default asks 1/40.
 - **`dof` is the window, not the depth.** It slides the whole range through the
   screen plane and cancels in near-minus-far. Never trade one for the other.
+- **The window rests on the near point, and is derived exactly as the base is.**
+  `Stereo::window()` is `dev·aspect`, which by the algebra puts the zero-parallax
+  plane *on* the nearest thing in frame at every zoom and aspect — no camera term
+  in it. It was a bare constant (0.0925) while `eof` became aspect-aware, which
+  put the near point 3.6% of image width behind the glass at 4:3 and 1.9% at
+  16:9, values nobody chose, with the whole scene behind the screen. **Forward of
+  the near point is rejected on purpose**: the RmlUi interface is drawn flat *at*
+  the screen plane, so negative parallax intersects the menus — a window
+  violation whose frame is the UI. The stored `dof` is now an *offset* from that
+  resting place (default 0, clamped ±0.05); a value from the old meaning is out
+  of range and read as zero. Uploaded from `shadeIt()` beside the base and never
+  from `setMetrics()`, because it follows the aspect ratio — the same trap that
+  froze the base at the last shader switch. `stereo_convergence_ratio` is 1 when
+  it is resting; assert the ratio, not a distance.
+- **`eof`, `dof`, gamma and contrast are not camera state.** They describe the
+  screen and the glasses in front of it, so they are sticky like `anaglyph`,
+  `pointer` and the evaluation toggles: written by the commands that change them
+  (`GobanView::saveShaderSettings()`). They used to be saved only by
+  `save camera` and *re-read* by `reset camera`, so tuning an anaglyph and then
+  reframing the board silently threw the tuning away.
 - **One base, computed once, uploaded every frame.** `GobanView::stereoHalfBase()`
   goes to the vertex shader from `shadeIt()` — it lived in `setMetrics()` for one
   afternoon, which runs only on a board or shader change, so the board's base

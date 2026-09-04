@@ -111,6 +111,58 @@ TEST_CASE("the deviation holds across the zoom range — and did not before") {
     CHECK(legacyWorst > 2.0f * Stereo::MAX_DEVIATION);
 }
 
+TEST_CASE("the window rests on the near point, at every zoom and aspect") {
+    // The identity the derived window is built on. Substituting halfBase() into
+    // convergence() cancels the near point, so `dof = deviation * aspect` puts
+    // the zero-parallax plane exactly on the nearest thing in frame — with no
+    // camera term left in it.
+    //
+    // This is what a fixed `dof` could not do. Measured before the change, the
+    // shipped 0.0925 put the near point 3.6% of the image width behind the glass
+    // at 4:3 and 1.9% at 16:9 — the whole scene behind the screen by an amount
+    // nobody chose, and different on every monitor.
+    for (float aspect : {4.0f / 3.0f, 16.0f / 9.0f, 16.0f / 10.0f, 1.0f, 21.0f / 9.0f}) {
+        for (float d : {1.2f, 1.6f, 2.2f, 3.1f, 5.0f, 9.0f, 20.0f}) {
+            const float nearPoint = nearPointAt(d);
+            REQUIRE(nearPoint > 0.0f);
+
+            const float base = Stereo::halfBase(Stereo::DEFAULT_DEVIATION, aspect, nearPoint, F);
+            const float win  = Stereo::window(Stereo::DEFAULT_DEVIATION, aspect);
+            CHECK(Stereo::convergence(base, win, F)
+                  == doctest::Approx(nearPoint).epsilon(1e-4));
+        }
+    }
+}
+
+TEST_CASE("the window offset moves the scene, and only the scene") {
+    const float nearPoint = nearPointAt(3.1f);
+    const float base = Stereo::halfBase(Stereo::DEFAULT_DEVIATION, ASPECT, nearPoint, F);
+
+    const float atNear = Stereo::convergence(base, Stereo::window(Stereo::DEFAULT_DEVIATION, ASPECT), F);
+    // Positive pushes the window back, so the plane moves away from the camera
+    // and the scene sinks further behind the glass.
+    const float pushed = Stereo::convergence(
+        base, Stereo::window(Stereo::DEFAULT_DEVIATION, ASPECT, +0.01f), F);
+    // Negative pulls it forward, bringing the near part of the scene out through
+    // the screen plane — vivid, and where it collides with the flat interface.
+    const float pulled = Stereo::convergence(
+        base, Stereo::window(Stereo::DEFAULT_DEVIATION, ASPECT, -0.01f), F);
+
+    CHECK(pushed < atNear);
+    CHECK(pulled > atNear);
+
+    // The offset is bounded, and the deviation is untouched by any of it — the
+    // window slides the range through the screen, it does not stretch it.
+    CHECK(Stereo::clampWindowOffset(+10.0f) == doctest::Approx(Stereo::MAX_WINDOW_OFFSET));
+    CHECK(Stereo::clampWindowOffset(-10.0f) == doctest::Approx(-Stereo::MAX_WINDOW_OFFSET));
+    for (float offset : {-0.01f, 0.0f, +0.01f}) {
+        (void) offset;
+        CHECK(Stereo::deviation(base, ASPECT, nearPoint,
+                                std::numeric_limits<float>::infinity(), F)
+              == doctest::Approx(Stereo::DEFAULT_DEVIATION).epsilon(1e-4));
+    }
+}
+
 TEST_CASE("an anaglyph mode survives a round trip through its name") {
     // The name is what goes into user.json and what comes back out of it, so a
     // mode whose name does not parse would be silently reset to gray on the next

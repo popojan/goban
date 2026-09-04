@@ -125,6 +125,7 @@ public:
         gobanShader.setGamma(1.0);
         gobanShader.setContrast(0.0);
         updateFlag |= UPDATE_SHADER;
+        saveShaderSettings();
     }
 
     float getContrast() const {
@@ -193,6 +194,22 @@ public:
     /// GobanOverlay to place the same two eyes. Splitting it would let the text
     /// drift off the wood it is supposed to be lying on.
     [[nodiscard]] float stereoHalfBase() const;
+
+    /// The horizontal image shift — the stereoscopic window — for the current
+    /// camera and aspect ratio. Derived, exactly as the base above is: it rests
+    /// on the near point unless the user has pushed it off with `dof`. The one
+    /// implementation again, and for the same reason — the board and the
+    /// overlay's text must sit in the same window or the labels leave the wood.
+    [[nodiscard]] float stereoWindow() const;
+
+    /// Persist the four appearance settings that are *not* camera state: the
+    /// stereo base and window, gamma and contrast. Called by the commands that
+    /// change them, so they behave like every other display setting here
+    /// (`anaglyph`, `pointer`, the evaluation toggles) — sticky the moment they
+    /// change. They used to be written only by `save camera` and re-read by
+    /// `reset camera`, so tuning an anaglyph and then reframing the board
+    /// silently undid the tuning.
+    void saveShaderSettings();
 
     void resetView();
     void saveView();          // Save current camera to preset (user-triggered)

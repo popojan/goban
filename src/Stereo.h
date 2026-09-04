@@ -76,6 +76,38 @@ inline float halfBase(float deviation, float aspect, float nearPoint, float foca
     return std::min(deviation, MAX_DEVIATION) * aspect * nearPoint / focal;
 }
 
+/// The horizontal image shift that puts the **near point exactly at the screen
+/// plane** — the stereoscopic window resting on the nearest thing in frame, so
+/// nothing in the scene comes forward through it.
+///
+/// Substituting halfBase() into convergence() cancels the near point entirely:
+///
+///     convergence = f·e/dof = near   ⟺   dof = deviation · aspect
+///
+/// so the window needs no camera term at all, only the aspect ratio it is
+/// measured against. That is why a fixed number could not do this job: it was
+/// right at one shape of window and wrong at every other — 3.6% of the image
+/// width behind the glass at 4:3 and 1.9% at 16:9, chosen by nobody. Exactly the
+/// defect the stereo base had before it was tied to the near point.
+///
+/// `offset` moves the window off that resting place, as a fraction of image
+/// width. Positive pushes the scene further behind the glass. Negative brings it
+/// forward *through* the screen plane, which is legitimate stereoscopy and is
+/// the more vivid picture — but the interface is drawn flat at that plane, so
+/// anything in front of it collides with the menus. Nothing in the scene is
+/// allowed forward of the window by default for that reason.
+inline float window(float deviation, float aspect, float offset = 0.0f) {
+    return (std::min(deviation, MAX_DEVIATION) + offset) * aspect;
+}
+
+/// How far the window may be shifted off the near point, either way. Small,
+/// because the whole usable range is a few percent of image width.
+constexpr float MAX_WINDOW_OFFSET = 0.05f;
+
+inline float clampWindowOffset(float offset) {
+    return std::min(MAX_WINDOW_OFFSET, std::max(-MAX_WINDOW_OFFSET, offset));
+}
+
 /// Camera-space depth of the **zero-parallax plane**: where the two eyes' images
 /// of a point coincide, and so where the scene meets the glass. Nearer than this
 /// is negative parallax — in front of the screen, out toward the viewer; further

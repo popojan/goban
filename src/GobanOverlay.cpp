@@ -225,7 +225,10 @@ unsigned GobanOverlay::draw(const GobanModel& model, const DDG::Camera& cam, uns
 	// both, whichever occlusion it held clipped the other eye's labels.
 	const bool stereo = view.gobanShader.isStereo();
 	const float halfBase = stereo ? view.stereoHalfBase() : 0.0f;
-	const float hit = stereo ? view.gobanShader.getDof() : 0.0f;
+	// The window the board is using, not the user's offset — one implementation,
+	// the same rule as the base beside it. Asking gobanShader for the raw `dof`
+	// would put the text in a different window from the wood it lies on.
+	const float hit = stereo ? view.stereoWindow() : 0.0f;
 	const int pass = stereo ? eye : 0;
 
 	// The text writes no depth. It runs last within its eye's pass, over a board

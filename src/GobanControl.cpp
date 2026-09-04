@@ -1233,41 +1233,56 @@ void GobanControl::buildRegistry() {
     add("increase gamma", 0, 0, "raise gamma", [this](CommandContext&) {
         spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() + 0.025f);
+        view.saveShaderSettings();
     });
 
     add("decrease gamma", 0, 0, "lower gamma", [this](CommandContext&) {
         spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() - 0.025f);
+        view.saveShaderSettings();
     });
 
-    add("increase eof", 0, 0, "raise the stereo eye offset factor", [this](CommandContext&) {
+    // All six of these persist immediately, like `anaglyph`, `pointer` and the
+    // evaluation toggles. They used to be written only by `save camera` and
+    // re-read by `reset camera`, which meant tuning an anaglyph and then
+    // reframing the board threw the tuning away — they are not camera state.
+    add("increase eof", 0, 0, "ask for more stereo deviation", [this](CommandContext&) {
         view.setEof(view.getEof() + 0.0025f);
+        view.saveShaderSettings();
         spdlog::debug("new eof = {0}", view.getEof());
     });
 
-    add("decrease eof", 0, 0, "lower the stereo eye offset factor", [this](CommandContext&) {
+    add("decrease eof", 0, 0, "ask for less stereo deviation", [this](CommandContext&) {
         view.setEof(view.getEof() - 0.0025f);
+        view.saveShaderSettings();
         spdlog::debug("new eof = {0}", view.getEof());
     });
 
-    add("increase dof", 0, 0, "raise the depth of field", [this](CommandContext&) {
-        view.setDof(view.getDof() + 0.0025f);
-        spdlog::debug("new dof = {0}", view.getDof());
+    // The window rests on the near point at 0. Positive pushes the scene further
+    // behind the glass; negative brings it forward through the screen plane,
+    // which is more vivid and collides with the interface drawn at that plane.
+    add("increase dof", 0, 0, "push the stereoscopic window back", [this](CommandContext&) {
+        view.setDof(Stereo::clampWindowOffset(view.getDof() + 0.0025f));
+        view.saveShaderSettings();
+        spdlog::debug("new dof offset = {0}", view.getDof());
     });
 
-    add("decrease dof", 0, 0, "lower the depth of field", [this](CommandContext&) {
-        view.setDof(view.getDof() - 0.0025f);
-        spdlog::debug("new dof = {0}", view.getDof());
+    add("decrease dof", 0, 0, "pull the stereoscopic window forward", [this](CommandContext&) {
+        view.setDof(Stereo::clampWindowOffset(view.getDof() - 0.0025f));
+        view.saveShaderSettings();
+        spdlog::debug("new dof offset = {0}", view.getDof());
     });
 
     add("increase contrast", 0, 0, "raise contrast", [this](CommandContext&) {
         spdlog::debug("new contrast = {0}", view.getContrast() + 0.025f);
         view.setContrast(view.getContrast() + 0.025f);
+        view.saveShaderSettings();
     });
 
     add("decrease contrast", 0, 0, "lower contrast", [this](CommandContext&) {
         spdlog::debug("new contrast = {0}", view.getContrast() - 0.025f);
         view.setContrast(view.getContrast() - 0.025f);
+        view.saveShaderSettings();
     });
 
     add("reset contrast and gamma", 0, 0, "restore default contrast and gamma", [this](CommandContext&) {
@@ -2213,6 +2228,14 @@ nlohmann::json GobanControl::dumpState() const {
     s["stereo_convergence"] = view.stereoConvergence();
     s["stereo_board_near"]  = boardNear;
     s["stereo_board_far"]   = boardFar;
+    // Where the window sits relative to the nearest thing in frame: 1 means it
+    // rests exactly on it, which is the default and the whole point of deriving
+    // it. Published as a ratio because that is the *invariant* — it holds at
+    // every zoom and aspect ratio, where the two distances above are camera
+    // specific, and "assert at more than one zoom" is the lesson this file's
+    // stereo scenario was written to enforce.
+    const float near = view.stereoNearPoint();
+    s["stereo_convergence_ratio"] = near > 0.0f ? view.stereoConvergence() / near : 0.0f;
     // Reported whatever shader is selected, for the same reason: it is a
     // property of the viewer, not of the shader, and it outlives a switch to
     // mono and back.
