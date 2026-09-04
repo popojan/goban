@@ -667,21 +667,30 @@ void GobanControl::buildRegistry() {
             ctx.notifyMenu = false;
             return;
         }
-        bool next = !view.isAnalysisOverlayShown();
-        if (!ctx.args.empty()) {
-            const std::string arg = toLower(ctx.args[0]);
-            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
-                && arg != "1" && arg != "0") {
-                spdlog::warn("toggle_evaluation_moves: expected on or off, got '{}'",
-                             ctx.args[0]);
+        using HintMode = GobanView::HintMode;
+        // Three states now (ADR-0014): off, revealed on a dwell once the player
+        // has aimed at a point, or always. `on`/`off` still work — they were the
+        // whole vocabulary before, and scenarios and keybindings use them.
+        HintMode next;
+        if (ctx.args.empty()) {
+            switch (view.analysisOverlayMode()) {
+                case HintMode::Off:      next = HintMode::OnDemand; break;
+                case HintMode::OnDemand: next = HintMode::Always;   break;
+                default:                 next = HintMode::Off;      break;
+            }
+        } else {
+            const auto parsed = parseHintMode(toLower(ctx.args[0]));
+            if (!parsed) {
+                spdlog::warn("toggle_evaluation_moves: expected off, on_demand or "
+                             "always, got '{}'", ctx.args[0]);
                 ctx.notifyMenu = false;
                 return;
             }
-            next = (arg == "on" || arg == "true" || arg == "1");
+            next = *parsed;
         }
-        view.setAnalysisOverlay(next);
-        UserSettings::instance().setEvaluationMoves(next);
-        ctx.checked = next;
+        view.setAnalysisOverlayMode(next);
+        UserSettings::instance().setEvaluationMoves(hintModeName(next));
+        ctx.checked = (next != HintMode::Off);
     });
 
     add("toggle_evaluation_readout", 0, 1,
@@ -1707,6 +1716,11 @@ void GobanControl::buildRegistry() {
                 spdlog::warn("click: ignored, initialization is not complete");
                 return;
             }
+            // A real click always lands where the cursor already is —
+            // moveCursor() ran on the way there. The scripted one skipped that,
+            // so anything reading the cursor (the ghost stone, the pointer mark,
+            // the dwell that reveals the suggestions) saw the previous point.
+            model.setCursor(coord);
             boardClick(coord);
     });
 }
@@ -2306,7 +2320,11 @@ nlohmann::json GobanControl::dumpState() const {
         // The move suggestions are a separate feature from the readout, and off
         // by default — `eval_labels` reading 0 with the evaluation running is
         // the normal case, not a fault.
+        // What is on screen now, and the mode that decides when it may be.
+        // Separate, because in on_demand they differ for most of a turn.
         s["eval_moves_shown"] = view.isAnalysisOverlayShown();
+        s["eval_moves_mode"]  = hintModeName(view.analysisOverlayMode());
+        s["eval_hint_waiting"] = view.hintDwellPending();
         s["eval_board_text"] = view.evaluationReadoutText();
         s["eval_readout_shown"] = view.isEvaluationReadoutShown();
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());

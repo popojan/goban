@@ -41,7 +41,11 @@ void UserSettings::load() {
         }
 
         if (user.contains("evaluation_moves")) {
-            evaluationMoves = user["evaluation_moves"].get<bool>();
+            // Was a boolean before the three-state mode: true meant the
+            // suggestions were always drawn, false that they never were.
+            const auto& v = user["evaluation_moves"];
+            if (v.is_boolean()) evaluationMoves = v.get<bool>() ? "always" : "off";
+            else if (v.is_string()) evaluationMoves = v.get<std::string>();
         }
 
         if (user.contains("coordinates")) {
@@ -365,7 +369,7 @@ void UserSettings::setEvaluationEnabled(bool value) {
     saveLocked();
 }
 
-void UserSettings::setEvaluationMoves(bool value) {
+void UserSettings::setEvaluationMoves(const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex);
     evaluationMoves = value;
     saveLocked();

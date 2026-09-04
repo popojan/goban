@@ -55,8 +55,11 @@ public:
     /// times: the numbers *after* a move, so a player can invent their own and
     /// judge it; the stars *before*, at which point the choice is no longer
     /// theirs. Turning the panel on must not silently take that away.
-    bool getEvaluationMoves() const { std::lock_guard<std::mutex> lock(mutex); return evaluationMoves; }
-    void setEvaluationMoves(bool value);
+    /// "off", "on_demand" or "always" (ADR-0014). A string rather than an enum
+    /// because this header is shared with goban_core, which knows nothing of the
+    /// view; GobanView parses it.
+    std::string getEvaluationMoves() const { std::lock_guard<std::mutex> lock(mutex); return evaluationMoves; }
+    void setEvaluationMoves(const std::string& value);
 
     /// The numbers on the wood, and the elapsed-seconds clock. Both default on;
     /// both are visibility settings for parts of one on-board display, not a
@@ -265,7 +268,7 @@ private:
 
     // Live evaluation overlay
     bool evaluationEnabled = false;
-    bool evaluationMoves = false;
+    std::string evaluationMoves = "off";
     bool coordinates = false;
     bool evaluationReadout = true;
     bool waitClock = true;

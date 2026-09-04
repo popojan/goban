@@ -313,6 +313,13 @@ double ElementGame::getIdleTimeout() const {
         return 0.1;
     }
 
+    // A dwell is a wait with no input event at its end — the mouse has stopped,
+    // which is the whole point — so without a timeout no frame is drawn and the
+    // reveal never happens. Same trap as the three below.
+    if (view.hintDwellPending()) {
+        return 0.05;
+    }
+
     // During async engine loading, poll periodically to check completion
     if (!enginesLoaded && engineLoadingStarted) {
         return 0.1;  // 100ms polling interval during loading
@@ -606,7 +613,9 @@ void ElementGame::performDeferredInitialization() {
     // Restored separately from the evaluation itself: the suggestions are a
     // separate feature, and their default is off so that turning the evaluation
     // on never silently starts pointing at the board.
-    view.setAnalysisOverlay(UserSettings::instance().getEvaluationMoves());
+    view.setAnalysisOverlayMode(
+        parseHintMode(UserSettings::instance().getEvaluationMoves())
+            .value_or(GobanView::HintMode::Off));
     view.setEvaluationReadout(UserSettings::instance().getEvaluationReadout());
     view.setWaitClock(UserSettings::instance().getWaitClock());
     view.setCoordinates(UserSettings::instance().getCoordinates());

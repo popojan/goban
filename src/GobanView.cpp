@@ -1061,6 +1061,8 @@ void GobanView::Update() {
 	// by the game thread has to land before those comparisons, not after.
 	applyPendingResize();
 
+	updateHintDwell();
+
 	int newProgram = gobanShader.getCurrentProgram();
 	if (currentProgram != newProgram) {
 		// UPDATE_OVERLAY too: switching to or from an anaglyph shader changes
@@ -1695,13 +1697,99 @@ bool GobanView::toggleAnalysisOverlay() {
 	return showAnalysisOverlay;
 }
 
+const char* hintModeName(GobanView::HintMode mode) {
+	switch (mode) {
+		case GobanView::HintMode::OnDemand: return "on_demand";
+		case GobanView::HintMode::Always:   return "always";
+		case GobanView::HintMode::Off:      break;
+	}
+	return "off";
+}
+
+std::optional<GobanView::HintMode> parseHintMode(std::string name) {
+	for (char& c : name) {
+		c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		if (c == '-' || c == ' ') c = '_';
+	}
+	if (name == "off" || name == "false" || name == "0") return GobanView::HintMode::Off;
+	if (name == "always" || name == "on" || name == "true" || name == "1")
+		return GobanView::HintMode::Always;
+	if (name == "on_demand" || name == "ondemand" || name == "demand"
+	    || name == "hint" || name == "dwell")
+		return GobanView::HintMode::OnDemand;
+	return std::nullopt;
+}
+
 void GobanView::setAnalysisOverlay(bool shown) {
+	setAnalysisOverlayMode(shown ? HintMode::Always : HintMode::Off);
+}
+
+void GobanView::setAnalysisOverlayMode(HintMode mode) {
+	if (hintMode == mode) return;
+	hintMode = mode;
+	hintRevealed = false;
+	hintDwellPoint = Position(-1, -1);
+	applyOverlayVisibility();
+}
+
+void GobanView::applyOverlayVisibility() {
+	const bool shown = (hintMode == HintMode::Always)
+	                || (hintMode == HintMode::OnDemand && hintRevealed);
 	if (showAnalysisOverlay == shown) return;
 	showAnalysisOverlay = shown;
 	// UPDATE_STONES as well as UPDATE_OVERLAY: a label sets the annotation
 	// material, and that has to reach the stone upload or the grid stays drawn
 	// under it.
 	requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
+}
+
+/// How long a point must be aimed at before the suggestions appear, in
+/// milliseconds. Configurable because the right value is a matter of feel.
+static int hintDwellMs() {
+	using nlohmann::json;
+	if (!config) return 800;
+	return config->data.value("annotations", json::object()).value("hint_dwell_ms", 800);
+}
+
+bool GobanView::hintDwellPending() const {
+	return hintMode == HintMode::OnDemand && !hintRevealed
+	    && model.state.holdsStone && hintDwellPoint;
+}
+
+/// ADR-0014: a stone in hand is the precondition, the dwell is the trigger.
+/// Neither says much alone — reaching for the board says nothing about where,
+/// a parked cursor says nothing about intent — but together they mean the
+/// player has chosen this point, which is the moment the engine may answer.
+void GobanView::updateHintDwell() {
+	if (hintMode != HintMode::OnDemand) return;
+
+	// Placed, or put back in the bowl: the question has been answered either
+	// way, so the reveal closes. Until then it survives looking around the
+	// board, which is what makes comparing the candidates possible.
+	if (!model.state.holdsStone) {
+		hintRevealed = false;
+		hintDwellPoint = Position(-1, -1);
+		applyOverlayVisibility();
+		return;
+	}
+	if (hintRevealed) return;
+
+	const Position aim = model.cursor;
+	const bool onBoard = model.isPointOnBoard(aim);
+	// Reset on a change of *intersection*, not of pixel: the cursor already
+	// snaps to a point, so anything finer would restart the wait on a shake of
+	// the hand.
+	if (!onBoard || !(hintDwellPoint == aim)) {
+		hintDwellPoint = onBoard ? aim : Position(-1, -1);
+		hintDwellSince = std::chrono::steady_clock::now();
+		return;
+	}
+	const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::steady_clock::now() - hintDwellSince).count();
+	if (waited >= hintDwellMs()) {
+		hintRevealed = true;
+		applyOverlayVisibility();
+	}
 }
 
 void GobanView::onBoardSized(int newBoardSize) {

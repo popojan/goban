@@ -336,7 +336,9 @@
     "coordinate_color": "#00000040",
     "coordinate_offset": 0.425,
     "move_quality": ["#0f521f", "#7a4d0d", "#a83d38"],
-    "move_quality_loss": [0.015, 0.10]
+    "move_quality_loss": [0.015, 0.10],
+    "_comment_hint_dwell_ms": "How long a point must be aimed at, with a stone in hand, before the suggestions appear in the `on demand` mode (View -> Overlay -> Best Moves). A stone in hand is the precondition and the dwell is the trigger: reaching for the board says nothing about where, a parked cursor says nothing about intent, but together they mean the point has been chosen - which is the moment the engine may answer without replacing the player's own thinking. Configurable because the right value is a matter of feel; the reveal then lasts until the stone is placed or put back, so the candidates can be compared.",
+    "hint_dwell_ms": 800
   },
   "overlay_shaders": {
     "vertex": "./config/shaders/overlay/overlay-vertex.glsl",

@@ -16,6 +16,7 @@
 #ifndef GOBAN_GOBANVIEW_H
 #define GOBAN_GOBANVIEW_H
 
+#include <chrono>
 #include <string>
 #include <atomic>
 #include <optional>
@@ -470,14 +471,28 @@ public:
     [[nodiscard]] bool areCoordinatesShown() const { return showCoordinates; }
     void setCoordinates(bool shown);
 
-    /// Off by default, and that is the point. The panel's numbers are read
-    /// *after* a move, so a player can invent their own and judge it. Stars on
-    /// the board are read *before*, and once the engine has pointed at a point
-    /// you cannot un-see it — the freedom to choose your own is gone from the
-    /// first move. Two different features, separately switchable.
+    /// When the engine's suggestions are drawn (ADR-0014).
+    ///
+    /// `Always` is what the old boolean `true` meant, and it is read *before* a
+    /// decision — once the engine has pointed at a point you cannot un-see it.
+    /// `OnDemand` withholds them until the player has aimed at a point long
+    /// enough to have chosen it, which turns the same display from a substitute
+    /// for thinking into a check on it.
+    enum class HintMode { Off, OnDemand, Always };
+
     bool toggleAnalysisOverlay();
+    // hintModeName / parseHintMode are free functions below the class.
+    /// Whether the suggestions are on screen *now* — the mode, plus whether an
+    /// on-demand reveal is currently open. The renderer asks only this.
     [[nodiscard]] bool isAnalysisOverlayShown() const { return showAnalysisOverlay; }
     void setAnalysisOverlay(bool shown);
+    [[nodiscard]] HintMode analysisOverlayMode() const { return hintMode; }
+    void setAnalysisOverlayMode(HintMode mode);
+
+    /// True while a stone is held over a point and the dwell has not yet
+    /// elapsed — the loop must keep waking, or no frame is drawn and the reveal
+    /// never happens.
+    [[nodiscard]] bool hintDwellPending() const;
 
     /// Where the suggestions come from. Set once by ElementGame; the view reads
     /// the published report exactly as it reads GobanModel::snapshot(), so
@@ -574,7 +589,18 @@ public:
     Position lastMove;
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
+    /// The effective "draw them now" flag, derived from hintMode and
+    /// hintRevealed. Kept as the single thing the renderer reads.
     bool showAnalysisOverlay = false;
+    HintMode hintMode = HintMode::Off;
+    /// An on-demand reveal is open. Set when the dwell elapses; cleared when the
+    /// stone is placed or put back, so it survives looking around the board.
+    bool hintRevealed = false;
+    Position hintDwellPoint{-1, -1};
+    std::chrono::steady_clock::time_point hintDwellSince;
+    void applyOverlayVisibility();
+    void updateHintDwell();
+
     bool showCoordinates = false;
     glm::vec4 coordinateInk{0.0f, 0.0f, 0.0f, 1.0f};
     float coordOffset = 0.425f;
@@ -636,5 +662,10 @@ public:
     void clearView();
 };
 
+/// The names `evaluation_moves` takes in user.json and on the command line.
+/// `on`/`off` are still accepted: they were the whole vocabulary before the
+/// third state, and both scenarios and keybindings use them.
+const char* hintModeName(GobanView::HintMode mode);
+std::optional<GobanView::HintMode> parseHintMode(std::string name);
 
 #endif //GOBAN_GOBANVIEW_H
