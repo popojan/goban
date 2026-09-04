@@ -46,16 +46,17 @@
                             <div class="hr">Popisky</div>
                             <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">Poslední tah</div>
                             <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">Další tah</div>
-                            <div class="cmd">
-                                <select id="selectEvaluationMoves" onchange="evaluation_moves" onmousedown="nop">
-                                    <option value="off">Nejlepší tahy: vypnuto</option>
-                                    <option value="on_demand">Nejlepší tahy: na vyžádání</option>
-                                    <option value="always">Nejlepší tahy: vždy</option>
-                                </select>
-                            </div>
                             <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">Odhad skóre</div>
                             <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">Uplynulý čas</div>
                             <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">Souřadnice</div>
+                            <div class="hr">Nejlepší tahy</div>
+                            <div class="cmd">
+                                <select id="selectEvaluationMoves" onchange="evaluation_moves" onmousedown="nop">
+                                    <option value="off">vypnuto</option>
+                                    <option value="on_demand">na vyžádání</option>
+                                    <option value="always">vždy</option>
+                                </select>
+                            </div>
                         </div>
                         <!--
                         <div class="grp">
