@@ -40,6 +40,13 @@ wait_until eval_board_text B 60% B+2.5
 wait_until eval_moves_shown true
 expect eval_hint_waiting false
 
+# The engine is asked for more candidates than it seriously searched (`minmoves`)
+# so an aimed-at point is more likely to have a number — and the ones it barely
+# looked at are dropped again, because a win rate from a single visit is noise
+# and showing it would be worse than the silence it replaces. This mock reports
+# two real candidates and six with one visit each.
+expect eval_moves 2
+
 # Now the readout answers about the candidate under the stone. This is where the
 # delta of a contemplated move lives: there is no room on the stone, and the
 # suggestions carry their loss as colour rather than as a printed number.

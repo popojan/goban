@@ -338,7 +338,11 @@
     "move_quality": ["#0f521f", "#7a4d0d", "#a83d38"],
     "move_quality_loss": [0.015, 0.10],
     "_comment_hint_dwell_ms": "How long a point must be aimed at, with a stone in hand, before the suggestions appear in the `on demand` mode (View -> Overlay -> Best Moves). A stone in hand is the precondition and the dwell is the trigger: reaching for the board says nothing about where, a parked cursor says nothing about intent, but together they mean the point has been chosen - which is the moment the engine may answer without replacing the player's own thinking. Configurable because the right value is a matter of feel; the reveal then lasts until the stone is placed or put back, so the candidates can be compared.",
-    "hint_dwell_ms": 800
+    "hint_dwell_ms": 800,
+    "_comment_hint_min_moves": "How many candidates to ask the analysis engine to report (kata-analyze `minmoves`). The engine volunteers only the moves it actually searched, so a point a beginner is aiming at often has no number at all; asking wider makes one more likely. An engine that does not know the parameter rejects the whole command, which is caught once and asked without it for the rest of the session. 0 disables the request.",
+    "hint_min_moves": 30,
+    "_comment_hint_min_visits_fraction": "How few visits makes a candidate not worth showing, as a fraction of the best move's visits. Asking for more candidates is only useful with this behind it: a win rate from two visits is noise, and showing it would be worse than the silence it replaces. 0 disables the filter.",
+    "hint_min_visits_fraction": 0.05
   },
   "overlay_shaders": {
     "vertex": "./config/shaders/overlay/overlay-vertex.glsl",

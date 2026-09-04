@@ -149,6 +149,10 @@ private:
     /// Runs one stream until the position changes, the game claims the device,
     /// or the service is switched off.
     void streamUntilStale(const struct AnalysisTarget& target);
+    static int hintMinMoves();
+    static void dropUnreliable(AnalysisReport& report);
+    /// Cleared for the session the first time an engine refuses `minmoves`.
+    bool useMinMoves = true;
     void publish(const AnalysisReport& next);
     void setState(AnalysisState next);
 
