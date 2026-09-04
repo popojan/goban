@@ -61,22 +61,35 @@ explicitly widening the rule and marking the display as an opinion about the
 previous position. Revealing before the commit has no such problem: the position
 has not changed and the report is current.
 
-**4. The verdict on the played move is state, and belongs on the board.** Whether
-the last move was the engine's first choice, and what it cost, stays true for as
-long as that move is the last one — so by ADR-0012 it is state, not an event, and
-the wood is where it goes.
+**4. The verdict lives only while the move is being decided, and nothing is shown
+after the commit.** The engine's answer is consumed at decision time: the letter,
+the tinted candidates and the readout are all read before the stone is placed. By
+the time it lands there is nothing left to learn from it.
 
-`#lblMessage` is specifically wrong for it. `OnUpdate()` clears that line on every
-position change carrying no comment, and the position changes when the opponent
-replies — measured at 13 ms for GNU Go. The verdict would flash and vanish before
-it could be read. This is the same failure that made a confirmation prompt
-impossible to click during a bot match.
+Two alternatives were considered and both fail.
+
+`#lblMessage` is wrong because `OnUpdate()` clears that line on every position
+change carrying no comment, and the position changes when the opponent replies —
+measured at 13 ms for GNU Go. The verdict would flash and vanish. This is the
+same failure that made a confirmation prompt impossible to click during a bot
+match.
+
+**Tinting the move number after the commit fails for the same measured reason.**
+`updateLastMoveOverlay()` clears the previous marker and labels only the single
+most recent stone, so a tint on the player's move survives about one frame before
+the opponent's reply takes the marker over. Grading *every* played stone would
+avoid that, but it is a different feature — post-hoc review of a whole game, with
+a permanent visual load — and not this one.
+
+The cost is worth stating: a move played without waiting for the reveal gets no
+feedback at all. That is consistent rather than regrettable. The player chose not
+to ask.
 
 **5. The verdict speaks in the vocabulary that already exists.** The
 move-quality ramp (`move_quality_loss`: a concession at 0.015, a blunder at 0.10)
-already grades moves, and the last move already carries a number drawn on the
-stone. Grading the played move on that same scale reuses both; inventing a second
-scale would mean the same move could be described two ways.
+already grades moves and already tints the suggestions. Grading the aimed-at
+point on that same scale reuses it; inventing a second scale would mean the same
+move could be described two ways.
 
 **6. The verdict is drawn on the stone, not in the margin.** The
 bottom margin is full — the recommended pass at the left, the readout centred,
@@ -85,10 +98,11 @@ units per character there are about ten characters free beside a centred readout
 on 19x19 and **two** on 9x9. A beginner playing a bot is on the small board, so
 there is no room for a second item exactly where this feature is aimed.
 
-So the verdict is drawn on the stone: tinted by the quality ramp, and carrying
-the engine's rank letter when the move was in its list. The suggestions already
-label ranked moves `A`/`B`/`C`, so a move number wearing an `A` says "first
-choice" in vocabulary the player has already learnt.
+So the verdict is drawn at the point being aimed at: tinted by the quality ramp,
+and carrying the engine's rank letter when the point is in its list. The
+suggestions already label ranked moves `A`/`B`/`C`, so the aimed-at point wearing
+an `A` says "first choice" in vocabulary the player has already learnt — and
+seeing it there, before committing, is the praise.
 
 **It is the evaluation's own label, not the last-move marker's.** It merely lands
 on the same point. That matters because gating it on the last-move toggle would
@@ -101,23 +115,18 @@ Faking the other toggle on instead — drawing move numbers while the menu still
 says they are off — only inverts the problem into a setting that disagrees with
 the board, which is what ADR-0005 exists to prevent.
 
-The overlap has a rule already, the one the suggestions follow: where a label is
-already there, tint it rather than replace it; where there is none, draw one. So
-with the last-move number shown the verdict colours it, and without it the
-verdict draws its own mark. Both branches covered, no setting overridden.
-
 **A move number is a fact about the record, so it may not appear before the move
-is in it.** An unconfirmed stone carries no number, which decides the sequence:
+is in it.** An unconfirmed stone therefore carries no number, and the labels the
+mode draws are its own:
 
 | phase | on the stone |
 |---|---|
-| stone in hand, not committed | no number exists — its own mark, the rank letter |
-| dwell elapsed, report trustworthy | suggestions revealed; the aimed-at point takes its letter |
-| committed | the move number appears — tint it, and drop the letter |
+| stone in hand, not committed | nothing yet |
+| dwell elapsed, report trustworthy | the rank letter on the aimed-at point, tinted; the other candidates likewise |
+| committed | the mode's labels go; the ordinary move number appears |
 
-That is the same tint-or-draw rule, applied across time rather than across space:
-the number does not exist yet, then it does. After the commit the letter is
-redundant, because the colour is the verdict.
+The reveal is transient by construction, so it never has to coexist with the move
+number — which is also why nothing has to be overridden or borrowed.
 
 **7. The delta goes in the readout, not on the stone.** While a stone is held and
 aimed at a point, the readout in the bottom margin shows *that candidate's*
@@ -173,8 +182,9 @@ count.
 3. **Is the after-the-stone reveal worth widening the `positionId` rule?** It is
    what was originally asked for, and it is the more natural moment — the move is
    made, now show me. Decision 3 defers it rather than refusing it.
-4. **Does praise survive the commit?** Once the move number appears the letter is
-   dropped and only the tint remains, so "this was the engine's first choice"
-   becomes the darkest ink rather than an `A` — which is subtle, and praise that
-   is not noticed is not praise. Keeping the letter for rank 1 alone is the
-   obvious exception. Not decidable on paper; it needs looking at.
+4. **Is showing nothing after the commit too austere?** Decision 4 says the
+   answer was consumed while deciding, and the measurement backs it — a mark on
+   the last move alone survives one frame against a 13 ms opponent. But a player
+   who plays quickly then gets no feedback at all, and grading every stone is a
+   whole separate feature rather than a small extension of this one. Whether that
+   feature is wanted is a question this ADR does not settle. Needs looking at.
