@@ -14,14 +14,15 @@
 #      fact twice; the Minimal scenes show nothing, so the number is what there
 #      is. `"bowls": 1` is declared in the shader's config entry, never inferred
 #      from its GLSL — ADR-0011's rule.
-#   2. Nothing until something is taken, then *both* numbers, a zero included.
-#      Two noughts from move one are the bar resting at 50% that ADR-0007
-#      decision 12 rejects: permanently present, saying nothing, teaching
-#      nothing. But a lone digit is worse than either — with nothing beside it
-#      to contrast against, the colour convention is illegible and it reads as a
-#      display fault. The pair is the smallest thing that explains itself.
-#   3. They follow the cursor. Navigating back before the capture takes them
-#      away again, because the board is rebuilt per position.
+#   2. Both counts are drawn whenever they are drawn at all — a zero included.
+#      An earlier version hid a nought, citing ADR-0007's "absent is not zero".
+#      That principle is about an estimate nobody has computed; a prisoner count
+#      of zero is known, exact and unambiguous. Hiding it made `always` show an
+#      empty margin, which is a control disagreeing with its own name, and it
+#      left a lone digit with nothing to contrast against — the colour
+#      convention is only legible as a pair.
+#   3. They follow the cursor. Navigating back before the capture returns them
+#      to nought, because the board is rebuilt per position.
 #
 # `prisoner_text_*` is what the glyph pass actually composed, not what the Board
 # counted — the same distinction as `prisoners_drawn_*` and `sounds_played`, and
@@ -38,6 +39,18 @@ wait_idle
 
 # Shader 0 is Red Carpet, which carries "bowls": 1.
 expect prisoner_mode auto
+expect prisoner_shown false
+
+# `always` means always, and on an empty board that has to mean 0 and 0 — this
+# is the case that made the hiding rule untenable. Nothing has been captured and
+# the shader has bowls, and the counts appear regardless, immediately.
+prisoners always
+wait_idle
+expect prisoner_shown true
+wait_until prisoner_text_white 0
+expect prisoner_text_black 0
+prisoners auto
+wait_idle
 expect prisoner_shown false
 
 # Black B1, White A1, Black A2 — Black takes the corner stone. Same capture as
@@ -69,12 +82,13 @@ wait_until prisoner_text_white 1
 # one number alone cannot show which colour means what.
 expect prisoner_text_black 0
 
-# Back before the capture and *both* go, because nothing has been taken there.
+# They follow the cursor: back before the capture the count returns to nought,
+# and it is drawn as a nought rather than vanishing.
 navigate_back
 wait_idle
 expect captured_white 0
-wait_until prisoner_text_white ""
-expect prisoner_text_black ""
+wait_until prisoner_text_white 0
+expect prisoner_text_black 0
 navigate_forward
 wait_idle
 wait_until prisoner_text_white 1

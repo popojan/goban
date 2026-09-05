@@ -429,10 +429,9 @@ public:
         if (prisonerMode == PrisonerMode::Always) return true;
         return !gobanShader.drawsBowls();
     }
-    /// What the glyph pass last drew, for dumpState(). Both empty until either
-    /// side has taken a stone, then both set — a lone digit with nothing beside
-    /// it reads as a fault, since the colour convention is only legible as a
-    /// contrast. See updateFloatingLabels().
+    /// What the glyph pass last drew, for dumpState(). Both set whenever the
+    /// counts are shown at all, a zero included — empty only means the mode or
+    /// the shader is keeping them off. See updateFloatingLabels().
     [[nodiscard]] const std::string& prisonerTextBlack() const { return prisonerTextB; }
     [[nodiscard]] const std::string& prisonerTextWhite() const { return prisonerTextW; }
 

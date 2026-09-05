@@ -112,3 +112,33 @@ paper and dropped: the group header would then read differently depending on wha
 was installed, and differently again when nothing was, which is three headings for
 one menu. The constant noun with a varying value under it is how every other
 select in that menu already behaves.
+
+---
+
+## Correction, 2026-09-05: the zero is drawn
+
+The decision above says "nothing until a stone has been taken; then both counts,
+a zero included", and cites ADR-0007 decision 12 for the first half. **That
+citation was a misapplication, and the first half is withdrawn: both counts are
+drawn whenever they are drawn at all.**
+
+"Absent is not zero" is about a quantity that has *not been computed* — a win
+rate resting at 50% cannot be told from a genuinely even game, so showing the
+default is a lie about what is known. A prisoner count of zero is nothing like
+that. It is known, exact, true, and there is no unknown state it could be
+confused with. The principle does not reach it.
+
+What made this concrete was the mode: switching to `always` on an untouched
+board showed an empty margin. A control that does nothing when set to *always*
+disagrees with its own name, which is the ADR-0005 family of failure this
+codebase keeps rediscovering — and the rule would have had to grow an exception
+for `Always` to fix it, which is a sign the rule was wrong rather than
+incomplete.
+
+The withdrawn half also cost the pair its baseline. Two numbers materialising
+mid-game are a larger surprise than two noughts standing there from the start,
+and a capture reads better as a count *changing* than as one appearing.
+
+The second half stands and is now the whole rule: **both counts, always,
+together.** A lone digit has nothing to contrast against, and the ink convention
+is legible only as a pair.

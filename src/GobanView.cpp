@@ -1565,26 +1565,25 @@ void GobanView::updateFloatingLabels() {
 	// Coordinates are pinned to top and left, and the bottom row is already
 	// three-way shared by the pass recommendation, the readout and the clock.
 	//
-	// **Nothing until something is taken, then both — a zero included.** The two
-	// halves of that are separate decisions.
+	// **Both counts, always, zero included.** An earlier version drew nothing
+	// until the first capture, on the ADR-0007 "absent is not zero" precedent.
+	// That was a misapplication: the principle is about an estimate that has *not
+	// been computed* — a win rate resting at 50% cannot be told from a genuinely
+	// even game — and a prisoner count of zero carries no such ambiguity. It is
+	// known, exact, and true, and nothing else could be mistaken for it.
 	//
-	// Silent until the first capture, because two noughts standing in the margin
-	// from move one are the bar resting at 50% that ADR-0007 decision 12 rejects:
-	// permanently present, saying nothing, teaching nothing. Appearing at the
-	// moment of a capture is what makes them self-explaining — a stone vanishes
-	// and a number in that stone's colour arrives one frame later, with no label
-	// to translate.
+	// The symptom was the giveaway. Switching the mode to `always` and seeing an
+	// empty margin is a control disagreeing with its own name, which is the
+	// ADR-0005 family of failure. It also cost the pair its baseline: two numbers
+	// materialising mid-game are a bigger surprise than two noughts standing there
+	// from the start, and a capture reads better as a count *changing* than as one
+	// appearing.
 	//
-	// But then *both*, even the side still on nought. A lone digit with nothing
-	// beside it reads as a fault rather than as a count: the colour convention is
-	// only legible as a contrast, and one number cannot show a contrast. The pair
-	// is the smallest thing that explains itself.
-	//
-	// Navigating back before the first capture takes them away again, because the
-	// board is rebuilt per position.
+	// Cleared first: these are what dumpState() reports as drawn, so a mode change
+	// that switches them off has to leave them empty rather than stale.
 	prisonerTextB.clear();
 	prisonerTextW.clear();
-	if (showPrisonerCounts() && (snap->capturedBlack + snap->capturedWhite) > 0) {
+	if (showPrisonerCounts()) {
 		const float size = 0.8f / static_cast<float>(model.getBoardSize());
 		const float lastCol = static_cast<float>(model.getBoardSize()) - 1.0f;
 		const float halfN = 0.5f * lastCol;

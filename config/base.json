@@ -53,7 +53,7 @@
       ]
     },
     {
-      "name": "Katago #kata9x9 b18",
+      "name": "Katago 9x9",
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata9x9-b18c384nbt-20231025.bin.gz -config ./default_gtp.cfg",

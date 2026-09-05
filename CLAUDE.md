@@ -540,10 +540,12 @@ See `docs/adr/0015-tsumego-is-a-game-mode.md`.
   coordinates are pinned top and left and the bottom row is shared three ways.
   The ink is the colour of the stones *counted*, which is what sits in the bowl,
   and it survives `eyeInk()` because black against white is a brightness
-  difference. **Nothing is drawn until a stone has been taken, and then both
-  counts are, a zero included**: silent at first because two standing noughts are
-  the resting-at-50% bar ADR-0007 rejected, both afterwards because a lone digit
-  with nothing to contrast against reads as a fault rather than a count.
+  difference. **Both counts are drawn together, always, a zero included.** A
+  lone digit has nothing to contrast against and the ink convention is legible
+  only as a pair. Hiding a nought was tried and withdrawn: "absent is not zero"
+  is about a quantity nobody has *computed*, and a prisoner count of zero is
+  known and exact — the rule made `always` show an empty margin, a control
+  disagreeing with its own name.
   `PrisonerMode` is `Auto`/`Always`/`Never` on the `PointerMode` precedent, and
   `Auto` asks the *shader*: `"bowls": 1` is declared in its config entry
   (ADR-0011's rule) because only `scene/red.glsl` includes `bowl_stones.glsl`, so
