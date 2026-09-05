@@ -258,7 +258,25 @@ from wanting to switch the bowls off while playing.
 - **M1 — booleans.** Scene features on and off per shader: bowls, lids. Delivers
   the request that prompted this, and makes the frame-rate question measurable.
 - **M2 — scalars.** Ambient level, light size, shininess. First point at which
-  generated UI is needed.
+  generated UI is needed — and it should be a **panel, not the menu**. A slider
+  in a dropdown is the wrong control: the menu closes on a click, dragging in it
+  is awkward, and the whole point of a scalar is watching the board while you
+  move it. The original backlog sketch had a "Shader Settings" dialog and was
+  right about that. Generating it from `shader_params` is also what makes the
+  `label` and `group` keys load-bearing, retiring the two-labels wart above.
+
+  **Two questions are deliberately held over to that point** rather than guessed
+  at now (Jan, 2026-09-05):
+
+  - *Greyed or hidden, for a parameter the shader does not offer.* Greyed today,
+    on ADR-0015's precedent — the menu does not reflow on a shader switch, and a
+    greyed "Bowls" says this scene has none. It read oddly enough to be asked
+    about immediately, so it is not settled; a generated panel can answer it
+    better than a hand-written menu can, and hiding would have to take the group
+    heading with it.
+  - *Where the controls live once there are more than a handful.* Booleans fit in
+    the menu. The panel is the answer for scalars, and may then absorb the
+    booleans too.
 - **M3 — colours.** Blocked on the material-array decision above, and on a colour
   control RmlUi does not have.
 
