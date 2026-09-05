@@ -1407,6 +1407,17 @@ void GobanView::updateFloatingLabels() {
 			// of naming the leader, because that is how a result is written.
 			text << "B " << static_cast<int>(std::lround(shownWinrate * 100.0))
 			     << "%";
+			if (aimed) {
+				// What this point costs against the engine's best — the very
+				// quantity the colour ramp encodes, here as a number, for the one
+				// point the player is asking about. Both terms come from the same
+				// report, so no second search and no comparison across two of
+				// them: an absolute difference, because both are in Black's frame
+				// and the best move is the least bad for whoever is to move.
+				const int loss = static_cast<int>(std::lround(
+					std::fabs(report->winrateBlack - aimed->winrateBlack) * 100.0));
+				text << " (" << (loss ? "-" : "") << loss << "%)";
+			}
 			if (shownLead) {
 				const double lead = *shownLead;
 				// One space, not a run of them: the scenario runner re-joins an

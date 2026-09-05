@@ -47,10 +47,11 @@ expect eval_hint_waiting false
 # two real candidates and six with one visit each.
 expect eval_moves 2
 
-# Now the readout answers about the candidate under the stone. This is where the
-# delta of a contemplated move lives: there is no room on the stone, and the
-# suggestions carry their loss as colour rather than as a printed number.
-wait_until eval_board_text B 55% B+2.5
+# Now the readout answers about the candidate under the stone, with what that
+# point costs against the engine's best in brackets. Both terms come from the
+# same report, so the delta needs no second search and no comparison across two
+# of them — which is also why it is available before the stone is placed.
+wait_until eval_board_text B 55% (-5%) B+2.5
 
 # --- The reveal survives looking around --------------------------------------
 # It closes on placing or putting the stone back, not on moving away: comparing
