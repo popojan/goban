@@ -347,11 +347,14 @@ remain, and none of them blocks the numbers-only first stage.
    Whether ownership extends the fractional convention that `mDeltaCaptured`
    started, or takes a second channel, is a rendering decision of its own and
    blocks only ownership — not win rate or score.
-2. **Does analysis run in tsumego mode?** An overlay that stars the correct move
-   destroys the puzzle. Off is almost certainly right, but tsumego already
-   carries blanket exclusions elsewhere (`suppressSessionCopy`), and whether this
-   is one more of those or a user-visible choice should be settled when tsumego's
-   UX is next touched rather than guessed at here.
+2. ~~**Does analysis run in tsumego mode?**~~ **Settled by ADR-0015**, the way
+   this question guessed: it does not. A blanket exclusion, not a user-visible
+   choice — and *suppressed* rather than disabled, so the process stays alive and
+   the user's toggles are untouched. `AnalysisService::loop()` drops the report
+   while `tsumegoMode` holds, which silences all three surfaces at once. The
+   enforcement had to be at the display rather than in `availableActions()`
+   alone: greying the toggles leaves whoever switched them on before opening a
+   problem unable to switch them off.
 3. **The stream's visit budget and report cadence.** Decision 14 caps the
    *redraw* rate; the engine-side `maxVisits` and report interval that keep a
    live search from saturating a device are a measurement question on real

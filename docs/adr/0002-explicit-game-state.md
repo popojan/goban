@@ -1,6 +1,8 @@
 # ADR-0002: Replace the lifecycle flags with explicit state machines
 
-**Status:** Accepted 2026-08-09 — `GamePhase` steps 1–2 implemented, steps 3–5 outstanding
+**Status:** Accepted 2026-08-09 — complete, all five steps. See the implementation
+log, which records where the plan was wrong: step 5's premise was, and `syncingUI`
+was split rather than retired
 **Date:** 2026-08-09
 
 ## Context
