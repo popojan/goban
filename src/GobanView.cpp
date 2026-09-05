@@ -104,6 +104,21 @@ GobanView::GobanView(GobanModel& m)
                              "or #rrggbbaa", waitConfigured);
             }
         }
+        // The two prisoner counts. Not derived from readoutInk like the wait
+        // clock is: these two have to differ from *each other* by brightness, or
+        // they say nothing under a stereo shader, so neither can inherit.
+        for (auto* entry : {&prisonerInkBlack, &prisonerInkWhite}) {
+            const char* key = entry == &prisonerInkBlack ? "prisoner_black_color"
+                                                         : "prisoner_white_color";
+            const std::string configured = annotations.value(key, std::string());
+            if (configured.empty()) continue;
+            if (const auto parsed = parseHexColor(configured)) {
+                *entry = *parsed;
+            } else {
+                spdlog::warn("annotations.{}: '{}' is not #rgb, #rrggbb or "
+                             "#rrggbbaa", key, configured);
+            }
+        }
         if (annotations.contains("wait_grace")) {
             const float grace = annotations.value("wait_grace", 0.5f);
             // Zero is meaningful — a scenario wants the mark on the first frame —
@@ -194,6 +209,9 @@ GobanView::GobanView(GobanModel& m)
     }
     if (const auto parsed = parsePointerMode(settings.getPointerMode())) {
         pointerMode = *parsed;
+    }
+    if (const auto parsed = parsePrisonerMode(settings.getPrisonerMode())) {
+        prisonerMode = *parsed;
     }
     if (settings.getAnaglyphGreen() >= 0.0f) {
         anaglyphGreenLevel = Stereo::clampGreen(settings.getAnaglyphGreen());
@@ -1543,6 +1561,45 @@ void GobanView::updateFloatingLabels() {
 		}
 	}
 
+	// The prisoners, on the right margin — the one edge nothing else uses.
+	// Coordinates are pinned to top and left, and the bottom row is already
+	// three-way shared by the pass recommendation, the readout and the clock.
+	//
+	// **Nothing until something is taken, then both — a zero included.** The two
+	// halves of that are separate decisions.
+	//
+	// Silent until the first capture, because two noughts standing in the margin
+	// from move one are the bar resting at 50% that ADR-0007 decision 12 rejects:
+	// permanently present, saying nothing, teaching nothing. Appearing at the
+	// moment of a capture is what makes them self-explaining — a stone vanishes
+	// and a number in that stone's colour arrives one frame later, with no label
+	// to translate.
+	//
+	// But then *both*, even the side still on nought. A lone digit with nothing
+	// beside it reads as a fault rather than as a count: the colour convention is
+	// only legible as a contrast, and one number cannot show a contrast. The pair
+	// is the smallest thing that explains itself.
+	//
+	// Navigating back before the first capture takes them away again, because the
+	// board is rebuilt per position.
+	prisonerTextB.clear();
+	prisonerTextW.clear();
+	if (showPrisonerCounts() && (snap->capturedBlack + snap->capturedWhite) > 0) {
+		const float size = 0.8f / static_cast<float>(model.getBoardSize());
+		const float lastCol = static_cast<float>(model.getBoardSize()) - 1.0f;
+		const float halfN = 0.5f * lastCol;
+		const float col = lastCol + coordOffset;
+		// White above, black below, which is where the RmlUi labels this
+		// replaces used to sit (White top right, Black bottom left). Kept as a
+		// pair near the middle so neither lands in a corner beside a coordinate.
+		prisonerTextW = std::to_string(snap->capturedWhite);
+		prisonerTextB = std::to_string(snap->capturedBlack);
+		labels.push_back({glm::vec2(col, halfN + 0.75f), prisonerTextW, size,
+		                  prisonerInkWhite, 0u, TextAlign::Center});
+		labels.push_back({glm::vec2(col, halfN - 0.75f), prisonerTextB, size,
+		                  prisonerInkBlack, 0u, TextAlign::Center});
+	}
+
 	gobanOverlay.setFloatingLabels(std::move(labels));
 }
 
@@ -1629,6 +1686,32 @@ std::optional<PointerMode> parsePointerMode(const std::string& name) {
     if (n == "always" || n == "on" || n == "yes") return PointerMode::Always;
     if (n == "never" || n == "off" || n == "no") return PointerMode::Never;
     return std::nullopt;
+}
+
+const char* prisonerModeName(PrisonerMode mode) {
+    switch (mode) {
+        case PrisonerMode::Always: return "always";
+        case PrisonerMode::Never:  return "never";
+        case PrisonerMode::Auto:   break;
+    }
+    return "auto";
+}
+
+std::optional<PrisonerMode> parsePrisonerMode(const std::string& name) {
+    std::string n;
+    for (char c : name) n += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (n == "auto")   return PrisonerMode::Auto;
+    if (n == "always" || n == "on"  || n == "yes") return PrisonerMode::Always;
+    if (n == "never"  || n == "off" || n == "no")  return PrisonerMode::Never;
+    return std::nullopt;
+}
+
+void GobanView::setPrisonerMode(PrisonerMode mode) {
+	if (prisonerMode == mode) return;
+	prisonerMode = mode;
+	// The counts are floating labels, so the glyph buffers have to be rebuilt.
+	updateFloatingLabels();
+	requestRepaint(UPDATE_SOME);
 }
 
 void GobanView::setPointerMode(PointerMode mode) {

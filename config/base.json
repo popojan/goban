@@ -276,6 +276,8 @@
       "name": "Red Carpet",
       "vertex": "./config/shaders/vertex/mono.glsl",
       "fragment": "./config/shaders/fragment/red_carpet.glsl",
+      "_comment_bowls": "This scene includes bowl_stones.glsl, so the prisoners are already a visible pile; PrisonerMode::Auto keeps the margin counts off here.",
+      "bowls": 1,
       "height": 0.85
     },
     {
@@ -301,6 +303,8 @@
       "stereo": 1,
       "vertex": "./config/shaders/vertex/stereo.glsl",
       "fragment": "./config/shaders/fragment/red_carpet_stereo.glsl",
+      "_comment_bowls": "This scene includes bowl_stones.glsl, so the prisoners are already a visible pile; PrisonerMode::Auto keeps the margin counts off here.",
+      "bowls": 1,
       "height": 0.85
     },
     {
@@ -334,6 +338,9 @@
     "readout_color": "#00000040",
     "readout_stale_color": "#00000000",
     "coordinate_color": "#00000040",
+    "_comment_prisoner_color": "Ink for the captured-stone counts on the right margin (View -> the `prisoners` command). The colour is the colour of the stones *counted*, matching what sits in a bowl, and the two must differ in brightness rather than only in hue: GobanOverlay::eyeInk() flattens every label to its own brightness under a stereo shader.",
+    "prisoner_black_color": "#00000060",
+    "prisoner_white_color": "#ffffff90",
     "coordinate_offset": 0.425,
     "move_quality": ["#0f521f", "#7a4d0d", "#a83d38"],
     "move_quality_loss": [0.015, 0.10],

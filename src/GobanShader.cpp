@@ -550,6 +550,11 @@ bool GobanShader::resolveShader(int idx, PendingShader& out) const {
     // overlay has to draw the same two eyes, and a path comparison is not a
     // fact about the shader.
     out.stereo = shader.value("stereo", 0) != 0;
+    // Third of the same kind. Whether the scene has bowls in it cannot be read
+    // off the fragment path without parsing the include graph, and the CPU has
+    // to know: PrisonerMode::Auto draws the counts in the margin exactly where
+    // the shader does not draw the pile.
+    out.bowls = shader.value("bowls", 0) != 0;
     // Same shape, and the same reason: an appearance fact the CPU has to act
     // on, declared by the shader rather than inferred. The global block is the
     // default and no shipped shader overrides it, so this normally resolves to
@@ -568,6 +573,7 @@ bool GobanShader::resolveShader(int idx, PendingShader& out) const {
 void GobanShader::applyShaderMetadata(const PendingShader& s) {
     currentProgramH = s.height;
     currentProgramStereo = s.stereo;
+    currentProgramBowls = s.bowls;
     currentPalette = s.palette;
 }
 

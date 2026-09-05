@@ -46,6 +46,15 @@ enum class PointerMode { Auto, Always, Never };
 const char* pointerModeName(PointerMode mode);
 std::optional<PointerMode> parsePointerMode(const std::string& name);
 
+/// When the prisoner counts are drawn in the margin. Same three states as
+/// PointerMode, and for the same reason: `Auto` means "where the real thing is
+/// missing", which here is a shader that draws no bowls — four of the six
+/// shipped ones, on which the captures were invisible.
+enum class PrisonerMode { Auto, Always, Never };
+
+const char* prisonerModeName(PrisonerMode mode);
+std::optional<PrisonerMode> parsePrisonerMode(const std::string& name);
+
 // WaitKind, waitKindName() and the blink curve; see WaitIndicator.h for why the
 // two game waits are drawn on the board rather than written in #lblStatus.
 #include "WaitIndicator.h"
@@ -409,6 +418,24 @@ public:
     void setPointerMode(PointerMode mode);
     [[nodiscard]] PointerMode pointerMode_() const { return pointerMode; }
 
+    void setPrisonerMode(PrisonerMode mode);
+    [[nodiscard]] PrisonerMode prisonerMode_() const { return prisonerMode; }
+    /// Whether the counts belong in the margin at all. `Auto` asks the shader:
+    /// Red Carpet already shows the prisoners as a pile in its bowls, so a
+    /// number beside it would be the same fact twice, while the Minimal scenes
+    /// show nothing at all.
+    [[nodiscard]] bool showPrisonerCounts() const {
+        if (prisonerMode == PrisonerMode::Never)  return false;
+        if (prisonerMode == PrisonerMode::Always) return true;
+        return !gobanShader.drawsBowls();
+    }
+    /// What the glyph pass last drew, for dumpState(). Both empty until either
+    /// side has taken a stone, then both set — a lone digit with nothing beside
+    /// it reads as a fault, since the colour convention is only legible as a
+    /// contrast. See updateFloatingLabels().
+    [[nodiscard]] const std::string& prisonerTextBlack() const { return prisonerTextB; }
+    [[nodiscard]] const std::string& prisonerTextWhite() const { return prisonerTextW; }
+
     /// How much of the green channel the colour modes use. The dial for lenses
     /// that pass green through *both* filters, where no assignment of green to an
     /// eye is clean and the only remaining lever is how much of it there is.
@@ -617,6 +644,14 @@ public:
     bool pointerOverBoard = false;
     bool pointerOnWidget = false;
     PointerMode pointerMode = PointerMode::Auto;
+    PrisonerMode prisonerMode = PrisonerMode::Auto;
+    /// Ink for the two counts: the colour of the stones *counted*, which is what
+    /// the bowls show — black stones sitting in White's bowl. It survives a
+    /// stereo shader, where eyeInk() flattens every label to its own brightness
+    /// and black against white is exactly a brightness difference.
+    glm::vec4 prisonerInkBlack{0.0f, 0.0f, 0.0f, 1.0f};
+    glm::vec4 prisonerInkWhite{1.0f, 1.0f, 1.0f, 1.0f};
+    std::string prisonerTextB, prisonerTextW;
     void updatePointerState();
     /// Mirrors the GLFW input mode, so it is set on change rather than per frame.
     bool nativePointerHidden = false;

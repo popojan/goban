@@ -92,6 +92,16 @@
                         <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">Souřadnice</div>
                         <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">Uplynulý čas</div>
                     </div>
+                    <div class="grp">
+                        <div class="hr">Zajatci</div>
+                        <div class="cmd">
+                        <select id="selectPrisoners" onchange="prisoners" onmousedown="nop">
+                        <option value="auto">automaticky</option>
+                        <option value="always">vždy</option>
+                        <option value="never">nikdy</option>
+                        </select>
+                        </div>
+                    </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
@@ -185,7 +195,7 @@
                             <div class="hr">Herní mód</div>
                             <div class="cmd" id="cmdGameMode">
                                 <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
-                                    <option value="match">Zápas</option>
+                                    <option value="match">Partie</option>
                                     <option value="explore">Explorace</option>
                                     <option value="tsumego" disabled="disabled">Tsumego</option>
                                 </select>
@@ -200,14 +210,12 @@
                         </div>
                         <div class="grp">
                             <div class="hr">Analýza</div>
-                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">Hodnocení</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">Zajatci</div>
-                            <div class="template" id="templatePrisonersWhite">Bílý: %d</div>
-                            <div class="template" id="templatePrisonersBlack">Černý: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite">Bílý: 0</div>
-                            <div class="cmd" id="lblPrisonersBlack">Černý: 0</div>
+                            <div class="cmd" id="cmdEvaluation">
+                                <select id="selectEvaluation" onchange="toggle_evaluation" onmousedown="nop">
+                                    <option value="off">Vypnuto</option>
+                                    <option value="on">Analýza</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -241,18 +249,6 @@
             </div>
         </div>
 
-        <div id="grpPlayers">
-            <div id="grpBlack" class="hoverable bottom left">
-                <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="nop">Black: 0</div>
-                </div>
-            </div>
-            <div id="grpWhite" class="hoverable top right">
-                <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="nop">White: 0</div>
-                </div>
-            </div>
-        </div>
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
@@ -268,6 +264,8 @@
         </div>
     </game>
     <!-- Mode label templates -->
+    <div class="template" id="tplAnalysisEngine">Analýza</div>
+    <div class="template" id="tplAnalysisUnavailable">nedostupné</div>
     <div class="template" id="tplTsumegoModeFixed">Režim tsumego se řídí úlohou — otevřete úlohu pro vstup, novou hrou pro odchod</div>
     <div class="template" id="tplTsumegoSolved">Vyřešeno!</div>
     <div class="template" id="tplTsumegoWrong">Špatně!</div>
@@ -295,7 +293,7 @@
     <div class="template" id="tplNothingToArchive">Není co archivovat</div>
     <div class="template" id="tplArchiveFailed">Archivace selhala</div>
     <div class="template" id="tplScoringFailed">Počítání bodů selhalo: %s</div>
-    <div class="template" id="tplAnalysisAnswersEveryMove">V režimu analýzy odpovídá engine na každý tah — v zápase použijte Radu</div>
+    <div class="template" id="tplAnalysisAnswersEveryMove">V režimu analýzy odpovídá engine na každý tah — v partii použijte Radu</div>
     <div class="template" id="tplResignAtEndOnly">Vzdát se lze jen na konci partie</div>
     <div class="template" id="tplKomiBeforePlayOnly">Komi lze změnit jen před začátkem hry</div>
 

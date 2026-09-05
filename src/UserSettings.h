@@ -117,6 +117,8 @@ public:
     /// means the config's answer stands.
     std::string getPointerMode() const { std::lock_guard<std::mutex> lock(mutex); return pointerMode; }
     void setPointerMode(const std::string& value);
+    std::string getPrisonerMode() const { std::lock_guard<std::mutex> lock(mutex); return prisonerMode; }
+    void setPrisonerMode(const std::string& value);
 
     /// How much green the colour modes use; negative means "not set", so the
     /// config's answer stands. Same sentinel as anaglyphStrength.
@@ -285,6 +287,7 @@ private:
     std::string glasses;
     float anaglyphGreen = -1.0f;
     std::string pointerMode;
+    std::string prisonerMode;
     std::string evaluationColor;
     std::string coordinateColor;
 

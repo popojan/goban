@@ -854,49 +854,6 @@ void ElementGame::cacheTsumegoHints() {
     model.tsumegoHintWhite = getTemplateText(context, "tplWhiteToMove");
 }
 
-/// Writes the four prisoner labels — the two board-corner counters and the two
-/// in the Analysis menu — from one place.
-///
-/// It is one function because it was two, and they disagreed. `capturedBlack`
-/// counts *black stones removed from the board* (`Board::updateCaptures`
-/// increments it when the captured colour is black), so it is what **White** has
-/// taken. The in-game branch had that right and the game-over branch had it
-/// backwards, so every game's final position showed both counts swapped. Same
-/// shape as the buttons that disagreed with their commands before ADR-0005: two
-/// copies of a rule, one of them wrong.
-void ElementGame::syncPrisonerLabels() {
-    auto context = GetContext();
-    if (!context) return;
-    auto doc = context->GetDocument("game_window");
-    if (!doc) return;
-
-    const std::string whiteTpl = templateText("templatePrisonersWhite", "White: %d");
-    const std::string blackTpl = templateText("templatePrisonersBlack", "Black: %d");
-
-    // White's prisoners are the black stones taken, and vice versa.
-    //
-    // From the Board, which is the only thing that counts captures.
-    // GameState::capturedBlack/capturedWhite were initialised to zero and never
-    // assigned anywhere, so these labels read 0 for the whole of every game, and
-    // the bowls stayed empty because the shader is handed the same dead numbers.
-    // Fixing the *pairing* of two permanently-zero values, as this function once
-    // did, could not show it.
-    const auto snap = model.snapshot();
-    const int whiteHasTaken = snap->capturedBlack;
-    const int blackHasTaken = snap->capturedWhite;
-
-    for (const char* id : {"cntWhite", "lblPrisonersWhite"}) {
-        if (auto* el = doc->GetElementById(id)) {
-            el->SetInnerRML(Rml::CreateString(whiteTpl.c_str(), whiteHasTaken).c_str());
-        }
-    }
-    for (const char* id : {"cntBlack", "lblPrisonersBlack"}) {
-        if (auto* el = doc->GetElementById(id)) {
-            el->SetInnerRML(Rml::CreateString(blackTpl.c_str(), blackHasTaken).c_str());
-        }
-    }
-}
-
 std::string ElementGame::templateText(const char* id, const std::string& fallback) const {
     auto context = GetContext();
     if (!context) return fallback;
@@ -1241,14 +1198,42 @@ void ElementGame::OnUpdate()
             OnMenuToggle("toggle_territory", model.board.showTerritory);
         }
     }
-    // Sync the evaluation toggle. It can move without the menu being touched:
+    // Sync the evaluation select. It can move without the menu being touched:
     // the setting is restored at startup, and the service switches itself off
     // when an engine turns out to be incapable.
+    //
+    // A select rather than a toggle so the *engine* can be named on its "on"
+    // option — "who is analysing" was invisible, the same anonymity ADR-0012
+    // left open about the wait indicator. The group header above it stays the
+    // constant "Analysis": a heading that changed with the configuration read as
+    // two different menus. When nobody claimed the role, or the engine that did
+    // turned out unable to analyse, the option says so rather than naming
+    // something that cannot answer — and `a.evaluation` greys the whole control
+    // in exactly those cases, so the word is an explanation, not a false offer.
+    //
+    // This is not the engine *picker*: the analysis role is resolved once from
+    // the configuration and there is no second candidate to choose (ADR-0007
+    // decision 2). The shape is the picker's, so it can grow one.
     {
-        auto* cmdEl = context->GetDocument("game_window")->GetElementById("cmdEvaluation");
-        const bool checked = analysis.isEnabled();
-        if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
-            OnMenuToggle("toggle_evaluation", checked);
+        if (auto* evalEl = dynamic_cast<Rml::ElementFormControlSelect*>(
+                context->GetDocument("game_window")->GetElementById("selectEvaluation"))) {
+            const int want = analysis.isEnabled() ? 1 : 0;
+            if (evalEl->GetSelection() != want) {
+                GobanControl::WidgetEventGuard suppressEvents(control);
+                evalEl->SetSelection(want);
+            }
+            const std::string& name = analysis.analysisEngineName();
+            const bool usable = analysis.isConfigured()
+                             && analysis.state() != AnalysisState::Unavailable;
+            const std::string label = (usable && !name.empty())
+                    ? name
+                    : templateText(usable ? "tplAnalysisEngine" : "tplAnalysisUnavailable",
+                                   usable ? "Analysis" : "unavailable");
+            if (auto* onOption = evalEl->GetOption(1)) {
+                if (onOption->GetInnerRML() != label) {
+                    onOption->SetInnerRML(label.c_str());
+                }
+            }
         }
         // The suggestions are a three-state select, not a toggle: it can move
         // without the menu being touched (restored at startup, or set by the
@@ -1275,6 +1260,17 @@ void ElementGame::OnUpdate()
         const bool coordChecked = view.areCoordinatesShown();
         if (coordEl && coordEl->IsClassSet("selected") != coordChecked) {
             OnMenuToggle("toggle_coordinates", coordChecked);
+        }
+        // The prisoner counts are the fourth thing drawn on the wood, so they
+        // belong beside the other three rather than only on a command. Three
+        // states, so a select: option order is PrisonerMode's declaration order.
+        if (auto* prisEl = dynamic_cast<Rml::ElementFormControlSelect*>(
+                context->GetDocument("game_window")->GetElementById("selectPrisoners"))) {
+            const int want = static_cast<int>(view.prisonerMode_());
+            if (prisEl->GetSelection() != want) {
+                GobanControl::WidgetEventGuard suppressEvents(control);
+                prisEl->SetSelection(want);
+            }
         }
     }
 
@@ -1332,7 +1328,6 @@ void ElementGame::OnUpdate()
         || (view.capturedWhiteShown != boardCapturedWhite) /*stones captured */
         || (view.state.reason != GameState::NO_REASON && model.state.reason == GameState::NO_REASON) /* new game */)
     {
-        syncPrisonerLabels();
         // UPDATE_STONES, not a bare repaint: these two numbers are uniforms
         // (iBlackCapturedCount / iWhiteCapturedCount) that GobanShader uploads
         // only under that flag, and they are what tell the shader how many
@@ -1467,10 +1462,6 @@ void ElementGame::OnUpdate()
         }
         case GameState::BLACK_WON:
         case GameState::WHITE_WON: {
-            // The same call as the in-game branch, which is the point: this
-            // branch had its own copy and gave cntWhite capturedWhite, so both
-            // prisoner counts silently swapped on the last move of every game.
-            syncPrisonerLabels();
             // Build result message, combining with SGF comment if present
             std::string resultMsg;
             if (model.state.winner == Color::WHITE)

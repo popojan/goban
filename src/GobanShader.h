@@ -127,6 +127,11 @@ public:
     /// offset the overlay draws with, the greyscale its ink collapses to — is
     /// out here rather than in GLSL.
     [[nodiscard]] bool isStereo() const { return currentProgramStereo; }
+    /// Whether this shader draws the bowls, and so shows the prisoners as a
+    /// physical pile. Declared, not inferred: only `scene/red.glsl` includes
+    /// `bowl_stones.glsl`, so four of the six shipped shaders show no prisoners
+    /// at all — which is what the margin counts are for (PrisonerMode::Auto).
+    [[nodiscard]] bool drawsBowls() const { return currentProgramBowls; }
     [[nodiscard]] float getStoneHeight() const { return currentProgramH; }
     /// The move-quality ink for the selected shader: the global `annotations`
     /// block with this shader's own laid over it.
@@ -219,6 +224,7 @@ private:
     int currentProgram;
     float currentProgramH{};
     bool currentProgramStereo{false};
+    bool currentProgramBowls{false};
     QualityPalette currentPalette{};
 
     float width, height;
@@ -234,6 +240,7 @@ private:
         std::string vertex, fragment;
         float height = 0.0f;
         bool stereo = false;
+        bool bowls = false;
         QualityPalette palette{};
     };
 

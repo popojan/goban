@@ -92,6 +92,16 @@
                         <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">Coordinates</div>
                         <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">Elapsed Time</div>
                     </div>
+                    <div class="grp">
+                        <div class="hr">Prisoners</div>
+                        <div class="cmd">
+                        <select id="selectPrisoners" onchange="prisoners" onmousedown="nop">
+                        <option value="auto">auto</option>
+                        <option value="always">always</option>
+                        <option value="never">never</option>
+                        </select>
+                        </div>
+                    </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
@@ -200,14 +210,12 @@
                         </div>
                         <div class="grp">
                             <div class="hr">Analysis</div>
-                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">Evaluation</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">Prisoners</div>
-                            <div class="template" id="templatePrisonersWhite">White: %d</div>
-                            <div class="template" id="templatePrisonersBlack">Black: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite">White: 0</div>
-                            <div class="cmd" id="lblPrisonersBlack">Black: 0</div>
+                            <div class="cmd" id="cmdEvaluation">
+                                <select id="selectEvaluation" onchange="toggle_evaluation" onmousedown="nop">
+                                    <option value="off">Off</option>
+                                    <option value="on">Analysis</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -241,18 +249,6 @@
             </div>
         </div>
 
-        <div id="grpPlayers">
-            <div id="grpBlack" class="hoverable bottom left">
-                <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="nop">Black: 0</div>
-                </div>
-            </div>
-            <div id="grpWhite" class="hoverable top right">
-                <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="nop">White: 0</div>
-                </div>
-            </div>
-        </div>
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
@@ -269,6 +265,8 @@
         </div>
     </game>
     <!-- Mode label templates -->
+    <div class="template" id="tplAnalysisEngine">Analysis</div>
+    <div class="template" id="tplAnalysisUnavailable">unavailable</div>
     <div class="template" id="tplTsumegoModeFixed">Tsumego mode follows the problem — open one to enter, start a new game to leave</div>
     <div class="template" id="tplTsumegoSolved">Solved!</div>
     <div class="template" id="tplTsumegoWrong">Wrong!</div>

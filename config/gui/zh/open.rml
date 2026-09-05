@@ -37,7 +37,7 @@
             </div>
             <div class="bottomleft">
                 <span class="cmd button" onmouseup="refresh">刷新</span>
-                <label class="checkbox_label"><input type="checkbox" id="cmdTsumego" name="tsumego"/>Tsumego</label>
+                <label class="checkbox_label"><input type="checkbox" id="cmdTsumego" name="tsumego"/>死活题</label>
             </div>
         </div>
     </div>

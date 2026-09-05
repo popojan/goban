@@ -178,7 +178,6 @@ private:
 
     /// The four prisoner labels, written from one place so the two callers
     /// cannot disagree about which colour took which stones — they did.
-    void syncPrisonerLabels();
 
     bool logPanelOpen{false};
     uint64_t logVersionShown{0};

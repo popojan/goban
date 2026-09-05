@@ -81,6 +81,16 @@
                         <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">좌표</div>
                         <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">경과 시간</div>
                     </div>
+                    <div class="grp">
+                        <div class="hr">따낸 돌</div>
+                        <div class="cmd">
+                        <select id="selectPrisoners" onchange="prisoners" onmousedown="nop">
+                        <option value="auto">자동</option>
+                        <option value="always">항상</option>
+                        <option value="never">끔</option>
+                        </select>
+                        </div>
+                    </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
@@ -175,7 +185,7 @@
                                 <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
                                     <option value="match">대국</option>
                                     <option value="explore">탐색</option>
-                                    <option value="tsumego" disabled="disabled">Tsumego</option>
+                                    <option value="tsumego" disabled="disabled">사활</option>
                                 </select>
                             </div>
                         </div>
@@ -188,14 +198,12 @@
                         </div>
                         <div class="grp">
                             <div class="hr">분석</div>
-                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">형세</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">따낸 돌</div>
-                            <div class="template" id="templatePrisonersWhite">백: %d</div>
-                            <div class="template" id="templatePrisonersBlack">흑: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite">백: 0</div>
-                            <div class="cmd" id="lblPrisonersBlack">흑: 0</div>
+                            <div class="cmd" id="cmdEvaluation">
+                                <select id="selectEvaluation" onchange="toggle_evaluation" onmousedown="nop">
+                                    <option value="off">끔</option>
+                                    <option value="on">분석</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -229,18 +237,6 @@
             </div>
         </div>
 
-        <div id="grpPlayers">
-            <div id="grpBlack" class="hoverable bottom left">
-                <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="nop">흑: 0</div>
-                </div>
-            </div>
-            <div id="grpWhite" class="hoverable top right">
-                <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="nop">백: 0</div>
-                </div>
-            </div>
-        </div>
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
@@ -256,6 +252,8 @@
         </div>
     </game>
     <!-- Mode label templates -->
+    <div class="template" id="tplAnalysisEngine">분석</div>
+    <div class="template" id="tplAnalysisUnavailable">사용 불가</div>
     <div class="template" id="tplTsumegoModeFixed">사활 모드는 문제를 따릅니다 — 문제를 열어 들어가고, 새 대국으로 나갑니다</div>
     <div class="template" id="tplTsumegoSolved">정답!</div>
     <div class="template" id="tplTsumegoWrong">오답!</div>

@@ -102,6 +102,9 @@ void UserSettings::load() {
         if (user.contains("pointer_mode")) {
             pointerMode = user["pointer_mode"].get<std::string>();
         }
+        if (user.contains("prisoner_mode") && user["prisoner_mode"].is_string()) {
+            prisonerMode = user["prisoner_mode"].get<std::string>();
+        }
 
         if (user.contains("coordinate_color")) {
             coordinateColor = user["coordinate_color"].get<std::string>();
@@ -302,6 +305,10 @@ std::string UserSettings::serialize() const {
     if (anaglyphGreen >= 0.0f) {
         user["anaglyph_green"] = anaglyphGreen;
     }
+    if (!prisonerMode.empty()) {
+        user["prisoner_mode"] = prisonerMode;
+    }
+
     if (!pointerMode.empty()) {
         user["pointer_mode"] = pointerMode;
     }
@@ -429,6 +436,12 @@ void UserSettings::setAnaglyphStrength(float value) {
 void UserSettings::setPointerMode(const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex);
     pointerMode = value;
+    saveLocked();
+}
+
+void UserSettings::setPrisonerMode(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    prisonerMode = value;
     saveLocked();
 }
 

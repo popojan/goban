@@ -535,6 +535,23 @@ See `docs/adr/0015-tsumego-is-a-game-mode.md`.
 - **Keep `availableActions()` pure over plain data.** It must not take a `GobanModel` or `GameThread`: `isThinking()` reads a member only the game loop sets, so the engine-thinking cases would stop being testable — and they are half of what it decides.
 - **The UI thread must not read the SGF tree *or* `GameState`'s strings — it reads `GobanModel::snapshot()`.** The game thread owns that tree and mutates it freely; `GameRecord`'s const accessors take no lock, and its own mutex covers neither the readers nor half the mutators. `uiInputs()` and `dumpState()` take every record fact from the published `GameSnapshot` (ADR-0006). **Whoever changes what the UI displays must publish it**: `onBoardChange()` is the funnel that covers moves, navigation, load, switch, scoring and handicap; `createNewRecord()` and `onBoardSized()` publish for themselves because the new-game path bypasses it. A missed publish shows up as stale UI and the scenario suite catches it — both misses in the original change were caught on the first run. A plain scalar that changes off the position-change path becomes atomic instead, as `GameRecord::unsavedChanges` did; saving is not a position change. **ADR-0006 is complete through stage 5**: `comment`, `markup`, `scoringError` and `passVariationLabel` are all published, so nothing on a per-frame or per-keystroke path reads the record *or* copies a `GameState` string. The player dropdowns compare `getActivePlayer()` — a `size_t` handed out under `PlayerManager::mutex` — rather than `state.black`/`state.white`, because the index is what the widget holds and the string was a race for no information. `GobanModel::onBoardSized()` does `state = GameState()`, reassigning every one of those strings at once, which is the sharpest version of the hazard. What remains by design is listed in the ADR — `hasGameWorthKeeping()`, save/archive, and the dialog seed — all on explicit user actions. Note that `ElementGame`'s old `positionNumber` guard was not wrong, only insufficient: an atomic edge makes a write *visible* but grants no exclusion, so copying a `std::string` or walking a `std::vector` across it is still a use-after-free. The same partial-locking shape has now been found three times — `GameRecord`, `PlayerManager` (writers unlocked while readers locked), and the process pipes — so when a reader crosses this boundary, check the writers before assuming a mutex means anything.
 - **Widget state reads the phase, not `state.reason`.** They diverge after navigating back from a finished game: the phase returns to `Paused` while the reason stays set. See the `state.reason` invariant above.
+- **Prisoner counts are drawn on the board, never in a panel** (ADR-0016). Two
+  numbers on the **right margin** — the only edge nothing else uses, since the
+  coordinates are pinned top and left and the bottom row is shared three ways.
+  The ink is the colour of the stones *counted*, which is what sits in the bowl,
+  and it survives `eyeInk()` because black against white is a brightness
+  difference. **Nothing is drawn until a stone has been taken, and then both
+  counts are, a zero included**: silent at first because two standing noughts are
+  the resting-at-50% bar ADR-0007 rejected, both afterwards because a lone digit
+  with nothing to contrast against reads as a fault rather than a count.
+  `PrisonerMode` is `Auto`/`Always`/`Never` on the `PointerMode` precedent, and
+  `Auto` asks the *shader*: `"bowls": 1` is declared in its config entry
+  (ADR-0011's rule) because only `scene/red.glsl` includes `bowl_stones.glsl`, so
+  four of the six shipped shaders showed no prisoners at all. The menu labels,
+  `syncPrisonerLabels()` and the two `display: none` corner elements it was still
+  writing to every frame are gone. **If the bowls ever become a user setting,
+  `drawsBowls()` must follow the live value**, or switching them off would take
+  the counts away too.
 - **Prisoner counts come from `Board`, published in `GameSnapshot`. `GameState`
   never held them.** `GameState::capturedBlack`/`capturedWhite` existed, were
   initialised to zero and were **never assigned anywhere in the program** — while

@@ -923,6 +923,26 @@ void GobanControl::buildRegistry() {
         parent->showMessage(pointerModeName(*parsed));
     });
 
+    add("prisoners", 0, 1,
+        "[auto|always|never] — when the captured-stone counts are drawn on the "
+        "board's right margin; auto means under a shader that draws no bowls, "
+        "where the prisoners would otherwise not be shown at all",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->showMessage(prisonerModeName(view.prisonerMode_()));
+            ctx.notifyMenu = false;
+            return;
+        }
+        const auto parsed = parsePrisonerMode(ctx.args[0]);
+        if (!parsed) {
+            spdlog::warn("prisoners: expected auto, always or never, got '{}'", ctx.args[0]);
+            return;
+        }
+        view.setPrisonerMode(*parsed);
+        UserSettings::instance().setPrisonerMode(prisonerModeName(*parsed));
+        ctx.notifyMenu = false;
+    });
+
     add("mouse_click", 2, 2,
         "<x> <y> — click at a window pixel, as the mouse would. The point is "
         "whatever the ray finds, which is what makes it usable where a scenario "
@@ -2203,6 +2223,14 @@ nlohmann::json GobanControl::dumpState() const {
     // sounds_played and overlay_glyphs.
     s["prisoners_drawn_black"] = view.capturedBlackShown;
     s["prisoners_drawn_white"] = view.capturedWhiteShown;
+    // The margin counts: the mode, and what the glyph pass actually composed.
+    // Empty is the answer for a count of zero, which is deliberate — nothing is
+    // drawn until something has been taken. Same distinction as the two keys
+    // above: what was *drawn*, not what the board knows.
+    s["prisoner_mode"]  = prisonerModeName(view.prisonerMode_());
+    s["prisoner_shown"] = view.showPrisonerCounts();
+    s["prisoner_text_black"] = view.prisonerTextBlack();
+    s["prisoner_text_white"] = view.prisonerTextWhite();
 
     // Lifecycle flags — the ones the Design Invariants are written about
     // Three values since tsumego became a mode rather than a flag beside one.

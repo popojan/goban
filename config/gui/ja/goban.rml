@@ -81,6 +81,16 @@
                         <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">座標</div>
                         <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">経過時間</div>
                     </div>
+                    <div class="grp">
+                        <div class="hr">アゲハマ</div>
+                        <div class="cmd">
+                        <select id="selectPrisoners" onchange="prisoners" onmousedown="nop">
+                        <option value="auto">自動</option>
+                        <option value="always">常に</option>
+                        <option value="never">なし</option>
+                        </select>
+                        </div>
+                    </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
@@ -175,7 +185,7 @@
                                 <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
                                     <option value="match">対局</option>
                                     <option value="explore">探索</option>
-                                    <option value="tsumego" disabled="disabled">Tsumego</option>
+                                    <option value="tsumego" disabled="disabled">詰碁</option>
                                 </select>
                             </div>
                         </div>
@@ -188,14 +198,12 @@
                         </div>
                         <div class="grp">
                             <div class="hr">分析</div>
-                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">形勢</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">アゲハマ</div>
-                            <div class="template" id="templatePrisonersWhite">白: %d</div>
-                            <div class="template" id="templatePrisonersBlack">黒: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite">白: 0</div>
-                            <div class="cmd" id="lblPrisonersBlack">黒: 0</div>
+                            <div class="cmd" id="cmdEvaluation">
+                                <select id="selectEvaluation" onchange="toggle_evaluation" onmousedown="nop">
+                                    <option value="off">オフ</option>
+                                    <option value="on">分析</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -229,18 +237,6 @@
             </div>
         </div>
 
-        <div id="grpPlayers">
-            <div id="grpBlack" class="hoverable bottom left">
-                <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="nop">黒: 0</div>
-                </div>
-            </div>
-            <div id="grpWhite" class="hoverable top right">
-                <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="nop">白: 0</div>
-                </div>
-            </div>
-        </div>
         <div class="bottom message-container">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
@@ -256,6 +252,8 @@
         </div>
     </game>
     <!-- Mode label templates -->
+    <div class="template" id="tplAnalysisEngine">分析</div>
+    <div class="template" id="tplAnalysisUnavailable">利用不可</div>
     <div class="template" id="tplTsumegoModeFixed">詰碁モードは問題に従います — 問題を開いて入り、新規対局で出ます</div>
     <div class="template" id="tplTsumegoSolved">正解！</div>
     <div class="template" id="tplTsumegoWrong">不正解！</div>

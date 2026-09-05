@@ -177,19 +177,6 @@ div.template {
   display: none;
 }
 
-/* Bottom status area - prisoner counts hidden (now in Analyze menu) */
-#grpPlayers {
-  display: none;
-}
-
-#cntBlack {
-  display: none;
-}
-
-#cntWhite {
-  display: none;
-}
-
 #lblMessage {
   display: block;
   text-align: center;
@@ -221,8 +208,9 @@ div.template {
  *
  * Everything about where this lives is here, in #grpStatus — move that one rule
  * and the badge and its panel move together. Top left is simply the corner the
- * menu (top right), the prisoner counts (bottom left / top right) and the
- * message box (bottom, full width) do not already use.
+ * menu (top right) and the message box (bottom, full width) do not already
+ * use. The prisoner counts used to hold two more corners; they are drawn on
+ * the board's own margin now.
  *
  * The indicator is deliberately not a toast. A message that fades is no better
  * than a log file nobody opens, and engine failures land in the first seconds
