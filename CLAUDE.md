@@ -551,9 +551,19 @@ See `docs/adr/0015-tsumego-is-a-game-mode.md`.
   (ADR-0011's rule) because only `scene/red.glsl` includes `bowl_stones.glsl`, so
   four of the six shipped shaders showed no prisoners at all. The menu labels,
   `syncPrisonerLabels()` and the two `display: none` corner elements it was still
-  writing to every frame are gone. **If the bowls ever become a user setting,
-  `drawsBowls()` must follow the live value**, or switching them off would take
-  the counts away too.
+  writing to every frame are gone. **The bowls did become a user setting**
+  (ADR-0017), and the rule this entry predicted now holds:
+  `GobanShader::drawsPrisonerPile()` is `capability && showLids`, and
+  `showPrisonerCounts()` asks *it*, never the bare capability.
+- **The prisoners are in the lids, not the bowls.** `cc[0]` and `cc[1]` are the
+  lids and `bowl_stones.glsl` fills them from `iBlackCapturedCount` /
+  `iWhiteCapturedCount`; `cc[2]` and `cc[3]` are the bowls and hold the
+  reservoir. So `showLids` is the toggle `PrisonerMode::Auto` follows, and hiding
+  the *bowls* costs no information. One toggle for both — which is how the
+  request was phrased — would have hidden the pile with `Auto` still believing it
+  was there. Beware `bowls.glsl`, which names `oid` 0 and 1 `idCup*` and 2 and 3
+  `idLid*`: that is backwards against both `Metrics::calc()` and the contents,
+  and is a material name rather than an authority.
 - **Prisoner counts come from `Board`, published in `GameSnapshot`. `GameState`
   never held them.** `GameState::capturedBlack`/`capturedWhite` existed, were
   initialised to zero and were **never assigned anywhere in the program** — while
@@ -581,6 +591,43 @@ See `docs/adr/0015-tsumego-is-a-game-mode.md`.
   it is what **White** has taken, and the game-over branch had the pairing
   backwards — every finished game showed both counts swapped. Same shape as the
   buttons that disagreed with their commands before ADR-0005.
+
+### Tunable Shader Parameters
+See `docs/adr/0017-tunable-shader-parameters-are-declared-in-configuration.md`.
+- **A tunable parameter is declared in `shader_params`; the GLSL declares only
+  the uniform.** The key *is* the uniform name — one identity, because two is how
+  keys drift apart. Metadata does not go in a GLSL comment: it cannot be
+  localised, it is a second parsing mechanism where `Configuration` already does
+  layered defaults, and the value the user picks has to live out here anyway.
+- **A capability is not a setting.** `"bowls": 1` on a shader entry says the
+  scene *contains* the vessels; `showBowls` says whether they are drawn.
+  `requires` links the two generically — a shader whose entry omits the
+  capability is never offered the parameter, and no C++ knows the word "bowls".
+- **Write and read the saved value through the same name.**
+  `GobanShader::currentShaderName()`, from the shader's config entry — *not*
+  `UserSettings::getShaderName()`, which is empty until something saves the
+  selection. Keying the write there and the read here put every value under `""`
+  where it persisted and was never loaded. Committed while implementing the
+  decision that forbids it.
+- **A boolean is a `uniform bool`, never a `#define`.** A `#define` needs a
+  relink — 2019 ms cold (ADR-0013) — which is the cost a live toggle exists to
+  avoid. Uploaded unconditionally from `draw()`, not behind an update flag: a
+  value travelling on one flag while what it affects travels on another is a
+  shape this codebase has produced twice.
+- **The gate goes inside the loop, shadows included.** `rBowls`, `sBowls` and
+  `rBowlStones` each iterate all four cups, so the toggle is a `continue` on the
+  index rather than a branch at the `rScene()` call site. Missing `sBowls` leaves
+  a hidden vessel casting its shadow — and it is the shadow that costs: 27.4 →
+  31.6 fps measured on the 19x19 bench with all four gone.
+- **`menu_click <element-id>` is how a scenario presses a menu item**, the
+  sibling of `menu_select` for everything clicked rather than chosen from a list.
+  It refuses a `disabled` item on purpose: greying is `pointer-events: none`,
+  which a dispatched event goes straight past, so without the check the harness
+  could do what a user provably cannot.
+- **The scenario suite cannot see persistence.** `run_scenarios.sh` hands each
+  scenario a throwaway `user.json`, so nothing written by one run is read by
+  another. Anything that must survive a restart is verified by hand, or not at
+  all — which is how the two-identity bug above got in.
 
 ### Building a Shader
 See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.

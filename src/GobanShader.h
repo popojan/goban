@@ -5,8 +5,10 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <vector>
 #include "AnalysisService.h"
 #include "Metrics.h"
+#include "ShaderParams.h"
 #include "Stereo.h"
 #include "GobanModel.h"
 
@@ -127,11 +129,52 @@ public:
     /// offset the overlay draws with, the greyscale its ink collapses to — is
     /// out here rather than in GLSL.
     [[nodiscard]] bool isStereo() const { return currentProgramStereo; }
-    /// Whether this shader draws the bowls, and so shows the prisoners as a
-    /// physical pile. Declared, not inferred: only `scene/red.glsl` includes
-    /// `bowl_stones.glsl`, so four of the six shipped shaders show no prisoners
-    /// at all — which is what the margin counts are for (PrisonerMode::Auto).
-    [[nodiscard]] bool drawsBowls() const { return currentProgramBowls; }
+    /// Whether this shader is *capable* of drawing the bowls. Declared, not
+    /// inferred: only `scene/red.glsl` includes `bowl_stones.glsl`, so four of
+    /// the six shipped shaders have no vessels in the scene at all.
+    ///
+    /// This is the capability, not the setting — ask drawsPrisonerPile() for
+    /// what is actually on screen.
+    [[nodiscard]] bool hasBowls() const { return currentProgramBowls; }
+
+    /// Whether the captured stones are visible as a physical pile right now,
+    /// which is the question `PrisonerMode::Auto` asks before drawing the counts
+    /// in the margin (ADR-0016).
+    ///
+    /// Two inputs, and ADR-0017 decision 3 is that both are needed: the scene
+    /// must contain the vessels *and* the user must not have switched them off.
+    /// A toggle that answered only the first would let someone hide the pile and
+    /// keep `Auto` believing it was there, which is the collision that made this
+    /// a decision rather than a keyword.
+    ///
+    /// It follows the **lids**, not the bowls: cc[0] and cc[1] are the lids and
+    /// `bowl_stones.glsl` fills them from iBlackCapturedCount /
+    /// iWhiteCapturedCount, while the bowls hold the reservoir. Hiding the bowls
+    /// costs no information; hiding the lids costs the prisoners.
+    ///
+    /// A shader offering no `showLids` parameter falls back to the capability
+    /// alone, which is exactly the behaviour before this mechanism existed.
+    [[nodiscard]] bool drawsPrisonerPile() const {
+        return currentProgramBowls && shaderParamValue(currentParams, "showLids", true);
+    }
+
+    /// The tunable parameters the selected shader offers, in declaration order.
+    [[nodiscard]] const std::vector<ShaderParam>& shaderParams() const { return currentParams; }
+
+    /// The selected shader's `name` from its config entry — the key its saved
+    /// parameter values are stored under.
+    ///
+    /// Deliberately *not* `UserSettings::getShaderName()`, which is empty until
+    /// something writes it: keying the write there and the read here is how the
+    /// two drifted apart the first time this was wired up, and a value written
+    /// under "" is a value that is never read back. One identity, from the same
+    /// place resolveShader() takes it. ADR-0017 decision 4.
+    [[nodiscard]] const std::string& currentShaderName() const { return currentProgramName; }
+
+    /// Set one by name. Returns false when this shader does not offer it, which
+    /// a caller should report rather than swallow — a command naming a parameter
+    /// that is not there is a typo or a shader that cannot do it.
+    bool setShaderParam(const std::string& name, bool value);
     [[nodiscard]] float getStoneHeight() const { return currentProgramH; }
     /// The move-quality ink for the selected shader: the global `annotations`
     /// block with this shader's own laid over it.
@@ -225,7 +268,17 @@ private:
     float currentProgramH{};
     bool currentProgramStereo{false};
     bool currentProgramBowls{false};
+    std::string currentProgramName;
     QualityPalette currentPalette{};
+
+    /// What the selected shader offers, and what it is set to. Resolved from the
+    /// configuration in resolveShader(), like every other appearance fact here.
+    std::vector<ShaderParam> currentParams;
+    /// Locations for the above, parallel and same length. Separate because
+    /// ShaderParam lives in goban_core, which has no GL — and queried on the UI
+    /// thread in adoptProgram() with the other ~50, since binding is context
+    /// state (ADR-0013).
+    std::vector<GLint> currentParamLocations;
 
     float width, height;
     float gamma, contrast;
@@ -241,12 +294,22 @@ private:
         float height = 0.0f;
         bool stereo = false;
         bool bowls = false;
+        std::string name;
         QualityPalette palette{};
+        std::vector<ShaderParam> params;
     };
 
     [[nodiscard]] bool resolveShader(int idx, PendingShader& out) const;
     void applyShaderMetadata(const PendingShader&);
     void startBuild(const PendingShader&);
+
+    /// UI thread only, from adoptProgram(): binding and lookups are context
+    /// state (ADR-0013). Warns about a declaration the program has no uniform
+    /// for — see ADR-0017 decision 7.
+    void queryShaderParamLocations();
+    /// From draw(), with the program bound. glUniform applies to whatever is
+    /// currently bound, which is the trap setEye() records.
+    void uploadShaderParams() const;
 
     /// The background link. Only two values cross the thread boundary — the
     /// program name the worker produced and the fact that it finished — which is

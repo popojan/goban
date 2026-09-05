@@ -1,3 +1,20 @@
+// Tunable scene features (ADR-0017). Declared in the `shader_params` block of
+// the configuration, where the key is the uniform name, and offered only where
+// the shader entry declares the `bowls` capability they require. A `uniform`
+// rather than a `#define` because a #define needs a relink — 2019 ms cold,
+// measured in ADR-0013 — which is the cost a live toggle exists to avoid.
+//
+// Which is which matters, and the geometry disagrees with one of its own names.
+// cc[0] and cc[1] are the **lids**, and `bowl_stones.glsl` fills them from
+// iBlackCapturedCount / iWhiteCapturedCount — so the lids are where the
+// *prisoners* sit, which is what PrisonerMode::Auto is asking about. cc[2] and
+// cc[3] are the bowls, holding the reservoir. (The `oid` assigned in
+// bowls.glsl calls 0 and 1 `idCup*` and 2 and 3 `idLid*`, which is backwards
+// against both Metrics::calc()'s comments and the contents. Left alone here —
+// it is a material name, not a position — but do not take it as the authority.)
+uniform bool showBowls;
+uniform bool showLids;
+
 #include object/plane.glsl
 #include object/sphere.glsl
 #include object/board.glsl

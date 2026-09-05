@@ -946,6 +946,57 @@ void GobanControl::buildRegistry() {
         ctx.notifyMenu = false;
     });
 
+    add("shader_param", 0, 2,
+        "[<name> [on|off|toggle]] — a scene feature the current shader exposes "
+        "(ADR-0017). With no arguments, lists what this shader offers and what "
+        "each is set to; with a name alone, reports that one. The shipped ones "
+        "are showBowls and showLids, and it is showLids that holds the "
+        "prisoners — switching it off brings the margin counts back",
+        [this](CommandContext& ctx) {
+        const auto& params = view.shaderParams();
+
+        if (ctx.args.empty()) {
+            if (params.empty()) {
+                parent->showMessage("no tunable parameters");
+                return;
+            }
+            std::string list;
+            for (const auto& p : params) {
+                if (!list.empty()) list += ", ";
+                list += p.name + (p.value ? " on" : " off");
+            }
+            parent->showMessage(list);
+            return;
+        }
+
+        const std::string& name = ctx.args[0];
+        const ShaderParam* p = findShaderParam(params, name);
+        if (!p) {
+            // Loud, not silent: either the name is a typo or this shader cannot
+            // do it, and the two look identical from the outside.
+            spdlog::warn("shader_param: the current shader offers no '{}'", name);
+            return;
+        }
+
+        if (ctx.args.size() == 1) {
+            parent->showMessage(name + (p->value ? " on" : " off"));
+            return;
+        }
+
+        const std::string& arg = ctx.args[1];
+        bool value;
+        if (arg == "on" || arg == "1" || arg == "true")        value = true;
+        else if (arg == "off" || arg == "0" || arg == "false") value = false;
+        else if (arg == "toggle")                              value = !p->value;
+        else {
+            spdlog::warn("shader_param: expected on, off or toggle, got '{}'", arg);
+            return;
+        }
+
+        view.setShaderParam(name, value);
+        parent->showMessage(name + (value ? " on" : " off"));
+    });
+
     add("mouse_click", 2, 2,
         "<x> <y> — click at a window pixel, as the mouse would. The point is "
         "whatever the ray finds, which is what makes it usable where a scenario "
@@ -1596,6 +1647,33 @@ void GobanControl::buildRegistry() {
             }
         }
         spdlog::warn("menu_select: '{}' has no option '{}'", ctx.args[0], ctx.args[1]);
+    });
+
+    add("menu_click", 1, 1,
+        "<element-id> — press a menu item, as a user would. The sibling of "
+        "menu_select for the items that are clicked rather than chosen from a "
+        "list, which is most of the menu and had no coverage at all",
+        [this](CommandContext& ctx) {
+        auto* context = parent->GetContext();
+        auto* doc = context ? context->GetDocument("game_window") : nullptr;
+        auto* el = doc ? doc->GetElementById(ctx.args[0]) : nullptr;
+        if (!el) {
+            spdlog::warn("menu_click: no element '{}'", ctx.args[0]);
+            return;
+        }
+        // Checked here rather than left to the style sheet. A greyed item is
+        // kept unclickable by `div.cmd.disabled { pointer-events: none }`, which
+        // a dispatched event goes straight past — so without this the harness
+        // could do what a user provably cannot, and would report a greyed
+        // control as working. Same refusal menu_select makes for a disabled
+        // option.
+        if (el->IsClassSet("disabled")) {
+            spdlog::warn("menu_click: '{}' is disabled", ctx.args[0]);
+            return;
+        }
+        // Dispatched, not shortcut: this runs the inline `onmouseup` through the
+        // real Event/EventManager chain, which is the wiring being tested.
+        el->DispatchEvent(Rml::EventId::Mouseup, Rml::Dictionary());
     });
 
     add("chooser_up", 0, 0, "browse to the parent directory", [chooser](CommandContext&) {
@@ -2271,6 +2349,13 @@ nlohmann::json GobanControl::dumpState() const {
     // above: what was *drawn*, not what the board knows.
     s["prisoner_mode"]  = prisonerModeName(view.prisonerMode_());
     s["prisoner_shown"] = view.showPrisonerCounts();
+    // One key per tunable parameter the current shader offers (ADR-0017), so a
+    // scenario can assert what is *in force* rather than that a command ran.
+    // A shader offering none contributes no keys, which is itself assertable —
+    // `expect shader_param_showLids ...` fails on a Minimal scene, and should.
+    for (const auto& p : view.shaderParams()) {
+        s["shader_param_" + p.name] = p.value;
+    }
     s["prisoner_text_black"] = view.prisonerTextBlack();
     s["prisoner_text_white"] = view.prisonerTextWhite();
 

@@ -38,6 +38,11 @@
                                         onchange="shader" onmousedown="nop"/>
                             </div>
                         </div>
+                        <div class="grp" id="grpSceneParams">
+                            <div class="hr">Scene</div>
+                            <div class="cmd selected" id="cmdParam_showBowls" onmouseup="shader_param showBowls toggle">Bowls</div>
+                            <div class="cmd selected" id="cmdParam_showLids" onmouseup="shader_param showLids toggle">Lids</div>
+                        </div>
                         <div class="grp">
                             <div class="hr">Window</div>
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">Fullscreen</div>

@@ -31,6 +31,7 @@
 #include "AudioPlayer.hpp"
 #include "AnalysisService.h"
 #include "StereoComposite.h"
+#include "UserSettings.h"
 
 
 extern std::shared_ptr<Configuration> config;
@@ -140,6 +141,30 @@ public:
 
     float getContrast() const {
 		return gobanShader.getContrast();
+    }
+
+    /// The tunable scene parameters the current shader offers (ADR-0017).
+    [[nodiscard]] const std::vector<ShaderParam>& shaderParams() const {
+        return gobanShader.shaderParams();
+    }
+
+    /// Set one, persist it, and repaint. False when this shader does not offer
+    /// it — the caller says so rather than failing quietly.
+    ///
+    /// `UPDATE_STONES` because the vessels and the stones in them are stone
+    /// geometry, and the prisoner counts that may appear in their place travel
+    /// on it too: a bare repaint would change the scene and leave the margin
+    /// showing the old answer, which is the shape of the annotation-patch bug.
+    bool setShaderParam(const std::string& name, bool value) {
+        if (!gobanShader.setShaderParam(name, value)) return false;
+        // Keyed by the shader's own name, which is what resolveShader() reads it
+        // back with. Using UserSettings::getShaderName() here instead wrote every
+        // value under "" until something else happened to save the selection —
+        // so it persisted, and was never loaded. See currentShaderName().
+        UserSettings::instance().setShaderParam(
+            gobanShader.currentShaderName(), name, value);
+        requestRepaint(UPDATE_SHADER | UPDATE_STONES);
+        return true;
     }
 
     bool toggleFpsLimit() {MAX_FPS = !MAX_FPS; return MAX_FPS;}
@@ -421,13 +446,17 @@ public:
     void setPrisonerMode(PrisonerMode mode);
     [[nodiscard]] PrisonerMode prisonerMode_() const { return prisonerMode; }
     /// Whether the counts belong in the margin at all. `Auto` asks the shader:
-    /// Red Carpet already shows the prisoners as a pile in its bowls, so a
+    /// Red Carpet already shows the prisoners as a pile in its lids, so a
     /// number beside it would be the same fact twice, while the Minimal scenes
     /// show nothing at all.
+    ///
+    /// It asks `drawsPrisonerPile()` rather than the capability, so switching
+    /// the lids off (ADR-0017) brings the counts back instead of leaving the
+    /// prisoners uncounted anywhere.
     [[nodiscard]] bool showPrisonerCounts() const {
         if (prisonerMode == PrisonerMode::Never)  return false;
         if (prisonerMode == PrisonerMode::Always) return true;
-        return !gobanShader.drawsBowls();
+        return !gobanShader.drawsPrisonerPile();
     }
     /// What the glyph pass last drew, for dumpState(). Both set whenever the
     /// counts are shown at all, a zero included — empty only means the mode or

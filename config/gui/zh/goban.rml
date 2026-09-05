@@ -38,6 +38,11 @@
                                         onchange="shader" onmousedown="nop"/>
                             </div>
                         </div>
+                        <div class="grp" id="grpSceneParams">
+                            <div class="hr">场景</div>
+                            <div class="cmd selected" id="cmdParam_showBowls" onmouseup="shader_param showBowls toggle">棋盒</div>
+                            <div class="cmd selected" id="cmdParam_showLids" onmouseup="shader_param showLids toggle">盒盖</div>
+                        </div>
                         <div class="grp">
                             <div class="hr">窗口</div>
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">全屏</div>

@@ -5,6 +5,7 @@
 #include "AppState.h"
 #include "GobanView.h"
 #include "Shadinclude.hpp"
+#include "UserSettings.h"
 #include <glm/gtc/type_ptr.hpp>
 
 const GLushort GobanShader::elementBufferData[] = {0, 1, 2, 3};
@@ -196,6 +197,8 @@ void GobanShader::adoptProgram(GLuint program) {
     fsu_anaglyphBalance = glGetUniformLocation(gobanProgram, "anaglyphBalance");
     fsu_glasses = glGetUniformLocation(gobanProgram, "glasses");
     fsu_anaglyphGreen = glGetUniformLocation(gobanProgram, "anaglyphGreen");
+
+    queryShaderParamLocations();
 
     glUseProgram(gobanProgram);
     glUniform1f(iAnimT, animT);
@@ -463,6 +466,13 @@ void GobanShader::draw(const GobanModel& model, int updateFlag, float time) cons
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
 
+    // Unconditionally, like the camera and unlike the stone data: a toggle is
+    // rare but it must not need a particular flag to be in the frame that
+    // carries it. Uploading two integers per frame costs nothing measurable,
+    // and the alternative is the bug where a value travels on one flag while
+    // what it affects travels on another.
+    uploadShaderParams();
+
     if (view.animationRunning) {
         glUniform1f(iTime, view.lastTime + time - view.startTime);
     } else {
@@ -545,6 +555,7 @@ bool GobanShader::resolveShader(int idx, PendingShader& out) const {
     out.vertex = shader.value("vertex", "");
     out.fragment = shader.value("fragment", "");
 
+    out.name = shader.value("name", std::string());
     out.height = shader.value("height", 0.0f);
     // Declared by the shader rather than inferred from its vertex file: the
     // overlay has to draw the same two eyes, and a path comparison is not a
@@ -562,6 +573,14 @@ bool GobanShader::resolveShader(int idx, PendingShader& out) const {
     out.palette = resolveQualityPalette(
             config->data.value("annotations", json::object()),
             shader.value("annotations", json::object()));
+    // Fourth of the same kind, and the one that is a *setting* rather than a
+    // fact: what the shader offers comes from the config, what it is set to
+    // comes from user.json, keyed by the same name that restores the selection.
+    // ADR-0017.
+    out.params = resolveShaderParams(
+            config->data.value("shader_params", json::object()),
+            shader,
+            UserSettings::instance().getShaderParams(out.name));
 
     if(out.vertex.empty() || out.fragment.empty()) {
         spdlog::warn("Shader [{}] must comprise both vertex and fragment programs.", out.index);
@@ -574,7 +593,50 @@ void GobanShader::applyShaderMetadata(const PendingShader& s) {
     currentProgramH = s.height;
     currentProgramStereo = s.stereo;
     currentProgramBowls = s.bowls;
+    currentProgramName = s.name;
     currentPalette = s.palette;
+    currentParams = s.params;
+    // Cleared rather than resized: these are locations in a program that may not
+    // be the one currently adopted. adoptProgram() fills them, and uploadShaderParams()
+    // does nothing while they are empty, which is the right behaviour during a
+    // build — the old program is still drawing and its own locations are gone.
+    currentParamLocations.clear();
+}
+
+void GobanShader::queryShaderParamLocations() {
+    currentParamLocations.assign(currentParams.size(), -1);
+    for (size_t i = 0; i < currentParams.size(); ++i) {
+        const GLint loc = glGetUniformLocation(gobanProgram, currentParams[i].name.c_str());
+        currentParamLocations[i] = loc;
+        // ADR-0017 decision 7. The one real advantage of metadata in a GLSL
+        // comment is that it cannot drift from the uniform; this is what buys
+        // that back. -1 means either a typo in the config or a uniform the
+        // compiler eliminated because nothing reads it — both are the author's
+        // mistake and both are silent otherwise.
+        if (loc < 0) {
+            spdlog::warn("Shader parameter '{}' is declared in the configuration "
+                         "but the linked program has no such uniform (typo, or "
+                         "nothing in the shader reads it).", currentParams[i].name);
+        }
+    }
+}
+
+void GobanShader::uploadShaderParams() const {
+    for (size_t i = 0; i < currentParamLocations.size(); ++i) {
+        if (currentParamLocations[i] >= 0) {
+            glUniform1i(currentParamLocations[i], currentParams[i].value ? 1 : 0);
+        }
+    }
+}
+
+bool GobanShader::setShaderParam(const std::string& name, bool value) {
+    for (auto& p : currentParams) {
+        if (p.name == name) {
+            p.value = value;
+            return true;
+        }
+    }
+    return false;
 }
 
 int GobanShader::choose(int idx) {

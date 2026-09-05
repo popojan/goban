@@ -90,6 +90,11 @@ public:
     void OnMenuToggle(const std::string& cmd, bool checked) const;
     void setElementDisabled(const std::string& elementId, bool disabled) const;
 
+    /// Follow the shader's tunable scene parameters into the View menu
+    /// (ADR-0017). Generic over the menu's own children, so a new boolean needs
+    /// no code here.
+    void syncSceneParamItems() const;
+
     /// Localised text for a template id, or `fallback` when the interface
     /// language's .rml does not define it.
     ///

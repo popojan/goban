@@ -427,6 +427,7 @@ else()
         src/Quaternion.h
         src/ScenarioRecorder.h
         src/SGF.h
+        src/ShaderParams.h
         src/UserSettings.h
         src/Vector.h
         src/UiActions.h
@@ -449,6 +450,7 @@ else()
         src/player.cpp
         src/Quaternion.cpp
         src/ScenarioRecorder.cpp
+        src/ShaderParams.cpp
         src/UiActions.cpp
         src/UserSettings.cpp
         src/Vector.cpp

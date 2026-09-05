@@ -183,6 +183,22 @@ public:
     float getShaderContrast() const { std::lock_guard<std::mutex> lock(mutex); return shaderContrast; }
     void setShaderContrast(float value);
 
+    /// Tunable scene parameters the user has changed, keyed by shader name then
+    /// by uniform name (ADR-0017 decision 4). Shader *name* rather than its
+    /// fragment path, because that is already the identity `shaderName` uses to
+    /// restore the selection — and a second identity for one object is how two
+    /// keys drift apart.
+    ///
+    /// Only values that were actually changed are written. A parameter left at
+    /// its shipped default stays absent, so a later change to that default
+    /// reaches everyone who never expressed an opinion — the same rule
+    /// `evaluation_color` follows.
+    ///
+    /// Returned by value: a reference handed out under a lock is not protected
+    /// by it, and the camera accessors here already learned that.
+    nlohmann::json getShaderParams(const std::string& shader) const;
+    void setShaderParam(const std::string& shader, const std::string& name, bool value);
+
     // Camera preset (saved via "save camera", applied via "reset camera")
     CameraState getSavedCamera() const { std::lock_guard<std::mutex> lock(mutex); return savedCamera; }
     void setSavedCamera(const CameraState& state) { std::lock_guard<std::mutex> lock(mutex); savedCamera = state; savedCameraLoaded = true; }
@@ -319,6 +335,8 @@ private:
 
     // Shader
     std::string shaderName;
+    /// shader name -> { uniform name -> value }. See getShaderParams().
+    nlohmann::json shaderParams = nlohmann::json::object();
     float shaderEof = 0.0725f;
     float shaderDof = 0.0925f;
     float shaderGamma = 1.0f;

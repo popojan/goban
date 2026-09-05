@@ -144,6 +144,10 @@ void UserSettings::load() {
             shaderContrast = shader.value("contrast", shaderContrast);
         }
 
+        if (user.contains("shader_params") && user["shader_params"].is_object()) {
+            shaderParams = user["shader_params"];
+        }
+
         // Helper to parse camera state from JSON
         auto parseCamera = [](const nlohmann::json& j, CameraState& cam) {
             if (j.contains("rotation")) {
@@ -340,6 +344,14 @@ std::string UserSettings::serialize() const {
         {"contrast", shaderContrast}
     };
 
+    // Written only when something is in it, so an untouched install carries no
+    // key at all — the same restraint `evaluation_color` shows. Pinning today's
+    // shipped defaults into every user.json would quietly defeat any later
+    // change to them.
+    if (!shaderParams.empty()) {
+        user["shader_params"] = shaderParams;
+    }
+
     // Helper to serialize camera state to JSON
     auto serializeCamera = [](const CameraState& cam) {
         return nlohmann::json{
@@ -533,6 +545,19 @@ void UserSettings::setShaderGamma(float value) {
 void UserSettings::setShaderContrast(float value) {
     std::lock_guard<std::mutex> lock(mutex);
     shaderContrast = value;
+}
+
+nlohmann::json UserSettings::getShaderParams(const std::string& shader) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    const auto it = shaderParams.find(shader);
+    if (it == shaderParams.end() || !it->is_object()) return nlohmann::json::object();
+    return *it;   // by value; see the header
+}
+
+void UserSettings::setShaderParam(const std::string& shader, const std::string& name,
+                                  bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    shaderParams[shader][name] = value;
 }
 
 void UserSettings::setBoardSize(int value) {

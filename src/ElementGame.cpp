@@ -1303,6 +1303,7 @@ void ElementGame::OnUpdate()
                 prisEl->SetSelection(want);
             }
         }
+        syncSceneParamItems();
     }
 
     // The mode is a three-value select, and the widget follows GameThread
@@ -1547,6 +1548,43 @@ void ElementGame::OnMenuToggle(const std::string &cmd, bool checked) const {
         std::vector<Rml::Element*> elements;
         GetContext()->GetDocument("game_window")->GetElementsByClassName(elements, cmd.c_str());
         for(auto el: elements) {
+            el->SetClass("selected", checked);
+            el->SetClass("unselected", !checked);
+        }
+    }
+}
+
+void ElementGame::syncSceneParamItems() const {
+    auto* grp = GetContext()->GetDocument("game_window")->GetElementById("grpSceneParams");
+    if (!grp) return;
+
+    // Driven by the *menu*, not by a list of names in here: every child whose id
+    // is `cmdParam_<uniform>` is looked up among what the shader offers. Adding
+    // a boolean is then one line of RML and one of config, with no C++ to
+    // change — which is the property ADR-0017 is trying to buy.
+    for (int i = 0; i < grp->GetNumChildren(); ++i) {
+        Rml::Element* el = grp->GetChild(i);
+        const Rml::String id = el->GetId();
+        if (id.rfind("cmdParam_", 0) != 0) continue;
+        const std::string name = id.substr(std::strlen("cmdParam_"));
+
+        const ShaderParam* p = findShaderParam(view.shaderParams(), name);
+
+        // Greyed rather than hidden where the shader has no such feature. It
+        // keeps the menu from reflowing on every shader switch, and a greyed
+        // "Bowls" says this scene has none — which is true, and worth saying.
+        // The same reasoning ADR-0015 used for the Tsumego option: a value the
+        // menu reports without offering.
+        if (el->IsClassSet("disabled") != (p == nullptr)) {
+            el->SetClass("disabled", p == nullptr);
+        }
+
+        // The widget follows the shader, never the other way: the value can move
+        // without the menu being touched — restored from user.json at startup,
+        // set by the command, or reset by switching shader. Same rule as the
+        // Best Moves select.
+        const bool checked = p && p->value;
+        if (el->IsClassSet("selected") != checked) {
             el->SetClass("selected", checked);
             el->SetClass("unselected", !checked);
         }
