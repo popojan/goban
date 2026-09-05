@@ -285,6 +285,7 @@ with its arguments. The ones worth binding to a key:
 | `game_mode` | `[match\|explore\|tsumego]` — report or set the mode. Tsumego is refused: a puzzle is entered by opening one |
 | `toggle_explore_mode` | Cycle Match <-> Explore (`toggle_analysis_mode` still works) |
 | `prisoners` | `[auto\|always\|never]` — the captured-stone counts on the board's right margin. `auto` draws them under a shader that has no bowls |
+| `menu_select` | `<select-id> <value>` — pick an option in a menu dropdown as a user would; for scenarios |
 | `toggle ai vs ai` | Let both engines play each other |
 | `toggle_territory` | Show/hide territory markers |
 | `toggle_last_move_overlay` / `toggle_next_move_overlay` | Show/hide the move markers |

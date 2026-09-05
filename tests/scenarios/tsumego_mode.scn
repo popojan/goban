@@ -217,6 +217,21 @@ toggle_explore_mode
 wait_idle
 expect mode match
 
+# The same two through the *widget*, which needs its own branch to carry the
+# chosen value to the command — this select shipped without one.
+menu_select selectGameMode explore
+wait_idle
+expect mode explore
+menu_select selectGameMode match
+wait_idle
+expect mode match
+
+# And the Tsumego option is refused at the widget, not merely at the command:
+# it carries RmlUi's `disabled`, so a click cannot reach it at all.
+menu_select selectGameMode tsumego
+wait_idle
+expect mode match
+
 # A name that is not a mode changes nothing. It must not fall through to
 # whichever value happens to be listed first, which is what the tempting
 # nlohmann enum macro would have done.

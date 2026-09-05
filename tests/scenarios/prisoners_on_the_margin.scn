@@ -44,13 +44,22 @@ expect prisoner_shown false
 # `always` means always, and on an empty board that has to mean 0 and 0 — this
 # is the case that made the hiding rule untenable. Nothing has been captured and
 # the shader has bowls, and the counts appear regardless, immediately.
-prisoners always
+#
+# Driven through the *widget*, not the command: a select's chosen value does not
+# reach its command by itself, and this select shipped without the branch in
+# EventHandlerNewGame that lifts it out of the change event. `prisoners always`
+# worked and picking "always" from the menu did not — it ran the bare command,
+# which reports the setting rather than changing it. Nothing else in the suite
+# exercises a widget, so nothing else could have caught it.
+menu_select selectPrisoners always
 wait_idle
+expect prisoner_mode always
 expect prisoner_shown true
 wait_until prisoner_text_white 0
 expect prisoner_text_black 0
-prisoners auto
+menu_select selectPrisoners auto
 wait_idle
+expect prisoner_mode auto
 expect prisoner_shown false
 
 # Black B1, White A1, Black A2 — Black takes the corner stone. Same capture as

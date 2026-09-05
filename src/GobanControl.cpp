@@ -1556,6 +1556,45 @@ void GobanControl::buildRegistry() {
         if (auto* h = chooser()) h->SetPath(ctx.args[0]);
     });
 
+    add("menu_select", 2, 2,
+        "<select-id> <value> — pick an option in a menu dropdown, as a user would. "
+        "Drives the widget, not the command behind it, which is the wiring "
+        "nothing else covers",
+        [this](CommandContext& ctx) {
+        // Every other scenario step dispatches a command directly, so the path
+        // from a widget to that command had no coverage at all — and three
+        // selects shipped with no branch in EventHandlerNewGame to lift the
+        // chosen value out of the change event. The symptom was quiet: the bare
+        // command ran, which for `prisoners` reports the setting instead of
+        // changing it, and for `toggle_evaluation` toggles whatever was picked.
+        auto* context = parent->GetContext();
+        auto* doc = context ? context->GetDocument("game_window") : nullptr;
+        auto* select = doc ? dynamic_cast<Rml::ElementFormControlSelect*>(
+                doc->GetElementById(ctx.args[0])) : nullptr;
+        if (!select) {
+            spdlog::warn("menu_select: no select element '{}'", ctx.args[0]);
+            return;
+        }
+        // Checked rather than assumed: SetValue() on a value no option carries
+        // leaves the control showing something nothing can act on, which is a
+        // worse failure than a refusal. Also catches a renamed option.
+        for (int i = 0; i < select->GetNumOptions(); ++i) {
+            auto* option = select->GetOption(i);
+            if (option && option->GetAttribute<Rml::String>("value", "") == ctx.args[1].c_str()) {
+                if (option->HasAttribute("disabled")) {
+                    spdlog::warn("menu_select: option '{}' of '{}' is disabled",
+                                 ctx.args[1], ctx.args[0]);
+                    return;
+                }
+                // SetValue dispatches EventId::Change exactly as a click does,
+                // so this runs the real handler chain rather than a shortcut.
+                select->SetValue(ctx.args[1].c_str());
+                return;
+            }
+        }
+        spdlog::warn("menu_select: '{}' has no option '{}'", ctx.args[0], ctx.args[1]);
+    });
+
     add("chooser_up", 0, 0, "browse to the parent directory", [chooser](CommandContext&) {
         if (auto* h = chooser()) h->NavigateUp();
     });

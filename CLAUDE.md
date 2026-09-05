@@ -1083,6 +1083,22 @@ of its decisions, and `tests/test_analysis.cpp` plus
   but cannot remove one, and only the JSON looks replaced. Pinned by
   `tests/test_configuration.cpp`.
 
+- **A select's chosen value reaches its command only through a branch in
+  `EventHandlerNewGame::ProcessEvent`.** Nothing appends it automatically: each
+  dropdown lifts it out of the change event with
+  `event.GetParameter<Rml::String>("value", …)` and builds the command itself.
+  Three selects shipped without one in a single change, and the failure is
+  *quiet* — the bare command runs, so `prisoners` printed its current setting
+  into `#lblMessage` and the widget snapped back, and `toggle_evaluation`
+  toggled whichever option was picked. Adding a `<select>` means adding a branch.
+- **Scenarios drive commands, so a widget needs `menu_select`.** `menu_select
+  <select-id> <value>` picks an option through `SetValue()`, which dispatches
+  `EventId::Change` exactly as a click does — the only step in the suite that
+  exercises the widget-to-command wiring rather than the command. It refuses a
+  value no option carries and one carrying `disabled`, so it also pins the
+  greyed-option decisions (ADR-0015's Tsumego). Every earlier scenario passed
+  with all three selects broken.
+
 ### UI Event Suppression
 - **`syncingUI` flag**: `GobanControl::syncingUI` suppresses game actions triggered by UI change events during programmatic dropdown updates. Any method that repopulates dropdowns (player, board size, komi, handicap) must wrap the repopulation with `setSyncingUI(true/false)`. Event handlers in `EventHandlerNewGame` check `isSyncingUI()` and skip side effects when true. This prevents transient intermediate states (e.g. briefly activating an engine player during dropdown clear/repopulate) from triggering game actions.
 

@@ -166,8 +166,24 @@ assert on pixels, so a committed screenshot scenario guards nothing.
 | `wait_until <key> [op] <value>` | wait for a state key to reach a value |
 | `wait <ms>` | unconditional delay — prefer `wait_idle` |
 | `key [mod+]<name>` | press a key, down then up |
+| `menu_select <id> <value>` | pick an option in a menu dropdown, as a user would |
 | `dump_state [label]` | log the whole state; use this when authoring |
 | `fail_fast on\|off` | stop at the first failure (default on) |
+
+`menu_select` exists for the same kind of reason, one level up. Every other step
+dispatches a **command**, so the path from a *widget* to that command had no
+coverage at all — and it is not automatic: each `<select>` needs a branch in
+`EventHandlerNewGame::ProcessEvent` to lift the chosen value out of the change
+event. Three selects shipped without one in a single change, and every scenario
+passed, because they all drove the commands. The failure is quiet rather than
+loud: the bare command runs, which for `prisoners` *reports* the setting instead
+of changing it.
+
+It goes through `ElementFormControlSelect::SetValue()`, which dispatches
+`EventId::Change` exactly as a click does, so the real handler chain runs. It
+refuses a value no option carries, and one whose option is `disabled` — which
+also makes it the way to assert that a greyed option really cannot be chosen,
+as `tsumego_mode.scn` does for the Tsumego mode.
 
 `key` exists because a few behaviours live in `GobanControl::keyPress()` and
 never reach the command registry — most importantly **Space at the end of an
