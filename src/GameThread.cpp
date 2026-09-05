@@ -1171,6 +1171,13 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                 }
 
                 if (model.game.isOnBadMovePath()) {
+                    // The record's refutation was never played, so the solver was
+                    // told "wrong" and not shown why. No engine is asked here;
+                    // that stays on request.
+                    if (model.game.hasNextMove()) {
+                        navigator->navigateForward();
+                    }
+                    // After the refutation: navigating clears the message.
                     model.state.msg = GameState::TSUMEGO_WRONG;
                 } else if (model.game.isAtEndOfNavigation()) {
                     model.state.msg = GameState::TSUMEGO_SOLVED;
