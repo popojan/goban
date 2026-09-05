@@ -617,8 +617,22 @@ See `docs/adr/0017-tunable-shader-parameters-are-declared-in-configuration.md`.
 - **The gate goes inside the loop, shadows included.** `rBowls`, `sBowls` and
   `rBowlStones` each iterate all four cups, so the toggle is a `continue` on the
   index rather than a branch at the `rScene()` call site. Missing `sBowls` leaves
-  a hidden vessel casting its shadow — and it is the shadow that costs: 27.4 →
-  31.6 fps measured on the 19x19 bench with all four gone.
+  a hidden vessel casting its shadow, and it is largely the shadow that costs.
+- **The vessels cost half the frame rate fullscreen, so measure them there.**
+  `tests/bench/` 19x19: **17.2 → 25.8 fps at 1920x1080 (+50%)** against 27.8 →
+  33.6 windowed (+21%). That is 3.1x the cost for 1.9x the pixels — worse than
+  linear, most likely because the vessels sit at the far left and right and a
+  16:9 frame shows all four whole. A windowed benchmark understates the case the
+  feature exists for.
+- **A benchmark must set the state it measures, not inherit it.** A scripted run
+  with no `--user-settings` writes to a *single shared* `scenario-user.json`, so
+  an off-run persists its setting and the next on-run silently measures the same
+  scene again. This produced two plausible, entirely fictional results before the
+  fullscreen pair came back identical to three digits and gave it away.
+  `run_scenarios.sh` passes a per-scenario file and is unaffected; direct
+  `--script` runs — which is what benchmarking uses — are not. Prefer
+  `shader_param <name> on|off` over `toggle`, and assert the state with `expect`
+  before measuring.
 - **`menu_click <element-id>` is how a scenario presses a menu item**, the
   sibling of `menu_select` for everything clicked rather than chosen from a list.
   It refuses a `disabled` item on purpose: greying is `pointer-events: none`,

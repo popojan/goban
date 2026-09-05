@@ -212,13 +212,39 @@ from wanting to switch the bowls off while playing.
 - **`drawsBowls()` gains a second input**, and every reader of it must go through
   the accessor rather than the config key. `PrisonerMode::Auto` is the reader
   that matters, and ADR-0016 already says it must follow the live value.
-- **The frame-rate claim is real, and modest.** Measured on `tests/bench/`
-  (19×19, 140 stones, Intel/Mesa): **27.4 fps** with the vessels and **31.6 fps**
-  without, six one-second samples each, first discarded. That is **+15%** for
-  removing four spheres and their shadows — worth having on a slow machine,
-  nowhere near a reason to switch them off by default. It is the *shadows* that
-  cost: `sBowls` is called per shading point, which is why the gate is inside it
-  as well as inside `rBowls`.
+- **The frame-rate claim is real, and it is worth half the frame rate
+  fullscreen.** `tests/bench/` 19×19, 140 stones, Intel/Mesa:
+
+  | | vessels on | off | gain | cost per frame |
+  |---|---|---|---|---|
+  | Windowed, 1056×1050 | 27.8 | 33.6 | +21% | 6.2 ms |
+  | **Fullscreen, 1920×1080** | **17.2** | **25.8** | **+50%** | **19.4 ms** |
+
+  Confirmed independently at 18 → 27 fullscreen, in play.
+
+  **Measure it fullscreen or not at all.** The cost is 3.1× larger there for
+  1.9× the pixels, so it is worse than linear, and a windowed benchmark
+  understates the thing the feature exists for. The likely reason is framing
+  rather than fill rate: the vessels sit at the far left and right, so a 16:9
+  frame shows all four whole where a nearly square window clips them.
+
+  It is largely the *shadows*: `sBowls` is called per shading point, which is why
+  the gate is inside it as well as inside `rBowls`.
+
+- **A benchmark must set the state it claims to measure.** Both earlier attempts
+  at the table above were wrong, in the same way and for a reason worth
+  recording: a scripted run with no `--user-settings` writes to a *single shared*
+  `scenario-user.json` (`main.cpp`, "a scripted run defaults to a throwaway
+  settings file" — throwaway, but one file for every run). So the off-run
+  persisted `showBowls: false`, and the next on-run inherited it and measured the
+  same scene twice. It produced two plausible fictions: 27.4 → 31.6 in a window,
+  and "no measurable cost on an empty board". Only the identical fullscreen
+  figures — 26.1 both ways, to three digits — gave it away.
+
+  `run_scenarios.sh` is not affected; it passes a per-scenario settings file.
+  Direct `--script` invocations are, which is what benchmarking uses. Hence
+  `shader_param <name> on|off` taking an explicit state rather than only
+  `toggle`, and hence the assertions now in `tests/bench/bench.scn`.
 - **The `const MAT materials[10]` problem is untouched.** Colours are the
   expensive third milestone and this ADR does not decide them: a const array
   cannot be a uniform array without either per-property uniforms, a UBO, or a
