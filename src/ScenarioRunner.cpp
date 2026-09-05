@@ -231,6 +231,17 @@ bool ScenarioRunner::execute(const Step& step, GobanControl& control) {
             recordFailure(step, "screenshot needs a file path", control.dumpState());
             return true;
         }
+        // Wait for the camera to settle first. `new_game` starts the intro
+        // animation, and a frame captured during it shows the board mid-flight —
+        // a tiny rectangle in a dark surround — which looks like the renderer
+        // having failed rather than like a scenario asking too early. CLAUDE.md
+        // has said a screenshot taken while `camera_animating` is not
+        // reproducible since the key was added; nothing enforced it, and the
+        // first thing that happened when a screenshot was written by hand was
+        // exactly that black frame. `wait_idle` does not cover it on purpose:
+        // an animation is not work in flight, and everything else is happy to
+        // proceed during one.
+        if (control.cameraAnimating()) return false;
         if (!screenshotRequested) {
             control.requestScreenshot(step.args[0]);
             screenshotRequested = true;

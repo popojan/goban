@@ -168,6 +168,11 @@ public:
     /// blocks until the main loop has captured the frame.
     void requestScreenshot(const std::string& path);
     [[nodiscard]] bool screenshotPending() const;
+    /// The camera is between positions. A screenshot taken now is not
+    /// reproducible — the intro animation is still flying the board in, and the
+    /// shader is being fed a live clock — so the `screenshot` step waits for
+    /// this to clear before it asks for one.
+    [[nodiscard]] bool cameraAnimating() const;
 
     /// Whether a widget change event should be read as the user's intent. False
     /// during startup, and while a dropdown is being repopulated — removing and

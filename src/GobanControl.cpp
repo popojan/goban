@@ -2558,6 +2558,12 @@ void GobanControl::requestScreenshot(const std::string& path) {
     view.requestScreenshot(path);
 }
 
+bool GobanControl::cameraAnimating() const {
+    // The same expression dumpState() reports as `camera_animating`, so a
+    // scenario asserting that key and the screenshot step agree by construction.
+    return view.animationRunning || view.cameraAnim.active;
+}
+
 bool GobanControl::screenshotPending() const {
     return view.screenshotPending();
 }
