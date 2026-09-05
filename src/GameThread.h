@@ -50,9 +50,11 @@ struct NavCommand {
 /// What produces the opponent's moves.
 enum class GameMode {
     MATCH,      ///< Strict turn alternation, assigned roles.
-    EXPLORE     ///< Human plays either colour; the kibitz engine answers every
+    EXPLORE,    ///< Human plays either colour; the kibitz engine answers every
                 ///< move. That reply is the distinguishing property, not the
                 ///< free navigation a loaded game has anyway while Paused.
+    TSUMEGO     ///< A problem: the record answers, on the solution path and on a
+                ///< refuted one alike. Player assignment is not consulted.
 };
 
 /** \brief Whether the engines match the game record — ADR-0002 step 4.

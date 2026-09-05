@@ -1315,6 +1315,10 @@ bool GameThread::setGameMode(GameMode mode) {
 
     if (gameMode != mode) {
         gameMode = mode;
+        // Published for the threads that cannot reach `gameMode`: the analysis
+        // loop drops its report in a puzzle, and the view and model read it per
+        // frame. One writer, here (ADR-0006).
+        model.tsumegoMode = (mode == GameMode::TSUMEGO);
         spdlog::info("Game mode changed to: {}", mode == GameMode::MATCH ? "Match" : "Analysis");
         if (mode == GameMode::MATCH) {
             aiVsAiMode = false;
@@ -1812,7 +1816,10 @@ void GameThread::finalizeGameLoad(Engine* alreadySynced, bool matchPlayers) {
 
     // Set game mode based on result (but don't start yet - caller must call
     // model.start() after UI refresh to avoid race with transient player changes)
-    gameMode = model.game.hasGameResult() ? GameMode::EXPLORE : GameMode::MATCH;
+    // Tsumego first. The file chooser marks it before the load runs, and
+    // deciding purely on the result would undo that.
+    gameMode = model.tsumegoMode ? GameMode::TSUMEGO
+             : model.game.hasGameResult() ? GameMode::EXPLORE : GameMode::MATCH;
 
     // Start game thread for navigation (loop waits at !model until started)
     run();
