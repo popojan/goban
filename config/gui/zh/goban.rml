@@ -193,7 +193,7 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">最后一手</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">得分</div>
+                            <div class="hr">引擎</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">胜率</div>
                         </div>
                         <div class="grp">

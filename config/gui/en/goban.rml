@@ -193,7 +193,7 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">Last</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">Score</div>
+                            <div class="hr">Engine</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">Evaluation</div>
                         </div>
                         <div class="grp">

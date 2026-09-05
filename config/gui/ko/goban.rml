@@ -181,7 +181,7 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">마지막</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">점수</div>
+                            <div class="hr">엔진</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">형세</div>
                         </div>
                         <div class="grp">
