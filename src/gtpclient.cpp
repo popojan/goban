@@ -597,7 +597,7 @@ static std::string findExecutable(const std::string& exe, const std::string& pat
     // Check if exe has a file extension (dot after last slash/backslash)
     size_t lastSlash = exe.find_last_of("/\\");
     size_t lastDot = exe.find_last_of('.');
-    bool hasExtension = (lastDot != std::string::npos &&
+    [[maybe_unused]] const bool hasExtension = (lastDot != std::string::npos &&
                         (lastSlash == std::string::npos || lastDot > lastSlash));
 
 #ifdef _WIN32

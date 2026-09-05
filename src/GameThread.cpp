@@ -513,7 +513,7 @@ void GameThread::syncOtherEngines(const Move& move, const Player* player, const 
     }
 }
 
-void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
+void GameThread::notifyMoveComplete(Engine* /*coach*/, const Move& move,
                                      Engine* kibitzEngine, bool kibitzed,
                                      const std::string& engineComments) {
     std::ostringstream comment;
@@ -1811,7 +1811,7 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     return applyLoadedGame(gameInfo, engine);
 }
 
-void GameThread::finalizeGameLoad(Engine* alreadySynced, bool matchPlayers) {
+void GameThread::finalizeGameLoad(Engine* /*alreadySynced*/, bool matchPlayers) {
     // Finalize game load: mark for initial sync, match players, start game thread.
     // All engines will be synced on game thread (coach first for scoring).
 

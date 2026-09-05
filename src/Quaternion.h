@@ -47,6 +47,10 @@ namespace DDG
          Quaternion( const Quaternion& q );
          // initializes from existing quaternion
 
+         Quaternion& operator=( const Quaternion& q ) = default;
+         // copy assignment; declared because the copy constructor above would
+         // otherwise leave it implicit and deprecated
+
          Quaternion( double s, double vi, double vj, double vk );
          // initializes with specified real (s) and imaginary (v) components
 
@@ -139,7 +143,7 @@ namespace DDG
 
          void normalize( void );
          // divides by Euclidean length
-   
+
       protected:
          double s;
          // scalar (double) part
@@ -147,7 +151,7 @@ namespace DDG
          Vector v;
          // vector (imaginary) part
    };
-   
+
    Quaternion operator*( double c, const Quaternion& q );
    // left scalar multiplication
 

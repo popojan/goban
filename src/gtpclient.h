@@ -37,7 +37,7 @@ struct OutputFilter {
     std::string regex;
     std::string output;
     std::string var;
-    std::regex compiled;
+    std::regex compiled{};
 };
 
 void replaceAll(std::string& out, const std::string& what, const std::string& by);

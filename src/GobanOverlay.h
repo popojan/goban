@@ -13,7 +13,8 @@ class GobanView;
 struct Layer {
 	float height;
 	glm::vec4 color;
-	bool empty;
+	/// Nothing has been put in this layer yet; Update() sets it.
+	bool empty = true;
 	/// How many text items Update() put in this layer's buffer. `empty` is the
 	/// same fact as a boolean; the count is what draw() reports back, so that a
 	/// scenario can assert what was *drawn* rather than what was built.

@@ -41,10 +41,10 @@ extern std::shared_ptr<Configuration> config;
 struct NavCommand {
     enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION, KIBITZ_NAV, TO_TREE_PATH };
     Type type;
-    Move move;  // For TO_VARIATION
+    Move move{};  // For TO_VARIATION
     bool promote = true;  // For TO_VARIATION: promote to main line
     int pathLength = 0;                 // For TO_TREE_PATH
-    std::vector<int> branchChoices;     // For TO_TREE_PATH
+    std::vector<int> branchChoices{};   // For TO_TREE_PATH
 };
 
 /** \brief Whether the engines match the game record — ADR-0002 step 4.

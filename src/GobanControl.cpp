@@ -702,7 +702,10 @@ void GobanControl::buildRegistry() {
         // Three states now (ADR-0014): off, revealed on a dwell once the player
         // has aimed at a point, or always. `on`/`off` still work — they were the
         // whole vocabulary before, and scenarios and keybindings use them.
-        HintMode next;
+        // Seeded, though every path below assigns it: GCC cannot see that
+        // through the inlining at -O2 and warns, and a cycle starting from Off
+        // is the same answer the switch's default gives anyway.
+        HintMode next = HintMode::Off;
         if (ctx.args.empty()) {
             switch (view.analysisOverlayMode()) {
                 case HintMode::Off:      next = HintMode::OnDemand; break;
@@ -778,7 +781,7 @@ void GobanControl::buildRegistry() {
         "[left|center|right] — where the board readout sits along the edge; "
         "with no argument, cycles through them",
         [this](CommandContext& ctx) {
-        TextAlign next;
+        TextAlign next = TextAlign::Center;
         if (ctx.args.empty()) {
             // Cycling is for judging it by eye, which is the only way this
             // choice can be made.
@@ -804,7 +807,7 @@ void GobanControl::buildRegistry() {
         "[gray|half-color|color|dubois] — how a stereo shader combines the two "
         "eyes; with no argument, cycles through them",
         [this](CommandContext& ctx) {
-        Stereo::Anaglyph next;
+        Stereo::Anaglyph next = Stereo::Anaglyph::Gray;
         if (ctx.args.empty()) {
             // Cycling, for the same reason evaluation_align cycles: the only way
             // to choose between these is to look at the board through the

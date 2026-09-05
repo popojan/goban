@@ -51,6 +51,10 @@ namespace DDG
          Vector( const Vector& v );
          // initializes from existing vector
 
+         Vector& operator=( const Vector& v ) = default;
+         // copy assignment; declared because the copy constructor above would
+         // otherwise leave it implicit and deprecated
+
          double& operator[] ( const int& index );
          // returns reference to the specified component (0-based indexing: x, y, z)
 
