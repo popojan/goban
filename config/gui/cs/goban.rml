@@ -42,22 +42,6 @@
                             <div class="hr">Okno</div>
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">Celá obrazovka</div>
                         </div>
-                        <div class="grp">
-                            <div class="hr">Popisky</div>
-                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">Poslední tah</div>
-                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">Další tah</div>
-                            <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">Odhad skóre</div>
-                            <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">Uplynulý čas</div>
-                            <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">Souřadnice</div>
-                            <div class="hr">Nejlepší tahy</div>
-                            <div class="cmd">
-                                <select id="selectEvaluationMoves" onchange="evaluation_moves" onmousedown="nop">
-                                    <option value="off">vypnuto</option>
-                                    <option value="on_demand">na vyžádání</option>
-                                    <option value="always">vždy</option>
-                                </select>
-                            </div>
-                        </div>
                         <!--
                         <div class="grp">
                             <div class="hr">Gamma correction</div>
@@ -78,6 +62,36 @@
                             <div class="cmd" onmouseup="save camera">Uložit</div>
                             <div class="cmd" onmouseup="delete camera">Smazat</div>
                         </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>Popisky</span>
+                    <div class="menuitem show">
+                    <div class="grp">
+                        <div class="hr">Tahy</div>
+                        <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">Poslední tah</div>
+                        <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">Další tah</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">Analýza</div>
+                        <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">Odhad skóre</div>
+                        <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">Území</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">Nejlepší tahy</div>
+                        <div class="cmd">
+                        <select id="selectEvaluationMoves" onchange="evaluation_moves" onmousedown="nop">
+                        <option value="off">vypnuto</option>
+                        <option value="on_demand">na vyžádání</option>
+                        <option value="always">vždy</option>
+                        </select>
+                        </div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">Deska</div>
+                        <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">Souřadnice</div>
+                        <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">Uplynulý čas</div>
+                    </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
@@ -180,7 +194,6 @@
                         </div>
                         <div class="grp">
                             <div class="hr">Skóre</div>
-                            <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">Území</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">Hodnocení</div>
                         </div>
                         <div class="grp">
