@@ -511,7 +511,7 @@ sequenceDiagram
 Until `uiReady`, `availableActions()` returns all-false and every command is
 refused — which is also why a scenario must wait for `areEnginesLoaded()`.
 
-Session state (last SGF, game index, tree path, tsumego/analysis mode, camera) is
+Session state (last SGF, game index, tree path, tsumego/explore mode, camera) is
 persisted in `user.json` by `UserSettings` and restored here. The tree-path
 navigation is *queued before the engines start*, so it runs on the game thread
 like any other navigation — one path, no special case.

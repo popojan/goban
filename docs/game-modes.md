@@ -1,6 +1,9 @@
 # Game Modes
 
-Red Carpet Goban has two game modes that determine how player interaction works. The mode is always explicit — switched only by the user, never automatically.
+Red Carpet Goban has two game modes that determine how player interaction works.
+The user switches between them, with one exception: loading a finished SGF (one
+carrying a result) selects Explore by itself, since there is no match left to
+play.
 
 ## Match Mode
 
@@ -10,17 +13,17 @@ Red Carpet Goban has two game modes that determine how player interaction works.
 
 - Players alternate turns according to their assigned color
 - If an engine is assigned to a color, it responds automatically after the opponent moves
-- **Undo** removes one move (consistent with Analysis mode)
+- **Undo** removes one move (consistent with Explore mode)
 - Engine-vs-engine games run continuously until finished
 
 ### When Active
 
 - Starting a new game (Game > New, or board click after game ends)
-- Explicitly switching from Analysis mode via menu/Enter key
+- Explicitly switching from Explore mode via menu/Enter key
 
 ---
 
-## Analysis Mode
+## Explore Mode
 
 **The default after loading a finished SGF game.** Free exploration without strict turn enforcement.
 
@@ -28,7 +31,7 @@ Red Carpet Goban has two game modes that determine how player interaction works.
 
 - Human can play either color by clicking on the board
 - After playing a move, **the configured kibitz engine replies** — whichever
-  color is to move, and regardless of who is assigned to it. Analysis mode does
+  color is to move, and regardless of who is assigned to it. Explore mode does
   not consult the color assignment at all.
 - **Undo** removes one move
 - Navigation (Home/End/Left/Right) works freely
@@ -49,14 +52,14 @@ Red Carpet Goban has two game modes that determine how player interaction works.
 | **Load finished SGF** (has result) | Sets Analysis |
 | **Load unfinished SGF** (no result, e.g. session resume) | Sets Match |
 
-Analysis mode is **not available when both players are human**, and the refusal
-says so. The reason is the reply, not its absence: analysis mode answers every
+Explore mode is **not available when both players are human**, and the refusal
+says so. The reason is the reply, not its absence: explore mode answers every
 move with the kibitz engine, so entering it with two humans would quietly turn
 the game into human-versus-engine.
 
-This costs nothing, because **Kibitz does not need analysis mode**. The Kibitz
+This costs nothing, because **Kibitz does not need explore mode**. The Kibitz
 button and the Space key ask the engine for a move in an ordinary match, with
-two humans, at any time. Analysis mode is for handing every reply to the engine;
+two humans, at any time. Explore mode is for handing every reply to the engine;
 Kibitz is for asking once.
 
 ---
@@ -102,7 +105,7 @@ scale of a single move.
 ### 4. Resuming a match from a loaded SGF position
 
 - **Mode**: Switch to Match explicitly (Enter key)
-- Load the SGF (starts in Analysis mode)
+- Load the SGF (starts in Explore mode)
 - Navigate to the desired position
 - Toggle to Match mode — the position becomes the starting point
 - Play continues as a match from that position
@@ -112,7 +115,7 @@ scale of a single move.
 - **Mode**: Match
 - Assign engines to both colors, start the game
 - Engines play automatically
-- To pause and review: switch to Analysis mode (Enter key)
+- To pause and review: switch to Explore mode (Enter key)
 - To resume: switch back to Match mode
 
 ### 6. Getting AI analysis of a position
@@ -129,11 +132,11 @@ scale of a single move.
 Navigation (Home/End/Left/Right) is available in both modes:
 - **Match mode**: Navigation is blocked while the engine is thinking, and
   blocked outright in a bot-versus-bot match — see below
-- **Analysis mode**: Navigation is always available (engine auto-play is paused)
+- **Explore mode**: Navigation is always available (engine auto-play is paused)
 
-In a **bot-versus-bot match outside analysis mode** the human is a spectator:
+In a **bot-versus-bot match outside explore mode** the human is a spectator:
 navigation, Undo, Pass, Resign and Kibitz are all refused, by the keys exactly
-as by the greyed-out buttons (ADR-0005). Switching to analysis mode is the
+as by the greyed-out buttons (ADR-0005). Switching to explore mode is the
 supported way to step in, and it pauses the match.
 
 Creating a new variation (clicking a new point during navigation) works identically in both modes — the difference is only in whether the engine responds automatically (Match) or on request (Analysis).

@@ -170,8 +170,8 @@
                     <span>분석</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr">모드</div>
-                            <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">분석 모드</div>
+                            <div class="hr">대국 모드</div>
+                            <div class="cmd toggle_explore_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_explore_mode">탐색</div>
                         </div>
                         <div class="grp" id="grpReplay">
                             <div class="hr">재생</div>
@@ -250,8 +250,8 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">분석 모드</div>
-    <div class="template" id="tplTsumegoMode">쓰메고 모드</div>
+    <div class="template" id="tplAnalysisMode">탐색</div>
+    <div class="template" id="tplTsumegoMode">Tsumego</div>
     <div class="template" id="tplTsumegoSolved">정답!</div>
     <div class="template" id="tplTsumegoWrong">오답!</div>
     <div class="template" id="tplBlackToMove">흑선</div>

@@ -85,8 +85,8 @@ bool ScenarioRecorder::writePrologue(std::ostream& out, const nlohmann::json& st
     out << "switch_player white " << state.value("white_player", std::string("Human")) << "\n";
     out << "settle\n";
 
-    if (state.value("mode", std::string("match")) == "analysis") {
-        out << "toggle_analysis_mode\n";
+    if (state.value("mode", std::string("match")) == "explore") {
+        out << "toggle_explore_mode\n";
     }
 
     const size_t movesIn = state.value("move_count", 0);

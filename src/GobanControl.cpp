@@ -597,7 +597,7 @@ void GobanControl::buildRegistry() {
         view.requestRepaint();
     });
 
-    add("toggle_analysis_mode", 0, 0, "switch between match and analysis mode", [this](CommandContext& ctx) {
+    add("toggle_explore_mode", 0, 0, "switch between match and explore mode", [this](CommandContext& ctx) {
         if (view.isTsumegoMode()) {
             // Tsumego mode exits only via new game or loading ordinary SGF.
             // Leave the menu toggle alone — OnUpdate keeps it lit for tsumego.
@@ -605,7 +605,7 @@ void GobanControl::buildRegistry() {
             return;
         }
         if (engine.getGameMode() == GameMode::MATCH) {
-            if (engine.setGameMode(GameMode::ANALYSIS)) {
+            if (engine.setGameMode(GameMode::EXPLORE)) {
                 ctx.checked = true;
             } else {
                 // Refused for a human-versus-human game, and silently until now:
@@ -1115,7 +1115,7 @@ void GobanControl::buildRegistry() {
         const auto snap = model.snapshot();
         if (snap->navigating && !snap->atEnd) {
             playVariationAt(Move(Move::PASS, snap->colorToMove));
-        } else if (engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS) {
+        } else if (engine.humanToMove() || engine.getGameMode() == GameMode::EXPLORE) {
             model.start();
             if (!engine.isRunning()) engine.run();
             auto move = engine.getLocalMove(Move::PASS);
@@ -1238,6 +1238,11 @@ void GobanControl::buildRegistry() {
             }
         }
     });
+
+    // The old name for toggle_explore_mode. Keybindings accumulate across an
+    // $include chain, so a user config naming the command that used to exist
+    // would otherwise silently fail to bind.
+    registry["toggle_analysis_mode"] = registry["toggle_explore_mode"];
 
     add("increase gamma", 0, 0, "raise gamma", [this](CommandContext&) {
         spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
@@ -2062,7 +2067,7 @@ UiInputs GobanControl::uiInputs() const {
     // Bot-bot detection: the explicit toggle, or simply both sides being
     // engines. Analysis mode unlocks it, since that is the mode for stepping in.
     in.aiVsAiLocked      = (engine.isAiVsAi() || engine.areBothPlayersEngines())
-                           && engine.getGameMode() != GameMode::ANALYSIS;
+                           && engine.getGameMode() != GameMode::EXPLORE;
     in.tsumego           = model.tsumegoMode;
     // Everything about the record comes from the published snapshot, never from
     // the record itself: uiInputs() runs every frame on the UI thread, and
@@ -2169,7 +2174,7 @@ nlohmann::json GobanControl::dumpState() const {
     s["prisoners_drawn_white"] = view.capturedWhiteShown;
 
     // Lifecycle flags — the ones the Design Invariants are written about
-    s["mode"]           = (engine.getGameMode() == GameMode::ANALYSIS) ? "analysis" : "match";
+    s["mode"]           = (engine.getGameMode() == GameMode::EXPLORE) ? "explore" : "match";
     s["ai_vs_ai"]       = engine.isAiVsAi();
     s["phase"]          = phaseName(model.phase());
     s["running"]        = engine.isRunning();
@@ -2433,10 +2438,10 @@ void GobanControl::saveCurrentGame() const {
         settings.setSessionTreePath(treePath.branchChoices);
         settings.setSessionIsExternal(isExternal);
         settings.setSessionTsumegoMode(model.tsumegoMode);
-        settings.setSessionAnalysisMode(engine.getGameMode() == GameMode::ANALYSIS);
+        settings.setSessionAnalysisMode(engine.getGameMode() == GameMode::EXPLORE);
         spdlog::info("Saved session state: file={}, gameIndex={}, pathLen={}, branchChoices={}, tsumego={}, analysis={}",
             sessionFile, model.game.getLoadedGameIndex(), treePath.length, treePath.branchChoices.size(),
-            model.tsumegoMode.load(), engine.getGameMode() == GameMode::ANALYSIS);
+            model.tsumegoMode.load(), engine.getGameMode() == GameMode::EXPLORE);
     } else {
         settings.clearSessionState();
     }

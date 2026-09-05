@@ -527,7 +527,7 @@ void ElementGame::performDeferredInitialization() {
 
         // Restore analysis mode
         if (sessionRestoreNeeded && sessionAnalysisMode) {
-            engine.setGameMode(GameMode::ANALYSIS);
+            engine.setGameMode(GameMode::EXPLORE);
             spdlog::info("Session restore: analysis mode enabled");
         }
 
@@ -1278,7 +1278,7 @@ void ElementGame::OnUpdate()
         auto doc = context->GetDocument("game_window");
         auto* cmdEl = doc->GetElementById("cmdAnalysisMode");
         bool tsumego = view.isTsumegoMode();
-        bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
+        bool analysisMode = engine.getGameMode() == GameMode::EXPLORE;
         bool checked = tsumego || analysisMode;
         if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
             OnMenuToggle("toggle_analysis_mode", checked);

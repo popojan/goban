@@ -130,7 +130,7 @@ human has to eyeball.
 cd cmake-build-release && make goban mock_gtp_engine
 cd ..
 ./tests/run_scenarios.sh                                   # all
-./tests/run_scenarios.sh tests/scenarios/analysis_mode_toggle.scn
+./tests/run_scenarios.sh tests/scenarios/explore_mode_toggle.scn
 ```
 
 The window is created hidden, and settings are redirected to a scratch file, so

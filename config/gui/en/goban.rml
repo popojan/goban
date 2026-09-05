@@ -182,8 +182,8 @@
                     <span>Analyze</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr">Mode</div>
-                            <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">Analysis Mode</div>
+                            <div class="hr">Game mode</div>
+                            <div class="cmd toggle_explore_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_explore_mode">Explore</div>
                         </div>
                         <div class="grp" id="grpReplay">
                             <div class="hr">Replay</div>
@@ -263,8 +263,8 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">Analysis Mode</div>
-    <div class="template" id="tplTsumegoMode">Tsumego Mode</div>
+    <div class="template" id="tplAnalysisMode">Explore</div>
+    <div class="template" id="tplTsumegoMode">Tsumego</div>
     <div class="template" id="tplTsumegoSolved">Solved!</div>
     <div class="template" id="tplTsumegoWrong">Wrong!</div>
     <div class="template" id="tplBlackToMove">Black to move</div>

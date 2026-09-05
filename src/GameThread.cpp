@@ -693,7 +693,7 @@ void GameThread::gameLoop() {
         // No separate navigatingHistory check needed.
 
         Player* humanPlayer = playerManager->humanPlayer();
-        if (gameMode == GameMode::ANALYSIS && coach && humanPlayer && !stopRequested()) {
+        if (gameMode == GameMode::EXPLORE && coach && humanPlayer && !stopRequested()) {
             // Analysis mode: human plays either color, engine responds to human moves
             spdlog::debug("Game loop: Analysis mode, waiting for human move (color={})",
                 model.state.colorToMove.toString());
@@ -864,7 +864,7 @@ void GameThread::gameLoop() {
         if(locked) lock.unlock();
 
         // Debug: log if we fell through without entering any mode
-        if (gameMode != GameMode::ANALYSIS && !(coach && player)) {
+        if (gameMode != GameMode::EXPLORE && !(coach && player)) {
             static int fallCount = 0;
             if (++fallCount % 100 == 1) {
                 spdlog::debug("Game loop: fell through (gameMode={}, coach={}, player={})",
@@ -1196,7 +1196,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             }
 
             // In Analysis mode, auto-respond with kibitz engine after human variation
-            if (varResult.success && gameMode == GameMode::ANALYSIS) {
+            if (varResult.success && gameMode == GameMode::EXPLORE) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
                 if (kibitz && coach && model.phase() != GamePhase::Finished) {
@@ -1299,7 +1299,7 @@ bool GameThread::setGameMode(GameMode mode) {
     std::unique_lock<std::mutex> lock(playerMutex);
 
     // Don't allow Analysis mode for human-human matches (no AI to respond)
-    if (mode == GameMode::ANALYSIS) {
+    if (mode == GameMode::EXPLORE) {
         if (playerManager->areBothPlayersHuman()) {
             spdlog::info("Analysis mode not available for human-human matches");
             return false;
@@ -1805,7 +1805,7 @@ void GameThread::finalizeGameLoad(Engine* alreadySynced, bool matchPlayers) {
 
     // Set game mode based on result (but don't start yet - caller must call
     // model.start() after UI refresh to avoid race with transient player changes)
-    gameMode = model.game.hasGameResult() ? GameMode::ANALYSIS : GameMode::MATCH;
+    gameMode = model.game.hasGameResult() ? GameMode::EXPLORE : GameMode::MATCH;
 
     // Start game thread for navigation (loop waits at !model until started)
     run();

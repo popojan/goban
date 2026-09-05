@@ -47,9 +47,12 @@ struct NavCommand {
 
 /** \brief Game mode determining player interaction behavior
  */
+/// What produces the opponent's moves.
 enum class GameMode {
-    MATCH,      ///< Default - strict turn alternation, assigned roles
-    ANALYSIS    ///< Sabaki-like - human plays either color, AI responds based on move source
+    MATCH,      ///< Strict turn alternation, assigned roles.
+    EXPLORE     ///< Human plays either colour; the kibitz engine answers every
+                ///< move. That reply is the distinguishing property, not the
+                ///< free navigation a loaded game has anyway while Paused.
 };
 
 /** \brief Whether the engines match the game record — ADR-0002 step 4.

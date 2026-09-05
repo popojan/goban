@@ -65,10 +65,10 @@ expect result black_resigned
 # Loading a game that carries a result selects analysis mode, per
 # docs/game-modes.md. Leave it: in analysis mode the kibitz engine answers every
 # move, which would add a reply on top of the variation below and is covered on
-# its own in analysis_mode_auto_reply.scn. Entering MATCH is always permitted —
+# its own in explore_mode_auto_reply.scn. Entering MATCH is always permitted —
 # only entering ANALYSIS is refused for a human-versus-human game.
-expect mode analysis
-toggle_analysis_mode
+expect mode explore
+toggle_explore_mode
 wait_idle
 expect mode match
 

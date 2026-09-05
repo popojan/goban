@@ -226,7 +226,7 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 ### Navigation & Engine Synchronization
 - **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
 - **Block navigation while engine thinking**: `isThinking()` returns true only for ENGINE types (not human players). Navigation keys are blocked when engine is processing.
-- **Navigation in bot-bot matches**: Requires switching to Analysis mode first (pauses genmove loop).
+- **Navigation in bot-bot matches**: Requires switching to Explore mode first (pauses genmove loop).
 - **Engine sync invariant**: All enabled engines stay in sync at the same position. After load/new game, `EngineSync::Unsynced` triggers initial sync on the game thread: coach syncs first (enables scoring), then remaining engines. After initial sync, every move is sent to ALL engines via `syncOtherEngines`. No special cases for coach/player/kibitz roles.
 - **`Unsynced` is not "busy", `Syncing` is**: only `Syncing` — held while the game thread is actually replaying — may make `isIdle()` false. Waiting on `Unsynced` would never return, since nothing guarantees anyone will act on it. The replay always leaves `Syncing`, failure included.
 - **The sync starts when the board changes, not when the player moves — but only once the new record exists.** `GameThread::startSyncingNewGame()` is called from `newGameNow()` *after* `createNewRecord()`, never from `clearGame()`: the replay reads whatever record the model holds, and starting it inside `clearGame()` raced the empty record's installation. The engines were handed the game being discarded, the board drew empty, and GNU Go refused the player's opening move because that point was the old game's first stone. The function checks the precondition (`moveCount > 0` means the old record is still there) and logs an error rather than syncing — the failure is otherwise invisible until an engine disagrees with the board. A new game, a board size change and a handicap all begin the replay immediately — while the user is still looking at an empty board. It used to leave the engines `Unsynced` with the loop *stopped* until a click called `start()` + `run()`, which billed a several-second KataGo rebuild to the first move: stone stuck in hand, nothing on screen. The SGF load path had always started the thread early (`loadSGF`, "start game thread early"); the two paths had simply grown apart. Ordering matters twice — after `setFixedHandicap()`, because the replay carries its setup stones, and behind `if (!isRunning())`, because `clearGame()` also runs *on* the game thread when a discarding action was deferred, where `run()` would take a mutex that path may hold. Pinned by `tests/scenarios/sync_before_first_move.scn`, whose every assertion is "without a move having been played".
@@ -1046,7 +1046,7 @@ syntax. They are kept here as an index; the scenario file is the specification.
 | Player Switch During Navigation | `player_switch_during_navigation.scn` |
 | Space Key at Branch End | `navigation_keys.scn` |
 | SGF Modification and Save | `variation_promotes_main_line.scn` |
-| Analysis Mode Workflow | `analysis_mode_toggle.scn`, `analysis_mode_auto_reply.scn` |
+| Explore Mode Workflow | `explore_mode_toggle.scn`, `explore_mode_auto_reply.scn` |
 
 Areas covered since (each found at least one real defect): board clicking and
 the stone-in-hand model (`board_click_stone_in_hand.scn`), tsumego mode

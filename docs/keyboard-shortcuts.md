@@ -10,7 +10,7 @@ Complete reference of keyboard controls. Keys can be customized in the [configur
 | **P** | Pass |
 | **R** | Resign game |
 | **U** | Undo — step back one move |
-| **Enter** | Toggle Analysis mode (pause AI-vs-AI matches for review) |
+| **Enter** | Toggle Explore mode (pause AI-vs-AI matches for review) |
 
 ## SGF Navigation
 
