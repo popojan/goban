@@ -1708,9 +1708,16 @@ std::optional<PrisonerMode> parsePrisonerMode(const std::string& name) {
 void GobanView::setPrisonerMode(PrisonerMode mode) {
 	if (prisonerMode == mode) return;
 	prisonerMode = mode;
-	// The counts are floating labels, so the glyph buffers have to be rebuilt.
-	updateFloatingLabels();
-	requestRepaint(UPDATE_SOME);
+	// UPDATE_OVERLAY, exactly as setCoordinates() and setWaitClock() do: that is
+	// the flag Update() runs updateFloatingLabels() under, and rebuilding the
+	// glyph buffers is the whole job. It used to call updateFloatingLabels()
+	// here and ask for a bare UPDATE_SOME, which was worse than useless — the
+	// direct call refreshed the *text* dumpState() reports while the pass that
+	// draws it never ran, so switching to `never` left the numbers on screen
+	// until an unrelated shader change rebuilt the overlay, and the scenario
+	// asserting prisoner_text_* passed throughout. Same trap as sounds_played:
+	// assert what was drawn, not what was composed.
+	requestRepaint(UPDATE_OVERLAY);
 }
 
 void GobanView::setPointerMode(PointerMode mode) {

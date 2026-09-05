@@ -161,7 +161,7 @@
                     <span>落子</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div id="grpGame">
+                            <div>
                             <div class="hr">游戏</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">开始</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">清除</div>
@@ -178,7 +178,7 @@
                             <div class="template" id="templateQuitWithoutFinishing">退出未完成的对局？</div>
                             <div class="template" id="templateStartNewGame">开始新对局？</div>
                             </div>
-                            <div id="grpMoves">
+                            <div>
                             <div class="hr">落子</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">停一手</div>
                             <div class="cmd" id="cmdKibitz" onmouseup="play once">提示</div>
@@ -201,7 +201,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="grp" id="grpReplay">
+                        <div class="grp">
                             <div class="hr">回放</div>
                             <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">第一手</div>
                             <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">上一手</div>
@@ -249,7 +249,7 @@
             </div>
         </div>
 
-        <div class="bottom message-container">
+        <div class="bottom">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
 
@@ -284,8 +284,6 @@
          move and read as noise. -->
 
     <!-- Status and command feedback -->
-    <div class="template" id="templateKomi">贴目: %.1f</div>
-    <div class="template" id="templateHandicap">让子: %d</div>
     <div class="template" id="tplWaitingFor">正在等待 %s...</div>
     <div class="template" id="tplSaveFailed">保存失败: %s</div>
     <div class="template" id="tplNothingToSave">没有可保存的内容</div>

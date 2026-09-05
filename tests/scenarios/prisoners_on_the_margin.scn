@@ -57,10 +57,20 @@ expect prisoner_mode always
 expect prisoner_shown true
 wait_until prisoner_text_white 0
 expect prisoner_text_black 0
+# And what the glyph pass *drew*, which is a different question — the board is
+# empty and the coordinates are off, so the two digits are the only glyphs there
+# can be. `prisoner_text_*` alone does not catch a missed repaint: it is written
+# by updateFloatingLabels(), and a mode change that rebuilds the label list
+# without asking for UPDATE_OVERLAY leaves GobanOverlay drawing its old buffers
+# — the numbers stayed on screen until an unrelated shader change. Same
+# distinction as sounds_played, and wait_until rather than expect because idle
+# is not repainted.
+wait_until overlay_glyphs 2
 menu_select selectPrisoners auto
 wait_idle
 expect prisoner_mode auto
 expect prisoner_shown false
+wait_until overlay_glyphs 0
 
 # Black B1, White A1, Black A2 — Black takes the corner stone. Same capture as
 # board_click_stone_in_hand.scn, and the colours fall out of the move order.

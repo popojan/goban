@@ -271,9 +271,6 @@ div.template {
 /* Positioning utilities */
 .bottom { position: absolute; bottom: 0px; left: 0px; right: 0px; }
 
-/* Message container */
-.message-container {
-}
 .left { position: absolute; left: 0px; }
 .center { text-align: center; }
 .right { position: absolute; right: 0px; }
@@ -282,8 +279,6 @@ div.template {
 /* Combined positioning classes */
 .top.right { position: absolute; top: 0px; right: 0px; }
 .top.left { position: absolute; top: 0px; left: 0px; }
-.bottom.right { position: absolute; bottom: 0px; right: 0px; }
-.bottom.left { position: absolute; bottom: 0px; left: 0px; }
 
 /* State indicators */
 div.selected {

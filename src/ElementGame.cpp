@@ -1126,10 +1126,6 @@ void ElementGame::syncActionAvailability() {
     setElementDisabled("cmdClear",      !a.clear);
     setElementDisabled("cmdSave",       !a.save);
     setElementDisabled("cmdEvaluation", !a.evaluation);
-    // Same answer, two buttons: the board annotations need exactly what the
-    // panel needs — an engine that can analyse, and not a tsumego.
-    setElementDisabled("cmdEvaluationMoves", !a.evaluation);
-    setElementDisabled("cmdEvaluationBoard", !a.evaluation);
     // The wrapper, not the select: div.cmd.disabled carries `pointer-events:
     // none`, which is inherited in RCSS, so greying the row also stops the
     // dropdown opening. A puzzle is the one mode the select only reports.
@@ -1185,7 +1181,9 @@ void ElementGame::OnUpdate()
     std::string gameState(!isOver && isRunning ? "1" : (isOver ? "2" : "4"));
     model.state.cmd = gameState;
     if(model.state.cmd != view.state.cmd) {
-        // Both grpGame and grpMoves are always visible; individual items are disabled as needed
+        // Nothing is shown or hidden by this any more — syncActionAvailability()
+        // greys individual items instead. It survives as the repaint latch for
+        // a lifecycle change that has no other trigger.
         requestRepaint();
         view.state.cmd = gameState;
     }
@@ -1349,25 +1347,11 @@ void ElementGame::OnUpdate()
     }
     if (view.state.handicap != model.state.handicap) {
         auto doc = context->GetDocument("game_window");
-        Rml::Element* hand = doc->GetElementById("lblHandicap");
-        if (hand != nullptr) {
-            hand->SetInnerRML(Rml::CreateString(
-                templateText("templateHandicap", "Handicap: %d").c_str(),
-                model.state.handicap).c_str());
-            requestRepaint();
-        }
         syncDropdown(doc, "selectHandicap", std::to_string(model.state.handicap));
         view.state.handicap = model.state.handicap;
     }
     if (view.state.komi != model.state.komi) {
         auto doc = context->GetDocument("game_window");
-        Rml::Element* elKomi = doc->GetElementById("lblKomi");
-        if (elKomi != nullptr) {
-            elKomi->SetInnerRML(Rml::CreateString(
-                templateText("templateKomi", "Komi: %.1f").c_str(),
-                model.state.komi).c_str());
-            requestRepaint();
-        }
         std::ostringstream komiStr;
         komiStr << model.state.komi;
         syncDropdown(doc, "selectKomi", komiStr.str());

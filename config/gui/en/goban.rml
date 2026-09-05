@@ -161,7 +161,7 @@
                     <span>Move</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div id="grpGame">
+                            <div>
                             <div class="hr">Game</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">Start</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">Clear</div>
@@ -178,7 +178,7 @@
                             <div class="template" id="templateQuitWithoutFinishing">Quit without finishing?</div>
                             <div class="template" id="templateStartNewGame">Start a new game?</div>
                             </div>
-                            <div id="grpMoves">
+                            <div>
                             <div class="hr">Play</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">Pass</div>
                             <div class="cmd" id="cmdKibitz" onmouseup="play once">Kibitz move</div>
@@ -201,7 +201,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="grp" id="grpReplay">
+                        <div class="grp">
                             <div class="hr">Replay</div>
                             <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">First</div>
                             <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">Previous</div>
@@ -249,7 +249,7 @@
             </div>
         </div>
 
-        <div class="bottom message-container">
+        <div class="bottom">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
 
@@ -290,8 +290,6 @@
          move and read as noise. -->
 
     <!-- Status and command feedback -->
-    <div class="template" id="templateKomi">Komi: %.1f</div>
-    <div class="template" id="templateHandicap">Handicap: %d</div>
     <div class="template" id="tplWaitingFor">Waiting for %s...</div>
     <div class="template" id="tplSaveFailed">Save failed: %s</div>
     <div class="template" id="tplNothingToSave">Nothing to save</div>

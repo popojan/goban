@@ -149,7 +149,7 @@
                     <span>着手</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div id="grpGame">
+                            <div>
                             <div class="hr">対局</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">開始</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">クリア</div>
@@ -166,7 +166,7 @@
                             <div class="template" id="templateQuitWithoutFinishing">対局を終了しますか？</div>
                             <div class="template" id="templateStartNewGame">新しい対局を始めますか？</div>
                             </div>
-                            <div id="grpMoves">
+                            <div>
                             <div class="hr">着手</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">パス</div>
                             <div class="cmd" id="cmdKibitz" onmouseup="play once">検討</div>
@@ -189,7 +189,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="grp" id="grpReplay">
+                        <div class="grp">
                             <div class="hr">再生</div>
                             <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">最初</div>
                             <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">前へ</div>
@@ -237,7 +237,7 @@
             </div>
         </div>
 
-        <div class="bottom message-container">
+        <div class="bottom">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
 
@@ -272,8 +272,6 @@
          move and read as noise. -->
 
     <!-- Status and command feedback -->
-    <div class="template" id="templateKomi">コミ: %.1f</div>
-    <div class="template" id="templateHandicap">置石: %d</div>
     <div class="template" id="tplWaitingFor">%s を待っています...</div>
     <div class="template" id="tplSaveFailed">保存に失敗しました: %s</div>
     <div class="template" id="tplNothingToSave">保存するものがありません</div>

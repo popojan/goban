@@ -161,7 +161,7 @@
                     <span>Tah</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div id="grpGame">
+                            <div>
                             <div class="hr">Partie</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">Začít</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">Nová hra</div>
@@ -178,7 +178,7 @@
                             <div class="template" id="templateQuitWithoutFinishing">Ukončit rozehranou hru?</div>
                             <div class="template" id="templateStartNewGame">Začít novou hru?</div>
                             </div>
-                            <div id="grpMoves">
+                            <div>
                             <div class="hr">Hrát</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">Pas</div>
                             <div class="cmd" id="cmdKibitz" onmouseup="play once">Nápověda</div>
@@ -201,7 +201,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="grp" id="grpReplay">
+                        <div class="grp">
                             <div class="hr">Přehrát</div>
                             <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">Na začátek</div>
                             <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">Předchozí</div>
@@ -249,7 +249,7 @@
             </div>
         </div>
 
-        <div class="bottom message-container">
+        <div class="bottom">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
 
@@ -284,8 +284,6 @@
          move and read as noise. -->
 
     <!-- Status and command feedback -->
-    <div class="template" id="templateKomi">Komi: %.1f</div>
-    <div class="template" id="templateHandicap">Handicap: %d</div>
     <div class="template" id="tplWaitingFor">Čeká se na %s...</div>
     <div class="template" id="tplSaveFailed">Uložení selhalo: %s</div>
     <div class="template" id="tplNothingToSave">Není co uložit</div>
