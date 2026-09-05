@@ -69,6 +69,7 @@ separate from the camera you happen to be looking through — see below.
 | `session.tree_path` | Branch choices, recorded **only at multi-child nodes** |
 | `session.is_external` | Whether the file was an external SGF rather than the daily session |
 | `session.game_mode` | `match`, `explore` or `tsumego`. Replaces the `tsumego_mode` / `analysis_mode` pair, which is still read once for migration |
+| `session.black_player`, `session.white_player` | Who was playing the game being resumed. Distinct from `game.*_player`, which is the default a **new** game starts from |
 
 On the next launch, startup peeks at `session.file` for the board size, renders
 the board immediately, and queues the tree-path navigation so it runs on the game
@@ -107,6 +108,7 @@ to today's daily session file.
   "last_sgf_path": "./games/2026-08-12.sgf",
   "session": {
     "file": "./games/2026-08-12.sgf",
+    "black_player": "Human",
     "game_index": 1,
     "game_mode": "match",
     "is_external": false,

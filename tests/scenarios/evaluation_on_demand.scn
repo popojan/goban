@@ -47,11 +47,13 @@ expect eval_hint_waiting false
 # two real candidates and six with one visit each.
 expect eval_moves 2
 
-# Now the readout answers about the candidate under the stone, with what that
-# point costs against the engine's best in brackets. Both terms come from the
-# same report, so the delta needs no second search and no comparison across two
-# of them — which is also why it is available before the stone is placed.
-wait_until eval_board_text B 55% (-5%) B+2.5
+# The numbers stay the *position's* — they do not become the candidate's — and
+# what the aimed-at point costs is appended in brackets. Anchoring them is what
+# makes the line readable: the same slot used to mean two different things, so
+# aiming at the best move and aiming at a point the engine never searched
+# produced identical text. The mock gives both candidates the same score lead,
+# so only the win-rate half of the cost appears here.
+wait_until eval_board_text B 60% B+2.5 (-5%)
 
 # --- The reveal survives looking around --------------------------------------
 # It closes on placing or putting the stone back, not on moving away: comparing
@@ -80,3 +82,24 @@ expect holds_stone true
 wait 1000
 expect eval_moves_shown false
 expect eval_hint_waiting false
+
+# --- The engine's own first choice is marked, not left blank -----------------
+# A fresh board, because aiming needs an empty hand: (0,0) is the mock's first
+# candidate, and its cost is nothing. With the cost suppressed below a whole
+# percent it would read exactly like a point the engine never searched — both
+# bracketless — so the one case worth marking got nothing. `=` says "level with
+# the best".
+#
+# A symbol rather than a word on purpose: every language config points
+# `fonts.overlay` at the same ASCII-only font, so nothing drawn on the board can
+# be translated at all. (`pass` in the margin survives that rule by being a GTP
+# literal rather than English.)
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+toggle_evaluation_moves on_demand
+click 0 0
+wait_until eval_moves_shown true
+wait_until eval_board_text B 60% B+2.5 (=)

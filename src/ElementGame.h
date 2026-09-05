@@ -163,6 +163,7 @@ private:
     std::vector<int> sessionTreePath;  // Branch choices only (at multi-child nodes)
     bool sessionIsExternal{false};
     GameMode sessionGameMode{GameMode::MATCH};
+    std::string sessionBlackPlayer, sessionWhitePlayer;
     bool sessionRestoreNeeded{false};
 
     void startAsyncEngineLoading();

@@ -73,7 +73,7 @@ inline int displayedSecond(float elapsedSeconds, float graceSeconds) {
 /// variation labels and the evaluation's A/B/C; the punctuation for the
 /// evaluation readout ("B+4.5", "62%") and this indicator's count ("12s").
 constexpr const char* BASE_ATLAS =
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#^O+-.%()";
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#^O+-.%()=";
 
 /// Splits a UTF-8 string into whole characters, the same way
 /// GlyphyBuffer::add_text decodes it — which is what decides which codepoints

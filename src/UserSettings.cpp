@@ -207,6 +207,8 @@ void UserSettings::load() {
             } else if (session.value("analysis_mode", false)) {
                 sessionGameMode = GameMode::EXPLORE;
             }
+            sessionBlackPlayer = session.value("black_player", std::string());
+            sessionWhitePlayer = session.value("white_player", std::string());
         }
 
         spdlog::debug("User settings loaded");
@@ -366,7 +368,9 @@ std::string UserSettings::serialize() const {
             {"is_external", sessionIsExternal},
             // Only the new key is written; the two booleans it replaced are read
             // for migration and then left behind.
-            {"game_mode", gameModeName(sessionGameMode)}
+            {"game_mode", gameModeName(sessionGameMode)},
+            {"black_player", sessionBlackPlayer},
+            {"white_player", sessionWhitePlayer}
         };
     }
 
@@ -585,4 +589,6 @@ void UserSettings::clearSessionState() {
     sessionTreePath.clear();
     sessionIsExternal = false;
     sessionGameMode = GameMode::MATCH;
+    sessionBlackPlayer.clear();
+    sessionWhitePlayer.clear();
 }

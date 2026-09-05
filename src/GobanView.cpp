@@ -1438,8 +1438,14 @@ void GobanView::updateFloatingLabels() {
 					}
 				}
 			}
-			const double shownWinrate = aimed ? aimed->winrateBlack : report->winrateBlack;
-			const auto& shownLead = aimed ? aimed->scoreLeadBlack : report->scoreLeadBlack;
+			// The anchor never moves: both numbers are the position's, aimed or
+			// not, and what a point costs goes in a bracket of its own. They used
+			// to become the candidate's, so the same slot said two things with
+			// nothing to tell them apart. Nothing is lost — the candidate's win
+			// rate is the position's minus the loss, and its score lead now is
+			// too, which it was not before. See ADR-0014.
+			const double shownWinrate = report->winrateBlack;
+			const auto& shownLead = report->scoreLeadBlack;
 
 			std::ostringstream text;
 			// Anchored to Black, always — the same convention the panel uses,
@@ -1450,25 +1456,41 @@ void GobanView::updateFloatingLabels() {
 			// of naming the leader, because that is how a result is written.
 			text << "B " << static_cast<int>(std::lround(shownWinrate * 100.0))
 			     << "%";
-			if (aimed) {
-				// What this point costs against the engine's best — the very
-				// quantity the colour ramp encodes, here as a number, for the one
-				// point the player is asking about. Both terms come from the same
-				// report, so no second search and no comparison across two of
-				// them: an absolute difference, because both are in Black's frame
-				// and the best move is the least bad for whoever is to move.
+			// Both terms come from one report, so this is an absolute difference
+			// in Black's frame rather than a second search. Each half is dropped
+			// when it rounds to nothing, and the bracket with it: a win rate is a
+			// mean over visits, so a fraction of a percent is precision without
+			// accuracy. An unsearched point therefore gets no bracket and needs
+			// no marker — that was only needed while the numbers moved under it.
+			std::string cost;
+			if (aimed && aimed->order == 0) {
+				// The engine's own first choice. Without it, finding the best
+				// move and aiming at a point the engine never searched read
+				// identically — both blank — and the one case worth marking got
+				// nothing. `order` is the engine saying so; it defaults to -1, so
+				// an engine that does not rank never lands here.
 				//
-				// Nothing is printed below a whole percent. The estimate is a
-				// mean over visits, so its uncertainty falls as 1/sqrt(visits) —
-				// a few percent at ordinary counts — and a tenth of a percent is
-				// far under that: precision without accuracy. `(0%)` would also
-				// have said two different things at once, "costs nothing" and
-				// "percentages can no longer tell these apart". The rank letter
-				// on the stone says which move this is; the bracket is only for
-				// what it costs.
+				// A symbol, not a word: `fonts.overlay` is the same ASCII-only
+				// font in every language config, so nothing drawn on the board
+				// can be translated. `=` reads as "level with the best" and sits
+				// in the slot that otherwise carries a cost.
+				cost = "=";
+			} else if (aimed) {
 				const int loss = static_cast<int>(std::lround(
 					std::fabs(report->winrateBlack - aimed->winrateBlack) * 100.0));
-				if (loss > 0) text << " (-" << loss << "%)";
+				if (loss > 0) cost = "-" + std::to_string(loss) + "%";
+				if (aimed->scoreLeadBlack && report->scoreLeadBlack) {
+					const double d = std::fabs(*report->scoreLeadBlack
+					                         - *aimed->scoreLeadBlack);
+					// A tenth of a point is the resolution the score itself is
+					// printed at, so anything under it is not a difference.
+					if (d >= 0.05) {
+						std::ostringstream s;
+						s << std::fixed << std::setprecision(1) << d;
+						if (!cost.empty()) cost += " ";
+						cost += "-" + s.str();
+					}
+				}
 			}
 			if (shownLead) {
 				const double lead = *shownLead;
@@ -1479,6 +1501,7 @@ void GobanView::updateFloatingLabels() {
 				text << " " << (lead >= 0.0 ? "B+" : "W+")
 				     << std::fixed << std::setprecision(1) << std::fabs(lead);
 			}
+			if (!cost.empty()) text << " (" << cost << ")";
 
 			// add_text centres on the point, so this is the middle of the board
 			// edge. Black on wood, like every other board-level label.

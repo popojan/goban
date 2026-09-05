@@ -142,6 +142,7 @@ TEST_CASE("session state round-trips, including the branch choices") {
     f.settings().setSessionTreePathLength(27);
     f.settings().setSessionTreePath({0, 1, 0});
     f.settings().setSessionGameMode(GameMode::TSUMEGO);
+    f.settings().setSessionPlayers("GNU Go 3.8", "KataGo 9x9");
     f.settings().save();
 
     f.settings().load();
@@ -150,11 +151,18 @@ TEST_CASE("session state round-trips, including the branch choices") {
     CHECK(f.settings().getSessionTreePathLength() == 27);
     CHECK(f.settings().getSessionTreePath() == std::vector<int>{0, 1, 0});
     CHECK(f.settings().getSessionGameMode() == GameMode::TSUMEGO);
+    // Distinct from game.*_player, which is the default a *new* game starts
+    // from. One key served both, so an engine switched mid-game came back after
+    // a restart as whoever the SGF's PB/PW named — those are written at the
+    // first move and never updated again.
+    CHECK(f.settings().getSessionBlackPlayer() == "GNU Go 3.8");
+    CHECK(f.settings().getSessionWhitePlayer() == "KataGo 9x9");
 
     f.settings().clearSessionState();
     CHECK_FALSE(f.settings().hasSessionState());
     CHECK(f.settings().getSessionTreePath().empty());
     CHECK(f.settings().getSessionGameMode() == GameMode::MATCH);
+    CHECK(f.settings().getSessionBlackPlayer().empty());
 }
 
 TEST_CASE("the two mode booleans migrate to the one game_mode key") {

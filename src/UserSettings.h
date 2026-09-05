@@ -223,6 +223,17 @@ public:
     /// once, in the JSON at the edge.
     GameMode getSessionGameMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionGameMode; }
     void setSessionGameMode(GameMode value) { std::lock_guard<std::mutex> lock(mutex); sessionGameMode = value; }
+
+    /// Who was playing the game being resumed. Distinct from `game.*_player`,
+    /// which is the default for a *new* game: one key was serving both, so a
+    /// player switched mid-game came back as whatever the SGF's PB/PW said —
+    /// those are written at the first move and never updated again.
+    std::string getSessionBlackPlayer() const { std::lock_guard<std::mutex> lock(mutex); return sessionBlackPlayer; }
+    std::string getSessionWhitePlayer() const { std::lock_guard<std::mutex> lock(mutex); return sessionWhitePlayer; }
+    void setSessionPlayers(const std::string& black, const std::string& white) {
+        std::lock_guard<std::mutex> lock(mutex);
+        sessionBlackPlayer = black; sessionWhitePlayer = white;
+    }
     bool hasSessionState() const { std::lock_guard<std::mutex> lock(mutex); return !sessionFile.empty(); }
     void clearSessionState();
 
@@ -321,6 +332,7 @@ private:
     std::vector<int> sessionTreePath;  // Branch choices only (consumed at multi-child nodes)
     bool sessionIsExternal = false;
     GameMode sessionGameMode = GameMode::MATCH;
+    std::string sessionBlackPlayer, sessionWhitePlayer;
 };
 
 #endif

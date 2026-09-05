@@ -2541,6 +2541,17 @@ void GobanControl::saveCurrentGame() const {
         settings.setSessionTreePath(treePath.branchChoices);
         settings.setSessionIsExternal(isExternal);
         settings.setSessionGameMode(engine.getGameMode());
+        // Who is playing *this* game, as against `game.*_player`, which is the
+        // default a new game starts from. The two shared one key, so switching
+        // engines mid-game and restarting came back to whoever the SGF names —
+        // PB/PW are written at the first move and never updated after it.
+        {
+            auto players = engine.getPlayers();
+            const size_t b = engine.getActivePlayer(0), w = engine.getActivePlayer(1);
+            settings.setSessionPlayers(
+                b < players.size() ? players[b]->getName() : std::string(),
+                w < players.size() ? players[w]->getName() : std::string());
+        }
         spdlog::info("Saved session state: file={}, gameIndex={}, pathLen={}, branchChoices={}, mode={}",
             sessionFile, model.game.getLoadedGameIndex(), treePath.length, treePath.branchChoices.size(),
             gameModeName(engine.getGameMode()));

@@ -810,6 +810,18 @@ See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
   run with signal 13 *after* the scenario had passed.
 
 ### Persisted Settings
+- **`game.*_player` is the default a *new* game starts from;
+  `session.*_player` is who was playing the game being resumed.** One key served
+  both, and the resume path never read it — the settings branch of
+  `performDeferredInitialization()` runs only when *no* SGF was loaded, so a
+  restored session took its players from `matchSgfPlayers()`, i.e. from `PB`/`PW`.
+  Those are written at the first move and never updated, so switching engines
+  mid-game was undone by a restart. The session pair is now laid *over* the SGF
+  match rather than replacing it: never for `is_external` (matching a foreign
+  record's own names is what that path is for), and only when the name still
+  resolves to a non-SGF player — a renamed or removed engine keeps the SGF's
+  answer instead of silently dropping to Human, which is what a bare
+  `findPlayer()` does and what today's KataGo rename would have triggered.
 - **`user.json` is the runtime scratchpad and is not tracked.** Defaults that
   ship — the opening camera — live in `config/base.json`, which the application
   never writes. Keeping both in one file leaked local paths and language into the
@@ -900,13 +912,23 @@ of its decisions, and `tests/test_analysis.cpp` plus
   `on_demand` a stone in hand is the precondition and a dwell of
   `annotations.hint_dwell_ms` is the trigger, and the reveal lasts until the
   stone is placed or put back. `getIdleTimeout()` must cover a pending dwell — a
-  dwell ends with no input event by definition. While the suggestions are
-  visible and a stone is aimed at a candidate, the **readout** answers about that
-  candidate rather than the position: it is the only place a contemplated move's
-  delta fits, and the suggestions carry their loss as colour rather than a
-  printed number. A point the engine did not search says nothing about itself —
-  `minmoves` widens the list and `hint_min_visits_fraction` drops what came back
-  unreliable.
+  dwell ends with no input event by definition.
+- **The readout's numbers are always the position's; a contemplated move's cost
+  goes in a bracket.** They used to *become* the aimed-at candidate's — win rate
+  and score both — so one slot meant two things with nothing to separate them,
+  and aiming at the best move read identically to aiming at a point the engine
+  never searched. Anchoring loses nothing: the candidate's win rate is the
+  position's minus the loss, and its score lead is now readable too, which it was
+  not before. Each half of the bracket is dropped when it rounds to nothing, so
+  an unsearched point simply gets none.
+- **The engine's own first choice is marked `(=)`, and the mark is a symbol
+  because on-board text cannot be translated.** Every language config points
+  `fonts.overlay` at the same ASCII-only font, so a word there would be English
+  in every language — `pass` in the margin escapes that only by being a GTP
+  literal rather than prose. `(=)` reads as "level with the best"; the test is
+  `order == 0`, the engine saying so, which defaults to -1 so an engine that does
+  not rank never claims it. Any new on-board glyph must also be added to
+  `Wait::BASE_ATLAS`, or it silently does not draw.
 - **The panel and the board suggestions are two features, and the board one is
   off by default.** Not for clutter — for judgement. The numbers are read *after*
   a move, so a player can invent their own and evaluate it post-hoc; stars on the

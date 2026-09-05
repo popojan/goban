@@ -402,6 +402,8 @@ void ElementGame::startAsyncEngineLoading() {
             sessionTreePath = settings.getSessionTreePath();
             sessionIsExternal = settings.getSessionIsExternal();
             sessionGameMode = settings.getSessionGameMode();
+            sessionBlackPlayer = settings.getSessionBlackPlayer();
+            sessionWhitePlayer = settings.getSessionWhitePlayer();
             sessionRestoreNeeded = true;
             spdlog::info("Session restoration: file={}, gameIndex={}, pathLen={}, branchChoices={}, mode={}",
                 sessionFile, sgfGameIndex, sessionTreePathLength, sessionTreePath.size(),
@@ -551,6 +553,37 @@ void ElementGame::performDeferredInitialization() {
             spdlog::info("Bootstrapped UserSettings from daily session: {}x{}, komi={}, handicap={}, players={}/{}",
                 model.getBoardSize(), model.getBoardSize(), model.state.komi, model.state.handicap,
                 blackName, whiteName);
+        }
+
+        // Who was playing when the session was saved, laid *over* whatever
+        // matchSgfPlayers() matched from PB/PW rather than replacing it. Those
+        // are written at the first move and never updated, so a mid-game switch
+        // used to be undone by a restart. Not for an external SGF: matching its
+        // own PB/PW to engines is the whole point of loading someone else's
+        // record. And only when the name still resolves — an engine renamed or
+        // removed from the config keeps the SGF's answer rather than silently
+        // dropping to Human, which is what a bare findPlayer() would do.
+        if (sessionRestoreNeeded && !sessionIsExternal) {
+            auto players = engine.getPlayers();
+            auto findPlayer = [&players](const std::string& name) -> int {
+                if (name.empty()) return -1;
+                for (size_t i = 0; i < players.size(); i++) {
+                    if (players[i]->getName() == name
+                        && !players[i]->isTypeOf(Player::SGF_PLAYER)) {
+                        return static_cast<int>(i);
+                    }
+                }
+                return -1;
+            };
+            const int b = findPlayer(sessionBlackPlayer);
+            const int w = findPlayer(sessionWhitePlayer);
+            if (b >= 0) control.switchPlayer(0, b);
+            if (w >= 0) control.switchPlayer(1, w);
+            if ((b < 0 && !sessionBlackPlayer.empty())
+                || (w < 0 && !sessionWhitePlayer.empty())) {
+                spdlog::info("Session players '{}'/'{}' not both found; keeping the "
+                             "SGF's assignment", sessionBlackPlayer, sessionWhitePlayer);
+            }
         }
 
         refreshPlayerDropdowns();
