@@ -43,10 +43,12 @@ public:
         view.updateNavigationOverlay();
     }
 
+    /// Enter or leave a puzzle. GameThread owns the mode — the model's flag and
+    /// the record's session-copy suppression are copies it publishes — so the
+    /// authoritative write goes there and only the view's own copy is set here.
     void setTsumegoMode(bool enabled) {
+        engine.setGameMode(enabled ? GameMode::TSUMEGO : GameMode::MATCH);
         view.setTsumegoMode(enabled);
-        model.tsumegoMode = enabled;
-        model.game.setSuppressSessionCopy(enabled);
         if (enabled) {
             cacheTsumegoHints();
         }
@@ -160,8 +162,7 @@ private:
     int sessionTreePathLength{0};
     std::vector<int> sessionTreePath;  // Branch choices only (at multi-child nodes)
     bool sessionIsExternal{false};
-    bool sessionTsumegoMode{false};
-    bool sessionAnalysisMode{false};
+    GameMode sessionGameMode{GameMode::MATCH};
     bool sessionRestoreNeeded{false};
 
     void startAsyncEngineLoading();

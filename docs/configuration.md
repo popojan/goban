@@ -282,7 +282,8 @@ with its arguments. The ones worth binding to a key:
 | `archive` | Close the daily session file and start a new one |
 | `load` | Open the file browser |
 | `report_bug` | Write a replayable script of the recent session |
-| `toggle_explore_mode` | Toggle explore mode (`toggle_analysis_mode` still works) |
+| `game_mode` | `[match\|explore\|tsumego]` — report or set the mode. Tsumego is refused: a puzzle is entered by opening one |
+| `toggle_explore_mode` | Cycle Match <-> Explore (`toggle_analysis_mode` still works) |
 | `toggle ai vs ai` | Let both engines play each other |
 | `toggle_territory` | Show/hide territory markers |
 | `toggle_last_move_overlay` / `toggle_next_move_overlay` | Show/hide the move markers |

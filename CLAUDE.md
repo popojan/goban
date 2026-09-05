@@ -346,6 +346,48 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 - **The coach may not be the engine you configured.** `coach`/`kibitz` are indices whose "unset" value is 0, which is also a valid engine, so `PlayerManager` tracks `coachConfigured`/`kibitzConfigured` separately. When the engine carrying `main` fails to load, `currentCoach()` still hands out `players[0]` — an arbitrary engine under parallel loading — and that promotion is now warned about. Keep the warning: an engine that cannot count silently refereeing is the top of this whole failure chain.
 - **A missing engine folder is not fatal.** `path` only supplies the working directory; if `command` resolves from `PATH` the engine runs from the application folder with a warning. Making it an error regressed the stock `"path": "./engine/gnugo"` + `"command": "gnugo"` config on every machine with a distribution GNU Go — and that regression is what removed the real coach.
 
+### Game Mode
+See `docs/adr/0015-tsumego-is-a-game-mode.md`.
+- **`GameThread::gameMode` is the source of truth; `GobanModel::tsumegoMode` is
+  the copy published from it.** `applyGameMode()` is the one writer — of the
+  enum, of that flag, and of `GameRecord::suppressSessionCopy` — so nothing sets
+  a puzzle's session-copy suppression beside the mode any more. Same rule as
+  `GobanModel::transitionTo()`. Ask `getGameMode()`; the published flag exists
+  for the analysis loop and the view, which cannot reach `GameThread`.
+- **`TSUMEGO` is never refused, `EXPLORE` still is.** A puzzle ignores player
+  assignment entirely; Explore answers every move with the kibitz engine, so in
+  a human-versus-human game it would quietly turn the game into
+  human-versus-engine. The refusal carries a message — an explanation a greyed
+  control cannot give, which is why `availableActions()` deliberately does not
+  pre-empt it.
+- **The mode survives a load because nothing between the request and
+  `finalizeGameLoad()` writes it.** The file chooser and `load_tsumego` ask for
+  `TSUMEGO` *before* the load runs. `applyLoadedGame()` used to reset to `MATCH`
+  in between — harmless while tsumego was an independent flag, silently
+  destructive once merged. Don't reintroduce a reset there; `finalizeGameLoad()`
+  always follows and settles it.
+- **Tsumego is the value the menu reports, never one it offers.** A puzzle is
+  entered by opening one and left by starting a new game, in both directions:
+  the option carries RmlUi's `disabled` attribute (`SetSelection()` ignores it,
+  which is what lets the mode still be *displayed*), and `UiActions::gameMode`
+  greys the whole select while a puzzle is open. Offering Match mid-puzzle would
+  restore `promote=true` in `playVariationAt()`, letting the solver's next
+  attempt overwrite the recorded answer.
+- **`game_mode` and `toggle_explore_mode` share one body.** Two entry points to
+  a three-valued setting is how the Space key and the Kibitz menu item came to
+  disagree. The select follows `GameThread` in `OnUpdate()` rather than being
+  driven by the command, so a refusal leaves the widget showing what is actually
+  in force.
+- **The enum's declaration order is the option order** in every
+  `config/gui/<lang>/goban.rml`: `OnUpdate()` casts the mode straight to a
+  selection index, as `selectEvaluationMoves` already does. Nothing enforces it.
+- **`user.json` carries one `game_mode` key.** `tsumego_mode` / `analysis_mode`
+  are read for migration only, tsumego winning if a stale file has both.
+  `UserSettings` stores the enum; `gameModeName()` / `parseGameMode()` are
+  crossed once, at the JSON edge. An unreadable name falls back to Match with a
+  warning — it must not silently mean "whichever value is listed first", which
+  is why `NLOHMANN_JSON_SERIALIZE_ENUM` is not used here.
+
 ### Replacing the Game on Screen
 - **Three paths replace the game, and all three confirm first**: `clear`, the board-size dropdown and the handicap dropdown. `GobanModel::hasGameWorthKeeping()` is the gate — a record with moves, in a game that is not finished and not tsumego — and `GobanControl::requestNewGame()` / `requestHandicap()` route the dropdowns through it. Anything new that discards the current game belongs on the same route; a silent replacement is the bug this fixed.
 - **The answer is asynchronous**: the prompt callback arrives after the handler returns, so a widget cannot revert its own selection at the call site. Take an `onSettled(bool changed)` callback and revert there, as `EventHandlerNewGame` does.

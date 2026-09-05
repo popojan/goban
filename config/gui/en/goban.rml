@@ -179,11 +179,17 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>Analyze</span>
+                    <span>Review</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Game mode</div>
-                            <div class="cmd toggle_explore_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_explore_mode">Explore</div>
+                            <div class="cmd" id="cmdGameMode">
+                                <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
+                                    <option value="match">Match</option>
+                                    <option value="explore">Explore</option>
+                                    <option value="tsumego" disabled="disabled">Tsumego</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="grp" id="grpReplay">
                             <div class="hr">Replay</div>
@@ -193,7 +199,7 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">Last</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">Engine</div>
+                            <div class="hr">Analysis</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">Evaluation</div>
                         </div>
                         <div class="grp">
@@ -263,8 +269,7 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">Explore</div>
-    <div class="template" id="tplTsumegoMode">Tsumego</div>
+    <div class="template" id="tplTsumegoModeFixed">Tsumego mode follows the problem — open one to enter, start a new game to leave</div>
     <div class="template" id="tplTsumegoSolved">Solved!</div>
     <div class="template" id="tplTsumegoWrong">Wrong!</div>
     <div class="template" id="tplBlackToMove">Black to move</div>

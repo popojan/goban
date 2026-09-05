@@ -105,6 +105,12 @@ struct UiActions {
     bool clear     = false;
     bool save      = false;
     bool evaluation = false;  ///< Toggle the live evaluation overlay.
+    /// The mode may be changed at all. False in a tsumego, which is entered by
+    /// opening a problem and left by starting a new game — there is no path
+    /// from the menu in either direction, and offering one would restore
+    /// `promote=true` in playVariationAt(), letting the solver's next attempt
+    /// overwrite the recorded answer.
+    bool gameMode  = false;
 };
 
 UiActions availableActions(const UiInputs& in);

@@ -182,8 +182,28 @@ void UserSettings::load() {
                 }
             }
             sessionIsExternal = session.value("is_external", false);
-            sessionTsumegoMode = session.value("tsumego_mode", false);
-            sessionAnalysisMode = session.value("analysis_mode", false);
+            // One key since the modes became one enum. `tsumego_mode` and
+            // `analysis_mode` are the two booleans it replaced — read only when
+            // the new key is absent, so an existing user.json still restores,
+            // and tsumego first, which is the order the enum resolves them in.
+            // An unreadable name falls back rather than throwing: a settings
+            // file is not a command line, and Match is the harmless answer.
+            sessionGameMode = GameMode::MATCH;
+            if (session.contains("game_mode")) {
+                const auto parsed = parseGameMode(
+                    session.value("game_mode", std::string()));
+                if (parsed) {
+                    sessionGameMode = *parsed;
+                } else {
+                    spdlog::warn("Unknown session game_mode '{}' — starting in {}",
+                        session.value("game_mode", std::string()),
+                        gameModeName(sessionGameMode));
+                }
+            } else if (session.value("tsumego_mode", false)) {
+                sessionGameMode = GameMode::TSUMEGO;
+            } else if (session.value("analysis_mode", false)) {
+                sessionGameMode = GameMode::EXPLORE;
+            }
         }
 
         spdlog::debug("User settings loaded");
@@ -337,8 +357,9 @@ std::string UserSettings::serialize() const {
             {"tree_path_length", sessionTreePathLength},
             {"tree_path", sessionTreePath},
             {"is_external", sessionIsExternal},
-            {"tsumego_mode", sessionTsumegoMode},
-            {"analysis_mode", sessionAnalysisMode}
+            // Only the new key is written; the two booleans it replaced are read
+            // for migration and then left behind.
+            {"game_mode", gameModeName(sessionGameMode)}
         };
     }
 
@@ -550,6 +571,5 @@ void UserSettings::clearSessionState() {
     sessionTreePathLength = 0;
     sessionTreePath.clear();
     sessionIsExternal = false;
-    sessionTsumegoMode = false;
-    sessionAnalysisMode = false;
+    sessionGameMode = GameMode::MATCH;
 }

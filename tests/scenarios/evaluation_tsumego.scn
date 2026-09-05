@@ -29,6 +29,7 @@ expect eval_moves_shown true
 # Load the problem with all of that still on.
 load_tsumego tests/data/tsumego.sgf
 wait_idle
+expect mode tsumego
 expect tsumego true
 
 # The policy already refused the toggles; now the display agrees with it.
@@ -60,6 +61,7 @@ expect eval_moves_shown true
 # Leaving the puzzle brings it back, unchanged.
 new_game 9
 wait_idle
+expect mode match
 expect tsumego false
 expect can_evaluation true
 wait_until eval_state running

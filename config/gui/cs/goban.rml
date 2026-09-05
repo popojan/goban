@@ -179,11 +179,17 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>Analýza</span>
+                    <span>Rozbor</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">Herní mód</div>
-                            <div class="cmd toggle_explore_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_explore_mode">Explorace</div>
+                            <div class="cmd" id="cmdGameMode">
+                                <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
+                                    <option value="match">Zápas</option>
+                                    <option value="explore">Explorace</option>
+                                    <option value="tsumego" disabled="disabled">Tsumego</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="grp" id="grpReplay">
                             <div class="hr">Přehrát</div>
@@ -193,7 +199,7 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">Na konec</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">Engine</div>
+                            <div class="hr">Analýza</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">Hodnocení</div>
                         </div>
                         <div class="grp">
@@ -262,8 +268,7 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">Explorace</div>
-    <div class="template" id="tplTsumegoMode">Tsumego</div>
+    <div class="template" id="tplTsumegoModeFixed">Režim tsumego se řídí úlohou — otevřete úlohu pro vstup, novou hrou pro odchod</div>
     <div class="template" id="tplTsumegoSolved">Vyřešeno!</div>
     <div class="template" id="tplTsumegoWrong">Špatně!</div>
     <div class="template" id="tplBlackToMove">Černý na tahu</div>

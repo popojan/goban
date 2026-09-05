@@ -95,8 +95,9 @@ bool GobanControl::newGameNow(unsigned boardSize) const {
     // neither possible nor needed. See ADR-0001.
     engine.interrupt();
     engine.removeSgfPlayers();  // Remove temporary SGF players from previous load
-    model.tsumegoMode = false;
-    model.game.setSuppressSessionCopy(false);
+    // clearGame() drops the mode back to Match, and the tsumego flag and the
+    // session-copy suppression follow it from there — they used to be cleared
+    // here, a second writer of what the mode already says.
     if(!engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         return false;
     }
@@ -457,13 +458,14 @@ void GobanControl::buildRegistry() {
 
         // Switching game replaces the one on screen, so a move still being
         // computed is worthless — defer past it rather than refusing.
-        const bool tsumego = view.isTsumegoMode();
+        // Asks the mode, not the view's copy of it: switchGame() ends in
+        // finalizeGameLoad(), which carries TSUMEGO across on its own, so the
+        // next problem in a collection needs nothing set by hand here.
+        const bool tsumego = engine.getGameMode() == GameMode::TSUMEGO;
         std::string busyEngine;
         const bool ran = engine.runWhenEngineFree([this, newIdx, tsumego]() {
             engine.switchGame(newIdx, tsumego);  // Start at root in tsumego mode
             if (tsumego) {
-                model.tsumegoMode = true;
-                model.game.setSuppressSessionCopy(true);
                 engine.autoPlayTsumegoSetup();
             }
         }, &busyEngine);
@@ -597,32 +599,61 @@ void GobanControl::buildRegistry() {
         view.requestRepaint();
     });
 
-    add("toggle_explore_mode", 0, 0, "switch between match and explore mode", [this](CommandContext& ctx) {
-        if (view.isTsumegoMode()) {
-            // Tsumego mode exits only via new game or loading ordinary SGF.
-            // Leave the menu toggle alone — OnUpdate keeps it lit for tsumego.
-            ctx.notifyMenu = false;
-            return;
+    // The one body behind both ways of changing the mode: the `game_mode`
+    // select and the `toggle_explore_mode` keybinding. Two of them is how the
+    // Space key and the Kibitz menu item came to disagree, and the mode already
+    // has three values for a pair of entry points to drift over.
+    auto requestGameMode = [this](GameMode wanted) -> bool {
+        const GameMode current = engine.getGameMode();
+        if (wanted == current) return false;
+        // A puzzle is entered by opening one and left by starting a new game.
+        // The select is greyed for exactly this, so nothing here contradicts a
+        // control (ADR-0005) — it refuses a script or a keybinding.
+        if (!actions().gameMode || wanted == GameMode::TSUMEGO) {
+            parent->showMessage(parent->templateText("tplTsumegoModeFixed",
+                "Tsumego mode follows the problem — open one to enter, "
+                "start a new game to leave"));
+            return false;
         }
-        if (engine.getGameMode() == GameMode::MATCH) {
-            if (engine.setGameMode(GameMode::EXPLORE)) {
-                ctx.checked = true;
-            } else {
-                // Refused for a human-versus-human game, and silently until now:
-                // the menu entry simply failed to light up. Analysis mode answers
-                // every move with the kibitz engine regardless of who is assigned
-                // to a colour, so entering it here would quietly turn the game
-                // into human-versus-engine. Kibitz on demand needs no mode change
-                // — it already works in a match. See docs/game-modes.md.
-                parent->showMessage(parent->templateText("tplAnalysisAnswersEveryMove",
-                    "Analysis mode answers every move — use Kibitz in match mode instead"));
-            }
-        } else {
-            if (engine.setGameMode(GameMode::MATCH)) {
-                ctx.checked = false;
-            }
+        if (!engine.setGameMode(wanted)) {
+            // Refused for a human-versus-human game, and silently until this
+            // message: the menu entry simply failed to light up. Explore answers
+            // every move with the kibitz engine regardless of who is assigned to
+            // a colour, so entering it here would quietly turn the game into
+            // human-versus-engine. Kibitz on demand needs no mode change — it
+            // already works in a match. See docs/game-modes.md.
+            parent->showMessage(parent->templateText("tplAnalysisAnswersEveryMove",
+                "Analysis mode answers every move — use Kibitz in match mode instead"));
+            return false;
         }
         view.requestRepaint();
+        return true;
+    };
+
+    add("game_mode", 0, 1, "[match|explore|tsumego] — what produces the opponent's moves",
+        [this, requestGameMode](CommandContext& ctx) {
+        // The select follows GameThread in OnUpdate() rather than being driven
+        // from here, so a refusal leaves the widget showing the mode that is
+        // actually in force instead of the one that was asked for.
+        ctx.notifyMenu = false;
+        if (ctx.args.empty()) {
+            parent->showMessage(gameModeName(engine.getGameMode()));
+            return;
+        }
+        const auto wanted = parseGameMode(toLower(ctx.args[0]));
+        if (!wanted) {
+            spdlog::warn("game_mode: expected match, explore or tsumego, got '{}'",
+                         ctx.args[0]);
+            return;
+        }
+        requestGameMode(*wanted);
+    });
+
+    add("toggle_explore_mode", 0, 0, "switch between match and explore mode",
+        [this, requestGameMode](CommandContext& ctx) {
+        ctx.notifyMenu = false;
+        requestGameMode(engine.getGameMode() == GameMode::MATCH ? GameMode::EXPLORE
+                                                                : GameMode::MATCH);
     });
 
     add("toggle_evaluation", 0, 1, "[on|off] — show or hide the live evaluation overlay",
@@ -2174,7 +2205,11 @@ nlohmann::json GobanControl::dumpState() const {
     s["prisoners_drawn_white"] = view.capturedWhiteShown;
 
     // Lifecycle flags — the ones the Design Invariants are written about
-    s["mode"]           = (engine.getGameMode() == GameMode::EXPLORE) ? "explore" : "match";
+    // Three values since tsumego became a mode rather than a flag beside one.
+    // `tsumego` below is kept: it is the *published* copy the analysis loop and
+    // the view actually read, and a scenario asserting both catches the two
+    // drifting apart — which is the failure this consolidation removed.
+    s["mode"]           = gameModeName(engine.getGameMode());
     s["ai_vs_ai"]       = engine.isAiVsAi();
     s["phase"]          = phaseName(model.phase());
     s["running"]        = engine.isRunning();
@@ -2313,6 +2348,7 @@ nlohmann::json GobanControl::dumpState() const {
     s["can_clear"]     = a.clear;
     s["can_save"]      = a.save;
     s["can_evaluation"] = a.evaluation;
+    s["can_game_mode"] = a.gameMode;
 
     // The evaluation overlay. `eval_state` is the one to wait on — `eval_enabled`
     // flips the instant the toggle is pressed, long before a process has started
@@ -2437,11 +2473,10 @@ void GobanControl::saveCurrentGame() const {
         settings.setSessionTreePathLength(treePath.length);
         settings.setSessionTreePath(treePath.branchChoices);
         settings.setSessionIsExternal(isExternal);
-        settings.setSessionTsumegoMode(model.tsumegoMode);
-        settings.setSessionAnalysisMode(engine.getGameMode() == GameMode::EXPLORE);
-        spdlog::info("Saved session state: file={}, gameIndex={}, pathLen={}, branchChoices={}, tsumego={}, analysis={}",
+        settings.setSessionGameMode(engine.getGameMode());
+        spdlog::info("Saved session state: file={}, gameIndex={}, pathLen={}, branchChoices={}, mode={}",
             sessionFile, model.game.getLoadedGameIndex(), treePath.length, treePath.branchChoices.size(),
-            model.tsumegoMode.load(), engine.getGameMode() == GameMode::EXPLORE);
+            gameModeName(engine.getGameMode()));
     } else {
         settings.clearSessionState();
     }

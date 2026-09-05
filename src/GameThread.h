@@ -21,11 +21,13 @@
 #include <atomic>
 #include <string>
 #include <memory>
+#include <optional>
 #include <queue>
 #include <functional>
 #include <condition_variable>
 
 #include "player.h"
+#include "GameMode.h"
 #include "GobanModel.h"
 #include "GameObserver.h"
 #include "GameNavigator.h"
@@ -43,18 +45,6 @@ struct NavCommand {
     bool promote = true;  // For TO_VARIATION: promote to main line
     int pathLength = 0;                 // For TO_TREE_PATH
     std::vector<int> branchChoices;     // For TO_TREE_PATH
-};
-
-/** \brief Game mode determining player interaction behavior
- */
-/// What produces the opponent's moves.
-enum class GameMode {
-    MATCH,      ///< Strict turn alternation, assigned roles.
-    EXPLORE,    ///< Human plays either colour; the kibitz engine answers every
-                ///< move. That reply is the distinguishing property, not the
-                ///< free navigation a loaded game has anyway while Paused.
-    TSUMEGO     ///< A problem: the record answers, on the solution path and on a
-                ///< refuted one alike. Player assignment is not consulted.
 };
 
 /** \brief Whether the engines match the game record — ADR-0002 step 4.
@@ -267,7 +257,7 @@ public:
     void playLocalMove(const Move& move);
     void playKibitzMove();
 
-    // Analysis mode support
+    // Game mode. TSUMEGO is never refused — a puzzle ignores player assignment.
     bool setGameMode(GameMode mode);  // Returns true if mode change succeeded
     GameMode getGameMode() const { return gameMode; }
     void setAiVsAi(bool enabled);
@@ -332,6 +322,12 @@ private:
     void processSuccessfulMove(const Move& move, const Player* movePlayer, Engine* coach,
                               Engine* kibitzEngine, bool wasKibitz);
 
+    /// The one writer of `gameMode` and of everything published from it. Holds
+    /// no policy: setGameMode() decides whether a change is allowed, this
+    /// performs it. clearGame() and finalizeGameLoad() come straight here,
+    /// since a game being replaced answers to no refusal.
+    void applyGameMode(GameMode mode);
+
     // Apply loaded game info to model state, sync engine, build board, finalize
     bool applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine* engine);
 
@@ -360,8 +356,13 @@ private:
     // Player management (extracted to separate class)
     std::unique_ptr<PlayerManager> playerManager;
 
-    // Analysis mode state
-    GameMode gameMode = GameMode::MATCH;
+    /// What produces the opponent's moves, and the source of truth for it —
+    /// `GobanModel::tsumegoMode` is only the copy published for the threads
+    /// that cannot reach this. applyGameMode() is the one writer; nothing else
+    /// assigns it, for the same reason GobanModel::transitionTo() is alone.
+    /// Atomic because the UI thread asks it every frame while the game thread
+    /// writes it — a deferred load settles the mode on the game thread.
+    std::atomic<GameMode> gameMode{GameMode::MATCH};
     bool aiVsAiMode = false;
 
     // Navigation (extracted to separate class)

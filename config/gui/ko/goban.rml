@@ -167,11 +167,17 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>분석</span>
+                    <span>복기</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">대국 모드</div>
-                            <div class="cmd toggle_explore_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_explore_mode">탐색</div>
+                            <div class="cmd" id="cmdGameMode">
+                                <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
+                                    <option value="match">대국</option>
+                                    <option value="explore">탐색</option>
+                                    <option value="tsumego" disabled="disabled">Tsumego</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="grp" id="grpReplay">
                             <div class="hr">재생</div>
@@ -181,7 +187,7 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">마지막</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">엔진</div>
+                            <div class="hr">분석</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">형세</div>
                         </div>
                         <div class="grp">
@@ -250,8 +256,7 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">탐색</div>
-    <div class="template" id="tplTsumegoMode">Tsumego</div>
+    <div class="template" id="tplTsumegoModeFixed">사활 모드는 문제를 따릅니다 — 문제를 열어 들어가고, 새 대국으로 나갑니다</div>
     <div class="template" id="tplTsumegoSolved">정답!</div>
     <div class="template" id="tplTsumegoWrong">오답!</div>
     <div class="template" id="tplBlackToMove">흑선</div>

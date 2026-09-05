@@ -14,6 +14,7 @@ new_game 9
 wait_idle
 load_tsumego tests/data/tsumego_refuted.sgf
 wait_idle
+expect mode tsumego
 expect tsumego true
 expect move_count 0
 expect white_stones 5

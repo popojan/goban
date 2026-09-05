@@ -15,6 +15,10 @@
 
 load_tsumego tests/data/tsumego.sgf
 wait_idle
+# Both, and deliberately: `mode` is GameThread's enum, `tsumego` is the copy it
+# publishes for the analysis loop and the view. They were independent variables
+# once, and asserting only one cannot see them drift apart again.
+expect mode tsumego
 expect tsumego true
 expect board_size 9
 expect view_position 0
@@ -166,8 +170,56 @@ wait_idle
 expect at_end true
 
 # Tsumego mode survives all of it, and leaves only by starting another game.
+expect mode tsumego
 expect tsumego true
 new_game 9
 wait_idle
+expect mode match
 expect tsumego false
 expect phase setup
+
+# And the mode select cannot be used to leave it either — clearGame() is what
+# drops the mode, not the menu. Asking for Match while a problem is open is
+# refused, in both spellings, because picking it would restore promote=true in
+# playVariationAt() and let the next attempt overwrite the recorded answer.
+load_tsumego tests/data/tsumego.sgf
+wait_idle
+expect mode tsumego
+# The select is greyed here, so the refusal below is not a control disagreeing
+# with its command — it is what a script or a keybinding gets.
+expect can_game_mode false
+game_mode match
+wait_idle
+expect mode tsumego
+expect tsumego true
+toggle_explore_mode
+wait_idle
+expect mode tsumego
+
+# Nor can a puzzle be entered from the menu: it follows the record that is open.
+# The select is live again — only the Tsumego *option* stays disabled, which is
+# what lets the mode be displayed while staying unpickable.
+new_game 9
+wait_idle
+expect mode match
+expect can_game_mode true
+game_mode tsumego
+wait_idle
+expect mode match
+expect tsumego false
+
+# The other two are ordinary, and `game_mode` reaches them by name — the same
+# two `toggle_explore_mode` cycles between, now that both go through one body.
+game_mode explore
+wait_idle
+expect mode explore
+toggle_explore_mode
+wait_idle
+expect mode match
+
+# A name that is not a mode changes nothing. It must not fall through to
+# whichever value happens to be listed first, which is what the tempting
+# nlohmann enum macro would have done.
+game_mode analysis
+wait_idle
+expect mode match

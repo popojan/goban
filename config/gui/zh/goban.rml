@@ -179,11 +179,17 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>分析</span>
+                    <span>复盘</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">对局模式</div>
-                            <div class="cmd toggle_explore_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_explore_mode">探索</div>
+                            <div class="cmd" id="cmdGameMode">
+                                <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
+                                    <option value="match">对局</option>
+                                    <option value="explore">探索</option>
+                                    <option value="tsumego" disabled="disabled">Tsumego</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="grp" id="grpReplay">
                             <div class="hr">回放</div>
@@ -193,7 +199,7 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">最后一手</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">引擎</div>
+                            <div class="hr">分析</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">胜率</div>
                         </div>
                         <div class="grp">
@@ -262,8 +268,7 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">探索</div>
-    <div class="template" id="tplTsumegoMode">Tsumego</div>
+    <div class="template" id="tplTsumegoModeFixed">死活模式由题目决定 — 打开题目进入，开始新对局离开</div>
     <div class="template" id="tplTsumegoSolved">解答正确！</div>
     <div class="template" id="tplTsumegoWrong">错误！</div>
     <div class="template" id="tplBlackToMove">黑先</div>

@@ -69,24 +69,37 @@ bool ScenarioRecorder::writePrologue(std::ostream& out, const nlohmann::json& st
     }
 
     const std::string sgf = state.value("sgf_file", std::string());
+    // Three modes now, and only two of them can be *named*: a puzzle is entered
+    // by opening one, so it has to be reached through the load rather than
+    // through `game_mode`. Restoring it with load_sgf and a mode change would
+    // reproduce neither the cursor at the root nor the auto-played setup move.
+    const std::string mode = state.value("mode", std::string("match"));
+    const bool tsumego = mode == "tsumego";
 
     out << "# --- prologue: puts a fresh instance back at the starting point ---\n";
     if (!sgf.empty()) {
-        out << "load_sgf " << sgf << " " << state.value("game_index", 0) << "\n";
+        out << (tsumego ? "load_tsumego " : "load_sgf ")
+            << sgf << " " << state.value("game_index", 0) << "\n";
         out << "settle\n";
         out << "# NOTE: this refers to an external SGF. If it has since changed or\n"
             << "# moved, the replay will not match.\n";
     } else {
         out << "new_game " << state.value("board_size", 19) << "\n";
         out << "settle\n";
+        if (tsumego) {
+            out << "# WARNING: the recording was made in tsumego mode but no file\n"
+                << "# was loaded, so the problem cannot be reproduced here.\n";
+        }
     }
 
     out << "switch_player black " << state.value("black_player", std::string("Human")) << "\n";
     out << "switch_player white " << state.value("white_player", std::string("Human")) << "\n";
     out << "settle\n";
 
-    if (state.value("mode", std::string("match")) == "explore") {
-        out << "toggle_explore_mode\n";
+    // Named rather than toggled: `toggle_explore_mode` asserts nothing about
+    // where it started, and there are three modes for it to start in now.
+    if (!tsumego && mode != "match") {
+        out << "game_mode " << mode << "\n";
     }
 
     const size_t movesIn = state.value("move_count", 0);

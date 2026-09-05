@@ -1,9 +1,13 @@
 # Game Modes
 
-Red Carpet Goban has two game modes that determine how player interaction works.
-The user switches between them, with one exception: loading a finished SGF (one
-carrying a result) selects Explore by itself, since there is no match left to
-play.
+Red Carpet Goban has three game modes that determine how player interaction
+works: **Match**, **Explore** and **Tsumego**. They are one setting, not a mode
+plus a flag — see `docs/adr/0015-tsumego-is-a-game-mode.md` for why that matters.
+
+The user switches between the first two from **Review > Game mode**, with one
+exception: loading a finished SGF (one carrying a result) selects Explore by
+itself, since there is no match left to play. **Tsumego is not chosen from the
+menu at all** — it follows the record you open, and the menu only reports it.
 
 ## Match Mode
 
@@ -19,7 +23,7 @@ play.
 ### When Active
 
 - Starting a new game (Game > New, or board click after game ends)
-- Explicitly switching from Explore mode via menu/Enter key
+- Explicitly switching from Explore mode via the mode select or the Enter key
 
 ---
 
@@ -39,7 +43,40 @@ play.
 ### When Active
 
 - After loading a finished SGF game (has result — resign or score)
-- Explicitly switching from Match mode via menu/Enter key
+- Explicitly switching from Match mode via the mode select or the Enter key
+
+---
+
+## Tsumego Mode
+
+**Set by opening a problem, and by nothing else.** The record *is* the opponent.
+
+### Behavior
+
+- The recorded main line is the answer, and it defines what "correct" means.
+  Nothing you play may promote itself over it — a variation stays a variation.
+- The record answers, on the solution path and on a refuted one alike. A move
+  the problem marks BM is a wrong move you may play out to see it punished.
+- The verdict is **Solved!** or **Wrong!**; a solved position refuses further
+  moves and refuses Kibitz.
+- Player assignment is not consulted, so unlike Explore this mode is never
+  refused. Resign is refused instead: a puzzle is not a game to concede.
+- The live evaluation is suppressed entirely — the engine's first suggestion
+  *is* the answer (ADR-0007). Your toggles are left alone and come back with the
+  next ordinary game.
+- Branches are not copied into the daily session document.
+
+### When Active
+
+- **File > Load game...** with the Tsumego checkbox armed (it arms itself when
+  the file looks like a problem), or the `load_tsumego` command
+- Stepping through a collection with Previous/Next game keeps it
+- A restored session that was in tsumego mode
+
+It is left by starting a new game (**Clear**) or loading an ordinary record. The
+mode select shows *Tsumego* greyed while it is active, and its Tsumego option is
+greyed at all other times: offering Match mid-puzzle would re-arm promotion and
+let your next attempt overwrite the recorded answer.
 
 ---
 
@@ -47,10 +84,16 @@ play.
 
 | Trigger | Result |
 |---------|--------|
-| **Enter** key or Game menu toggle | Toggles between Match and Analysis |
+| **Review > Game mode** select, or the **Enter** key | Match <-> Explore |
+| `game_mode match\|explore\|tsumego` | Named directly; Tsumego is refused |
 | **New Game** (clear board) | Resets to Match |
-| **Load finished SGF** (has result) | Sets Analysis |
+| **Load finished SGF** (has result) | Sets Explore |
 | **Load unfinished SGF** (no result, e.g. session resume) | Sets Match |
+| **Load with the Tsumego toggle**, or `load_tsumego` | Sets Tsumego |
+
+The select is greyed while a puzzle is open, and its Tsumego option is greyed
+while one is not, so no route — menu, key or script — can reach a mode the
+control refuses.
 
 Explore mode is **not available when both players are human**, and the refusal
 says so. The reason is the reply, not its absence: explore mode answers every
@@ -97,17 +140,17 @@ scale of a single move.
 
 ### 3. Reviewing a loaded SGF
 
-- **Mode**: Analysis (set automatically on load)
+- **Mode**: Explore (set automatically on load)
 - Navigate with Home/End/Left/Right
 - Click on the board to create variations and explore alternatives
 - Engine responds to your exploratory moves if assigned
 
 ### 4. Resuming a match from a loaded SGF position
 
-- **Mode**: Switch to Match explicitly (Enter key)
+- **Mode**: Switch to Match explicitly (mode select, or Enter key)
 - Load the SGF (starts in Explore mode)
 - Navigate to the desired position
-- Toggle to Match mode — the position becomes the starting point
+- Switch to Match — the position becomes the starting point
 - Play continues as a match from that position
 
 ### 5. Observing engine-vs-engine play
@@ -115,12 +158,12 @@ scale of a single move.
 - **Mode**: Match
 - Assign engines to both colors, start the game
 - Engines play automatically
-- To pause and review: switch to Explore mode (Enter key)
-- To resume: switch back to Match mode
+- To pause and review: switch to Explore (Enter key)
+- To resume: switch back to Match
 
 ### 6. Getting AI analysis of a position
 
-- **Mode**: Analysis
+- **Mode**: Explore
 - Navigate to or set up the position of interest
 - Click to play a move — engine responds with its evaluation
 - Press Space to trigger a kibitz suggestion without playing
@@ -129,7 +172,7 @@ scale of a single move.
 
 ## Interaction with Navigation
 
-Navigation (Home/End/Left/Right) is available in both modes:
+Navigation (Home/End/Left/Right) is available in every mode:
 - **Match mode**: Navigation is blocked while the engine is thinking, and
   blocked outright in a bot-versus-bot match — see below
 - **Explore mode**: Navigation is always available (engine auto-play is paused)
@@ -139,7 +182,11 @@ navigation, Undo, Pass, Resign and Kibitz are all refused, by the keys exactly
 as by the greyed-out buttons (ADR-0005). Switching to explore mode is the
 supported way to step in, and it pauses the match.
 
-Creating a new variation (clicking a new point during navigation) works identically in both modes — the difference is only in whether the engine responds automatically (Match) or on request (Analysis).
+Creating a new variation (clicking a new point during navigation) works
+identically in Match and Explore — the difference is only in whether the engine
+responds automatically (Match) or on request (Explore). In Tsumego the variation
+is never promoted over the recorded answer, which is the one place the three
+modes differ about what a click *means*.
 
 ---
 

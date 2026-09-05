@@ -18,6 +18,8 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 
+#include "GameMode.h"
+
 struct CameraState {
     float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f, rotW = 1.0f;
     float panX = 0.0f, panY = 0.0f;
@@ -214,10 +216,11 @@ public:
     void setSessionTreePathLength(int value) { std::lock_guard<std::mutex> lock(mutex); sessionTreePathLength = value; }
     bool getSessionIsExternal() const { std::lock_guard<std::mutex> lock(mutex); return sessionIsExternal; }
     void setSessionIsExternal(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionIsExternal = value; }
-    bool getSessionTsumegoMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionTsumegoMode; }
-    void setSessionTsumegoMode(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionTsumegoMode = value; }
-    bool getSessionAnalysisMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionAnalysisMode; }
-    void setSessionAnalysisMode(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionAnalysisMode = value; }
+    /// One value since the two modes became one enum. Stored as the enum, not
+    /// as its name: gameModeName() and parseGameMode() are crossed exactly
+    /// once, in the JSON at the edge.
+    GameMode getSessionGameMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionGameMode; }
+    void setSessionGameMode(GameMode value) { std::lock_guard<std::mutex> lock(mutex); sessionGameMode = value; }
     bool hasSessionState() const { std::lock_guard<std::mutex> lock(mutex); return !sessionFile.empty(); }
     void clearSessionState();
 
@@ -314,8 +317,7 @@ private:
     int sessionTreePathLength = 0;
     std::vector<int> sessionTreePath;  // Branch choices only (consumed at multi-child nodes)
     bool sessionIsExternal = false;
-    bool sessionTsumegoMode = false;
-    bool sessionAnalysisMode = false;
+    GameMode sessionGameMode = GameMode::MATCH;
 };
 
 #endif

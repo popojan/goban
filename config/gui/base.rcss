@@ -143,6 +143,16 @@ select option:hover {
   color: #fffffff0;
 }
 
+/* An option that only ever reports a state. Tsumego is entered by opening a
+   problem, never chosen from a menu, so the option has to be readable while
+   being unpickable — RmlUi honours `disabled` on an option, and SetSelection()
+   still displays it. Same grey as div.cmd.disabled, and :hover is overridden
+   too or the rule above would light it up under the pointer. */
+select option[disabled],
+select option[disabled]:hover {
+  color: #ffffff30;
+}
+
 select selectbox {
   width: auto;
   min-width: 10rem;

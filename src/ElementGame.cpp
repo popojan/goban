@@ -389,8 +389,7 @@ void ElementGame::startAsyncEngineLoading() {
     sessionTreePathLength = 0;
     sessionTreePath.clear();
     sessionIsExternal = false;
-    sessionTsumegoMode = false;
-    sessionAnalysisMode = false;
+    sessionGameMode = GameMode::MATCH;
     sessionRestoreNeeded = false;
 
     if (!settings.getStartFresh() && settings.hasSessionState()) {
@@ -402,11 +401,11 @@ void ElementGame::startAsyncEngineLoading() {
             sessionTreePathLength = settings.getSessionTreePathLength();
             sessionTreePath = settings.getSessionTreePath();
             sessionIsExternal = settings.getSessionIsExternal();
-            sessionTsumegoMode = settings.getSessionTsumegoMode();
-            sessionAnalysisMode = settings.getSessionAnalysisMode();
+            sessionGameMode = settings.getSessionGameMode();
             sessionRestoreNeeded = true;
-            spdlog::info("Session restoration: file={}, gameIndex={}, pathLen={}, branchChoices={}, tsumego={}, analysis={}",
-                sessionFile, sgfGameIndex, sessionTreePathLength, sessionTreePath.size(), sessionTsumegoMode, sessionAnalysisMode);
+            spdlog::info("Session restoration: file={}, gameIndex={}, pathLen={}, branchChoices={}, mode={}",
+                sessionFile, sgfGameIndex, sessionTreePathLength, sessionTreePath.size(),
+                gameModeName(sessionGameMode));
         } else {
             spdlog::warn("Session file not found: {}, falling back to default loading", sessionFile);
             settings.clearSessionState();
@@ -443,12 +442,13 @@ void ElementGame::startAsyncEngineLoading() {
     // Load all engines in parallel - first ready engine loads SGF, rest sync
     // Start at root if: tsumego mode OR we have a session tree path to navigate to
     int gameIdx = sgfGameIndex;  // Capture for lambda
-    bool loadAtRoot = sessionRestoreNeeded && (sessionTsumegoMode || sessionTreePathLength > 0);
+    const bool sessionTsumego = sessionGameMode == GameMode::TSUMEGO;
+    bool loadAtRoot = sessionRestoreNeeded && (sessionTsumego || sessionTreePathLength > 0);
 
     // Queue tree path navigation before starting engines. The command sits in the
     // queue until the game thread starts (inside loadEnginesParallel, as soon as
     // the coach engine is ready). Single unified path — always on the game thread.
-    if (sessionRestoreNeeded && sessionTreePathLength > 0 && !sessionTsumegoMode) {
+    if (sessionRestoreNeeded && sessionTreePathLength > 0 && !sessionTsumego) {
         engine.navigateToTreePath(sessionTreePathLength, sessionTreePath);
         spdlog::info("Session restore: queued tree path navigation ({} steps, {} branch choices)",
             sessionTreePathLength, sessionTreePath.size());
@@ -519,16 +519,17 @@ void ElementGame::performDeferredInitialization() {
         // Tree path navigation was queued in startAsyncEngineLoading() and already
         // processed by the game thread (started early, as soon as coach was ready).
 
-        // Restore tsumego mode
-        if (sessionRestoreNeeded && sessionTsumegoMode) {
-            setTsumegoMode(true);
-            spdlog::info("Session restore: tsumego mode enabled");
-        }
-
-        // Restore analysis mode
-        if (sessionRestoreNeeded && sessionAnalysisMode) {
-            engine.setGameMode(GameMode::EXPLORE);
-            spdlog::info("Session restore: analysis mode enabled");
+        // Restore the game mode. One value now, so tsumego and explore cannot
+        // both be asked for — which used to be representable, and where the
+        // kibitz auto-reply answered on the solution path, playing the puzzle
+        // for the solver.
+        if (sessionRestoreNeeded && sessionGameMode != GameMode::MATCH) {
+            if (sessionGameMode == GameMode::TSUMEGO) {
+                setTsumegoMode(true);  // also caches the hints and the view's copy
+            } else {
+                engine.setGameMode(sessionGameMode);
+            }
+            spdlog::info("Session restore: {} mode", gameModeName(sessionGameMode));
         }
 
         // Bootstrap UserSettings from daily session if no game settings exist yet
@@ -1172,6 +1173,10 @@ void ElementGame::syncActionAvailability() {
     // panel needs — an engine that can analyse, and not a tsumego.
     setElementDisabled("cmdEvaluationMoves", !a.evaluation);
     setElementDisabled("cmdEvaluationBoard", !a.evaluation);
+    // The wrapper, not the select: div.cmd.disabled carries `pointer-events:
+    // none`, which is inherited in RCSS, so greying the row also stops the
+    // dropdown opening. A puzzle is the one mode the select only reports.
+    setElementDisabled("cmdGameMode", !a.gameMode);
 }
 
 void ElementGame::OnUpdate()
@@ -1273,25 +1278,23 @@ void ElementGame::OnUpdate()
         }
     }
 
-    // Sync game mode menu toggle with engine state (analysis or tsumego)
+    // The mode is a three-value select, and the widget follows GameThread
+    // rather than the other way: the mode moves without the menu being touched
+    // (restored at startup, decided by an SGF's result, set to Tsumego by
+    // opening a problem), and a command that is refused must leave the widget
+    // showing what is actually in force. Same arrangement as
+    // selectEvaluationMoves. The label-swapping toggle this replaces asked
+    // OnMenuToggle for a class no element carried after the Explore rename, so
+    // its checkmark had silently stopped tracking anything at all.
     {
-        auto doc = context->GetDocument("game_window");
-        auto* cmdEl = doc->GetElementById("cmdAnalysisMode");
-        bool tsumego = view.isTsumegoMode();
-        bool analysisMode = engine.getGameMode() == GameMode::EXPLORE;
-        bool checked = tsumego || analysisMode;
-        if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
-            OnMenuToggle("toggle_analysis_mode", checked);
-        }
-        // Swap label between analysis and tsumego mode
-        if (cmdEl) {
-            const char* tplId = tsumego ? "tplTsumegoMode" : "tplAnalysisMode";
-            if (auto* tpl = doc->GetElementById(tplId)) {
-                Rml::String current = cmdEl->GetInnerRML();
-                Rml::String target = tpl->GetInnerRML();
-                if (current != target) {
-                    cmdEl->SetInnerRML(target);
-                }
+        if (auto* modeEl = dynamic_cast<Rml::ElementFormControlSelect*>(
+                context->GetDocument("game_window")->GetElementById("selectGameMode"))) {
+            const int want = static_cast<int>(engine.getGameMode());
+            if (modeEl->GetSelection() != want) {
+                // SetSelection() ignores `disabled`, which is what lets Tsumego
+                // be displayed while staying unpickable.
+                GobanControl::WidgetEventGuard suppressEvents(control);
+                modeEl->SetSelection(want);
             }
         }
     }

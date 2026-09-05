@@ -167,11 +167,17 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>分析</span>
+                    <span>研究</span>
                     <div class="menuitem show">
                         <div class="grp">
                             <div class="hr">対局モード</div>
-                            <div class="cmd toggle_explore_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_explore_mode">探索</div>
+                            <div class="cmd" id="cmdGameMode">
+                                <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
+                                    <option value="match">対局</option>
+                                    <option value="explore">探索</option>
+                                    <option value="tsumego" disabled="disabled">Tsumego</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="grp" id="grpReplay">
                             <div class="hr">再生</div>
@@ -181,7 +187,7 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">最後</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">エンジン</div>
+                            <div class="hr">分析</div>
                             <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">形勢</div>
                         </div>
                         <div class="grp">
@@ -250,8 +256,7 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">探索</div>
-    <div class="template" id="tplTsumegoMode">Tsumego</div>
+    <div class="template" id="tplTsumegoModeFixed">詰碁モードは問題に従います — 問題を開いて入り、新規対局で出ます</div>
     <div class="template" id="tplTsumegoSolved">正解！</div>
     <div class="template" id="tplTsumegoWrong">不正解！</div>
     <div class="template" id="tplBlackToMove">黒先</div>

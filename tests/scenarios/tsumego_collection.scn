@@ -12,6 +12,7 @@
 # the solver is handed the position PL meant rather than the one recorded.
 load_tsumego tests/data/tsumego_pl.sgf
 wait_idle
+expect mode tsumego
 expect tsumego true
 expect board_size 9
 expect main_line_moves 2
@@ -43,16 +44,19 @@ expect at_end true
 # only the player name and the solution's coordinates give it away.
 load_tsumego tests/data/tsumego_two.sgf
 wait_idle
+expect mode tsumego
 expect tsumego true
 expect game_index 0
 expect black_player One
 expect view_position 0
 expect comment Black to move
 
-# Stepping to the next problem keeps tsumego mode: switchGame() re-arms it and
-# re-applies suppressSessionCopy, because loading is not what set them here.
+# Stepping to the next problem keeps tsumego mode, and nothing re-arms it by
+# hand: switchGame() ends in finalizeGameLoad(), which carries TSUMEGO across
+# because nothing between the request and there writes the mode.
 next_game
 wait_idle
+expect mode tsumego
 expect tsumego true
 expect game_index 1
 expect view_position 0
@@ -81,6 +85,7 @@ expect at_end true
 prev_game
 wait_idle
 expect prompt_active false
+expect mode tsumego
 expect tsumego true
 expect game_index 0
 expect black_player One
@@ -89,5 +94,6 @@ expect view_position 0
 # Leaving tsumego mode still takes an explicit new game.
 new_game 9
 wait_idle
+expect mode match
 expect tsumego false
 expect phase setup
