@@ -437,6 +437,12 @@ void UserSettings::setAnaglyphStrength(float value) {
     saveLocked();
 }
 
+void UserSettings::clearSavedCamera() {
+    std::lock_guard<std::mutex> lock(mutex);
+    savedCameraLoaded = false;
+    saveLocked();
+}
+
 void UserSettings::setPointerMode(const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex);
     pointerMode = value;

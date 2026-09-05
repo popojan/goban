@@ -187,6 +187,10 @@ public:
     CameraState getSavedCamera() const { std::lock_guard<std::mutex> lock(mutex); return savedCamera; }
     void setSavedCamera(const CameraState& state) { std::lock_guard<std::mutex> lock(mutex); savedCamera = state; savedCameraLoaded = true; }
     bool hasSavedCamera() const { std::lock_guard<std::mutex> lock(mutex); return savedCameraLoaded; }
+    /// Forget the saved preset, and only that. `delete camera` used to
+    /// `std::remove()` the whole settings file, so a command named after the
+    /// camera took the language, the sound and every overlay toggle with it.
+    void clearSavedCamera();
 
     /// The view a fresh install opens on, from `camera` in the application
     /// config. Seeded by main() once the config is loaded, and never written

@@ -13,6 +13,28 @@
 #include "Stereo.h"
 #include "UserSettings.h"
 
+namespace {
+
+/// Unpack a stored preset into the three values a camera move is made of.
+///
+/// One function because it was three: the constructor's restore, resetView()
+/// and clearView() each carried their own copy of the same unpacking, so a
+/// field added to CameraState would have reached whichever the author happened
+/// to be looking at. The same shape as the prisoner labels, which were two
+/// copies of one rule with the colours swapped in one of them.
+void applyPreset(const CameraState& preset, DDG::Quaternion& rot,
+                 glm::vec2& pan, float& distance) {
+    rot[0] = preset.rotX;
+    rot[1] = preset.rotY;
+    rot[2] = preset.rotZ;
+    rot[3] = preset.rotW;
+    rot.normalize();
+    pan = glm::vec2(preset.panX, preset.panY);
+    distance = preset.distance;
+}
+
+}  // namespace
+
 GobanView::GobanView(GobanModel& m)
     :
     gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),
@@ -43,13 +65,7 @@ GobanView::GobanView(GobanModel& m)
         haveCamera = false;
     }
     if (haveCamera) {
-        cam.rLast[0] = camToRestore.rotX;
-        cam.rLast[1] = camToRestore.rotY;
-        cam.rLast[2] = camToRestore.rotZ;
-        cam.rLast[3] = camToRestore.rotW;
-        cam.rLast.normalize();
-        cameraPan = glm::vec2(camToRestore.panX, camToRestore.panY);
-        cameraDistance = camToRestore.distance;
+        applyPreset(camToRestore, cam.rLast, cameraPan, cameraDistance);
         baseCameraPan = cameraPan;
         baseCameraDistance = cameraDistance;
     }
@@ -342,15 +358,8 @@ void GobanView::resetView() {
     // a broken command.
     const bool haveSaved = settings.hasSavedCamera();
     if (haveSaved || settings.hasDefaultCamera()) {
-        const CameraState preset = haveSaved ? settings.getSavedCamera()
-                                             : settings.getDefaultCamera();
-        targetRot[0] = preset.rotX;
-        targetRot[1] = preset.rotY;
-        targetRot[2] = preset.rotZ;
-        targetRot[3] = preset.rotW;
-        targetRot.normalize();
-        targetPan = glm::vec2(preset.panX, preset.panY);
-        targetDist = preset.distance;
+        applyPreset(haveSaved ? settings.getSavedCamera() : settings.getDefaultCamera(),
+                    targetRot, targetPan, targetDist);
     }
 
     // Deliberately does *not* touch eof, dof, gamma or contrast. They are not
@@ -413,17 +422,26 @@ void GobanView::saveCurrentView() {
 }
 
 void GobanView::clearView() {
-    // Whichever file settings actually live in — not the hardcoded default.
-    // A scripted run redirects persistence to scenario-user.json precisely so it
-    // cannot touch the developer's real session, and `delete camera` was the one
-    // path that ignored that and deleted user.json anyway.
-    std::remove(UserSettings::instance().getSettingsFile().c_str());
+    auto& settings = UserSettings::instance();
+    // The saved preset, and only that. This used to std::remove() the whole
+    // settings file, so a command named after the camera also took the language,
+    // the sound and every overlay toggle with it.
+    settings.clearSavedCamera();
 
-    // Default camera: same values as initCam()
-    DDG::Quaternion targetRot(-1.0, 1.0, 0.0, 0.0);
-    targetRot.normalize();
-    glm::vec2 targetPan(0.0f, 0.0f);
-    float targetDist = 3.5f;
+    // Where the view goes once the preset is gone.
+    //
+    // It used to be the raw values from initCam() — which are *not* the camera
+    // config/base.json ships, so `delete camera` flew to a top-down view nobody
+    // configured. resetView() a few lines up resolves this properly; the three
+    // layers UserSettings knows about are hasCurrentCamera() / hasSavedCamera()
+    // / hasDefaultCamera(), and the saved one has just been dropped.
+    DDG::Quaternion targetRot = cam.rLast;
+    glm::vec2 targetPan = cameraPan;
+    float targetDist = cameraDistance;
+
+    if (settings.hasDefaultCamera()) {
+        applyPreset(settings.getDefaultCamera(), targetRot, targetPan, targetDist);
+    }
 
     gobanShader.setGamma(1.0);
     gobanShader.setContrast(0.0);
@@ -2003,12 +2021,12 @@ void GobanView::onStonePlaced(const Move& move) {
     }
 }
 
-void GobanView::onGameMove(const Move& move, const std::string& comment) {
+void GobanView::onGameMove(const Move& move, const std::string& /*comment*/) {
     // Delegate visual/audio to onStonePlaced
     onStonePlaced(move);
 }
 
-void GobanView::onBoardChange(const Board& newBoard) {
+void GobanView::onBoardChange(const Board& /*newBoard*/) {
 	// Model already has the board (GobanModel::onBoardChange stores it).
 	// UI thread copies from model.board and updates overlays in Render().
 	requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);
