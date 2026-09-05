@@ -101,7 +101,7 @@ to today's daily session file.
     "board_size": 13,
     "handicap": 0,
     "komi": 7.5,
-    "white_player": "Katago #kata9x9 b18"
+    "white_player": "KataGo 9x9"
   },
   "last_config": "./config/cs.json",
   "last_sgf_path": "./games/2026-08-12.sgf",

@@ -30,7 +30,7 @@
       "enabled": 0
     },
     {
-      "name": "Katago #kata1 b28",
+      "name": "KataGo",
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata1-b28c512nbt-s9584861952-d4960414494.bin.gz -config ./default_gtp.cfg",
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "name": "Katago 9x9",
+      "name": "KataGo 9x9",
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata9x9-b18c384nbt-20231025.bin.gz -config ./default_gtp.cfg",
