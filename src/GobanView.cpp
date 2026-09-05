@@ -628,6 +628,7 @@ void GobanView::Render(int w, int h)
 	if (flags & UPDATE_STONES) {
 	    board.updateStones(model.board);
         updateCursor();
+        promoteHintLabel();
 
         double vol = board.collision;
         if(vol > 0) {
@@ -1341,6 +1342,30 @@ void GobanView::updateAnalysisOverlay() {
 	}
 }
 
+/// The suggestion on the point being aimed at belongs on the stone layer, or the
+/// stone in hand draws over it — and it is the one letter the player is asking
+/// about.
+///
+/// Here rather than in updateAnalysisOverlay() for two reasons, both about
+/// order: the ghost stone is placed just above, and updateStones() runs before
+/// that and deletes stone-level overlays wherever the *model* has no stone —
+/// which is exactly what a point under a ghost is. A label promoted earlier is
+/// thrown away before it can be drawn.
+///
+/// It takes the stone palette rather than its quality colour: the ramp is ink
+/// for wood and every stop of it sits below the wood, so on a black stone it
+/// would be unreadable. Nothing is lost — the readout is answering about this
+/// very point, with the number rather than a shade of it.
+void GobanView::promoteHintLabel() {
+	if (!showAnalysisOverlay || !ghostStoneVisible()) return;
+	const Position aim = model.cursor;
+	if (std::find(analysisLabels.begin(), analysisLabels.end(), aim) == analysisLabels.end())
+		return;
+	const std::string text = board[aim].overlay.text;
+	if (text.empty()) return;
+	board.setOverlay(aim, text, state.colorToMove);
+}
+
 void GobanView::updateFloatingLabels() {
 	// One list, one setter: setFloatingLabels() replaces wholesale, so the
 	// readout and the coordinates have to be built together.
@@ -1414,9 +1439,18 @@ void GobanView::updateFloatingLabels() {
 				// report, so no second search and no comparison across two of
 				// them: an absolute difference, because both are in Black's frame
 				// and the best move is the least bad for whoever is to move.
+				//
+				// Nothing is printed below a whole percent. The estimate is a
+				// mean over visits, so its uncertainty falls as 1/sqrt(visits) —
+				// a few percent at ordinary counts — and a tenth of a percent is
+				// far under that: precision without accuracy. `(0%)` would also
+				// have said two different things at once, "costs nothing" and
+				// "percentages can no longer tell these apart". The rank letter
+				// on the stone says which move this is; the bracket is only for
+				// what it costs.
 				const int loss = static_cast<int>(std::lround(
 					std::fabs(report->winrateBlack - aimed->winrateBlack) * 100.0));
-				text << " (" << (loss ? "-" : "") << loss << "%)";
+				if (loss > 0) text << " (-" << loss << "%)";
 			}
 			if (shownLead) {
 				const double lead = *shownLead;

@@ -283,6 +283,7 @@ public:
     /// Every label placed by board coordinate rather than by board point: the
     /// evaluation readout, the wait indicator and, when shown, the coordinate
     /// labels. One function because setFloatingLabels() replaces the whole list.
+    void promoteHintLabel();
     void updateFloatingLabels();
 
     /// The numbers on the wood — win rate and score estimate. Separate from
