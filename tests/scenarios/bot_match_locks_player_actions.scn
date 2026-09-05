@@ -73,9 +73,9 @@ expect view_position 3
 expect main_line_moves 4
 
 # --- Analysis mode is the supported way in ----------------------------------
-toggle_analysis_mode
+toggle_explore_mode
 wait_idle
-expect mode analysis
+expect mode explore
 # The toggle itself survives — only entering MATCH clears it. What lifts is the
 # *lock*, which is the toggle and the mode together: aiVsAiLocked is
 # (ai_vs_ai || both players are engines) && mode != analysis. Asserting the flag

@@ -10,10 +10,27 @@
 # so the layout is deterministic), leaves the game Paused, then renders
 # continuously via the MAX_FPS toggle. The per-second averages land in the
 # debug log; discard the first sample, it straddles the toggle.
+#
+# Two traps, both of which have produced published numbers that were fiction:
+#
+# 1. **Pass --user-settings, one file per run.** With none, a scripted run
+#    writes to a single shared `scenario-user.json`, so a sticky setting from
+#    the previous run is inherited by this one — and a comparison then measures
+#    the same scene twice. Set the state explicitly too (`shader_param X on`,
+#    never `toggle`) and assert it with `expect` before measuring.
+# 2. **Wait for the camera.** Nothing here does by default, and during the
+#    intro flight the board is small and far, so the frame rate is not the one
+#    being asked about. `wait_until camera_animating false`.
+#
+# And measure fullscreen if the answer is meant to describe real use:
+# `toggle_fullscreen` before `toggle_fps`. The bowls cost 6.2 ms per frame in a
+# 1056x1050 window and 19.4 ms at 1920x1080 — a windowed figure is not a small
+# version of the fullscreen one.
 load_sgf ./tests/bench/bench19.sgf
 wait_idle
 navigate_end
 wait_idle
+wait_until camera_animating false
 toggle_fps
 wait 7000
 quit_when_done

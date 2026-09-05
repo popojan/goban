@@ -4,6 +4,9 @@ void rBowlStones(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
     int ei = 0;
 
     for (int i = 0; i < 4; i++) {
+        // The stones follow the vessel that holds them: 0 and 1 are the lids,
+        // and they carry the prisoners. See scene/red.glsl.
+        if (i < 2 ? !showLids : !showBowls) continue;
         vec3 cc1 = cc[i].xyz;
         cc1.y = bnx.y - legh + bowlRadius2 - 0.5* (bowlRadius2 - bowlRadius);
         vec4 ret0;

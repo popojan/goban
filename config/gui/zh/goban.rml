@@ -38,18 +38,14 @@
                                         onchange="shader" onmousedown="nop"/>
                             </div>
                         </div>
+                        <div class="grp" id="grpSceneParams">
+                            <div class="hr">场景</div>
+                            <div class="cmd selected" id="cmdParam_showBowls" onmouseup="shader_param showBowls toggle">棋盒</div>
+                            <div class="cmd selected" id="cmdParam_showLids" onmouseup="shader_param showLids toggle">盒盖</div>
+                        </div>
                         <div class="grp">
                             <div class="hr">窗口</div>
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">全屏</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">标注</div>
-                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">上一手</div>
-                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">下一手</div>
-                            <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">推荐手</div>
-                            <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">胜率数值</div>
-                            <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">用时</div>
-                            <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">坐标</div>
                         </div>
                         <!--
                         <div class="grp">
@@ -71,6 +67,46 @@
                             <div class="cmd" onmouseup="save camera">保存</div>
                             <div class="cmd" onmouseup="delete camera">还原</div>
                         </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>标注</span>
+                    <div class="menuitem show">
+                    <div class="grp">
+                        <div class="hr">着手</div>
+                        <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">上一手</div>
+                        <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">下一手</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">分析</div>
+                        <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">胜率数值</div>
+                        <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">形势判断</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">推荐手</div>
+                        <div class="cmd">
+                        <select id="selectEvaluationMoves" onchange="evaluation_moves" onmousedown="nop">
+                        <option value="off">关闭</option>
+                        <option value="on_demand">按需显示</option>
+                        <option value="always">始终显示</option>
+                        </select>
+                        </div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">棋盘</div>
+                        <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">坐标</div>
+                        <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">用时</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">提子</div>
+                        <div class="cmd">
+                        <select id="selectPrisoners" onchange="prisoners" onmousedown="nop">
+                        <option value="auto">自动</option>
+                        <option value="always">总是</option>
+                        <option value="never">从不</option>
+                        </select>
+                        </div>
+                    </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
@@ -130,7 +166,7 @@
                     <span>落子</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div id="grpGame">
+                            <div>
                             <div class="hr">游戏</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">开始</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">清除</div>
@@ -147,7 +183,7 @@
                             <div class="template" id="templateQuitWithoutFinishing">退出未完成的对局？</div>
                             <div class="template" id="templateStartNewGame">开始新对局？</div>
                             </div>
-                            <div id="grpMoves">
+                            <div>
                             <div class="hr">落子</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">停一手</div>
                             <div class="cmd" id="cmdKibitz" onmouseup="play once">提示</div>
@@ -158,13 +194,19 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>分析</span>
+                    <span>复盘</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr">模式</div>
-                            <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">分析模式</div>
+                            <div class="hr">对局模式</div>
+                            <div class="cmd" id="cmdGameMode">
+                                <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
+                                    <option value="match">对局</option>
+                                    <option value="explore">探索</option>
+                                    <option value="tsumego" disabled="disabled">死活题</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="grp" id="grpReplay">
+                        <div class="grp">
                             <div class="hr">回放</div>
                             <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">第一手</div>
                             <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">上一手</div>
@@ -172,16 +214,13 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">最后一手</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">得分</div>
-                            <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">形势判断</div>
-                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">胜率</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">提子</div>
-                            <div class="template" id="templatePrisonersWhite">白: %d</div>
-                            <div class="template" id="templatePrisonersBlack">黑: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite">白: 0</div>
-                            <div class="cmd" id="lblPrisonersBlack">黑: 0</div>
+                            <div class="hr">分析</div>
+                            <div class="cmd" id="cmdEvaluation">
+                                <select id="selectEvaluation" onchange="toggle_evaluation" onmousedown="nop">
+                                    <option value="off">关闭</option>
+                                    <option value="on">分析</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -215,19 +254,7 @@
             </div>
         </div>
 
-        <div id="grpPlayers">
-            <div id="grpBlack" class="hoverable bottom left">
-                <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="nop">Black: 0</div>
-                </div>
-            </div>
-            <div id="grpWhite" class="hoverable top right">
-                <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="nop">White: 0</div>
-                </div>
-            </div>
-        </div>
-        <div class="bottom message-container">
+        <div class="bottom">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
 
@@ -242,8 +269,9 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">分析模式</div>
-    <div class="template" id="tplTsumegoMode">诘棋模式</div>
+    <div class="template" id="tplAnalysisEngine">分析</div>
+    <div class="template" id="tplAnalysisUnavailable">不可用</div>
+    <div class="template" id="tplTsumegoModeFixed">死活模式由题目决定 — 打开题目进入，开始新对局离开</div>
     <div class="template" id="tplTsumegoSolved">解答正确！</div>
     <div class="template" id="tplTsumegoWrong">错误！</div>
     <div class="template" id="tplBlackToMove">黑先</div>
@@ -261,8 +289,6 @@
          move and read as noise. -->
 
     <!-- Status and command feedback -->
-    <div class="template" id="templateKomi">贴目: %.1f</div>
-    <div class="template" id="templateHandicap">让子: %d</div>
     <div class="template" id="tplWaitingFor">正在等待 %s...</div>
     <div class="template" id="tplSaveFailed">保存失败: %s</div>
     <div class="template" id="tplNothingToSave">没有可保存的内容</div>

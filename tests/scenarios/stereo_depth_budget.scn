@@ -51,12 +51,33 @@ cycle shaders
 cycle shaders
 cycle shaders
 cycle shaders
-wait 600
+wait_idle
 expect stereo true
 
 # Every label, once per eye. Nineteen items, thirty-eight draws.
-expect overlay_glyphs 38
+#
+# wait_until rather than expect: wait_idle above returns on the frame the shader
+# became current, and overlay_glyphs reports what the glyph pass last *drew* — so
+# the rebuild into two eyes has been asked for but need not have happened yet.
+# Quiescent is not the same as repainted.
+wait_until overlay_glyphs 38
 expect stereo_deviation <= 0.0334
+
+# Where the scene meets the glass, which the deviation above says nothing about —
+# the window cancels in near-minus-far, so it needs its own assertion.
+#
+# The window rests on the nearest thing in frame: ratio 1 means the near point is
+# exactly at the screen plane, so the scene recedes behind the glass and nothing
+# comes forward through it. That last part is not only taste — the RmlUi
+# interface is drawn flat *at* the screen plane, so anything in negative parallax
+# collides with the menus.
+#
+# A ratio rather than a distance, because this is the invariant: it holds at
+# every zoom and aspect, where a distance is camera specific. Asserted again
+# after the zoom below, which is what the old fixed window could not survive.
+expect stereo_convergence_ratio >= 0.999
+expect stereo_convergence_ratio <= 1.001
+expect stereo_board_far > 0
 
 # --- The zoom that used to break it ------------------------------------------
 # `zoom stones` frames the two stones, which is a much closer camera: the near
@@ -71,6 +92,13 @@ expect stereo_near <= 2.0          # the camera really did come in
 expect stereo_base <= 0.03         # ...and the base came in with it
 expect stereo_deviation <= 0.0334  # which is the whole point
 
+# And the window came in with them — still resting on the near point rather than
+# staying put in world units while the board advances through it. A fixed `dof`
+# could not do this: it put the near point 3.6% of the image width behind the
+# glass at 4:3 and 1.9% at 16:9, values nobody chose.
+expect stereo_convergence_ratio >= 0.999
+expect stereo_convergence_ratio <= 1.001
+
 # The overlay is still drawing both eyes at the new camera — the base it uses is
 # the same value the shader is handed, so there is nothing to drift.
 expect overlay_glyphs 38
@@ -80,7 +108,7 @@ expect overlay_glyphs 38
 # is what says the doubling above was the eyes and not something else.
 cycle shaders
 cycle shaders
-wait 600
+wait_idle
 expect stereo false
-expect overlay_glyphs 19
+wait_until overlay_glyphs 19
 expect stereo_deviation <= 0.0334

@@ -98,5 +98,11 @@ UiActions availableActions(const UiInputs& in) {
     // solves the puzzle for the reader.
     a.evaluation = in.evaluationAvailable && !in.tsumego;
 
+    // Deliberately not also gated on an engine being present. Explore needs one
+    // and setGameMode() refuses it for a human-versus-human game *with a
+    // message saying why* — an explanation the greyed control could not give.
+    // Tsumego is the one state the select only reports, never negotiates.
+    a.gameMode = !in.tsumego;
+
     return a;
 }

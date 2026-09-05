@@ -41,7 +41,11 @@ void UserSettings::load() {
         }
 
         if (user.contains("evaluation_moves")) {
-            evaluationMoves = user["evaluation_moves"].get<bool>();
+            // Was a boolean before the three-state mode: true meant the
+            // suggestions were always drawn, false that they never were.
+            const auto& v = user["evaluation_moves"];
+            if (v.is_boolean()) evaluationMoves = v.get<bool>() ? "always" : "off";
+            else if (v.is_string()) evaluationMoves = v.get<std::string>();
         }
 
         if (user.contains("coordinates")) {
@@ -98,6 +102,9 @@ void UserSettings::load() {
         if (user.contains("pointer_mode")) {
             pointerMode = user["pointer_mode"].get<std::string>();
         }
+        if (user.contains("prisoner_mode") && user["prisoner_mode"].is_string()) {
+            prisonerMode = user["prisoner_mode"].get<std::string>();
+        }
 
         if (user.contains("coordinate_color")) {
             coordinateColor = user["coordinate_color"].get<std::string>();
@@ -135,6 +142,10 @@ void UserSettings::load() {
             shaderDof = shader.value("dof", shaderDof);
             shaderGamma = shader.value("gamma", shaderGamma);
             shaderContrast = shader.value("contrast", shaderContrast);
+        }
+
+        if (user.contains("shader_params") && user["shader_params"].is_object()) {
+            shaderParams = user["shader_params"];
         }
 
         // Helper to parse camera state from JSON
@@ -178,8 +189,30 @@ void UserSettings::load() {
                 }
             }
             sessionIsExternal = session.value("is_external", false);
-            sessionTsumegoMode = session.value("tsumego_mode", false);
-            sessionAnalysisMode = session.value("analysis_mode", false);
+            // One key since the modes became one enum. `tsumego_mode` and
+            // `analysis_mode` are the two booleans it replaced — read only when
+            // the new key is absent, so an existing user.json still restores,
+            // and tsumego first, which is the order the enum resolves them in.
+            // An unreadable name falls back rather than throwing: a settings
+            // file is not a command line, and Match is the harmless answer.
+            sessionGameMode = GameMode::MATCH;
+            if (session.contains("game_mode")) {
+                const auto parsed = parseGameMode(
+                    session.value("game_mode", std::string()));
+                if (parsed) {
+                    sessionGameMode = *parsed;
+                } else {
+                    spdlog::warn("Unknown session game_mode '{}' — starting in {}",
+                        session.value("game_mode", std::string()),
+                        gameModeName(sessionGameMode));
+                }
+            } else if (session.value("tsumego_mode", false)) {
+                sessionGameMode = GameMode::TSUMEGO;
+            } else if (session.value("analysis_mode", false)) {
+                sessionGameMode = GameMode::EXPLORE;
+            }
+            sessionBlackPlayer = session.value("black_player", std::string());
+            sessionWhitePlayer = session.value("white_player", std::string());
         }
 
         spdlog::debug("User settings loaded");
@@ -278,6 +311,10 @@ std::string UserSettings::serialize() const {
     if (anaglyphGreen >= 0.0f) {
         user["anaglyph_green"] = anaglyphGreen;
     }
+    if (!prisonerMode.empty()) {
+        user["prisoner_mode"] = prisonerMode;
+    }
+
     if (!pointerMode.empty()) {
         user["pointer_mode"] = pointerMode;
     }
@@ -307,6 +344,14 @@ std::string UserSettings::serialize() const {
         {"contrast", shaderContrast}
     };
 
+    // Written only when something is in it, so an untouched install carries no
+    // key at all — the same restraint `evaluation_color` shows. Pinning today's
+    // shipped defaults into every user.json would quietly defeat any later
+    // change to them.
+    if (!shaderParams.empty()) {
+        user["shader_params"] = shaderParams;
+    }
+
     // Helper to serialize camera state to JSON
     auto serializeCamera = [](const CameraState& cam) {
         return nlohmann::json{
@@ -333,8 +378,11 @@ std::string UserSettings::serialize() const {
             {"tree_path_length", sessionTreePathLength},
             {"tree_path", sessionTreePath},
             {"is_external", sessionIsExternal},
-            {"tsumego_mode", sessionTsumegoMode},
-            {"analysis_mode", sessionAnalysisMode}
+            // Only the new key is written; the two booleans it replaced are read
+            // for migration and then left behind.
+            {"game_mode", gameModeName(sessionGameMode)},
+            {"black_player", sessionBlackPlayer},
+            {"white_player", sessionWhitePlayer}
         };
     }
 
@@ -365,7 +413,7 @@ void UserSettings::setEvaluationEnabled(bool value) {
     saveLocked();
 }
 
-void UserSettings::setEvaluationMoves(bool value) {
+void UserSettings::setEvaluationMoves(const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex);
     evaluationMoves = value;
     saveLocked();
@@ -401,9 +449,21 @@ void UserSettings::setAnaglyphStrength(float value) {
     saveLocked();
 }
 
+void UserSettings::clearSavedCamera() {
+    std::lock_guard<std::mutex> lock(mutex);
+    savedCameraLoaded = false;
+    saveLocked();
+}
+
 void UserSettings::setPointerMode(const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex);
     pointerMode = value;
+    saveLocked();
+}
+
+void UserSettings::setPrisonerMode(const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    prisonerMode = value;
     saveLocked();
 }
 
@@ -487,6 +547,19 @@ void UserSettings::setShaderContrast(float value) {
     shaderContrast = value;
 }
 
+nlohmann::json UserSettings::getShaderParams(const std::string& shader) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    const auto it = shaderParams.find(shader);
+    if (it == shaderParams.end() || !it->is_object()) return nlohmann::json::object();
+    return *it;   // by value; see the header
+}
+
+void UserSettings::setShaderParam(const std::string& shader, const std::string& name,
+                                  bool value) {
+    std::lock_guard<std::mutex> lock(mutex);
+    shaderParams[shader][name] = value;
+}
+
 void UserSettings::setBoardSize(int value) {
     std::lock_guard<std::mutex> lock(mutex);
     boardSize = value;
@@ -546,6 +619,7 @@ void UserSettings::clearSessionState() {
     sessionTreePathLength = 0;
     sessionTreePath.clear();
     sessionIsExternal = false;
-    sessionTsumegoMode = false;
-    sessionAnalysisMode = false;
+    sessionGameMode = GameMode::MATCH;
+    sessionBlackPlayer.clear();
+    sessionWhitePlayer.clear();
 }

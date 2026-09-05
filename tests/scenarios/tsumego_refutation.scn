@@ -1,0 +1,37 @@
+# A wrong move the record answers: the refutation is played.
+#
+# Collections mark a move BM and record how it is punished. That answer was left
+# lying in the file — the solver was told "Wrong" and never shown why, which is
+# the whole of what a wrong move has to teach. The correct path already played
+# the recorded reply; this branch simply never called the same navigateForward().
+#
+# No engine is involved. What to do when the record has *no* refutation is a
+# separate question and stays on request (Space).
+#
+#   ./tests/run_scenarios.sh tests/scenarios/tsumego_refutation.scn
+
+new_game 9
+wait_idle
+load_tsumego tests/data/tsumego_refuted.sgf
+wait_idle
+expect mode tsumego
+expect tsumego true
+expect move_count 0
+expect white_stones 5
+
+# a8 is the wrong move, recorded as BM with White's answer after it.
+click 0 1
+click 0 1
+wait_until msg tsumego_wrong
+
+# Two moves, not one: the mistake and its punishment. The white stone is the
+# refutation actually played onto the board.
+expect move_count 2
+expect white_stones 6
+
+# And the verdict survives the navigation that played it — setting it before
+# navigateForward() lost it, leaving the punishment with nothing to explain it.
+expect msg tsumego_wrong
+
+# The refutation's own comment is what says why, so it must be on screen.
+expect comment and this is how it is punished

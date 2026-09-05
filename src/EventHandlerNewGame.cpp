@@ -101,7 +101,43 @@ void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& val
             }
         }
     }
+    else if(value == "evaluation_moves") {
+        // Three states, so a select rather than a checkbox: "on demand" and
+        // "always" both looked ticked on one item.
+        if (!controller.acceptsUiEvents()) return;
+        const std::string mode = event.GetParameter<Rml::String>("value", "off").c_str();
+        controller.command("toggle_evaluation_moves " + mode);
+    }
+    else if(value == "game_mode" || value == "prisoners") {
+        // A select's chosen value does not reach the command by itself — every
+        // one of them needs a branch here to lift it out of the event. Three
+        // selects were added without one, and the symptom was quiet: the bare
+        // command reports the current setting instead of changing it, so
+        // `prisoners` printed "auto" into #lblMessage and the widget snapped
+        // back. The scenarios could not see it, because they drive the command
+        // rather than the widget.
+        if (!controller.acceptsUiEvents()) return;
+        const std::string arg = event.GetParameter<Rml::String>("value", "").c_str();
+        if (arg.empty()) return;   // no value is the *query* form; never from a menu
+        controller.command(std::string(value.c_str()) + " " + arg);
+    }
+    else if(value == "toggle_evaluation") {
+        // Its own branch for the same reason, and it is not merely cosmetic: a
+        // bare `toggle_evaluation` *toggles*, so picking "off" while already off
+        // would have switched the evaluation on.
+        if (!controller.acceptsUiEvents()) return;
+        const std::string arg = event.GetParameter<Rml::String>("value", "").c_str();
+        if (arg.empty()) return;
+        controller.command("toggle_evaluation " + arg);
+    }
     else if(value == "shader") {
+        // Like its four siblings above and below. This branch was the one that
+        // did not ask, so filling the dropdown counted as the user choosing a
+        // shader — see populateUIElements(), which now also suppresses events
+        // while it fills. Either fix alone would do here; both, because the rule
+        // is that a programmatic repopulation is not a choice, and it should
+        // hold from both ends.
+        if (!controller.acceptsUiEvents()) return;
         std::istringstream ss(event.GetParameter<Rml::String>("value", "0").c_str());
         int index = 0;
         ss >> index;

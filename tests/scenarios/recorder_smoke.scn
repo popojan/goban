@@ -13,9 +13,9 @@ wait_idle
 
 start
 wait_until move_count >= 3
-toggle_analysis_mode
+toggle_explore_mode
 wait_idle
-expect mode analysis
+expect mode explore
 
 navigate_start
 wait_idle

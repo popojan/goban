@@ -141,7 +141,8 @@ TEST_CASE("session state round-trips, including the branch choices") {
     f.settings().setSessionGameIndex(2);
     f.settings().setSessionTreePathLength(27);
     f.settings().setSessionTreePath({0, 1, 0});
-    f.settings().setSessionTsumegoMode(true);
+    f.settings().setSessionGameMode(GameMode::TSUMEGO);
+    f.settings().setSessionPlayers("GNU Go 3.8", "KataGo 9x9");
     f.settings().save();
 
     f.settings().load();
@@ -149,11 +150,47 @@ TEST_CASE("session state round-trips, including the branch choices") {
     CHECK(f.settings().getSessionGameIndex() == 2);
     CHECK(f.settings().getSessionTreePathLength() == 27);
     CHECK(f.settings().getSessionTreePath() == std::vector<int>{0, 1, 0});
-    CHECK(f.settings().getSessionTsumegoMode());
+    CHECK(f.settings().getSessionGameMode() == GameMode::TSUMEGO);
+    // Distinct from game.*_player, which is the default a *new* game starts
+    // from. One key served both, so an engine switched mid-game came back after
+    // a restart as whoever the SGF's PB/PW named — those are written at the
+    // first move and never updated again.
+    CHECK(f.settings().getSessionBlackPlayer() == "GNU Go 3.8");
+    CHECK(f.settings().getSessionWhitePlayer() == "KataGo 9x9");
 
     f.settings().clearSessionState();
     CHECK_FALSE(f.settings().hasSessionState());
     CHECK(f.settings().getSessionTreePath().empty());
+    CHECK(f.settings().getSessionGameMode() == GameMode::MATCH);
+    CHECK(f.settings().getSessionBlackPlayer().empty());
+}
+
+TEST_CASE("the two mode booleans migrate to the one game_mode key") {
+    // `tsumego_mode` and `analysis_mode` were independent, so a file written by
+    // an older build can carry either — or, since nothing stopped it, both. The
+    // enum has no such value; tsumego wins, which is the order finalizeGameLoad()
+    // resolves them in and the stricter of the two (a puzzle answers itself).
+    SettingsFixture f;
+    f.write(R"({"session": {"file": "./x.sgf", "tsumego_mode": true, "analysis_mode": true}})");
+    f.settings().load();
+    CHECK(f.settings().getSessionGameMode() == GameMode::TSUMEGO);
+
+    f.write(R"({"session": {"file": "./x.sgf", "analysis_mode": true}})");
+    f.settings().load();
+    CHECK(f.settings().getSessionGameMode() == GameMode::EXPLORE);
+
+    // The new key wins outright, so a stale boolean beside it cannot resurrect
+    // a mode the user has since left.
+    f.write(R"({"session": {"file": "./x.sgf", "game_mode": "match", "tsumego_mode": true}})");
+    f.settings().load();
+    CHECK(f.settings().getSessionGameMode() == GameMode::MATCH);
+
+    // An unreadable name is not a mode. Falling back beats throwing out of
+    // startup, and beats silently picking whichever value is listed first —
+    // which is what NLOHMANN_JSON_SERIALIZE_ENUM would have done here.
+    f.write(R"({"session": {"file": "./x.sgf", "game_mode": "analysis"}})");
+    CHECK_NOTHROW(f.settings().load());
+    CHECK(f.settings().getSessionGameMode() == GameMode::MATCH);
 }
 
 TEST_CASE("the shipped default camera is never written to the settings file") {

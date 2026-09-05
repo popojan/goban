@@ -93,6 +93,10 @@ struct Options {
     /// the board is full, which is the one case the scan-order candidates below
     /// can never produce on their own.
     bool analyzePass = false;
+    /// Extra candidates reported with a single visit each — what an engine
+    /// returns when asked for more moves than it seriously searched. They exist
+    /// so the client's "drop the unreliable ones" filter has something to drop.
+    int analyzeNoise = 0;
 };
 
 class Position {
@@ -488,12 +492,29 @@ private:
             // board moves that follow are measured against it.
             if (opts_.analyzePass) candidates.insert(candidates.begin(), "pass");
 
+            // Barely-searched extras, appended after everything real so the
+            // visits below fall away to 1. Counted after the pass is inserted:
+            // computing it earlier gave a real candidate a noise visit count.
+            const size_t serious = candidates.size();
+            for (int n = 0; n < opts_.analyzeNoise; ++n) {
+                for (int row = 0; row < pos_.size(); ++row) {
+                    for (int col = 0; col < pos_.size(); ++col) {
+                        std::string v = formatVertex(col, row);
+                        if (pos_.at(col, row) == kEmpty
+                            && std::find(candidates.begin(), candidates.end(), v) == candidates.end()) {
+                            candidates.push_back(v);
+                            row = pos_.size(); break;
+                        }
+                    }
+                }
+            }
+
             while (analyzing_.load()) {
                 std::ostringstream report;
                 for (size_t i = 0; i < candidates.size(); ++i) {
                     if (i) report << " ";
                     report << "info move " << candidates[i]
-                           << " visits " << (100 - 40 * static_cast<int>(i))
+                           << " visits " << (i < serious ? 100 - 40 * static_cast<int>(i) : 1)
                            << " utility 0.1"
                            << " winrate " << (opts_.analyzeWinrate - 0.05 * static_cast<double>(i));
                     if (kata) {
@@ -502,7 +523,11 @@ private:
                     }
                     report << " order " << i
                            << " pv " << candidates[i];
-                    if (candidates.size() > 1) report << " " << candidates[1 - i];
+                    // (i + 1) % size, not 1 - i: `i` is unsigned, so from the
+                    // third candidate on that underflowed and indexed far off
+                    // the end. Harmless while there were only ever two.
+                    if (candidates.size() > 1)
+                        report << " " << candidates[(i + 1) % candidates.size()];
                 }
                 {
                     std::lock_guard<std::mutex> lock(outMutex_);
@@ -818,6 +843,7 @@ int main(int argc, char** argv) {
         else if (flag == "--analyze-winrate") opts.analyzeWinrate = std::atof(next().c_str());
         else if (flag == "--analyze-score") opts.analyzeScoreLead = std::atof(next().c_str());
         else if (flag == "--analyze-pass") opts.analyzePass = true;
+        else if (flag == "--analyze-noise") opts.analyzeNoise = std::atoi(next().c_str());
         else {
             std::cerr << "mock_gtp_engine: unknown option " << flag << "\n";
             return 2;

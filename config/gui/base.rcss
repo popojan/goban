@@ -143,6 +143,16 @@ select option:hover {
   color: #fffffff0;
 }
 
+/* An option that only ever reports a state. Tsumego is entered by opening a
+   problem, never chosen from a menu, so the option has to be readable while
+   being unpickable — RmlUi honours `disabled` on an option, and SetSelection()
+   still displays it. Same grey as div.cmd.disabled, and :hover is overridden
+   too or the rule above would light it up under the pointer. */
+select option[disabled],
+select option[disabled]:hover {
+  color: #ffffff30;
+}
+
 select selectbox {
   width: auto;
   min-width: 10rem;
@@ -164,19 +174,6 @@ select selectbox {
 
 /* Templates - hidden always */
 div.template {
-  display: none;
-}
-
-/* Bottom status area - prisoner counts hidden (now in Analyze menu) */
-#grpPlayers {
-  display: none;
-}
-
-#cntBlack {
-  display: none;
-}
-
-#cntWhite {
   display: none;
 }
 
@@ -211,8 +208,9 @@ div.template {
  *
  * Everything about where this lives is here, in #grpStatus — move that one rule
  * and the badge and its panel move together. Top left is simply the corner the
- * menu (top right), the prisoner counts (bottom left / top right) and the
- * message box (bottom, full width) do not already use.
+ * menu (top right) and the message box (bottom, full width) do not already
+ * use. The prisoner counts used to hold two more corners; they are drawn on
+ * the board's own margin now.
  *
  * The indicator is deliberately not a toast. A message that fades is no better
  * than a log file nobody opens, and engine failures land in the first seconds
@@ -273,9 +271,6 @@ div.template {
 /* Positioning utilities */
 .bottom { position: absolute; bottom: 0px; left: 0px; right: 0px; }
 
-/* Message container */
-.message-container {
-}
 .left { position: absolute; left: 0px; }
 .center { text-align: center; }
 .right { position: absolute; right: 0px; }
@@ -284,8 +279,6 @@ div.template {
 /* Combined positioning classes */
 .top.right { position: absolute; top: 0px; right: 0px; }
 .top.left { position: absolute; top: 0px; left: 0px; }
-.bottom.right { position: absolute; bottom: 0px; right: 0px; }
-.bottom.left { position: absolute; bottom: 0px; left: 0px; }
 
 /* State indicators */
 div.selected {

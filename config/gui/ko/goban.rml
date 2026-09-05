@@ -38,18 +38,14 @@
                                         onchange="shader" onmousedown="nop"/>
                             </div>
                         </div>
+                        <div class="grp" id="grpSceneParams">
+                            <div class="hr">장면</div>
+                            <div class="cmd selected" id="cmdParam_showBowls" onmouseup="shader_param showBowls toggle">바둑통</div>
+                            <div class="cmd selected" id="cmdParam_showLids" onmouseup="shader_param showLids toggle">통뚜껑</div>
+                        </div>
                         <div class="grp">
                             <div class="hr">창</div>
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">전체화면</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">표시</div>
-                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">마지막 수</div>
-                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">다음 수</div>
-                            <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">추천수</div>
-                            <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">형세 수치</div>
-                            <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">경과 시간</div>
-                            <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">좌표</div>
                         </div>
                         <div class="grp">
                             <div class="hr">카메라</div>
@@ -60,6 +56,46 @@
                             <div class="cmd" onmouseup="save camera">저장</div>
                             <div class="cmd" onmouseup="delete camera">삭제</div>
                         </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>표시</span>
+                    <div class="menuitem show">
+                    <div class="grp">
+                        <div class="hr">착수</div>
+                        <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">마지막 수</div>
+                        <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">다음 수</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">분석</div>
+                        <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">형세 수치</div>
+                        <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">집</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">추천수</div>
+                        <div class="cmd">
+                        <select id="selectEvaluationMoves" onchange="evaluation_moves" onmousedown="nop">
+                        <option value="off">끔</option>
+                        <option value="on_demand">필요할 때</option>
+                        <option value="always">항상</option>
+                        </select>
+                        </div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">바둑판</div>
+                        <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">좌표</div>
+                        <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">경과 시간</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">따낸 돌</div>
+                        <div class="cmd">
+                        <select id="selectPrisoners" onchange="prisoners" onmousedown="nop">
+                        <option value="auto">자동</option>
+                        <option value="always">항상</option>
+                        <option value="never">끔</option>
+                        </select>
+                        </div>
+                    </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
@@ -118,7 +154,7 @@
                     <span>착수</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div id="grpGame">
+                            <div>
                             <div class="hr">대국</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">시작</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">초기화</div>
@@ -135,7 +171,7 @@
                             <div class="template" id="templateQuitWithoutFinishing">진행 중인 대국을 종료하시겠습니까?</div>
                             <div class="template" id="templateStartNewGame">새 대국을 시작하시겠습니까?</div>
                             </div>
-                            <div id="grpMoves">
+                            <div>
                             <div class="hr">착수</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">패스</div>
                             <div class="cmd" id="cmdKibitz" onmouseup="play once">검토</div>
@@ -146,13 +182,19 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>분석</span>
+                    <span>복기</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr">모드</div>
-                            <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">분석 모드</div>
+                            <div class="hr">대국 모드</div>
+                            <div class="cmd" id="cmdGameMode">
+                                <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
+                                    <option value="match">대국</option>
+                                    <option value="explore">탐색</option>
+                                    <option value="tsumego" disabled="disabled">사활</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="grp" id="grpReplay">
+                        <div class="grp">
                             <div class="hr">재생</div>
                             <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">처음</div>
                             <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">이전</div>
@@ -160,16 +202,13 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">마지막</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">점수</div>
-                            <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">집</div>
-                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">형세</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">따낸 돌</div>
-                            <div class="template" id="templatePrisonersWhite">백: %d</div>
-                            <div class="template" id="templatePrisonersBlack">흑: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite">백: 0</div>
-                            <div class="cmd" id="lblPrisonersBlack">흑: 0</div>
+                            <div class="hr">분석</div>
+                            <div class="cmd" id="cmdEvaluation">
+                                <select id="selectEvaluation" onchange="toggle_evaluation" onmousedown="nop">
+                                    <option value="off">끔</option>
+                                    <option value="on">분석</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -203,19 +242,7 @@
             </div>
         </div>
 
-        <div id="grpPlayers">
-            <div id="grpBlack" class="hoverable bottom left">
-                <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="nop">흑: 0</div>
-                </div>
-            </div>
-            <div id="grpWhite" class="hoverable top right">
-                <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="nop">백: 0</div>
-                </div>
-            </div>
-        </div>
-        <div class="bottom message-container">
+        <div class="bottom">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
 
@@ -230,8 +257,9 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">분석 모드</div>
-    <div class="template" id="tplTsumegoMode">쓰메고 모드</div>
+    <div class="template" id="tplAnalysisEngine">분석</div>
+    <div class="template" id="tplAnalysisUnavailable">사용 불가</div>
+    <div class="template" id="tplTsumegoModeFixed">사활 모드는 문제를 따릅니다 — 문제를 열어 들어가고, 새 대국으로 나갑니다</div>
     <div class="template" id="tplTsumegoSolved">정답!</div>
     <div class="template" id="tplTsumegoWrong">오답!</div>
     <div class="template" id="tplBlackToMove">흑선</div>
@@ -249,8 +277,6 @@
          move and read as noise. -->
 
     <!-- Status and command feedback -->
-    <div class="template" id="templateKomi">덤: %.1f</div>
-    <div class="template" id="templateHandicap">접바둑: %d</div>
     <div class="template" id="tplWaitingFor">%s 기다리는 중...</div>
     <div class="template" id="tplSaveFailed">저장 실패: %s</div>
     <div class="template" id="tplNothingToSave">저장할 내용이 없습니다</div>

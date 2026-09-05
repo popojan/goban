@@ -65,6 +65,18 @@ ElementGame::ElementGame(const Rml::String& tag)
 }
 
 void ElementGame::populateUIElements() {
+    // Filling a dropdown makes it fire a change event, and a change event on
+    // this one *switches the shader*. The invariant in CLAUDE.md has always said
+    // repopulation must be wrapped; the shader dropdown was simply left off the
+    // list of dropdowns it named, and it got away with it because the selection
+    // it ended up setting was the one already current.
+    //
+    // It stopped getting away with it when the shader began to be linked in the
+    // background: no program is current during the build, so the selection below
+    // fell to entry 0 and the change event replaced the shader the user had
+    // saved with the first in the list.
+    GobanControl::WidgetEventGuard suppressEvents(control);
+
     // Populate shaders dropdown (doesn't require engines)
     auto selectShader = dynamic_cast<Rml::ElementFormControlSelect*>(
             GetContext()->GetDocument("game_window")->GetElementById("selectShader"));
@@ -83,8 +95,10 @@ void ElementGame::populateUIElements() {
             std::string shaderIndex(ss.str());
             selectShader->Add(shaderName.c_str(),shaderIndex.c_str());
         }
-        // Sync shader menu to restored shader state
-        int currentShader = view.gobanShader.getCurrentProgram();
+        // Sync shader menu to restored shader state. selectedProgram(), not
+        // getCurrentProgram(): during a background link nothing is current yet,
+        // and the shader the user chose is the one being built.
+        int currentShader = view.gobanShader.selectedProgram();
         if (currentShader >= 0 && currentShader < static_cast<int>(shaders.size())) {
             selectShader->SetSelection(currentShader);
         } else {
@@ -286,6 +300,26 @@ void ElementGame::gameLoop() {
 }
 
 double ElementGame::getIdleTimeout() const {
+    // A shader being linked in the background produces no input event either,
+    // and this one is worse than the others: until it lands there is no board on
+    // screen at all, so without a wake-up the loop blocks in glfwWaitEvents(),
+    // draws nothing, and the message explaining the wait is never painted — and
+    // the finished program is never collected, because OnUpdate() is what
+    // collects it. Same trap as the resync and the genmove below; writing the
+    // message without this fixes nothing.
+    //
+    // Fast enough to turn the second count over cleanly.
+    if (view.gobanShader.isBuilding()) {
+        return 0.1;
+    }
+
+    // A dwell is a wait with no input event at its end — the mouse has stopped,
+    // which is the whole point — so without a timeout no frame is drawn and the
+    // reveal never happens. Same trap as the three below.
+    if (view.hintDwellPending()) {
+        return 0.05;
+    }
+
     // During async engine loading, poll periodically to check completion
     if (!enginesLoaded && engineLoadingStarted) {
         return 0.1;  // 100ms polling interval during loading
@@ -355,8 +389,7 @@ void ElementGame::startAsyncEngineLoading() {
     sessionTreePathLength = 0;
     sessionTreePath.clear();
     sessionIsExternal = false;
-    sessionTsumegoMode = false;
-    sessionAnalysisMode = false;
+    sessionGameMode = GameMode::MATCH;
     sessionRestoreNeeded = false;
 
     if (!settings.getStartFresh() && settings.hasSessionState()) {
@@ -368,11 +401,13 @@ void ElementGame::startAsyncEngineLoading() {
             sessionTreePathLength = settings.getSessionTreePathLength();
             sessionTreePath = settings.getSessionTreePath();
             sessionIsExternal = settings.getSessionIsExternal();
-            sessionTsumegoMode = settings.getSessionTsumegoMode();
-            sessionAnalysisMode = settings.getSessionAnalysisMode();
+            sessionGameMode = settings.getSessionGameMode();
+            sessionBlackPlayer = settings.getSessionBlackPlayer();
+            sessionWhitePlayer = settings.getSessionWhitePlayer();
             sessionRestoreNeeded = true;
-            spdlog::info("Session restoration: file={}, gameIndex={}, pathLen={}, branchChoices={}, tsumego={}, analysis={}",
-                sessionFile, sgfGameIndex, sessionTreePathLength, sessionTreePath.size(), sessionTsumegoMode, sessionAnalysisMode);
+            spdlog::info("Session restoration: file={}, gameIndex={}, pathLen={}, branchChoices={}, mode={}",
+                sessionFile, sgfGameIndex, sessionTreePathLength, sessionTreePath.size(),
+                gameModeName(sessionGameMode));
         } else {
             spdlog::warn("Session file not found: {}, falling back to default loading", sessionFile);
             settings.clearSessionState();
@@ -409,12 +444,13 @@ void ElementGame::startAsyncEngineLoading() {
     // Load all engines in parallel - first ready engine loads SGF, rest sync
     // Start at root if: tsumego mode OR we have a session tree path to navigate to
     int gameIdx = sgfGameIndex;  // Capture for lambda
-    bool loadAtRoot = sessionRestoreNeeded && (sessionTsumegoMode || sessionTreePathLength > 0);
+    const bool sessionTsumego = sessionGameMode == GameMode::TSUMEGO;
+    bool loadAtRoot = sessionRestoreNeeded && (sessionTsumego || sessionTreePathLength > 0);
 
     // Queue tree path navigation before starting engines. The command sits in the
     // queue until the game thread starts (inside loadEnginesParallel, as soon as
     // the coach engine is ready). Single unified path — always on the game thread.
-    if (sessionRestoreNeeded && sessionTreePathLength > 0 && !sessionTsumegoMode) {
+    if (sessionRestoreNeeded && sessionTreePathLength > 0 && !sessionTsumego) {
         engine.navigateToTreePath(sessionTreePathLength, sessionTreePath);
         spdlog::info("Session restore: queued tree path navigation ({} steps, {} branch choices)",
             sessionTreePathLength, sessionTreePath.size());
@@ -485,16 +521,17 @@ void ElementGame::performDeferredInitialization() {
         // Tree path navigation was queued in startAsyncEngineLoading() and already
         // processed by the game thread (started early, as soon as coach was ready).
 
-        // Restore tsumego mode
-        if (sessionRestoreNeeded && sessionTsumegoMode) {
-            setTsumegoMode(true);
-            spdlog::info("Session restore: tsumego mode enabled");
-        }
-
-        // Restore analysis mode
-        if (sessionRestoreNeeded && sessionAnalysisMode) {
-            engine.setGameMode(GameMode::ANALYSIS);
-            spdlog::info("Session restore: analysis mode enabled");
+        // Restore the game mode. One value now, so tsumego and explore cannot
+        // both be asked for — which used to be representable, and where the
+        // kibitz auto-reply answered on the solution path, playing the puzzle
+        // for the solver.
+        if (sessionRestoreNeeded && sessionGameMode != GameMode::MATCH) {
+            if (sessionGameMode == GameMode::TSUMEGO) {
+                setTsumegoMode(true);  // also caches the hints and the view's copy
+            } else {
+                engine.setGameMode(sessionGameMode);
+            }
+            spdlog::info("Session restore: {} mode", gameModeName(sessionGameMode));
         }
 
         // Bootstrap UserSettings from daily session if no game settings exist yet
@@ -516,6 +553,37 @@ void ElementGame::performDeferredInitialization() {
             spdlog::info("Bootstrapped UserSettings from daily session: {}x{}, komi={}, handicap={}, players={}/{}",
                 model.getBoardSize(), model.getBoardSize(), model.state.komi, model.state.handicap,
                 blackName, whiteName);
+        }
+
+        // Who was playing when the session was saved, laid *over* whatever
+        // matchSgfPlayers() matched from PB/PW rather than replacing it. Those
+        // are written at the first move and never updated, so a mid-game switch
+        // used to be undone by a restart. Not for an external SGF: matching its
+        // own PB/PW to engines is the whole point of loading someone else's
+        // record. And only when the name still resolves — an engine renamed or
+        // removed from the config keeps the SGF's answer rather than silently
+        // dropping to Human, which is what a bare findPlayer() would do.
+        if (sessionRestoreNeeded && !sessionIsExternal) {
+            auto players = engine.getPlayers();
+            auto findPlayer = [&players](const std::string& name) -> int {
+                if (name.empty()) return -1;
+                for (size_t i = 0; i < players.size(); i++) {
+                    if (players[i]->getName() == name
+                        && !players[i]->isTypeOf(Player::SGF_PLAYER)) {
+                        return static_cast<int>(i);
+                    }
+                }
+                return -1;
+            };
+            const int b = findPlayer(sessionBlackPlayer);
+            const int w = findPlayer(sessionWhitePlayer);
+            if (b >= 0) control.switchPlayer(0, b);
+            if (w >= 0) control.switchPlayer(1, w);
+            if ((b < 0 && !sessionBlackPlayer.empty())
+                || (w < 0 && !sessionWhitePlayer.empty())) {
+                spdlog::info("Session players '{}'/'{}' not both found; keeping the "
+                             "SGF's assignment", sessionBlackPlayer, sessionWhitePlayer);
+            }
         }
 
         refreshPlayerDropdowns();
@@ -579,7 +647,9 @@ void ElementGame::performDeferredInitialization() {
     // Restored separately from the evaluation itself: the suggestions are a
     // separate feature, and their default is off so that turning the evaluation
     // on never silently starts pointing at the board.
-    view.setAnalysisOverlay(UserSettings::instance().getEvaluationMoves());
+    view.setAnalysisOverlayMode(
+        parseHintMode(UserSettings::instance().getEvaluationMoves())
+            .value_or(GobanView::HintMode::Off));
     view.setEvaluationReadout(UserSettings::instance().getEvaluationReadout());
     view.setWaitClock(UserSettings::instance().getWaitClock());
     view.setCoordinates(UserSettings::instance().getCoordinates());
@@ -652,7 +722,30 @@ void ElementGame::syncStatusIndicator() {
 
     std::string text;
     const char* severityClass = nullptr;
-    if (logPanelOpen) {
+    if (view.gobanShader.isBuilding()) {
+        // Above loading, and above the badge: while this is true there is no
+        // board on screen at all, which is the most alarming thing the window
+        // can be doing and the one that most needs explaining. Engines loading
+        // in parallel is the lesser worry and waits its turn — it is also the
+        // longer wait, so it gets the line back soon enough.
+        //
+        // A whole-second count, not a progress bar: nothing can estimate how
+        // long a driver will take to link, so a bar would have to be a
+        // decorative one, and ADR-0012 already settled that a wait is reported
+        // by a count that turns over once a second rather than by motion
+        // carrying no information. The message says it is a one-time cost
+        // because that is the fact that turns a worrying pause into an
+        // acceptable one — it does not happen again on this machine.
+        // templateText() rather than getTemplateText(): this string is new, so
+        // only the English .rml has it, and the free function returns an empty
+        // string for a missing template — a language without the entry would
+        // show a blank line during the one pause that most needs a caption.
+        text = Rml::CreateString(
+            templateText("tplStatusBuildingShader",
+                         "Preparing the board — first time only on this computer… %ds").c_str(),
+            static_cast<int>(view.gobanShader.buildElapsed())).c_str();
+        severityClass = "loading";
+    } else if (logPanelOpen) {
         // While the panel is open this line is the only way to close it again,
         // so it must always be present. It was not: opening marked the messages
         // seen, which emptied the badge, which hid the element — leaving the
@@ -792,49 +885,6 @@ void ElementGame::cacheTsumegoHints() {
     if (!context) return;
     model.tsumegoHintBlack = getTemplateText(context, "tplBlackToMove");
     model.tsumegoHintWhite = getTemplateText(context, "tplWhiteToMove");
-}
-
-/// Writes the four prisoner labels — the two board-corner counters and the two
-/// in the Analysis menu — from one place.
-///
-/// It is one function because it was two, and they disagreed. `capturedBlack`
-/// counts *black stones removed from the board* (`Board::updateCaptures`
-/// increments it when the captured colour is black), so it is what **White** has
-/// taken. The in-game branch had that right and the game-over branch had it
-/// backwards, so every game's final position showed both counts swapped. Same
-/// shape as the buttons that disagreed with their commands before ADR-0005: two
-/// copies of a rule, one of them wrong.
-void ElementGame::syncPrisonerLabels() {
-    auto context = GetContext();
-    if (!context) return;
-    auto doc = context->GetDocument("game_window");
-    if (!doc) return;
-
-    const std::string whiteTpl = templateText("templatePrisonersWhite", "White: %d");
-    const std::string blackTpl = templateText("templatePrisonersBlack", "Black: %d");
-
-    // White's prisoners are the black stones taken, and vice versa.
-    //
-    // From the Board, which is the only thing that counts captures.
-    // GameState::capturedBlack/capturedWhite were initialised to zero and never
-    // assigned anywhere, so these labels read 0 for the whole of every game, and
-    // the bowls stayed empty because the shader is handed the same dead numbers.
-    // Fixing the *pairing* of two permanently-zero values, as this function once
-    // did, could not show it.
-    const auto snap = model.snapshot();
-    const int whiteHasTaken = snap->capturedBlack;
-    const int blackHasTaken = snap->capturedWhite;
-
-    for (const char* id : {"cntWhite", "lblPrisonersWhite"}) {
-        if (auto* el = doc->GetElementById(id)) {
-            el->SetInnerRML(Rml::CreateString(whiteTpl.c_str(), whiteHasTaken).c_str());
-        }
-    }
-    for (const char* id : {"cntBlack", "lblPrisonersBlack"}) {
-        if (auto* el = doc->GetElementById(id)) {
-            el->SetInnerRML(Rml::CreateString(blackTpl.c_str(), blackHasTaken).c_str());
-        }
-    }
 }
 
 std::string ElementGame::templateText(const char* id, const std::string& fallback) const {
@@ -1109,16 +1159,25 @@ void ElementGame::syncActionAvailability() {
     setElementDisabled("cmdClear",      !a.clear);
     setElementDisabled("cmdSave",       !a.save);
     setElementDisabled("cmdEvaluation", !a.evaluation);
-    // Same answer, two buttons: the board annotations need exactly what the
-    // panel needs — an engine that can analyse, and not a tsumego.
-    setElementDisabled("cmdEvaluationMoves", !a.evaluation);
-    setElementDisabled("cmdEvaluationBoard", !a.evaluation);
+    // The wrapper, not the select: div.cmd.disabled carries `pointer-events:
+    // none`, which is inherited in RCSS, so greying the row also stops the
+    // dropdown opening. A puzzle is the one mode the select only reports.
+    setElementDisabled("cmdGameMode", !a.gameMode);
 }
 
 void ElementGame::OnUpdate()
 {
-    if(!view.gobanShader.isReady())
+    // Before the gate below, because this is what opens it.
+    view.takeShaderBuild();
+
+    if(!view.gobanShader.isReady()) {
+        // The board cannot be drawn yet, so the one thing that must still happen
+        // is saying so. #lblStatus is where application status lives (ADR-0012),
+        // and this is the most application-ish state there is: the program is
+        // not able to show you a board yet.
+        syncStatusIndicator();
         return;
+    }
 
     //view.board.setStoneRadius(2.0f * model.metrics.stoneRadius / model.metrics.squareSizeX);
     view.board.updateMetrics(model.metrics);
@@ -1155,7 +1214,9 @@ void ElementGame::OnUpdate()
     std::string gameState(!isOver && isRunning ? "1" : (isOver ? "2" : "4"));
     model.state.cmd = gameState;
     if(model.state.cmd != view.state.cmd) {
-        // Both grpGame and grpMoves are always visible; individual items are disabled as needed
+        // Nothing is shown or hidden by this any more — syncActionAvailability()
+        // greys individual items instead. It survives as the repaint latch for
+        // a lifecycle change that has no other trigger.
         requestRepaint();
         view.state.cmd = gameState;
     }
@@ -1168,19 +1229,53 @@ void ElementGame::OnUpdate()
             OnMenuToggle("toggle_territory", model.board.showTerritory);
         }
     }
-    // Sync the evaluation toggle. It can move without the menu being touched:
+    // Sync the evaluation select. It can move without the menu being touched:
     // the setting is restored at startup, and the service switches itself off
     // when an engine turns out to be incapable.
+    //
+    // A select rather than a toggle so the *engine* can be named on its "on"
+    // option — "who is analysing" was invisible, the same anonymity ADR-0012
+    // left open about the wait indicator. The group header above it stays the
+    // constant "Analysis": a heading that changed with the configuration read as
+    // two different menus. When nobody claimed the role, or the engine that did
+    // turned out unable to analyse, the option says so rather than naming
+    // something that cannot answer — and `a.evaluation` greys the whole control
+    // in exactly those cases, so the word is an explanation, not a false offer.
+    //
+    // This is not the engine *picker*: the analysis role is resolved once from
+    // the configuration and there is no second candidate to choose (ADR-0007
+    // decision 2). The shape is the picker's, so it can grow one.
     {
-        auto* cmdEl = context->GetDocument("game_window")->GetElementById("cmdEvaluation");
-        const bool checked = analysis.isEnabled();
-        if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
-            OnMenuToggle("toggle_evaluation", checked);
+        if (auto* evalEl = dynamic_cast<Rml::ElementFormControlSelect*>(
+                context->GetDocument("game_window")->GetElementById("selectEvaluation"))) {
+            const int want = analysis.isEnabled() ? 1 : 0;
+            if (evalEl->GetSelection() != want) {
+                GobanControl::WidgetEventGuard suppressEvents(control);
+                evalEl->SetSelection(want);
+            }
+            const std::string& name = analysis.analysisEngineName();
+            const bool usable = analysis.isConfigured()
+                             && analysis.state() != AnalysisState::Unavailable;
+            const std::string label = (usable && !name.empty())
+                    ? name
+                    : templateText(usable ? "tplAnalysisEngine" : "tplAnalysisUnavailable",
+                                   usable ? "Analysis" : "unavailable");
+            if (auto* onOption = evalEl->GetOption(1)) {
+                if (onOption->GetInnerRML() != label) {
+                    onOption->SetInnerRML(label.c_str());
+                }
+            }
         }
-        auto* movesEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationMoves");
-        const bool movesChecked = view.isAnalysisOverlayShown();
-        if (movesEl && movesEl->IsClassSet("selected") != movesChecked) {
-            OnMenuToggle("toggle_evaluation_moves", movesChecked);
+        // The suggestions are a three-state select, not a toggle: it can move
+        // without the menu being touched (restored at startup, or set by the
+        // command), so the widget follows the view rather than the other way.
+        if (auto* movesEl = dynamic_cast<Rml::ElementFormControlSelect*>(
+                context->GetDocument("game_window")->GetElementById("selectEvaluationMoves"))) {
+            const int want = static_cast<int>(view.analysisOverlayMode());
+            if (movesEl->GetSelection() != want) {
+                GobanControl::WidgetEventGuard suppressEvents(control);
+                movesEl->SetSelection(want);
+            }
         }
         auto* readoutEl = context->GetDocument("game_window")->GetElementById("cmdEvaluationReadout");
         const bool readoutChecked = view.isEvaluationReadoutShown();
@@ -1197,27 +1292,37 @@ void ElementGame::OnUpdate()
         if (coordEl && coordEl->IsClassSet("selected") != coordChecked) {
             OnMenuToggle("toggle_coordinates", coordChecked);
         }
+        // The prisoner counts are the fourth thing drawn on the wood, so they
+        // belong beside the other three rather than only on a command. Three
+        // states, so a select: option order is PrisonerMode's declaration order.
+        if (auto* prisEl = dynamic_cast<Rml::ElementFormControlSelect*>(
+                context->GetDocument("game_window")->GetElementById("selectPrisoners"))) {
+            const int want = static_cast<int>(view.prisonerMode_());
+            if (prisEl->GetSelection() != want) {
+                GobanControl::WidgetEventGuard suppressEvents(control);
+                prisEl->SetSelection(want);
+            }
+        }
+        syncSceneParamItems();
     }
 
-    // Sync game mode menu toggle with engine state (analysis or tsumego)
+    // The mode is a three-value select, and the widget follows GameThread
+    // rather than the other way: the mode moves without the menu being touched
+    // (restored at startup, decided by an SGF's result, set to Tsumego by
+    // opening a problem), and a command that is refused must leave the widget
+    // showing what is actually in force. Same arrangement as
+    // selectEvaluationMoves. The label-swapping toggle this replaces asked
+    // OnMenuToggle for a class no element carried after the Explore rename, so
+    // its checkmark had silently stopped tracking anything at all.
     {
-        auto doc = context->GetDocument("game_window");
-        auto* cmdEl = doc->GetElementById("cmdAnalysisMode");
-        bool tsumego = view.isTsumegoMode();
-        bool analysisMode = engine.getGameMode() == GameMode::ANALYSIS;
-        bool checked = tsumego || analysisMode;
-        if (cmdEl && cmdEl->IsClassSet("selected") != checked) {
-            OnMenuToggle("toggle_analysis_mode", checked);
-        }
-        // Swap label between analysis and tsumego mode
-        if (cmdEl) {
-            const char* tplId = tsumego ? "tplTsumegoMode" : "tplAnalysisMode";
-            if (auto* tpl = doc->GetElementById(tplId)) {
-                Rml::String current = cmdEl->GetInnerRML();
-                Rml::String target = tpl->GetInnerRML();
-                if (current != target) {
-                    cmdEl->SetInnerRML(target);
-                }
+        if (auto* modeEl = dynamic_cast<Rml::ElementFormControlSelect*>(
+                context->GetDocument("game_window")->GetElementById("selectGameMode"))) {
+            const int want = static_cast<int>(engine.getGameMode());
+            if (modeEl->GetSelection() != want) {
+                // SetSelection() ignores `disabled`, which is what lets Tsumego
+                // be displayed while staying unpickable.
+                GobanControl::WidgetEventGuard suppressEvents(control);
+                modeEl->SetSelection(want);
             }
         }
     }
@@ -1255,7 +1360,6 @@ void ElementGame::OnUpdate()
         || (view.capturedWhiteShown != boardCapturedWhite) /*stones captured */
         || (view.state.reason != GameState::NO_REASON && model.state.reason == GameState::NO_REASON) /* new game */)
     {
-        syncPrisonerLabels();
         // UPDATE_STONES, not a bare repaint: these two numbers are uniforms
         // (iBlackCapturedCount / iWhiteCapturedCount) that GobanShader uploads
         // only under that flag, and they are what tell the shader how many
@@ -1277,25 +1381,11 @@ void ElementGame::OnUpdate()
     }
     if (view.state.handicap != model.state.handicap) {
         auto doc = context->GetDocument("game_window");
-        Rml::Element* hand = doc->GetElementById("lblHandicap");
-        if (hand != nullptr) {
-            hand->SetInnerRML(Rml::CreateString(
-                templateText("templateHandicap", "Handicap: %d").c_str(),
-                model.state.handicap).c_str());
-            requestRepaint();
-        }
         syncDropdown(doc, "selectHandicap", std::to_string(model.state.handicap));
         view.state.handicap = model.state.handicap;
     }
     if (view.state.komi != model.state.komi) {
         auto doc = context->GetDocument("game_window");
-        Rml::Element* elKomi = doc->GetElementById("lblKomi");
-        if (elKomi != nullptr) {
-            elKomi->SetInnerRML(Rml::CreateString(
-                templateText("templateKomi", "Komi: %.1f").c_str(),
-                model.state.komi).c_str());
-            requestRepaint();
-        }
         std::ostringstream komiStr;
         komiStr << model.state.komi;
         syncDropdown(doc, "selectKomi", komiStr.str());
@@ -1390,10 +1480,6 @@ void ElementGame::OnUpdate()
         }
         case GameState::BLACK_WON:
         case GameState::WHITE_WON: {
-            // The same call as the in-game branch, which is the point: this
-            // branch had its own copy and gave cntWhite capturedWhite, so both
-            // prisoner counts silently swapped on the last move of every game.
-            syncPrisonerLabels();
             // Build result message, combining with SGF comment if present
             std::string resultMsg;
             if (model.state.winner == Color::WHITE)
@@ -1462,6 +1548,43 @@ void ElementGame::OnMenuToggle(const std::string &cmd, bool checked) const {
         std::vector<Rml::Element*> elements;
         GetContext()->GetDocument("game_window")->GetElementsByClassName(elements, cmd.c_str());
         for(auto el: elements) {
+            el->SetClass("selected", checked);
+            el->SetClass("unselected", !checked);
+        }
+    }
+}
+
+void ElementGame::syncSceneParamItems() const {
+    auto* grp = GetContext()->GetDocument("game_window")->GetElementById("grpSceneParams");
+    if (!grp) return;
+
+    // Driven by the *menu*, not by a list of names in here: every child whose id
+    // is `cmdParam_<uniform>` is looked up among what the shader offers. Adding
+    // a boolean is then one line of RML and one of config, with no C++ to
+    // change — which is the property ADR-0017 is trying to buy.
+    for (int i = 0; i < grp->GetNumChildren(); ++i) {
+        Rml::Element* el = grp->GetChild(i);
+        const Rml::String id = el->GetId();
+        if (id.rfind("cmdParam_", 0) != 0) continue;
+        const std::string name = id.substr(std::strlen("cmdParam_"));
+
+        const ShaderParam* p = findShaderParam(view.shaderParams(), name);
+
+        // Greyed rather than hidden where the shader has no such feature. It
+        // keeps the menu from reflowing on every shader switch, and a greyed
+        // "Bowls" says this scene has none — which is true, and worth saying.
+        // The same reasoning ADR-0015 used for the Tsumego option: a value the
+        // menu reports without offering.
+        if (el->IsClassSet("disabled") != (p == nullptr)) {
+            el->SetClass("disabled", p == nullptr);
+        }
+
+        // The widget follows the shader, never the other way: the value can move
+        // without the menu being touched — restored from user.json at startup,
+        // set by the command, or reset by switching shader. Same rule as the
+        // Best Moves select.
+        const bool checked = p && p->value;
+        if (el->IsClassSet("selected") != checked) {
             el->SetClass("selected", checked);
             el->SetClass("unselected", !checked);
         }

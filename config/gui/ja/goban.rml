@@ -38,18 +38,14 @@
                                         onchange="shader" onmousedown="nop"/>
                             </div>
                         </div>
+                        <div class="grp" id="grpSceneParams">
+                            <div class="hr">シーン</div>
+                            <div class="cmd selected" id="cmdParam_showBowls" onmouseup="shader_param showBowls toggle">碁笥</div>
+                            <div class="cmd selected" id="cmdParam_showLids" onmouseup="shader_param showLids toggle">蓋</div>
+                        </div>
                         <div class="grp">
                             <div class="hr">ウィンドウ</div>
                             <div class="cmd toggle_fullscreen unselected" id="cmdFullscreen" onmouseup="toggle_fullscreen">全画面</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">表示</div>
-                            <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">最後の手</div>
-                            <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">次の手</div>
-                            <div class="cmd toggle_evaluation_moves unselected" id="cmdEvaluationMoves" onmouseup="toggle_evaluation_moves">候補手</div>
-                            <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">形勢の数値</div>
-                            <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">経過時間</div>
-                            <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">座標</div>
                         </div>
                         <div class="grp">
                             <div class="hr">カメラ</div>
@@ -60,6 +56,46 @@
                             <div class="cmd" onmouseup="save camera">保存</div>
                             <div class="cmd" onmouseup="delete camera">クリア</div>
                         </div>
+                    </div>
+                </div>
+                <div class="menuitem hoverable left">
+                    <span>オーバーレイ</span>
+                    <div class="menuitem show">
+                    <div class="grp">
+                        <div class="hr">着手</div>
+                        <div class="cmd toggle_last_move_overlay selected" id="cmdLastMoveOverlay" onmouseup="toggle_last_move_overlay">最後の手</div>
+                        <div class="cmd toggle_next_move_overlay selected" id="cmdNextMoveOverlay" onmouseup="toggle_next_move_overlay">次の手</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">分析</div>
+                        <div class="cmd toggle_evaluation_readout selected" id="cmdEvaluationReadout" onmouseup="toggle_evaluation_readout">形勢の数値</div>
+                        <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">地</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">候補手</div>
+                        <div class="cmd">
+                        <select id="selectEvaluationMoves" onchange="evaluation_moves" onmousedown="nop">
+                        <option value="off">オフ</option>
+                        <option value="on_demand">必要時のみ</option>
+                        <option value="always">常に表示</option>
+                        </select>
+                        </div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">盤</div>
+                        <div class="cmd toggle_coordinates unselected" id="cmdCoordinates" onmouseup="toggle_coordinates">座標</div>
+                        <div class="cmd toggle_wait_clock selected" id="cmdWaitClock" onmouseup="toggle_wait_clock">経過時間</div>
+                    </div>
+                    <div class="grp">
+                        <div class="hr">アゲハマ</div>
+                        <div class="cmd">
+                        <select id="selectPrisoners" onchange="prisoners" onmousedown="nop">
+                        <option value="auto">自動</option>
+                        <option value="always">常に</option>
+                        <option value="never">なし</option>
+                        </select>
+                        </div>
+                    </div>
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
@@ -118,7 +154,7 @@
                     <span>着手</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div id="grpGame">
+                            <div>
                             <div class="hr">対局</div>
                             <div class="cmd" id="cmdStart" onmouseup="start">開始</div>
                             <div class="cmd" id="cmdClear" onmouseup="clear">クリア</div>
@@ -135,7 +171,7 @@
                             <div class="template" id="templateQuitWithoutFinishing">対局を終了しますか？</div>
                             <div class="template" id="templateStartNewGame">新しい対局を始めますか？</div>
                             </div>
-                            <div id="grpMoves">
+                            <div>
                             <div class="hr">着手</div>
                             <div class="cmd" id="cmdPass" onmouseup="pass">パス</div>
                             <div class="cmd" id="cmdKibitz" onmouseup="play once">検討</div>
@@ -146,13 +182,19 @@
                     </div>
                 </div>
                 <div class="menuitem hoverable left">
-                    <span>分析</span>
+                    <span>研究</span>
                     <div class="menuitem show">
                         <div class="grp">
-                            <div class="hr">モード</div>
-                            <div class="cmd toggle_analysis_mode unselected" id="cmdAnalysisMode" onmouseup="toggle_analysis_mode">検討モード</div>
+                            <div class="hr">対局モード</div>
+                            <div class="cmd" id="cmdGameMode">
+                                <select id="selectGameMode" onchange="game_mode" onmousedown="nop">
+                                    <option value="match">対局</option>
+                                    <option value="explore">探索</option>
+                                    <option value="tsumego" disabled="disabled">詰碁</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="grp" id="grpReplay">
+                        <div class="grp">
                             <div class="hr">再生</div>
                             <div class="cmd" id="cmdNavStart" onmouseup="navigate_start">最初</div>
                             <div class="cmd" id="cmdNavBack" onmouseup="navigate_back">前へ</div>
@@ -160,16 +202,13 @@
                             <div class="cmd" id="cmdNavEnd" onmouseup="navigate_end">最後</div>
                         </div>
                         <div class="grp">
-                            <div class="hr">得点</div>
-                            <div class="cmd toggle_territory unselected" id="cmdTerritory" onmouseup="toggle_territory">地</div>
-                            <div class="cmd toggle_evaluation unselected" id="cmdEvaluation" onmouseup="toggle_evaluation">形勢</div>
-                        </div>
-                        <div class="grp">
-                            <div class="hr">アゲハマ</div>
-                            <div class="template" id="templatePrisonersWhite">白: %d</div>
-                            <div class="template" id="templatePrisonersBlack">黒: %d</div>
-                            <div class="cmd" id="lblPrisonersWhite">白: 0</div>
-                            <div class="cmd" id="lblPrisonersBlack">黒: 0</div>
+                            <div class="hr">分析</div>
+                            <div class="cmd" id="cmdEvaluation">
+                                <select id="selectEvaluation" onchange="toggle_evaluation" onmousedown="nop">
+                                    <option value="off">オフ</option>
+                                    <option value="on">分析</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -203,19 +242,7 @@
             </div>
         </div>
 
-        <div id="grpPlayers">
-            <div id="grpBlack" class="hoverable bottom left">
-                <div class="show bottom left">
-                  <div class="cmd" id="cntBlack" onmouseup="nop">黒: 0</div>
-                </div>
-            </div>
-            <div id="grpWhite" class="hoverable top right">
-                <div class="show top right">
-                  <div class="cmd" id="cntWhite" onmouseup="nop">白: 0</div>
-                </div>
-            </div>
-        </div>
-        <div class="bottom message-container">
+        <div class="bottom">
             <div class="cmd center" id="lblMessage" onmouseup="msg"></div>
         </div>
 
@@ -230,8 +257,9 @@
         </div>
     </game>
     <!-- Mode label templates -->
-    <div class="template" id="tplAnalysisMode">検討モード</div>
-    <div class="template" id="tplTsumegoMode">詰碁モード</div>
+    <div class="template" id="tplAnalysisEngine">分析</div>
+    <div class="template" id="tplAnalysisUnavailable">利用不可</div>
+    <div class="template" id="tplTsumegoModeFixed">詰碁モードは問題に従います — 問題を開いて入り、新規対局で出ます</div>
     <div class="template" id="tplTsumegoSolved">正解！</div>
     <div class="template" id="tplTsumegoWrong">不正解！</div>
     <div class="template" id="tplBlackToMove">黒先</div>
@@ -249,8 +277,6 @@
          move and read as noise. -->
 
     <!-- Status and command feedback -->
-    <div class="template" id="templateKomi">コミ: %.1f</div>
-    <div class="template" id="templateHandicap">置石: %d</div>
     <div class="template" id="tplWaitingFor">%s を待っています...</div>
     <div class="template" id="tplSaveFailed">保存に失敗しました: %s</div>
     <div class="template" id="tplNothingToSave">保存するものがありません</div>

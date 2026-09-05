@@ -218,16 +218,35 @@ TEST_CASE("a reader may copy the entries while writers are adding") {
         }
     });
 
+    // Wait for the writer to be scheduled at least once. Without this the two
+    // checks below can pass on a reader that only ever saw an empty log, which
+    // is a vacuous pass rather than a race that did not happen.
+    while (log.entries().empty()) std::this_thread::yield();
+
+    // Counted rather than CHECKed inside the loop, and asserted once at the end.
+    // The inner check ran once per *entry*, so the number of assertions this
+    // case reported depended on how far the writer had got — between 200 and
+    // about 13000 — and the suite total moved by thousands from run to run. That
+    // is not merely untidy: an assertion count that wanders on its own is a
+    // count nobody can read a regression out of. Every entry is still inspected;
+    // only the reporting is collapsed.
+    int torn = 0, oversized = 0;
+    size_t entriesSeen = 0;
     for (int i = 0; i < 200; ++i) {
         auto entries = log.entries();
-        CHECK(entries.size() <= 64);
+        if (entries.size() > 64) ++oversized;
+        entriesSeen += entries.size();
         for (const auto& e : entries) {
-            CHECK_FALSE(e.text.empty());   // no torn string
+            if (e.text.empty()) ++torn;   // a torn string
         }
     }
 
     stop.store(true);
     writer.join();
+
+    CHECK(oversized == 0);
+    CHECK(torn == 0);
+    CHECK(entriesSeen > 0);   // the reader really did race the writer
 }
 
 TEST_CASE("the spdlog sink captures existing call sites without editing them") {

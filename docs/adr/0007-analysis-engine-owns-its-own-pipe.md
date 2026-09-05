@@ -347,11 +347,14 @@ remain, and none of them blocks the numbers-only first stage.
    Whether ownership extends the fractional convention that `mDeltaCaptured`
    started, or takes a second channel, is a rendering decision of its own and
    blocks only ownership — not win rate or score.
-2. **Does analysis run in tsumego mode?** An overlay that stars the correct move
-   destroys the puzzle. Off is almost certainly right, but tsumego already
-   carries blanket exclusions elsewhere (`suppressSessionCopy`), and whether this
-   is one more of those or a user-visible choice should be settled when tsumego's
-   UX is next touched rather than guessed at here.
+2. ~~**Does analysis run in tsumego mode?**~~ **Settled by ADR-0015**, the way
+   this question guessed: it does not. A blanket exclusion, not a user-visible
+   choice — and *suppressed* rather than disabled, so the process stays alive and
+   the user's toggles are untouched. `AnalysisService::loop()` drops the report
+   while `tsumegoMode` holds, which silences all three surfaces at once. The
+   enforcement had to be at the display rather than in `availableActions()`
+   alone: greying the toggles leaves whoever switched them on before opening a
+   problem unable to switch them off.
 3. **The stream's visit budget and report cadence.** Decision 14 caps the
    *redraw* rate; the engine-side `maxVisits` and report interval that keep a
    live search from saturating a device are a measurement question on real
@@ -518,6 +521,41 @@ fix is the one decision 13 already made for the readout: at a scored end the
 board has finished making its claim, and what to play next is not a question it
 is being asked. `scoredEnd` is the predicate for both, so a resignation keeps
 its suggestions and navigating back off the end brings them back.
+
+### Correction, 2026-09-04: the inherited role is declined when it cannot work
+
+Decision 2's fallback stands, but its failure mode was wrong in three ways on the
+shipped configuration, where GNU Go carries `"kibitz"` and cannot analyse.
+
+The role was inherited anyway, a **clone of GNU Go was spawned** to discover by
+`list_commands` what could have been asked of the engine already running, and the
+failure was logged at `warn` — a red badge on every launch, naming an engine
+nobody had designated for analysis. Meanwhile `evaluationAvailable` was wired to
+`isConfigured()`, so the toggle **offered** the overlay regardless; the field's
+own comment said "and has not been found incapable", which nothing implemented.
+
+Engines are now asked for `list_commands` once, at load. `analysisConfig()`
+declines the *inherited* role when the answer is no — unless `analysis_command`
+or `analysis_parameters` make the analysis instance a different binary, where
+only spawning can tell. `evaluationAvailable` also requires the service not to be
+`Unavailable`, so the toggle greys. Reaching the capability probe now means the
+configuration asked for that engine, so failing it still warrants a warning.
+
+The distinction that makes this coherent: **kibitz needs only `genmove`**, which
+every GTP engine has, so inheriting the analysis role assumes a capability kibitz
+never had to possess.
+
+### Note, 2026-09-04: "the move you see is the move played" is a tendency
+
+Decision 2 justifies the inheritance partly by keeping "the overlay's
+recommendation consistent with what Space plays". That is a property of the
+default, not an invariant, and the code does not enforce it. It breaks when
+`analysis` and `kibitz` name different engines (a legitimate choice — a strong
+analysis engine and a weak opponent), and also *without* any unusual
+configuration: `analysis_command` exists precisely so the analysis instance can
+run a different backend, and `genmove` and `kata-analyze` are different searches
+in one binary with different budgets and move-selection randomness. Not fixed —
+detecting it would mean comparing every move — but not claimed either.
 
 ## What this does not change
 

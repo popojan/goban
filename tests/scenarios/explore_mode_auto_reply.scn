@@ -1,4 +1,4 @@
-# What analysis mode actually does, and why it is refused for a human-versus-
+# What explore mode actually does, and why it is refused for a human-versus-
 # human game.
 #
 # The mode's distinguishing behaviour is that it answers every human move with
@@ -19,11 +19,11 @@ switch_player white human
 wait_idle
 expect mode match
 
-toggle_analysis_mode
+toggle_explore_mode
 wait_idle
 expect mode match          # unchanged, and the refusal now says why
 
-# --- 2. Kibitz does not need analysis mode ----------------------------------
+# --- 2. Kibitz does not need explore mode ----------------------------------
 # Deliberately issued straight after a move, with no settling delay. Between two
 # moves nobody is blocked in genmove — the loop clears playerToMove and sleeps
 # 500 ms — and a kibitz request arriving in that window used to be dropped, so
@@ -40,21 +40,21 @@ wait_idle
 expect move_count 2
 expect mode match
 
-# --- 3. With an engine on the board, analysis mode is available -------------
+# --- 3. With an engine on the board, explore mode is available -------------
 switch_player white mock
 wait_idle
-toggle_analysis_mode
+toggle_explore_mode
 wait_idle
-expect mode analysis
+expect mode explore
 
-# --- 4. In analysis mode the reply ignores the colour assignment ------------
-# Loading a game that carries a result selects analysis mode by itself.
+# --- 4. In explore mode the reply ignores the colour assignment ------------
+# Loading a game that carries a result selects explore mode by itself.
 load_sgf tests/data/resign.sgf
 wait_idle
 switch_player black human
 switch_player white human
 wait_idle
-expect mode analysis
+expect mode explore
 expect main_line_moves 3
 
 navigate_back

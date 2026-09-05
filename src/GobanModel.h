@@ -34,8 +34,12 @@
 class GobanModel: public GameObserver {
 public:
     explicit GobanModel(int boardSize = Board::DEFAULT_SIZE, int handicap = 0, float komi = 0.0f)
-        : invalidated(true),
-          calcCapturedBlack(0), calcCapturedWhite(0), ddc{}, metrics(), cursor({0, 0}), board(boardSize) {
+        // In declaration order — which is the order members are constructed in
+        // whatever the list says, so the list is written to match rather than to
+        // mislead: board(173), invalidated(197), calcCaptured*(200), ddc(201),
+        // metrics(203), cursor(210).
+        : board(boardSize), invalidated(true),
+          calcCapturedBlack(0), calcCapturedWhite(0), ddc{}, metrics(), cursor({0, 0}) {
         // Initialize metrics so board can render before engine initialization
         metrics.calc(boardSize);
         state.metricsReady = true;  // Metrics are valid after calc()

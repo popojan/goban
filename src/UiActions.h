@@ -82,8 +82,9 @@ struct UiInputs {
     bool hasUnsavedChanges = false;
     /// An engine nominated itself for the analysis role and has not been found
     /// incapable. False means the evaluation overlay is not offered at all —
-    /// which is the stock configuration, where nothing carries "kibitz" and the
-    /// only engine is a GNU Go that cannot analyse (ADR-0007 decision 3).
+    /// which is the stock configuration: GNU Go carries "kibitz", so the role is
+    /// inherited, but it supports neither kata-analyze nor lz-analyze
+    /// (ADR-0007 decision 3).
     bool evaluationAvailable = false;
 };
 
@@ -104,6 +105,12 @@ struct UiActions {
     bool clear     = false;
     bool save      = false;
     bool evaluation = false;  ///< Toggle the live evaluation overlay.
+    /// The mode may be changed at all. False in a tsumego, which is entered by
+    /// opening a problem and left by starting a new game — there is no path
+    /// from the menu in either direction, and offering one would restore
+    /// `promote=true` in playVariationAt(), letting the solver's next attempt
+    /// overwrite the recorded answer.
+    bool gameMode  = false;
 };
 
 UiActions availableActions(const UiInputs& in);

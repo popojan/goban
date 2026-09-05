@@ -30,7 +30,7 @@
       "enabled": 0
     },
     {
-      "name": "Katago #kata1 b28",
+      "name": "KataGo",
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata1-b28c512nbt-s9584861952-d4960414494.bin.gz -config ./default_gtp.cfg",
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "name": "Katago #kata9x9 b18",
+      "name": "KataGo 9x9",
       "path": "./engine/katago",
       "command": "katago",
       "parameters": "gtp -model ./models/kata9x9-b18c384nbt-20231025.bin.gz -config ./default_gtp.cfg",
@@ -205,7 +205,7 @@
     },
     {
       "key": 72,
-      "command": "toggle_analysis_mode"
+      "command": "toggle_explore_mode"
     },
     {
       "key": 86,
@@ -276,6 +276,8 @@
       "name": "Red Carpet",
       "vertex": "./config/shaders/vertex/mono.glsl",
       "fragment": "./config/shaders/fragment/red_carpet.glsl",
+      "_comment_bowls": "This scene includes bowl_stones.glsl, so the prisoners are already a visible pile; PrisonerMode::Auto keeps the margin counts off here.",
+      "bowls": 1,
       "height": 0.85
     },
     {
@@ -301,6 +303,8 @@
       "stereo": 1,
       "vertex": "./config/shaders/vertex/stereo.glsl",
       "fragment": "./config/shaders/fragment/red_carpet_stereo.glsl",
+      "_comment_bowls": "This scene includes bowl_stones.glsl, so the prisoners are already a visible pile; PrisonerMode::Auto keeps the margin counts off here.",
+      "bowls": 1,
       "height": 0.85
     },
     {
@@ -311,6 +315,23 @@
       "height": 0.85
     }
   ],
+  "_comment_shader_params": "Scene features a shader exposes as live switches (ADR-0017). The key IS the uniform name, and the GLSL declares nothing but the uniform - metadata lives here rather than in a GLSL comment because a comment cannot be localised, because Configuration already does layered defaults and $include, and because the value the user picks has to be stored out here anyway. `requires` names a capability key on the shader's own entry above: showBowls requires `bowls`, so the four shaders that have no bowls in their scene never offer the toggle, and no C++ knows the word. `label` is overridable per language - that is the reason this is an object keyed by parameter rather than an array. Values the user sets are written to user.json under shader_params, keyed by shader name. Note which is which: the lids (cc[0], cc[1]) hold the PRISONERS and the bowls (cc[2], cc[3]) hold the reservoir, so switching the lids off is what takes the captured-stone pile away - PrisonerMode::Auto follows it and puts the counts in the margin instead.",
+  "shader_params": {
+    "showBowls": {
+      "type": "bool",
+      "default": true,
+      "label": "Bowls",
+      "group": "Scene",
+      "requires": "bowls"
+    },
+    "showLids": {
+      "type": "bool",
+      "default": true,
+      "label": "Lids and prisoners",
+      "group": "Scene",
+      "requires": "bowls"
+    }
+  },
   "_comment_anaglyph": "How a stereo shader combines the two eyes, for red/cyan glasses: gray (both eyes reduced to brightness - no colour, and no retinal rivalry, which is the discomfort of showing each eye a differently coloured version of one object), half-color (the right eye keeps its colour, the left stays grey), color (each eye keeps its own channels - most colour, most rivalry) or dubois (a least-squares optimal mix that keeps recognisable colour with much less rivalry than color). More colour is not simply better; judge it through the glasses. The `anaglyph` command switches live and cycles with no argument, and writes the choice to user.json. Not a per-shader setting like annotations: every stereo shader here is red/cyan, and the choice is about the glasses and the eyes behind them rather than about the board.",
   "_comment_glasses": "Which channels reach which eye, which is a property of the glasses and not of the picture. Red and blue are never in doubt - a red lens passes red and blocks blue, the other lens does the reverse. Green is the whole question. A cyan lens passes green, so with red-cyan glasses green belongs to the RIGHT eye. A blue lens BLOCKS green while the red lens leaks it, so with red-blue glasses green belongs to the LEFT eye. Whichever eye gets green has two channels and is therefore the only eye that can carry hue - colour vision needs two, so exactly one eye can be the coloured one and which eye that is flips with the glasses. Getting this backwards delivers one eye's image to the other eye, which shows up as a second picture rather than a wrong colour: if the colour modes double up and gray does not, this is the setting to change. Set live with the glasses command.",
   "_comment_pointer_mark": "The pointer drawn on the board itself, 0..1, where 0 keeps the native mouse pointer everywhere. Stereo shaders only. A native pointer is composited by the window system at the screen plane with no disparity at all, so under an anaglyph it can never sit at the depth of the point it indicates - fuse the board and you see two pointers, fuse the pointer and the board doubles. There is no value to tune: a 2D overlay has no depth. A mark ray-traced with the board inherits that eye's disparity and its occlusion for free. It is four ticks turned a quarter turn from the grid, so no arm parallels a line, and gapped at the centre so it never covers the intersection it names - on this board a disc already means a stone and an upright cross already means grid. The native pointer is hidden only while it is over the wood: over the interface it is correct, that interface being flat at the screen plane itself.",
@@ -334,9 +355,18 @@
     "readout_color": "#00000040",
     "readout_stale_color": "#00000000",
     "coordinate_color": "#00000040",
+    "_comment_prisoner_color": "Ink for the captured-stone counts on the right margin (View -> the `prisoners` command). The colour is the colour of the stones *counted*, matching what sits in a bowl, and the two must differ in brightness rather than only in hue: GobanOverlay::eyeInk() flattens every label to its own brightness under a stereo shader.",
+    "prisoner_black_color": "#00000060",
+    "prisoner_white_color": "#ffffff90",
     "coordinate_offset": 0.425,
     "move_quality": ["#0f521f", "#7a4d0d", "#a83d38"],
-    "move_quality_loss": [0.015, 0.10]
+    "move_quality_loss": [0.015, 0.10],
+    "_comment_hint_dwell_ms": "How long a point must be aimed at, with a stone in hand, before the suggestions appear in the `on demand` mode (View -> Overlay -> Best Moves). A stone in hand is the precondition and the dwell is the trigger: reaching for the board says nothing about where, a parked cursor says nothing about intent, but together they mean the point has been chosen - which is the moment the engine may answer without replacing the player's own thinking. Configurable because the right value is a matter of feel; the reveal then lasts until the stone is placed or put back, so the candidates can be compared.",
+    "hint_dwell_ms": 800,
+    "_comment_hint_min_moves": "How many candidates to ask the analysis engine to report (kata-analyze `minmoves`). The engine volunteers only the moves it actually searched, so a point a beginner is aiming at often has no number at all; asking wider makes one more likely. An engine that does not know the parameter rejects the whole command, which is caught once and asked without it for the rest of the session. 0 disables the request.",
+    "hint_min_moves": 30,
+    "_comment_hint_min_visits_fraction": "How few visits makes a candidate not worth showing, as a fraction of the best move's visits. Asking for more candidates is only useful with this behind it: a win rate from two visits is noise, and showing it would be worse than the silence it replaces. 0 disables the filter.",
+    "hint_min_visits_fraction": 0.05
   },
   "overlay_shaders": {
     "vertex": "./config/shaders/overlay/overlay-vertex.glsl",

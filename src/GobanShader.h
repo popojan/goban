@@ -1,9 +1,14 @@
 #ifndef GOBAN_GOBANSHADER_H
 #define GOBAN_GOBANSHADER_H
 
+#include <atomic>
+#include <chrono>
 #include <string>
+#include <thread>
+#include <vector>
 #include "AnalysisService.h"
 #include "Metrics.h"
+#include "ShaderParams.h"
 #include "Stereo.h"
 #include "GobanModel.h"
 
@@ -23,22 +28,75 @@ std::string createShaderFromFile(const std::string& filename);
 class GobanShader {
 public:
     explicit GobanShader(const GobanView& view): shadersReady(false), currentProgram(-1),
-        width(0), height(0), gamma(1.0f), contrast(0.0f), eof(0.0725), dof(0.0925), view(view), animT(0.5f)
+        width(0), height(0), gamma(1.0f), contrast(0.0f),
+        eof(Stereo::DEFAULT_DEVIATION), dof(0.0f), view(view), animT(0.5f)
     {
         init();
     }
+    /// Joins any build still in flight. A std::thread destroyed while joinable
+    /// calls std::terminate, and quitting during the very pause this class
+    /// exists to hide is not an unlikely thing for a user to do.
+    ~GobanShader() { joinBuild(); }
+
+    GobanShader(const GobanShader&) = delete;
+    GobanShader& operator=(const GobanShader&) = delete;
+
     void initProgram(const std::string& vprogram, const std::string& fprogram);
     void setMetrics(const Metrics &) const;
     void init();
     void destroy() const;
     void draw(const GobanModel&, int, float) const;
     int choose(int idx);
+
+    /// Select a shader without blocking, when a shared GL context is available.
+    ///
+    /// Linking is the entire cost of selecting a shader — 2019 ms measured on
+    /// Intel/Mesa with a cold driver cache against 19 ms to compile the fragment
+    /// shader — and it is paid the first time *each* shader is used, not only at
+    /// startup. Done on the UI thread it is a frozen window with nothing drawn
+    /// and nothing to explain it.
+    ///
+    /// Falls back to choose() when there is no shared context, so behaviour on a
+    /// driver or platform that will not give us one is exactly what it was.
+    /// Returns the index that will be current once the build lands.
+    int chooseAsync(int idx);
+
+    /// Take delivery of a finished background build, on the UI thread. Returns
+    /// true on the frame the program actually became current, which is the
+    /// caller's cue to mark the view ready and repaint everything.
+    ///
+    /// The context-local half of the build happens here and cannot happen on the
+    /// worker: glBindBufferRange() binds to the *context*, not to the program or
+    /// the buffer, so a binding made on the worker's context leaves this one
+    /// with no uniform buffer and the board draws from whatever was there.
+    bool pollBuild();
+
+    /// Whether a shader is being linked in the background right now.
+    [[nodiscard]] bool isBuilding() const { return buildRunning; }
+
+    /// Which shader is *selected* — the one being linked while a build is in
+    /// flight, the current one otherwise. Widgets must ask this rather than
+    /// getCurrentProgram(), which reports what is actually drawing and is -1
+    /// until the first program lands.
+    [[nodiscard]] int selectedProgram() const {
+        return buildRunning ? buildTarget : currentProgram;
+    }
+
+    /// How long the build in flight has been going, in seconds. Reported to the
+    /// user as a whole-second count — there is no way to estimate the total, so
+    /// there is no honest progress bar to draw; a count that turns over once a
+    /// second is the same answer ADR-0012 reached for the other waits.
+    [[nodiscard]] double buildElapsed() const;
     void use() const;
     static void unuse() ;
     void setTime(float) const;
     void setCameraPan(glm::vec2) const;
     void setCameraDistance(float) const;
     void setStereoBase(float) const;
+    /// The horizontal image shift, computed on the CPU (Stereo::window) like the
+    /// base beside it. Uploaded every frame from shadeIt(), never from
+    /// setMetrics(): it follows the aspect ratio, so a window resize changes it.
+    void setStereoWindow(float) const;
     /// Which eye the next draw renders: 0 left, 1 right. A no-op under a mono
     /// shader, which has no such uniform — the location is simply -1.
     void setEye(int) const;
@@ -71,6 +129,52 @@ public:
     /// offset the overlay draws with, the greyscale its ink collapses to — is
     /// out here rather than in GLSL.
     [[nodiscard]] bool isStereo() const { return currentProgramStereo; }
+    /// Whether this shader is *capable* of drawing the bowls. Declared, not
+    /// inferred: only `scene/red.glsl` includes `bowl_stones.glsl`, so four of
+    /// the six shipped shaders have no vessels in the scene at all.
+    ///
+    /// This is the capability, not the setting — ask drawsPrisonerPile() for
+    /// what is actually on screen.
+    [[nodiscard]] bool hasBowls() const { return currentProgramBowls; }
+
+    /// Whether the captured stones are visible as a physical pile right now,
+    /// which is the question `PrisonerMode::Auto` asks before drawing the counts
+    /// in the margin (ADR-0016).
+    ///
+    /// Two inputs, and ADR-0017 decision 3 is that both are needed: the scene
+    /// must contain the vessels *and* the user must not have switched them off.
+    /// A toggle that answered only the first would let someone hide the pile and
+    /// keep `Auto` believing it was there, which is the collision that made this
+    /// a decision rather than a keyword.
+    ///
+    /// It follows the **lids**, not the bowls: cc[0] and cc[1] are the lids and
+    /// `bowl_stones.glsl` fills them from iBlackCapturedCount /
+    /// iWhiteCapturedCount, while the bowls hold the reservoir. Hiding the bowls
+    /// costs no information; hiding the lids costs the prisoners.
+    ///
+    /// A shader offering no `showLids` parameter falls back to the capability
+    /// alone, which is exactly the behaviour before this mechanism existed.
+    [[nodiscard]] bool drawsPrisonerPile() const {
+        return currentProgramBowls && shaderParamValue(currentParams, "showLids", true);
+    }
+
+    /// The tunable parameters the selected shader offers, in declaration order.
+    [[nodiscard]] const std::vector<ShaderParam>& shaderParams() const { return currentParams; }
+
+    /// The selected shader's `name` from its config entry — the key its saved
+    /// parameter values are stored under.
+    ///
+    /// Deliberately *not* `UserSettings::getShaderName()`, which is empty until
+    /// something writes it: keying the write there and the read here is how the
+    /// two drifted apart the first time this was wired up, and a value written
+    /// under "" is a value that is never read back. One identity, from the same
+    /// place resolveShader() takes it. ADR-0017 decision 4.
+    [[nodiscard]] const std::string& currentShaderName() const { return currentProgramName; }
+
+    /// Set one by name. Returns false when this shader does not offer it, which
+    /// a caller should report rather than swallow — a command naming a parameter
+    /// that is not there is a typo or a shader that cannot do it.
+    bool setShaderParam(const std::string& name, bool value);
     [[nodiscard]] float getStoneHeight() const { return currentProgramH; }
     /// The move-quality ink for the selected shader: the global `annotations`
     /// block with this shader's own laid over it.
@@ -163,11 +267,78 @@ private:
     int currentProgram;
     float currentProgramH{};
     bool currentProgramStereo{false};
+    bool currentProgramBowls{false};
+    std::string currentProgramName;
     QualityPalette currentPalette{};
+
+    /// What the selected shader offers, and what it is set to. Resolved from the
+    /// configuration in resolveShader(), like every other appearance fact here.
+    std::vector<ShaderParam> currentParams;
+    /// Locations for the above, parallel and same length. Separate because
+    /// ShaderParam lives in goban_core, which has no GL — and queried on the UI
+    /// thread in adoptProgram() with the other ~50, since binding is context
+    /// state (ADR-0013).
+    std::vector<GLint> currentParamLocations;
 
     float width, height;
     float gamma, contrast;
     float eof, dof;
+
+    /// A shader entry resolved from the configuration: where its source is, and
+    /// the appearance facts it declares. Carried rather than applied on the spot
+    /// so an asynchronous build can take them on when the program actually
+    /// arrives — see pollBuild().
+    struct PendingShader {
+        int index = -1;
+        std::string vertex, fragment;
+        float height = 0.0f;
+        bool stereo = false;
+        bool bowls = false;
+        std::string name;
+        QualityPalette palette{};
+        std::vector<ShaderParam> params;
+    };
+
+    [[nodiscard]] bool resolveShader(int idx, PendingShader& out) const;
+    void applyShaderMetadata(const PendingShader&);
+    void startBuild(const PendingShader&);
+
+    /// UI thread only, from adoptProgram(): binding and lookups are context
+    /// state (ADR-0013). Warns about a declaration the program has no uniform
+    /// for — see ADR-0017 decision 7.
+    void queryShaderParamLocations();
+    /// From draw(), with the program bound. glUniform applies to whatever is
+    /// currently bound, which is the trap setEye() records.
+    void uploadShaderParams() const;
+
+    /// The background link. Only two values cross the thread boundary — the
+    /// program name the worker produced and the fact that it finished — which is
+    /// why none of the ~50 uniform locations need publishing: they are queried
+    /// on the UI thread in adoptProgram(), where a lookup in a linked program's
+    /// symbol table costs microseconds. Keeping them on one thread is what makes
+    /// this small enough to reason about.
+    std::thread buildThread;
+    std::atomic<bool> buildFinished{false};   ///< worker -> UI, the handover
+    bool buildRunning = false;                ///< UI thread only
+    GLuint buildResult = 0;                   ///< written by the worker, read after buildFinished
+    int buildTarget = -1;                     ///< which shader index is being built
+    std::chrono::steady_clock::time_point buildStarted;
+    PendingShader pending;                    ///< what the worker is building
+    PendingShader queued;                     ///< asked for while that was running
+    bool hasQueued = false;
+
+    /// Compile and link, touching nothing but locals and the GL context that is
+    /// current. Safe on the worker because every object it makes — shaders, the
+    /// program — is shared between contexts, and it sets no context state.
+    /// Returns 0 on failure.
+    static GLuint buildProgram(const std::string& vertexProgram,
+                               const std::string& fragmentProgram);
+
+    /// Install a linked program: the buffers, the binding point and every
+    /// uniform location. UI thread only; see pollBuild().
+    void adoptProgram(GLuint program);
+
+    void joinBuild();
 
     const GobanView& view;
 

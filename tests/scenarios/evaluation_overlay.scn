@@ -35,6 +35,22 @@ toggle_evaluation on
 expect eval_enabled true
 wait_until eval_state running
 
+# And through the widget, which is a different path: the menu item is a select
+# now (its "on" option carries the engine's name), and a select's value reaches
+# its command only through an explicit branch in EventHandlerNewGame. Without
+# one the bare `toggle_evaluation` runs, which *toggles* — so picking "off"
+# while already off would have switched the evaluation on.
+menu_select selectEvaluation off
+wait_idle
+expect eval_enabled false
+menu_select selectEvaluation off
+wait_idle
+expect eval_enabled false
+menu_select selectEvaluation on
+wait_idle
+expect eval_enabled true
+wait_until eval_state running
+
 # Black is to move on an empty board, and the mock reports 0.6 for the side to
 # move. Asserting 60 here and 40 below is the whole frame-of-reference rule:
 # raw numbers would read 60 both times and flip the bar every move.

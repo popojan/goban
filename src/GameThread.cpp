@@ -270,8 +270,9 @@ void GameThread::removeSgfPlayers() const {
 
 bool GameThread::clearGame(int boardSize, float komi, int handicap) {
 
-    // Reset to Match mode on new game
-    gameMode = GameMode::MATCH;
+    // A new game is never a puzzle, so this also drops tsumego — which
+    // newGameNow() used to clear by hand, on the model's published copy.
+    applyGameMode(GameMode::MATCH);
 
     // Only sync coach engine (needed for fixed_handicap computation).
     // All other engines are synced lazily on the game thread when they
@@ -512,7 +513,7 @@ void GameThread::syncOtherEngines(const Move& move, const Player* player, const 
     }
 }
 
-void GameThread::notifyMoveComplete(Engine* coach, const Move& move,
+void GameThread::notifyMoveComplete(Engine* /*coach*/, const Move& move,
                                      Engine* kibitzEngine, bool kibitzed,
                                      const std::string& engineComments) {
     std::ostringstream comment;
@@ -693,7 +694,7 @@ void GameThread::gameLoop() {
         // No separate navigatingHistory check needed.
 
         Player* humanPlayer = playerManager->humanPlayer();
-        if (gameMode == GameMode::ANALYSIS && coach && humanPlayer && !stopRequested()) {
+        if (gameMode == GameMode::EXPLORE && coach && humanPlayer && !stopRequested()) {
             // Analysis mode: human plays either color, engine responds to human moves
             spdlog::debug("Game loop: Analysis mode, waiting for human move (color={})",
                 model.state.colorToMove.toString());
@@ -864,11 +865,11 @@ void GameThread::gameLoop() {
         if(locked) lock.unlock();
 
         // Debug: log if we fell through without entering any mode
-        if (gameMode != GameMode::ANALYSIS && !(coach && player)) {
+        if (gameMode != GameMode::EXPLORE && !(coach && player)) {
             static int fallCount = 0;
             if (++fallCount % 100 == 1) {
                 spdlog::debug("Game loop: fell through (gameMode={}, coach={}, player={})",
-                    gameMode == GameMode::MATCH ? "Match" : "Analysis",
+                    gameModeName(gameMode),
                     coach ? coach->getName() : "null",
                     player ? player->getName() : "null");
             }
@@ -1171,6 +1172,13 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                 }
 
                 if (model.game.isOnBadMovePath()) {
+                    // The record's refutation was never played, so the solver was
+                    // told "wrong" and not shown why. No engine is asked here;
+                    // that stays on request.
+                    if (model.game.hasNextMove()) {
+                        navigator->navigateForward();
+                    }
+                    // After the refutation: navigating clears the message.
                     model.state.msg = GameState::TSUMEGO_WRONG;
                 } else if (model.game.isAtEndOfNavigation()) {
                     model.state.msg = GameState::TSUMEGO_SOLVED;
@@ -1196,7 +1204,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             }
 
             // In Analysis mode, auto-respond with kibitz engine after human variation
-            if (varResult.success && gameMode == GameMode::ANALYSIS) {
+            if (varResult.success && gameMode == GameMode::EXPLORE) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
                 if (kibitz && coach && model.phase() != GamePhase::Finished) {
@@ -1295,31 +1303,44 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
 
 }
 
+void GameThread::applyGameMode(GameMode mode) {
+    if (gameMode == mode) return;
+    gameMode = mode;
+    // Published for the threads that cannot reach `gameMode`: the analysis loop
+    // drops its report in a puzzle, and the view and model read it per frame.
+    // One writer, here (ADR-0006).
+    model.tsumegoMode = (mode == GameMode::TSUMEGO);
+    // Follows the mode rather than being set beside it at three call sites, one
+    // of which used to miss: a puzzle's branches must not be copied into the
+    // daily session document.
+    model.game.setSuppressSessionCopy(mode == GameMode::TSUMEGO);
+    spdlog::info("Game mode changed to: {}", gameModeName(mode));
+}
+
 bool GameThread::setGameMode(GameMode mode) {
     std::unique_lock<std::mutex> lock(playerMutex);
 
-    // Don't allow Analysis mode for human-human matches (no AI to respond)
-    if (mode == GameMode::ANALYSIS) {
-        if (playerManager->areBothPlayersHuman()) {
-            spdlog::info("Analysis mode not available for human-human matches");
-            return false;
-        }
+    // Explore answers *every* move with the kibitz engine, so it needs one:
+    // entering it in a human-versus-human game would quietly turn that game
+    // into human-versus-engine. Tsumego is deliberately not refused here — the
+    // record answers, and player assignment is not consulted at all.
+    if (mode == GameMode::EXPLORE && playerManager->areBothPlayersHuman()) {
+        spdlog::info("Explore mode not available for human-human matches");
+        return false;
     }
 
-    if (gameMode != mode) {
-        gameMode = mode;
-        spdlog::info("Game mode changed to: {}", mode == GameMode::MATCH ? "Match" : "Analysis");
-        if (mode == GameMode::MATCH) {
-            aiVsAiMode = false;
-        }
-        // Interrupt any blocking human player so game loop re-evaluates with new mode
-        Player* p = playerToMove.load();
-        if (p != nullptr && p->isTypeOf(Player::LOCAL | Player::HUMAN)) {
-            p->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
-        }
-        return true;
+    if (gameMode == mode) return false;  // No change (already in requested mode)
+
+    applyGameMode(mode);
+    if (mode == GameMode::MATCH) {
+        aiVsAiMode = false;
     }
-    return false;  // No change (already in requested mode)
+    // Interrupt any blocking human player so game loop re-evaluates with new mode
+    Player* p = playerToMove.load();
+    if (p != nullptr && p->isTypeOf(Player::LOCAL | Player::HUMAN)) {
+        p->suggestMove(Move(Move::INTERRUPT, model.state.colorToMove));
+    }
+    return true;
 }
 
 void GameThread::setAiVsAi(bool enabled) {
@@ -1696,7 +1717,9 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
 
     model.state.komi = gameInfo.komi;
     model.state.handicap = gameInfo.handicap;
-    gameMode = GameMode::MATCH;
+    // The mode is not touched here. finalizeGameLoad() always follows and
+    // settles it, and resetting to MATCH in between destroyed the one thing it
+    // has to read: a tsumego is requested *before* the load runs.
 
     // Copy setup stones to model (always update, even if empty, to clear old state).
     // The SGF tree already has AB/AW properties — don't call setHandicapStones() here,
@@ -1788,7 +1811,7 @@ bool GameThread::loadSGFWithEngine(const std::string& fileName, Engine* engine, 
     return applyLoadedGame(gameInfo, engine);
 }
 
-void GameThread::finalizeGameLoad(Engine* alreadySynced, bool matchPlayers) {
+void GameThread::finalizeGameLoad(Engine* /*alreadySynced*/, bool matchPlayers) {
     // Finalize game load: mark for initial sync, match players, start game thread.
     // All engines will be synced on game thread (coach first for scoring).
 
@@ -1805,7 +1828,11 @@ void GameThread::finalizeGameLoad(Engine* alreadySynced, bool matchPlayers) {
 
     // Set game mode based on result (but don't start yet - caller must call
     // model.start() after UI refresh to avoid race with transient player changes)
-    gameMode = model.game.hasGameResult() ? GameMode::ANALYSIS : GameMode::MATCH;
+    // Tsumego first, and it survives *because* nothing between the request and
+    // here writes the mode. The file chooser and load_tsumego ask for it before
+    // the load runs, and deciding purely on the result would undo that.
+    applyGameMode(gameMode == GameMode::TSUMEGO ? GameMode::TSUMEGO
+                : model.game.hasGameResult() ? GameMode::EXPLORE : GameMode::MATCH);
 
     // Start game thread for navigation (loop waits at !model until started)
     run();

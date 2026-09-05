@@ -11,7 +11,7 @@ Ray-traced 3D Go/Baduk/Weiqi board application with GLSL shaders, GTP engine sup
 ## Documentation
 
 - [Getting Started](getting-started.md) - First game, basic controls
-- [Game Modes](game-modes.md) - Match vs Analysis mode, use cases, undo behavior
+- [Game Modes](game-modes.md) - Match vs Explore mode, use cases, undo behavior
 - [Keyboard Shortcuts](keyboard-shortcuts.md) - Complete key binding reference
 - [Configuration](configuration.md) - JSON configuration files, GTP engines, controls
 - [User Settings](user-settings.md) - Settings persisted between sessions (user.json)
@@ -20,6 +20,9 @@ Ray-traced 3D Go/Baduk/Weiqi board application with GLSL shaders, GTP engine sup
 - [Architecture](architecture.md) - Component and thread map, and four data flows end to end
 - [Testing](testing.md) - Unit test suite, the mock GTP engine, adding a test
 - [Architecture Decision Records](adr/README.md) - Why the code is the way it is
+- [Release Notes](RELEASE_NOTES.md) - What changed in each version
+- [Credits](CREDITS.md) - Translation credits
+- [Third-Party Software](THIRD-PARTY.md) - What Goban is built from, and its licences
 
 ## Quick Start
 

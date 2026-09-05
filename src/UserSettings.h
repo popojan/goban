@@ -18,6 +18,8 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 
+#include "GameMode.h"
+
 struct CameraState {
     float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f, rotW = 1.0f;
     float panX = 0.0f, panY = 0.0f;
@@ -55,8 +57,11 @@ public:
     /// times: the numbers *after* a move, so a player can invent their own and
     /// judge it; the stars *before*, at which point the choice is no longer
     /// theirs. Turning the panel on must not silently take that away.
-    bool getEvaluationMoves() const { std::lock_guard<std::mutex> lock(mutex); return evaluationMoves; }
-    void setEvaluationMoves(bool value);
+    /// "off", "on_demand" or "always" (ADR-0014). A string rather than an enum
+    /// because this header is shared with goban_core, which knows nothing of the
+    /// view; GobanView parses it.
+    std::string getEvaluationMoves() const { std::lock_guard<std::mutex> lock(mutex); return evaluationMoves; }
+    void setEvaluationMoves(const std::string& value);
 
     /// The numbers on the wood, and the elapsed-seconds clock. Both default on;
     /// both are visibility settings for parts of one on-board display, not a
@@ -112,6 +117,8 @@ public:
     /// means the config's answer stands.
     std::string getPointerMode() const { std::lock_guard<std::mutex> lock(mutex); return pointerMode; }
     void setPointerMode(const std::string& value);
+    std::string getPrisonerMode() const { std::lock_guard<std::mutex> lock(mutex); return prisonerMode; }
+    void setPrisonerMode(const std::string& value);
 
     /// How much green the colour modes use; negative means "not set", so the
     /// config's answer stands. Same sentinel as anaglyphStrength.
@@ -176,10 +183,30 @@ public:
     float getShaderContrast() const { std::lock_guard<std::mutex> lock(mutex); return shaderContrast; }
     void setShaderContrast(float value);
 
+    /// Tunable scene parameters the user has changed, keyed by shader name then
+    /// by uniform name (ADR-0017 decision 4). Shader *name* rather than its
+    /// fragment path, because that is already the identity `shaderName` uses to
+    /// restore the selection — and a second identity for one object is how two
+    /// keys drift apart.
+    ///
+    /// Only values that were actually changed are written. A parameter left at
+    /// its shipped default stays absent, so a later change to that default
+    /// reaches everyone who never expressed an opinion — the same rule
+    /// `evaluation_color` follows.
+    ///
+    /// Returned by value: a reference handed out under a lock is not protected
+    /// by it, and the camera accessors here already learned that.
+    nlohmann::json getShaderParams(const std::string& shader) const;
+    void setShaderParam(const std::string& shader, const std::string& name, bool value);
+
     // Camera preset (saved via "save camera", applied via "reset camera")
     CameraState getSavedCamera() const { std::lock_guard<std::mutex> lock(mutex); return savedCamera; }
     void setSavedCamera(const CameraState& state) { std::lock_guard<std::mutex> lock(mutex); savedCamera = state; savedCameraLoaded = true; }
     bool hasSavedCamera() const { std::lock_guard<std::mutex> lock(mutex); return savedCameraLoaded; }
+    /// Forget the saved preset, and only that. `delete camera` used to
+    /// `std::remove()` the whole settings file, so a command named after the
+    /// camera took the language, the sound and every overlay toggle with it.
+    void clearSavedCamera();
 
     /// The view a fresh install opens on, from `camera` in the application
     /// config. Seeded by main() once the config is loaded, and never written
@@ -211,10 +238,22 @@ public:
     void setSessionTreePathLength(int value) { std::lock_guard<std::mutex> lock(mutex); sessionTreePathLength = value; }
     bool getSessionIsExternal() const { std::lock_guard<std::mutex> lock(mutex); return sessionIsExternal; }
     void setSessionIsExternal(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionIsExternal = value; }
-    bool getSessionTsumegoMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionTsumegoMode; }
-    void setSessionTsumegoMode(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionTsumegoMode = value; }
-    bool getSessionAnalysisMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionAnalysisMode; }
-    void setSessionAnalysisMode(bool value) { std::lock_guard<std::mutex> lock(mutex); sessionAnalysisMode = value; }
+    /// One value since the two modes became one enum. Stored as the enum, not
+    /// as its name: gameModeName() and parseGameMode() are crossed exactly
+    /// once, in the JSON at the edge.
+    GameMode getSessionGameMode() const { std::lock_guard<std::mutex> lock(mutex); return sessionGameMode; }
+    void setSessionGameMode(GameMode value) { std::lock_guard<std::mutex> lock(mutex); sessionGameMode = value; }
+
+    /// Who was playing the game being resumed. Distinct from `game.*_player`,
+    /// which is the default for a *new* game: one key was serving both, so a
+    /// player switched mid-game came back as whatever the SGF's PB/PW said —
+    /// those are written at the first move and never updated again.
+    std::string getSessionBlackPlayer() const { std::lock_guard<std::mutex> lock(mutex); return sessionBlackPlayer; }
+    std::string getSessionWhitePlayer() const { std::lock_guard<std::mutex> lock(mutex); return sessionWhitePlayer; }
+    void setSessionPlayers(const std::string& black, const std::string& white) {
+        std::lock_guard<std::mutex> lock(mutex);
+        sessionBlackPlayer = black; sessionWhitePlayer = white;
+    }
     bool hasSessionState() const { std::lock_guard<std::mutex> lock(mutex); return !sessionFile.empty(); }
     void clearSessionState();
 
@@ -265,7 +304,7 @@ private:
 
     // Live evaluation overlay
     bool evaluationEnabled = false;
-    bool evaluationMoves = false;
+    std::string evaluationMoves = "off";
     bool coordinates = false;
     bool evaluationReadout = true;
     bool waitClock = true;
@@ -279,6 +318,7 @@ private:
     std::string glasses;
     float anaglyphGreen = -1.0f;
     std::string pointerMode;
+    std::string prisonerMode;
     std::string evaluationColor;
     std::string coordinateColor;
 
@@ -295,6 +335,8 @@ private:
 
     // Shader
     std::string shaderName;
+    /// shader name -> { uniform name -> value }. See getShaderParams().
+    nlohmann::json shaderParams = nlohmann::json::object();
     float shaderEof = 0.0725f;
     float shaderDof = 0.0925f;
     float shaderGamma = 1.0f;
@@ -311,8 +353,8 @@ private:
     int sessionTreePathLength = 0;
     std::vector<int> sessionTreePath;  // Branch choices only (consumed at multi-child nodes)
     bool sessionIsExternal = false;
-    bool sessionTsumegoMode = false;
-    bool sessionAnalysisMode = false;
+    GameMode sessionGameMode = GameMode::MATCH;
+    std::string sessionBlackPlayer, sessionWhitePlayer;
 };
 
 #endif

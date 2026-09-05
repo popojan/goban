@@ -1,0 +1,114 @@
+# A scene feature the shader exposes can be switched off while the program runs,
+# and the prisoner counts follow it. ADR-0017.
+#
+# Two things are pinned here, and the second is the reason this is a decision
+# rather than a keyword.
+#
+# 1. A capability is not a setting. `"bowls": 1` on a shader entry says the scene
+#    *contains* the vessels; whether they are drawn is the user's. Only a shader
+#    declaring the capability offers the parameters at all, which is why the
+#    Minimal scenes below offer none rather than offering a toggle that would do
+#    nothing.
+#
+# 2. The prisoners live in the LIDS, not the bowls. cc[0] and cc[1] are the lids
+#    and bowl_stones.glsl fills them from iBlackCapturedCount /
+#    iWhiteCapturedCount; the bowls hold the reservoir. So it is showLids that
+#    PrisonerMode::Auto has to follow — a toggle wired to showBowls instead would
+#    let someone hide the pile while Auto went on believing it was there, and the
+#    captured stones would then be counted nowhere at all.
+#
+# NOT covered here, and it is where the first real bug was: persistence across a
+# restart. run_scenarios.sh hands every scenario a throwaway user.json, so a
+# value written by one run cannot be read by another. Verified by hand instead —
+# the write was keyed by UserSettings::getShaderName(), which is empty until
+# something saves the selection, while the read used the shader entry's own
+# name. It persisted under "" and was never loaded back. Two identities for one
+# object, which is the thing ADR-0017 decision 4 exists to forbid.
+
+new_game 9
+wait_idle
+
+# Red Carpet is shader 0 and declares the capability, so both parameters are
+# offered and both ship on.
+expect shader_param_showBowls true
+expect shader_param_showLids true
+
+# Auto keeps the margin counts off, because the pile is visible.
+prisoners auto
+wait_idle
+expect prisoner_mode auto
+expect prisoner_shown false
+
+# --- Switching the lids off brings the counts back --------------------------
+shader_param showLids off
+wait_idle
+expect shader_param_showLids false
+expect prisoner_shown true
+
+# And back again. The setting is live: no relink, which is the whole point of a
+# uniform bool over a #define (2019 ms cold, ADR-0013).
+shader_param showLids on
+wait_idle
+expect shader_param_showLids true
+expect prisoner_shown false
+
+# --- The bowls are independent, and cost no information ---------------------
+# Hiding the reservoir says nothing about the prisoners, so Auto must not react.
+shader_param showBowls off
+wait_idle
+expect shader_param_showBowls false
+expect shader_param_showLids true
+expect prisoner_shown false
+
+# `toggle` is accepted too, and reads the value in force rather than a copy.
+shader_param showBowls toggle
+wait_idle
+expect shader_param_showBowls true
+
+# --- The menu item, not just the command ------------------------------------
+# The wiring nothing else covers: every step above dispatches a command
+# directly, which is exactly how three selects once shipped with no branch to
+# carry their value. Same hazard one level over, for the items that are clicked.
+menu_click cmdParam_showLids
+wait_idle
+expect shader_param_showLids false
+expect prisoner_shown true
+
+menu_click cmdParam_showLids
+wait_idle
+expect shader_param_showLids true
+expect prisoner_shown false
+
+# --- A shader without the capability offers nothing -------------------------
+# One step along the list is Minimal Thin, whose scene has no vessels at all.
+# It contributes no shader_param_* keys, and the counts are shown because there
+# is no pile anywhere.
+cycle shaders
+wait_idle
+expect prisoner_shown true
+
+# And the menu says so: the item is greyed, and greyed means it does not act.
+# `pointer-events: none` keeps a real mouse off it; menu_click refuses for the
+# same reason, or the harness could do what a user cannot.
+#
+# `prisoner_shown` alone would prove nothing here — it is true on this shader
+# whatever happens, because there is no pile to hide. What the refusal has to
+# not do is corrupt the value Red Carpet will come back to, so that is what is
+# asserted, after cycling the rest of the way round the list (six shaders).
+menu_click cmdParam_showLids
+wait_idle
+expect prisoner_shown true
+
+cycle shaders
+cycle shaders
+cycle shaders
+cycle shaders
+cycle shaders
+wait_idle
+expect shader_param_showLids true
+expect prisoner_shown false
+
+# The explicit modes still outrank the shader, as ADR-0016 has it.
+prisoners never
+wait_idle
+expect prisoner_shown false

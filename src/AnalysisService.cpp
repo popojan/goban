@@ -400,8 +400,12 @@ void AnalysisService::start() {
         engineName = botConfig.value("name", botConfig.value("command", std::string()));
     }
     if (!configured) {
-        spdlog::info("analysis: no engine carries \"analysis\" or \"kibitz\"; "
-                     "the evaluation overlay is unavailable");
+        // Nobody asked for this, so it is not a fault: state the outcome, name
+        // the reason, and stop offering it (see isConfigured()).
+        spdlog::info("live evaluation unavailable: no engine is designated for analysis "
+                     "(\"analysis\": 1), and none carrying \"kibitz\" supports "
+                     "kata-analyze or lz-analyze");
+        setState(AnalysisState::Unavailable);
         running = false;
         return;
     }
@@ -571,8 +575,12 @@ bool AnalysisService::startEngine() {
         if (entry == "lz-analyze")   hasLz   = true;
     }
     if (!hasKata && !hasLz) {
-        spdlog::warn("analysis: [{}] supports neither kata-analyze nor "
-                     "lz-analyze; the evaluation overlay is unavailable", engineName);
+        // Reaching here means the configuration asked for this engine — either
+        // "analysis": 1 or an analysis_command override — so it not working is
+        // worth a warning. The merely-inherited case never spawns; see
+        // PlayerManager::analysisConfig().
+        spdlog::warn("live evaluation unavailable: [{}] is configured for analysis but "
+                     "supports neither kata-analyze nor lz-analyze", engineName);
         client.reset();
         return false;
     }
@@ -653,6 +661,38 @@ bool AnalysisService::syncTo(const AnalysisTarget& target) {
     return true;
 }
 
+/// How many candidates to ask the engine for, and how few visits makes one not
+/// worth showing — as a fraction of the best move's visits. Both configurable:
+/// asking wider is only useful with a filter behind it, and where that line
+/// falls is a judgement about the engine, not about the board.
+int AnalysisService::hintMinMoves() {
+    using nlohmann::json;
+    if (!config) return 30;
+    return config->data.value("annotations", json::object()).value("hint_min_moves", 30);
+}
+
+/// Drop candidates the engine barely looked at. A win rate from two visits is
+/// noise, and showing it would be worse than the silence it replaces: the point
+/// of asking for more candidates is coverage, not the appearance of it.
+void AnalysisService::dropUnreliable(AnalysisReport& report) {
+    using nlohmann::json;
+    const double fraction = config
+        ? config->data.value("annotations", json::object())
+              .value("hint_min_visits_fraction", 0.05)
+        : 0.05;
+    if (fraction <= 0.0 || report.moves.empty()) return;
+
+    int best = 0;
+    for (const auto& m : report.moves) best = std::max(best, m.visits);
+    if (best <= 0) return;
+
+    const int floor = std::max(1, static_cast<int>(best * fraction));
+    report.moves.erase(
+        std::remove_if(report.moves.begin(), report.moves.end(),
+                       [floor](const AnalysisMove& m) { return m.visits < floor; }),
+        report.moves.end());
+}
+
 void AnalysisService::streamUntilStale(const AnalysisTarget& target) {
     // A new position is always worth one immediate repaint, whatever the last
     // one displayed.
@@ -662,11 +702,18 @@ void AnalysisService::streamUntilStale(const AnalysisTarget& target) {
     std::ostringstream cmd;
     cmd << analyzeCommand << (target.colorToMove == Color::BLACK ? " B " : " W ")
         << REPORT_INTERVAL_CS;
+    // Ask for more candidates than the engine would volunteer, so a point the
+    // player is aiming at is more likely to have a number. Unreliable ones are
+    // filtered out below rather than shown — asking wider only helps if what
+    // comes back is still trustworthy.
+    const int wantMoves = hintMinMoves();
+    if (useMinMoves && wantMoves > 0) cmd << " minmoves " << wantMoves;
 
     const bool ok = client->streamCommand(cmd.str(), [&](const std::string& line) {
         AnalysisReport next;
         next.positionId = target.positionId;
         if (parseAnalysisLine(line, target.colorToMove, next)) {
+            dropUnreliable(next);
             publish(next);
         }
         if (!running.load() || !enabled.load()) return false;
@@ -683,6 +730,15 @@ void AnalysisService::streamUntilStale(const AnalysisTarget& target) {
         return;
     }
     if (!ok) {
+        // `minmoves` is an extension; an engine that does not know it rejects
+        // the whole command, which would otherwise retire the evaluation
+        // altogether. Drop the request and let the next iteration ask plainly.
+        if (useMinMoves && wantMoves > 0) {
+            useMinMoves = false;
+            spdlog::info("analysis: [{}] would not take `minmoves`; asking without it",
+                         engineName);
+            return;
+        }
         spdlog::warn("analysis: [{}] stream failed", engineName);
         stopEngine();
         setState(AnalysisState::Unavailable);

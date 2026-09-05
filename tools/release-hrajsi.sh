@@ -13,7 +13,7 @@
 # app/goban to rosti.cz — run it once you have looked at the page.
 #
 # The GNU Go binaries are built from the official 3.8 tarball plus one patch;
-# see deps/_patches/gnugo-3.8-implicit-int.patch. Shipping them obliges us to
+# see cmake/patches/gnugo-3.8-implicit-int.patch. Shipping them obliges us to
 # offer that source, which THIRD-PARTY.md does, and THIRD-PARTY.md is in the
 # bundle.
 set -euo pipefail

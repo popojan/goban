@@ -1,0 +1,20 @@
+# config: mock-noanalyze.json
+#
+# The other half of evaluation_unavailable.scn. There the analysis role was only
+# inherited from "kibitz" and the failure is reported quietly; here the engine is
+# designated with "analysis": 1, so somebody asked for it, and being unable to
+# stream is a misconfiguration worth a badge.
+#
+# The distinction is a log level, which nothing else would notice if it flipped.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/evaluation_engine_cannot_analyse.scn
+
+new_game 9
+wait_idle
+expect log_badge none
+
+toggle_evaluation on
+wait_until eval_state unavailable
+
+expect log_badge warning
+expect eval_winrate -1

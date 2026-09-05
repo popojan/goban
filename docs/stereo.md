@@ -78,6 +78,76 @@ it decides where the scene sits relative to the glass, never how much depth the
 eyes must accept. Parallel cameras, never toe-in: toe-in keystones each eye
 differently, which is a vertical disparity the eyes cannot fuse away.
 
+### Where the screen plane actually lands
+
+The shader shifts each eye's image by `dof`, so a point at depth `z` is seen by
+the right eye at `q0.x = dof + f·(x−e)/z` and by the left at `−dof + f·(x+e)/z`.
+Their separation is `2·dof − 2·f·e/z`, which vanishes at
+
+```
+convergence = f·e/dof                       // Stereo::convergence()
+```
+
+Everything nearer than that is in front of the glass, everything further behind
+it. `GobanView::stereoConvergence()` reports it and `dumpState()` publishes it as
+`stereo_convergence`, beside `stereo_board_near`/`stereo_board_far` — because the
+question anyone asks of it is a comparison, not a distance.
+
+Substituting `e = dev·aspect·near/f` cancels the near point entirely:
+
+```
+convergence = near   ⟺   dof = dev · aspect      // Stereo::window()
+```
+
+So the window needs no camera term — only the aspect ratio it is measured
+against — and that is what it is set to. **The window rests on the nearest thing
+in frame at every zoom and every aspect ratio**, so the scene recedes behind the
+glass and nothing comes forward through it.
+
+`dof` is now an *offset* from that resting place, in fractions of image width,
+default 0 and clamped to ±0.05. Positive sinks the scene further back; negative
+brings it forward through the screen plane.
+
+### Why the near point, and not further forward
+
+A fixed `dof` was wrong in a way no single screenshot shows. The shipped 0.0925
+put the near point **3.6% of the image width behind the glass at 4:3 and 1.9% at
+16:9** — the whole board behind the screen by an amount nobody chose, different on
+every monitor. Everything in the scene was in positive parallax, which is why the
+RmlUi interface, flat at the screen plane by construction, appeared to float in
+front of the board.
+
+Forward of the near point is more vivid and was tried: the board reads better
+with the plane nearer its middle. It is rejected because **the interface is drawn
+at the screen plane**, so anything in negative parallax intersects the menus —
+the classic window violation, with the window frame being the UI itself. The near
+point is therefore the furthest forward the window can go, and it is where it
+sits.
+
+**Measured** before the change, 19×19 at the default camera, 1024×768, board
+spanning 2.42 to 3.99:
+
+| `dof` (old absolute) | convergence | disparity at the board (measured / predicted) |
+|---|---|---|
+| 0.0925 (was shipped) | 1.16 | +41 / +40 px near, +46 / +49 px far |
+| 0.0450 | 2.39 | +5 / +4 px near, +9 / +12 px far |
+| 0 (no shift) | ∞ | −30 / −31 px near, −25 / −22 px far |
+
+Positive is behind the screen. Measured by cross-correlating the red and blue
+channels of a `gray` anaglyph screenshot — the two columns agreeing across a sign
+flip is the check that matters, not either column alone.
+
+The old arrangement also put the far field 6.9% of the image width behind the
+screen, which on a 2 m projection is 139 mm of positive parallax: past the
+interocular distance, so the eyes diverge. Projection is the case the 1/30
+ceiling is chosen for, so the fixed window contradicted the very rule the base
+follows.
+
+`stereo_convergence_ratio` reports convergence over the near point — 1 when the
+window is resting on it. A ratio rather than a distance because that is the
+invariant: it holds at every zoom and aspect, where a distance is camera
+specific.
+
 ## Two traps, both found the hard way
 
 **Do not normalize a ray direction in a vertex shader.** `rdb`/`rdbl`/`rdbr` are
@@ -104,6 +174,9 @@ letter showed straight through it. `render()` reports into `sceneDepth`;
 |---|---|
 | `src/Stereo.h` | the two formulas, the ceiling, the default |
 | `GobanView::stereoNearPoint()` | board box + the table's near edge |
+| `GobanView::cameraBasis()` | the camera model the vertex shaders build, in one place |
+| `GobanView::stereoWindow()` | the image shift, derived like the base and uploaded beside it |
+| `GobanView::stereoConvergence()` | where the scene meets the glass |
 | `GobanView::stereoHalfBase()` | the one base, uploaded to the shader **every frame** from `shadeIt()` and used by `GobanOverlay` for the same two eyes |
 | `GobanOverlay::draw()` | one pass per eye: eye offset, off-axis frustum for the window, colour mask, depth writes off |
 | `GobanOverlay::eyeInk()` | anaglyph is greyscale, so a label keeps only its brightness |

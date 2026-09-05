@@ -1,0 +1,105 @@
+# config: mock-eval.json
+#
+# ADR-0014: the engine answers after you have decided.
+#
+# The suggestions are withheld until the player has aimed at a point long enough
+# to have chosen it — a stone in hand is the precondition, the dwell is the
+# trigger. That turns the same display from a substitute for thinking into a
+# check on it, which is what lets it be on at all for someone learning.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/evaluation_on_demand.scn
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+toggle_evaluation on
+toggle_evaluation_moves on_demand
+expect eval_moves_mode on_demand
+
+# Nothing on the board, and nothing being waited for: no stone has been picked
+# up, so there is no point being aimed at.
+expect eval_moves_shown false
+expect eval_hint_waiting false
+
+# --- Reaching for a stone starts the wait, it does not end it ----------------
+# (1,0) is the mock's second candidate: its own win rate is 55 where the
+# position's is 60, so the two are told apart by the number itself.
+click 1 0
+expect holds_stone true
+# Still nothing: reaching for a stone is not choosing a point.
+expect eval_moves_shown false
+# And the readout still answers about the *position* — the mode is withholding
+# the engine's opinion of the point being aimed at.
+wait_until eval_board_text B 60% B+2.5
+
+# --- ...and the dwell ends it ------------------------------------------------
+# Longer than annotations.hint_dwell_ms, which ships at 800.
+wait_until eval_moves_shown true
+expect eval_hint_waiting false
+
+# The engine is asked for more candidates than it seriously searched (`minmoves`)
+# so an aimed-at point is more likely to have a number — and the ones it barely
+# looked at are dropped again, because a win rate from a single visit is noise
+# and showing it would be worse than the silence it replaces. This mock reports
+# two real candidates and six with one visit each.
+expect eval_moves 2
+
+# The numbers stay the *position's* — they do not become the candidate's — and
+# what the aimed-at point costs is appended in brackets. Anchoring them is what
+# makes the line readable: the same slot used to mean two different things, so
+# aiming at the best move and aiming at a point the engine never searched
+# produced identical text. The mock gives both candidates the same score lead,
+# so only the win-rate half of the cost appears here.
+wait_until eval_board_text B 60% B+2.5 (-5%)
+
+# --- The reveal survives looking around --------------------------------------
+# It closes on placing or putting the stone back, not on moving away: comparing
+# the candidates is the point of having revealed them.
+mouse_move 400 300
+expect eval_moves_shown true
+
+# --- Placing closes it -------------------------------------------------------
+click 1 0
+wait_until move_count >= 1
+expect holds_stone false
+expect eval_moves_shown false
+
+# --- `always` is the old behaviour, unconditional -----------------------------
+toggle_evaluation_moves always
+expect eval_moves_mode always
+expect eval_moves_shown true
+expect eval_hint_waiting false
+
+# --- and `off` is off, stone in hand or not ----------------------------------
+toggle_evaluation_moves off
+expect eval_moves_mode off
+expect eval_moves_shown false
+click 2 2
+expect holds_stone true
+wait 1000
+expect eval_moves_shown false
+expect eval_hint_waiting false
+
+# --- The engine's own first choice is marked, not left blank -----------------
+# A fresh board, because aiming needs an empty hand: (0,0) is the mock's first
+# candidate, and its cost is nothing. With the cost suppressed below a whole
+# percent it would read exactly like a point the engine never searched — both
+# bracketless — so the one case worth marking got nothing. `=` says "level with
+# the best".
+#
+# A symbol rather than a word on purpose: every language config points
+# `fonts.overlay` at the same ASCII-only font, so nothing drawn on the board can
+# be translated at all. (`pass` in the margin survives that rule by being a GTP
+# literal rather than English.)
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+toggle_evaluation_moves on_demand
+click 0 0
+wait_until eval_moves_shown true
+wait_until eval_board_text B 60% B+2.5 (=)

@@ -47,7 +47,8 @@ public:
     /// Prisoner counts do NOT live here. Board::capturedCount() is the only
     /// thing that counts captures; these fields were initialised to zero and
     /// never assigned, so every reader of them displayed 0 for the whole of
-    /// every game. See ElementGame::syncPrisonerLabels().
+    /// every game. The counts reach the UI through GameSnapshot; the board draws
+    /// them, in the bowls and as GobanView's margin labels.
     int reservoirBlack, reservoirWhite;
     float komi;
     int handicap;

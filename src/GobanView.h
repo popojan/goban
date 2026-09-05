@@ -16,6 +16,7 @@
 #ifndef GOBAN_GOBANVIEW_H
 #define GOBAN_GOBANVIEW_H
 
+#include <chrono>
 #include <string>
 #include <atomic>
 #include <optional>
@@ -30,6 +31,7 @@
 #include "AudioPlayer.hpp"
 #include "AnalysisService.h"
 #include "StereoComposite.h"
+#include "UserSettings.h"
 
 
 extern std::shared_ptr<Configuration> config;
@@ -44,6 +46,15 @@ enum class PointerMode { Auto, Always, Never };
 
 const char* pointerModeName(PointerMode mode);
 std::optional<PointerMode> parsePointerMode(const std::string& name);
+
+/// When the prisoner counts are drawn in the margin. Same three states as
+/// PointerMode, and for the same reason: `Auto` means "where the real thing is
+/// missing", which here is a shader that draws no bowls — four of the six
+/// shipped ones, on which the captures were invisible.
+enum class PrisonerMode { Auto, Always, Never };
+
+const char* prisonerModeName(PrisonerMode mode);
+std::optional<PrisonerMode> parsePrisonerMode(const std::string& name);
 
 // WaitKind, waitKindName() and the blink curve; see WaitIndicator.h for why the
 // two game waits are drawn on the board rather than written in #lblStatus.
@@ -125,10 +136,35 @@ public:
         gobanShader.setGamma(1.0);
         gobanShader.setContrast(0.0);
         updateFlag |= UPDATE_SHADER;
+        saveShaderSettings();
     }
 
     float getContrast() const {
 		return gobanShader.getContrast();
+    }
+
+    /// The tunable scene parameters the current shader offers (ADR-0017).
+    [[nodiscard]] const std::vector<ShaderParam>& shaderParams() const {
+        return gobanShader.shaderParams();
+    }
+
+    /// Set one, persist it, and repaint. False when this shader does not offer
+    /// it — the caller says so rather than failing quietly.
+    ///
+    /// `UPDATE_STONES` because the vessels and the stones in them are stone
+    /// geometry, and the prisoner counts that may appear in their place travel
+    /// on it too: a bare repaint would change the scene and leave the margin
+    /// showing the old answer, which is the shape of the annotation-patch bug.
+    bool setShaderParam(const std::string& name, bool value) {
+        if (!gobanShader.setShaderParam(name, value)) return false;
+        // Keyed by the shader's own name, which is what resolveShader() reads it
+        // back with. Using UserSettings::getShaderName() here instead wrote every
+        // value under "" until something else happened to save the selection —
+        // so it persisted, and was never loaded. See currentShaderName().
+        UserSettings::instance().setShaderParam(
+            gobanShader.currentShaderName(), name, value);
+        requestRepaint(UPDATE_SHADER | UPDATE_STONES);
+        return true;
     }
 
     bool toggleFpsLimit() {MAX_FPS = !MAX_FPS; return MAX_FPS;}
@@ -136,8 +172,42 @@ public:
 
     void switchShader(int idx);
 
+    /// Take delivery of a shader linked in the background, if one is ready.
+    /// Returns true on the frame it became current.
+    ///
+    /// Called from ElementGame::OnUpdate() **before** its readiness gate, since
+    /// this is the thing that opens that gate — it used to sit at the end of
+    /// Update(), which OnUpdate only reaches once the view is already ready, so
+    /// the build could never be adopted at all.
+    bool takeShaderBuild();
+
     [[nodiscard]] Position getBoardCoordinate(float x, float y)const ;
     [[nodiscard]] glm::vec2 boardCoordinate(float x, float y) const;
+
+    /// The camera model the vertex shaders build — origin plus the right, up and
+    /// forward axes — in one place. It was written out longhand in three
+    /// functions here, each claiming in a comment to match the other two, which
+    /// is the arrangement that eventually disagrees.
+    struct CameraBasis {
+        glm::vec3 roo;   ///< Camera position (the centre camera, not either eye)
+        glm::vec3 cu;    ///< Right
+        glm::vec3 cv;    ///< Up
+        glm::vec3 cw;    ///< Forward, toward the board
+    };
+    [[nodiscard]] CameraBasis cameraBasis() const;
+
+    /// Depth range of the board box alone, along the view axis. Unlike
+    /// stereoNearPoint() the table is not consulted: this exists to make
+    /// stereoConvergence() readable, and "the screen plane is at the back of the
+    /// board" is a claim about exactly these two numbers.
+    void stereoBoardDepth(float& nearZ, float& farZ) const;
+
+    /// Depth of the zero-parallax plane — where the scene meets the glass.
+    /// Everything nearer is in front of the screen, everything further behind.
+    /// This is what `dof` decides; see Stereo::convergence(). Reported by
+    /// dumpState() because there was no way to ask it, and so no way to check a
+    /// suspicion about it except by looking at a screenshot through glasses.
+    [[nodiscard]] float stereoConvergence() const;
 
     /// Depth of the nearest thing in frame, along the view axis. The board is a
     /// fixed-size box and the table runs under it toward the viewer, so both are
@@ -159,6 +229,22 @@ public:
     /// GobanOverlay to place the same two eyes. Splitting it would let the text
     /// drift off the wood it is supposed to be lying on.
     [[nodiscard]] float stereoHalfBase() const;
+
+    /// The horizontal image shift — the stereoscopic window — for the current
+    /// camera and aspect ratio. Derived, exactly as the base above is: it rests
+    /// on the near point unless the user has pushed it off with `dof`. The one
+    /// implementation again, and for the same reason — the board and the
+    /// overlay's text must sit in the same window or the labels leave the wood.
+    [[nodiscard]] float stereoWindow() const;
+
+    /// Persist the four appearance settings that are *not* camera state: the
+    /// stereo base and window, gamma and contrast. Called by the commands that
+    /// change them, so they behave like every other display setting here
+    /// (`anaglyph`, `pointer`, the evaluation toggles) — sticky the moment they
+    /// change. They used to be written only by `save camera` and re-read by
+    /// `reset camera`, so tuning an anaglyph and then reframing the board
+    /// silently undid the tuning.
+    void saveShaderSettings();
 
     void resetView();
     void saveView();          // Save current camera to preset (user-triggered)
@@ -231,6 +317,7 @@ public:
     /// Every label placed by board coordinate rather than by board point: the
     /// evaluation readout, the wait indicator and, when shown, the coordinate
     /// labels. One function because setFloatingLabels() replaces the whole list.
+    void promoteHintLabel();
     void updateFloatingLabels();
 
     /// The numbers on the wood — win rate and score estimate. Separate from
@@ -356,6 +443,27 @@ public:
     void setPointerMode(PointerMode mode);
     [[nodiscard]] PointerMode pointerMode_() const { return pointerMode; }
 
+    void setPrisonerMode(PrisonerMode mode);
+    [[nodiscard]] PrisonerMode prisonerMode_() const { return prisonerMode; }
+    /// Whether the counts belong in the margin at all. `Auto` asks the shader:
+    /// Red Carpet already shows the prisoners as a pile in its lids, so a
+    /// number beside it would be the same fact twice, while the Minimal scenes
+    /// show nothing at all.
+    ///
+    /// It asks `drawsPrisonerPile()` rather than the capability, so switching
+    /// the lids off (ADR-0017) brings the counts back instead of leaving the
+    /// prisoners uncounted anywhere.
+    [[nodiscard]] bool showPrisonerCounts() const {
+        if (prisonerMode == PrisonerMode::Never)  return false;
+        if (prisonerMode == PrisonerMode::Always) return true;
+        return !gobanShader.drawsPrisonerPile();
+    }
+    /// What the glyph pass last drew, for dumpState(). Both set whenever the
+    /// counts are shown at all, a zero included — empty only means the mode or
+    /// the shader is keeping them off. See updateFloatingLabels().
+    [[nodiscard]] const std::string& prisonerTextBlack() const { return prisonerTextB; }
+    [[nodiscard]] const std::string& prisonerTextWhite() const { return prisonerTextW; }
+
     /// How much of the green channel the colour modes use. The dial for lenses
     /// that pass green through *both* filters, where no assignment of green to an
     /// eye is clean and the only remaining lever is how much of it there is.
@@ -419,14 +527,30 @@ public:
     [[nodiscard]] bool areCoordinatesShown() const { return showCoordinates; }
     void setCoordinates(bool shown);
 
-    /// Off by default, and that is the point. The panel's numbers are read
-    /// *after* a move, so a player can invent their own and judge it. Stars on
-    /// the board are read *before*, and once the engine has pointed at a point
-    /// you cannot un-see it — the freedom to choose your own is gone from the
-    /// first move. Two different features, separately switchable.
+    /// When the engine's suggestions are drawn (ADR-0014).
+    ///
+    /// `Always` is what the old boolean `true` meant, and it is read *before* a
+    /// decision — once the engine has pointed at a point you cannot un-see it.
+    /// `OnDemand` withholds them until the player has aimed at a point long
+    /// enough to have chosen it, which turns the same display from a substitute
+    /// for thinking into a check on it.
+    /// The order matches the three `<option>`s of #selectEvaluationMoves, which
+    /// is what the menu sync casts through.
+    enum class HintMode { Off, OnDemand, Always };
+
     bool toggleAnalysisOverlay();
+    // hintModeName / parseHintMode are free functions below the class.
+    /// Whether the suggestions are on screen *now* — the mode, plus whether an
+    /// on-demand reveal is currently open. The renderer asks only this.
     [[nodiscard]] bool isAnalysisOverlayShown() const { return showAnalysisOverlay; }
     void setAnalysisOverlay(bool shown);
+    [[nodiscard]] HintMode analysisOverlayMode() const { return hintMode; }
+    void setAnalysisOverlayMode(HintMode mode);
+
+    /// True while a stone is held over a point and the dwell has not yet
+    /// elapsed — the loop must keep waking, or no frame is drawn and the reveal
+    /// never happens.
+    [[nodiscard]] bool hintDwellPending() const;
 
     /// Where the suggestions come from. Set once by ElementGame; the view reads
     /// the published report exactly as it reads GobanModel::snapshot(), so
@@ -523,7 +647,18 @@ public:
     Position lastMove;
     std::vector<Position> navOverlays; // Positions of navigation overlays (next move previews, supports branches)
     std::vector<Position> markupOverlays; // Positions of SGF markup annotations (LB/TR/SQ/CR/MA)
+    /// The effective "draw them now" flag, derived from hintMode and
+    /// hintRevealed. Kept as the single thing the renderer reads.
     bool showAnalysisOverlay = false;
+    HintMode hintMode = HintMode::Off;
+    /// An on-demand reveal is open. Set when the dwell elapses; cleared when the
+    /// stone is placed or put back, so it survives looking around the board.
+    bool hintRevealed = false;
+    Position hintDwellPoint{-1, -1};
+    std::chrono::steady_clock::time_point hintDwellSince;
+    void applyOverlayVisibility();
+    void updateHintDwell();
+
     bool showCoordinates = false;
     glm::vec4 coordinateInk{0.0f, 0.0f, 0.0f, 1.0f};
     float coordOffset = 0.425f;
@@ -537,6 +672,14 @@ public:
     bool pointerOverBoard = false;
     bool pointerOnWidget = false;
     PointerMode pointerMode = PointerMode::Auto;
+    PrisonerMode prisonerMode = PrisonerMode::Auto;
+    /// Ink for the two counts: the colour of the stones *counted*, which is what
+    /// the bowls show — black stones sitting in White's bowl. It survives a
+    /// stereo shader, where eyeInk() flattens every label to its own brightness
+    /// and black against white is exactly a brightness difference.
+    glm::vec4 prisonerInkBlack{0.0f, 0.0f, 0.0f, 1.0f};
+    glm::vec4 prisonerInkWhite{1.0f, 1.0f, 1.0f, 1.0f};
+    std::string prisonerTextB, prisonerTextW;
     void updatePointerState();
     /// Mirrors the GLFW input mode, so it is set on change rather than per frame.
     bool nativePointerHidden = false;
@@ -585,5 +728,10 @@ public:
     void clearView();
 };
 
+/// The names `evaluation_moves` takes in user.json and on the command line.
+/// `on`/`off` are still accepted: they were the whole vocabulary before the
+/// third state, and both scenarios and keybindings use them.
+const char* hintModeName(GobanView::HintMode mode);
+std::optional<GobanView::HintMode> parseHintMode(std::string name);
 
 #endif //GOBAN_GOBANVIEW_H

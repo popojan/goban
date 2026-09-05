@@ -117,6 +117,14 @@ public:
     /// The engine being started, for the status line. Empty unless `Starting`.
     [[nodiscard]] std::string startingEngineName() const;
 
+    /// Who would answer, whatever state the service is in — the name the menu
+    /// puts on its "on" option, so the user can see *which* engine the
+    /// evaluation would come from. Empty when nobody claimed the role.
+    ///
+    /// Safe to read per frame: `engineName` is assigned once, in start(), which
+    /// ElementGame calls on the UI thread after the loader threads have joined.
+    [[nodiscard]] const std::string& analysisEngineName() const { return engineName; }
+
     /// The last report, or nullptr when there is nothing truthful to show.
     /// Never a placeholder: a bar sitting at 50% because nothing has been
     /// computed cannot be told from a genuine 50%.
@@ -149,6 +157,10 @@ private:
     /// Runs one stream until the position changes, the game claims the device,
     /// or the service is switched off.
     void streamUntilStale(const struct AnalysisTarget& target);
+    static int hintMinMoves();
+    static void dropUnreliable(AnalysisReport& report);
+    /// Cleared for the session the first time an engine refuses `minmoves`.
+    bool useMinMoves = true;
     void publish(const AnalysisReport& next);
     void setState(AnalysisState next);
 

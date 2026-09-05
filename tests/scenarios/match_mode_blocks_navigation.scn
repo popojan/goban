@@ -1,4 +1,4 @@
-# The counterpart to analysis_mode_toggle: in MATCH mode with two engines
+# The counterpart to explore_mode_toggle: in MATCH mode with two engines
 # running, navigation must NOT take effect, because it would interleave with
 # genmove and corrupt engine state.
 #
@@ -29,9 +29,9 @@ navigate_start
 navigate_back
 
 # Switching to analysis is the supported way to review a running match.
-toggle_analysis_mode
+toggle_explore_mode
 wait_idle
-expect mode analysis
+expect mode explore
 
 navigate_start
 wait_idle

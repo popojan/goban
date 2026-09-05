@@ -22,12 +22,13 @@ res/screenshot/*.png
 # Binary executable
 goban
 
-# Dependencies (external libraries). Fetched sources are ignored; the patches
-# applied to them are not — they are the only record of what we changed, and for
-# GNU Go that record is a GPL obligation rather than a convenience. The existing
-# ones survived only by having been tracked before this rule existed.
-deps/*
-!deps/_patches/
+# Dependencies (external libraries). CMake clones glyphy and libsgfcplusplus in
+# here, so the directory exists at build time but nothing in it is tracked. The
+# patches applied to them live in `cmake/patches/`, outside this rule and beside
+# the find modules that reference them — they are the only record of what we
+# changed, and for GNU Go that record is a GPL obligation rather than a
+# convenience.
+deps/
 external/
 
 # External Go engines

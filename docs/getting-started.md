@@ -90,16 +90,16 @@ Common setups:
 - Human vs Engine (default) - You play Black against the AI
 - Engine vs Human - AI plays Black, you play White
 - Human vs Human - Two humans play (hotseat)
-- Engine vs Engine - Watch two AIs play (use Analysis mode to pause)
+- Engine vs Engine - Watch two AIs play (use Explore mode to pause)
 
-## Analysis Mode
+## Explore Mode
 
-Analysis mode enables free exploration of positions. It is set automatically when
+Explore mode enables free exploration of positions. It is set automatically when
 loading a **finished** SGF game, and can be toggled manually at any time.
 
-**Toggle Analysis Mode**: Press **Enter** or use the Game menu
+**Toggle Explore Mode**: Press **Enter** or use the Game menu
 
-When Analysis mode is active:
+When Explore mode is active:
 - You can play either color by clicking on the board
 - The **configured kibitz engine** replies to every move, whichever colour is to
   move and regardless of who is assigned to it
@@ -115,7 +115,7 @@ move in an ordinary match, with two humans, at any time.
 When Match mode is active:
 - Strict turn alternation with assigned player roles
 - Engine responds automatically after your move
-- Undo removes a single move, exactly as in Analysis mode
+- Undo removes a single move, exactly as in Explore mode
 
 See [Game Modes](game-modes.md) for detailed use cases and behavior.
 

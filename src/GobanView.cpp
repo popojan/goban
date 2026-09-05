@@ -13,6 +13,28 @@
 #include "Stereo.h"
 #include "UserSettings.h"
 
+namespace {
+
+/// Unpack a stored preset into the three values a camera move is made of.
+///
+/// One function because it was three: the constructor's restore, resetView()
+/// and clearView() each carried their own copy of the same unpacking, so a
+/// field added to CameraState would have reached whichever the author happened
+/// to be looking at. The same shape as the prisoner labels, which were two
+/// copies of one rule with the colours swapped in one of them.
+void applyPreset(const CameraState& preset, DDG::Quaternion& rot,
+                 glm::vec2& pan, float& distance) {
+    rot[0] = preset.rotX;
+    rot[1] = preset.rotY;
+    rot[2] = preset.rotZ;
+    rot[3] = preset.rotW;
+    rot.normalize();
+    pan = glm::vec2(preset.panX, preset.panY);
+    distance = preset.distance;
+}
+
+}  // namespace
+
 GobanView::GobanView(GobanModel& m)
     :
     gobanShader(*this), gobanOverlay(*this), model(m), MAX_FPS(false), VIEWPORT_WIDTH(0), VIEWPORT_HEIGHT(0),
@@ -43,13 +65,7 @@ GobanView::GobanView(GobanModel& m)
         haveCamera = false;
     }
     if (haveCamera) {
-        cam.rLast[0] = camToRestore.rotX;
-        cam.rLast[1] = camToRestore.rotY;
-        cam.rLast[2] = camToRestore.rotZ;
-        cam.rLast[3] = camToRestore.rotW;
-        cam.rLast.normalize();
-        cameraPan = glm::vec2(camToRestore.panX, camToRestore.panY);
-        cameraDistance = camToRestore.distance;
+        applyPreset(camToRestore, cam.rLast, cameraPan, cameraDistance);
         baseCameraPan = cameraPan;
         baseCameraDistance = cameraDistance;
     }
@@ -102,6 +118,21 @@ GobanView::GobanView(GobanModel& m)
             } else {
                 spdlog::warn("annotations.wait_color: '{}' is not #rgb, #rrggbb "
                              "or #rrggbbaa", waitConfigured);
+            }
+        }
+        // The two prisoner counts. Not derived from readoutInk like the wait
+        // clock is: these two have to differ from *each other* by brightness, or
+        // they say nothing under a stereo shader, so neither can inherit.
+        for (auto* entry : {&prisonerInkBlack, &prisonerInkWhite}) {
+            const char* key = entry == &prisonerInkBlack ? "prisoner_black_color"
+                                                         : "prisoner_white_color";
+            const std::string configured = annotations.value(key, std::string());
+            if (configured.empty()) continue;
+            if (const auto parsed = parseHexColor(configured)) {
+                *entry = *parsed;
+            } else {
+                spdlog::warn("annotations.{}: '{}' is not #rgb, #rrggbb or "
+                             "#rrggbbaa", key, configured);
             }
         }
         if (annotations.contains("wait_grace")) {
@@ -195,6 +226,9 @@ GobanView::GobanView(GobanModel& m)
     if (const auto parsed = parsePointerMode(settings.getPointerMode())) {
         pointerMode = *parsed;
     }
+    if (const auto parsed = parsePrisonerMode(settings.getPrisonerMode())) {
+        prisonerMode = *parsed;
+    }
     if (settings.getAnaglyphGreen() >= 0.0f) {
         anaglyphGreenLevel = Stereo::clampGreen(settings.getAnaglyphGreen());
     }
@@ -214,7 +248,23 @@ GobanView::GobanView(GobanModel& m)
     // Load shader settings (separate from camera)
     if (settings.hasShaderSettings()) {
         gobanShader.setEof(settings.getShaderEof());
-        gobanShader.setDof(settings.getShaderDof());
+        // `dof` used to be the image shift itself, in q0 units, typically
+        // 0.0925. It is now an *offset* from the window resting on the near
+        // point, and a value from the old meaning read as an offset would put
+        // the whole scene a long way behind the glass — which is precisely what
+        // the change is undoing. Out of range means "written under the old
+        // meaning", so it is read as zero rather than migrated: there is nothing
+        // to migrate to, since the old number encoded no intent beyond a default
+        // nobody chose. Same hazard eof's redefinition left behind, handled
+        // where that one relied on a clamp.
+        const float storedDof = settings.getShaderDof();
+        if (std::abs(storedDof) <= Stereo::MAX_WINDOW_OFFSET) {
+            gobanShader.setDof(storedDof);
+        } else {
+            spdlog::debug("ignoring dof {} from user.json: written when it meant "
+                          "an absolute image shift", storedDof);
+            gobanShader.setDof(0.0f);
+        }
         gobanShader.setGamma(settings.getShaderGamma());
         gobanShader.setContrast(settings.getShaderContrast());
     }
@@ -231,10 +281,17 @@ GobanView::GobanView(GobanModel& m)
             }
         }
     }
-    gobanShader.choose(shaderIdx);
+    // Asynchronous, so the several seconds this takes on a machine that has not
+    // linked this shader before are spent with the interface up and a message on
+    // screen rather than with a frozen window. Update() takes delivery and calls
+    // setReady() then. Without a shared GL context it falls back to linking here,
+    // which is what it always did.
+    gobanShader.chooseAsync(shaderIdx);
 
     updateFlag |= GobanView::UPDATE_ALL;  // Ensure full render on startup
-    gobanShader.setReady();
+    if (!gobanShader.isBuilding()) {
+        gobanShader.setReady();
+    }
     gobanOverlay.setReady();
 
     // Sync initial state from model to prevent stale default values (e.g., reservoir counts)
@@ -301,33 +358,31 @@ void GobanView::resetView() {
     // a broken command.
     const bool haveSaved = settings.hasSavedCamera();
     if (haveSaved || settings.hasDefaultCamera()) {
-        const CameraState preset = haveSaved ? settings.getSavedCamera()
-                                             : settings.getDefaultCamera();
-        targetRot[0] = preset.rotX;
-        targetRot[1] = preset.rotY;
-        targetRot[2] = preset.rotZ;
-        targetRot[3] = preset.rotW;
-        targetRot.normalize();
-        targetPan = glm::vec2(preset.panX, preset.panY);
-        targetDist = preset.distance;
+        applyPreset(haveSaved ? settings.getSavedCamera() : settings.getDefaultCamera(),
+                    targetRot, targetPan, targetDist);
     }
 
-    if (settings.hasShaderSettings()) {
-        gobanShader.setEof(settings.getShaderEof());
-        gobanShader.setDof(settings.getShaderDof());
-        gobanShader.setGamma(settings.getShaderGamma());
-        gobanShader.setContrast(settings.getShaderContrast());
-    }
-
+    // Deliberately does *not* touch eof, dof, gamma or contrast. They are not
+    // camera state — they describe the screen and the glasses in front of it —
+    // and re-reading them here meant that tuning an anaglyph and then reframing
+    // the board silently threw the tuning away. They are sticky now, saved by
+    // the commands that change them, like every other display setting.
     updateFlag |= UPDATE_SHADER;
     animateCamera(targetRot, targetPan, targetDist);
 }
 
 void GobanView::switchShader(int idx) {
     updateFlag |= GobanView::UPDATE_ALL;
-    gobanShader.choose(idx);
+    // Asynchronous for the same reason as at startup, and it matters as much
+    // here: every shader links the first time it is selected, so cycling through
+    // the list on a fresh machine froze the window once per shader. The previous
+    // program keeps drawing until the new one lands (adoptProgram), so the board
+    // does not blank meanwhile.
+    gobanShader.chooseAsync(idx);
     state.metricsReady = false;
-    gobanShader.setReady();
+    if (!gobanShader.isBuilding()) {
+        gobanShader.setReady();
+    }
     // Force OnUpdate to re-evaluate the game state message
     state.msg = GameState::NONE;
 }
@@ -345,11 +400,9 @@ void GobanView::saveView() {
     camState.distance = cameraDistance;
     settings.setSavedCamera(camState);
 
-    settings.setShaderEof(gobanShader.getEof());
-    settings.setShaderDof(gobanShader.getDof());
-    settings.setShaderGamma(gobanShader.getGamma());
-    settings.setShaderContrast(gobanShader.getContrast());
-
+    // The appearance settings are saved by the commands that change them, not
+    // here: `save camera` saves a camera. Writing them from both places is how
+    // `reset camera` came to be able to revert them.
     settings.save();
 }
 
@@ -369,22 +422,31 @@ void GobanView::saveCurrentView() {
 }
 
 void GobanView::clearView() {
-    // Whichever file settings actually live in — not the hardcoded default.
-    // A scripted run redirects persistence to scenario-user.json precisely so it
-    // cannot touch the developer's real session, and `delete camera` was the one
-    // path that ignored that and deleted user.json anyway.
-    std::remove(UserSettings::instance().getSettingsFile().c_str());
+    auto& settings = UserSettings::instance();
+    // The saved preset, and only that. This used to std::remove() the whole
+    // settings file, so a command named after the camera also took the language,
+    // the sound and every overlay toggle with it.
+    settings.clearSavedCamera();
 
-    // Default camera: same values as initCam()
-    DDG::Quaternion targetRot(-1.0, 1.0, 0.0, 0.0);
-    targetRot.normalize();
-    glm::vec2 targetPan(0.0f, 0.0f);
-    float targetDist = 3.5f;
+    // Where the view goes once the preset is gone.
+    //
+    // It used to be the raw values from initCam() — which are *not* the camera
+    // config/base.json ships, so `delete camera` flew to a top-down view nobody
+    // configured. resetView() a few lines up resolves this properly; the three
+    // layers UserSettings knows about are hasCurrentCamera() / hasSavedCamera()
+    // / hasDefaultCamera(), and the saved one has just been dropped.
+    DDG::Quaternion targetRot = cam.rLast;
+    glm::vec2 targetPan = cameraPan;
+    float targetDist = cameraDistance;
+
+    if (settings.hasDefaultCamera()) {
+        applyPreset(settings.getDefaultCamera(), targetRot, targetPan, targetDist);
+    }
 
     gobanShader.setGamma(1.0);
     gobanShader.setContrast(0.0);
-    gobanShader.setEof(0.0725);
-    gobanShader.setDof(0.0925);
+    gobanShader.setEof(Stereo::DEFAULT_DEVIATION);
+    gobanShader.setDof(0.0f);   // the window rests on the near point
     updateFlag |= UPDATE_SHADER;
 
     animateCamera(targetRot, targetPan, targetDist);
@@ -506,6 +568,9 @@ void GobanView::shadeIt(float time, const GobanShader& shader, int flags, int ey
 	// Every frame, with the camera: the base is a function of where the camera
 	// is, and the overlay recomputes it every frame too. See setStereoBase().
 	shader.setStereoBase(stereoHalfBase());
+	// And the window with it, for the same reason one rung along: it follows the
+	// aspect ratio, so it changes on a resize.
+	shader.setStereoWindow(stereoWindow());
 
 	if (flags & UPDATE_SHADER) {
 		spdlog::debug("setMetrics");
@@ -599,6 +664,7 @@ void GobanView::Render(int w, int h)
 	if (flags & UPDATE_STONES) {
 	    board.updateStones(model.board);
         updateCursor();
+        promoteHintLabel();
 
         double vol = board.collision;
         if(vol > 0) {
@@ -899,52 +965,69 @@ Position GobanView::getBoardCoordinate(float x, float y) const {
     return ret;
 }
 
+GobanView::CameraBasis GobanView::cameraBasis() const {
+    using namespace glm;
+    const mat4 m = cam.setView();
+    // Match shader camera model: ta = pan on board plane, camera behind along viewDir
+    const vec3 ta(cameraPan.x, 0.0f, cameraPan.y);
+    const vec3 cw = normalize(vec3(m * vec4(0, 0, 1, 0)));  // forward = toward board
+    const vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
+    const vec3 cu = normalize(cross(up, cw));
+    return {ta - cameraDistance * cw, cu, cross(cw, cu), cw};
+}
+
 glm::vec2 GobanView::boardCoordinate(float x, float y) const {
     using namespace glm;
-    mat4 m = cam.setView();
-    // Match shader camera model: ta = pan on board plane, camera behind along viewDir
-    vec3 ta = vec3(cameraPan.x, 0.0f, cameraPan.y);
-    vec3 viewDir = normalize(vec3(m * vec4(0, 0, 1, 0)));
-    vec3 roo = ta - cameraDistance * viewDir;
-    vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
-    vec3 cw = viewDir;  // forward = toward board
-    vec3 cu = normalize(cross(up, cw));
-    vec3 cv = cross(cw, cu);
+    const CameraBasis c = cameraBasis();
     float ratio = resolution.x / resolution.y;
     vec2 q0 = vec2(ratio * 2.0f * (x / resolution.x - 0.5f), 2.0f * (0.5f - y / resolution.y));
-    vec3 rdb = q0.x * cu + q0.y * cv + FOCAL_LENGTH * cw;
+    vec3 rdb = q0.x * c.cu + q0.y * c.cv + FOCAL_LENGTH * c.cw;
     // Intersect ray with board plane (y=0)
-    auto t = -roo.y / rdb.y;
-    vec3 ip = roo + rdb * t;
+    auto t = -c.roo.y / rdb.y;
+    vec3 ip = c.roo + rdb * t;
     return {ip.x, ip.z};
 }
 
-float GobanView::stereoNearPoint() const {
+void GobanView::stereoBoardDepth(float& nearZ, float& farZ) const {
     using namespace glm;
-    // Same camera model as boardCoordinate() above and as the vertex shaders.
-    const mat4 m = cam.setView();
-    const vec3 ta(cameraPan.x, 0.0f, cameraPan.y);
-    const vec3 cw = normalize(vec3(m * vec4(0, 0, 1, 0)));
-    const vec3 roo = ta - cameraDistance * cw;
-    const vec3 up = normalize(vec3(m * vec4(0, 1, 0, 0)));
-    const vec3 cu = normalize(cross(up, cw));
-    const vec3 cv = cross(cw, cu);
-    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
-
-    float nearest = std::numeric_limits<float>::max();
+    const CameraBasis c = cameraBasis();
 
     // The board box, as the scene shaders build it: half-extents (1, 0.25,
     // squareSizeY/squareSizeX) about the origin.
     const float halfZ = model.metrics.squareSizeX > 0.0f
                       ? model.metrics.squareSizeY / model.metrics.squareSizeX : 1.0f;
     const vec3 half(1.0f, 0.25f, halfZ);
+    nearZ = std::numeric_limits<float>::max();
+    farZ = 0.0f;
     for (int i = 0; i < 8; ++i) {
         const vec3 corner((i & 1) ? half.x : -half.x,
                           (i & 2) ? half.y : -half.y,
                           (i & 4) ? half.z : -half.z);
-        const float z = dot(corner - roo, cw);
-        if (z > 0.0f) nearest = std::min(nearest, z);
+        const float z = dot(corner - c.roo, c.cw);
+        if (z > 0.0f) {
+            nearZ = std::min(nearZ, z);
+            farZ = std::max(farZ, z);
+        }
     }
+    if (farZ <= 0.0f) nearZ = farZ = 0.0f;   // the whole box is behind the camera
+}
+
+float GobanView::stereoConvergence() const {
+    // stereoWindow(), not the raw `dof` — that is the user's *offset* from the
+    // window now, and passing it here reported the plane at infinity whenever
+    // the offset was zero, which is the default.
+    return Stereo::convergence(stereoHalfBase(), stereoWindow(), FOCAL_LENGTH);
+}
+
+float GobanView::stereoNearPoint() const {
+    using namespace glm;
+    const CameraBasis c = cameraBasis();
+    const vec3 roo = c.roo, cu = c.cu, cv = c.cv, cw = c.cw;
+    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
+
+    float boardNear = 0.0f, boardFar = 0.0f;
+    stereoBoardDepth(boardNear, boardFar);
+    float nearest = boardFar > 0.0f ? boardNear : std::numeric_limits<float>::max();
 
     // ...and the table, which passes under the board and continues toward the
     // viewer. Its nearest visible point is where the bottom edge of the frame
@@ -978,6 +1061,31 @@ float GobanView::stereoHalfBase() const {
     return Stereo::halfBase(gobanShader.getEof(), aspect, stereoNearPoint(), FOCAL_LENGTH);
 }
 
+float GobanView::stereoWindow() const {
+    const float aspect = resolution.y > 0.0f ? resolution.x / resolution.y : 1.0f;
+    return Stereo::window(gobanShader.getEof(), aspect, gobanShader.getDof());
+}
+
+void GobanView::saveShaderSettings() {
+    auto& settings = UserSettings::instance();
+    settings.setShaderEof(gobanShader.getEof());
+    settings.setShaderDof(gobanShader.getDof());
+    settings.setShaderGamma(gobanShader.getGamma());
+    settings.setShaderContrast(gobanShader.getContrast());
+    settings.save();
+}
+
+bool GobanView::takeShaderBuild() {
+	if (!gobanShader.pollBuild()) return false;
+	// A shader linked in the background becomes current here — on the UI thread,
+	// and on the UI thread's context, which is the half of the build that cannot
+	// happen anywhere else (see GobanShader::adoptProgram).
+	gobanShader.setReady();
+	state.metricsReady = false;
+	updateFlag |= UPDATE_ALL;
+	return true;
+}
+
 void GobanView::animateIntro() {
     lastTime = 0.0;
     startTime = static_cast<float>(glfwGetTime());
@@ -989,6 +1097,8 @@ void GobanView::Update() {
 	// First: everything below compares against `board`, and a resize handed over
 	// by the game thread has to land before those comparisons, not after.
 	applyPendingResize();
+
+	updateHintDwell();
 
 	int newProgram = gobanShader.getCurrentProgram();
 	if (currentProgram != newProgram) {
@@ -1268,6 +1378,30 @@ void GobanView::updateAnalysisOverlay() {
 	}
 }
 
+/// The suggestion on the point being aimed at belongs on the stone layer, or the
+/// stone in hand draws over it — and it is the one letter the player is asking
+/// about.
+///
+/// Here rather than in updateAnalysisOverlay() for two reasons, both about
+/// order: the ghost stone is placed just above, and updateStones() runs before
+/// that and deletes stone-level overlays wherever the *model* has no stone —
+/// which is exactly what a point under a ghost is. A label promoted earlier is
+/// thrown away before it can be drawn.
+///
+/// It takes the stone palette rather than its quality colour: the ramp is ink
+/// for wood and every stop of it sits below the wood, so on a black stone it
+/// would be unreadable. Nothing is lost — the readout is answering about this
+/// very point, with the number rather than a shade of it.
+void GobanView::promoteHintLabel() {
+	if (!showAnalysisOverlay || !ghostStoneVisible()) return;
+	const Position aim = model.cursor;
+	if (std::find(analysisLabels.begin(), analysisLabels.end(), aim) == analysisLabels.end())
+		return;
+	const std::string text = board[aim].overlay.text;
+	if (text.empty()) return;
+	board.setOverlay(aim, text, state.colorToMove);
+}
+
 void GobanView::updateFloatingLabels() {
 	// One list, one setter: setFloatingLabels() replaces wholesale, so the
 	// readout and the coordinates have to be built together.
@@ -1305,6 +1439,32 @@ void GobanView::updateFloatingLabels() {
 			if (readoutAlign == TextAlign::Left)  anchorCol = 0.0f;
 			if (readoutAlign == TextAlign::Right) anchorCol = lastCol;
 
+			// ADR-0014: while a stone is held over a point the engine has an
+			// opinion about, the readout answers about *that candidate* rather
+			// than about the position. It is the only place the delta of a
+			// contemplated move can go — there are two characters free beside a
+			// centred readout on 9x9 — and asking by aiming is how Lizzie
+			// answers the same question. Gated on the suggestions being visible:
+			// if you can see the stars you may query them, and if you cannot
+			// then this would leak the opinion the mode is withholding.
+			const AnalysisMove* aimed = nullptr;
+			if (showAnalysisOverlay && model.state.holdsStone) {
+				for (const auto& m : report->moves) {
+					if (m.move == Move::NORMAL && m.move.pos == model.cursor) {
+						aimed = &m;
+						break;
+					}
+				}
+			}
+			// The anchor never moves: both numbers are the position's, aimed or
+			// not, and what a point costs goes in a bracket of its own. They used
+			// to become the candidate's, so the same slot said two things with
+			// nothing to tell them apart. Nothing is lost — the candidate's win
+			// rate is the position's minus the loss, and its score lead now is
+			// too, which it was not before. See ADR-0014.
+			const double shownWinrate = report->winrateBlack;
+			const auto& shownLead = report->scoreLeadBlack;
+
 			std::ostringstream text;
 			// Anchored to Black, always — the same convention the panel uses,
 			// and chess's for the same reason: a figure that keeps its side is
@@ -1312,10 +1472,46 @@ void GobanView::updateFloatingLabels() {
 			// move caused. Naming whoever leads instead never drops below 50%
 			// and hides exactly that. The score below keeps Go's own convention
 			// of naming the leader, because that is how a result is written.
-			text << "B " << static_cast<int>(std::lround(report->winrateBlack * 100.0))
+			text << "B " << static_cast<int>(std::lround(shownWinrate * 100.0))
 			     << "%";
-			if (report->scoreLeadBlack) {
-				const double lead = *report->scoreLeadBlack;
+			// Both terms come from one report, so this is an absolute difference
+			// in Black's frame rather than a second search. Each half is dropped
+			// when it rounds to nothing, and the bracket with it: a win rate is a
+			// mean over visits, so a fraction of a percent is precision without
+			// accuracy. An unsearched point therefore gets no bracket and needs
+			// no marker — that was only needed while the numbers moved under it.
+			std::string cost;
+			if (aimed && aimed->order == 0) {
+				// The engine's own first choice. Without it, finding the best
+				// move and aiming at a point the engine never searched read
+				// identically — both blank — and the one case worth marking got
+				// nothing. `order` is the engine saying so; it defaults to -1, so
+				// an engine that does not rank never lands here.
+				//
+				// A symbol, not a word: `fonts.overlay` is the same ASCII-only
+				// font in every language config, so nothing drawn on the board
+				// can be translated. `=` reads as "level with the best" and sits
+				// in the slot that otherwise carries a cost.
+				cost = "=";
+			} else if (aimed) {
+				const int loss = static_cast<int>(std::lround(
+					std::fabs(report->winrateBlack - aimed->winrateBlack) * 100.0));
+				if (loss > 0) cost = "-" + std::to_string(loss) + "%";
+				if (aimed->scoreLeadBlack && report->scoreLeadBlack) {
+					const double d = std::fabs(*report->scoreLeadBlack
+					                         - *aimed->scoreLeadBlack);
+					// A tenth of a point is the resolution the score itself is
+					// printed at, so anything under it is not a difference.
+					if (d >= 0.05) {
+						std::ostringstream s;
+						s << std::fixed << std::setprecision(1) << d;
+						if (!cost.empty()) cost += " ";
+						cost += "-" + s.str();
+					}
+				}
+			}
+			if (shownLead) {
+				const double lead = *shownLead;
 				// One space, not a run of them: the scenario runner re-joins an
 				// expected value with single spaces, so a wider gap could not be
 				// asserted. How this should actually be spaced on a board edge
@@ -1323,6 +1519,7 @@ void GobanView::updateFloatingLabels() {
 				text << " " << (lead >= 0.0 ? "B+" : "W+")
 				     << std::fixed << std::setprecision(1) << std::fabs(lead);
 			}
+			if (!cost.empty()) text << " (" << cost << ")";
 
 			// add_text centres on the point, so this is the middle of the board
 			// edge. Black on wood, like every other board-level label.
@@ -1403,6 +1600,44 @@ void GobanView::updateFloatingLabels() {
 			                  std::to_string(Position::rowLabel(row)), size,
 			                  coordinateInk, 0u, TextAlign::Center});
 		}
+	}
+
+	// The prisoners, on the right margin — the one edge nothing else uses.
+	// Coordinates are pinned to top and left, and the bottom row is already
+	// three-way shared by the pass recommendation, the readout and the clock.
+	//
+	// **Both counts, always, zero included.** An earlier version drew nothing
+	// until the first capture, on the ADR-0007 "absent is not zero" precedent.
+	// That was a misapplication: the principle is about an estimate that has *not
+	// been computed* — a win rate resting at 50% cannot be told from a genuinely
+	// even game — and a prisoner count of zero carries no such ambiguity. It is
+	// known, exact, and true, and nothing else could be mistaken for it.
+	//
+	// The symptom was the giveaway. Switching the mode to `always` and seeing an
+	// empty margin is a control disagreeing with its own name, which is the
+	// ADR-0005 family of failure. It also cost the pair its baseline: two numbers
+	// materialising mid-game are a bigger surprise than two noughts standing there
+	// from the start, and a capture reads better as a count *changing* than as one
+	// appearing.
+	//
+	// Cleared first: these are what dumpState() reports as drawn, so a mode change
+	// that switches them off has to leave them empty rather than stale.
+	prisonerTextB.clear();
+	prisonerTextW.clear();
+	if (showPrisonerCounts()) {
+		const float size = 0.8f / static_cast<float>(model.getBoardSize());
+		const float lastCol = static_cast<float>(model.getBoardSize()) - 1.0f;
+		const float halfN = 0.5f * lastCol;
+		const float col = lastCol + coordOffset;
+		// White above, black below, which is where the RmlUi labels this
+		// replaces used to sit (White top right, Black bottom left). Kept as a
+		// pair near the middle so neither lands in a corner beside a coordinate.
+		prisonerTextW = std::to_string(snap->capturedWhite);
+		prisonerTextB = std::to_string(snap->capturedBlack);
+		labels.push_back({glm::vec2(col, halfN + 0.75f), prisonerTextW, size,
+		                  prisonerInkWhite, 0u, TextAlign::Center});
+		labels.push_back({glm::vec2(col, halfN - 0.75f), prisonerTextB, size,
+		                  prisonerInkBlack, 0u, TextAlign::Center});
 	}
 
 	gobanOverlay.setFloatingLabels(std::move(labels));
@@ -1491,6 +1726,39 @@ std::optional<PointerMode> parsePointerMode(const std::string& name) {
     if (n == "always" || n == "on" || n == "yes") return PointerMode::Always;
     if (n == "never" || n == "off" || n == "no") return PointerMode::Never;
     return std::nullopt;
+}
+
+const char* prisonerModeName(PrisonerMode mode) {
+    switch (mode) {
+        case PrisonerMode::Always: return "always";
+        case PrisonerMode::Never:  return "never";
+        case PrisonerMode::Auto:   break;
+    }
+    return "auto";
+}
+
+std::optional<PrisonerMode> parsePrisonerMode(const std::string& name) {
+    std::string n;
+    for (char c : name) n += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (n == "auto")   return PrisonerMode::Auto;
+    if (n == "always" || n == "on"  || n == "yes") return PrisonerMode::Always;
+    if (n == "never"  || n == "off" || n == "no")  return PrisonerMode::Never;
+    return std::nullopt;
+}
+
+void GobanView::setPrisonerMode(PrisonerMode mode) {
+	if (prisonerMode == mode) return;
+	prisonerMode = mode;
+	// UPDATE_OVERLAY, exactly as setCoordinates() and setWaitClock() do: that is
+	// the flag Update() runs updateFloatingLabels() under, and rebuilding the
+	// glyph buffers is the whole job. It used to call updateFloatingLabels()
+	// here and ask for a bare UPDATE_SOME, which was worse than useless — the
+	// direct call refreshed the *text* dumpState() reports while the pass that
+	// draws it never ran, so switching to `never` left the numbers on screen
+	// until an unrelated shader change rebuilt the overlay, and the scenario
+	// asserting prisoner_text_* passed throughout. Same trap as sounds_played:
+	// assert what was drawn, not what was composed.
+	requestRepaint(UPDATE_OVERLAY);
 }
 
 void GobanView::setPointerMode(PointerMode mode) {
@@ -1624,13 +1892,99 @@ bool GobanView::toggleAnalysisOverlay() {
 	return showAnalysisOverlay;
 }
 
+const char* hintModeName(GobanView::HintMode mode) {
+	switch (mode) {
+		case GobanView::HintMode::OnDemand: return "on_demand";
+		case GobanView::HintMode::Always:   return "always";
+		case GobanView::HintMode::Off:      break;
+	}
+	return "off";
+}
+
+std::optional<GobanView::HintMode> parseHintMode(std::string name) {
+	for (char& c : name) {
+		c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		if (c == '-' || c == ' ') c = '_';
+	}
+	if (name == "off" || name == "false" || name == "0") return GobanView::HintMode::Off;
+	if (name == "always" || name == "on" || name == "true" || name == "1")
+		return GobanView::HintMode::Always;
+	if (name == "on_demand" || name == "ondemand" || name == "demand"
+	    || name == "hint" || name == "dwell")
+		return GobanView::HintMode::OnDemand;
+	return std::nullopt;
+}
+
 void GobanView::setAnalysisOverlay(bool shown) {
+	setAnalysisOverlayMode(shown ? HintMode::Always : HintMode::Off);
+}
+
+void GobanView::setAnalysisOverlayMode(HintMode mode) {
+	if (hintMode == mode) return;
+	hintMode = mode;
+	hintRevealed = false;
+	hintDwellPoint = Position(-1, -1);
+	applyOverlayVisibility();
+}
+
+void GobanView::applyOverlayVisibility() {
+	const bool shown = (hintMode == HintMode::Always)
+	                || (hintMode == HintMode::OnDemand && hintRevealed);
 	if (showAnalysisOverlay == shown) return;
 	showAnalysisOverlay = shown;
 	// UPDATE_STONES as well as UPDATE_OVERLAY: a label sets the annotation
 	// material, and that has to reach the stone upload or the grid stays drawn
 	// under it.
 	requestRepaint(UPDATE_OVERLAY | UPDATE_STONES);
+}
+
+/// How long a point must be aimed at before the suggestions appear, in
+/// milliseconds. Configurable because the right value is a matter of feel.
+static int hintDwellMs() {
+	using nlohmann::json;
+	if (!config) return 800;
+	return config->data.value("annotations", json::object()).value("hint_dwell_ms", 800);
+}
+
+bool GobanView::hintDwellPending() const {
+	return hintMode == HintMode::OnDemand && !hintRevealed
+	    && model.state.holdsStone && hintDwellPoint;
+}
+
+/// ADR-0014: a stone in hand is the precondition, the dwell is the trigger.
+/// Neither says much alone — reaching for the board says nothing about where,
+/// a parked cursor says nothing about intent — but together they mean the
+/// player has chosen this point, which is the moment the engine may answer.
+void GobanView::updateHintDwell() {
+	if (hintMode != HintMode::OnDemand) return;
+
+	// Placed, or put back in the bowl: the question has been answered either
+	// way, so the reveal closes. Until then it survives looking around the
+	// board, which is what makes comparing the candidates possible.
+	if (!model.state.holdsStone) {
+		hintRevealed = false;
+		hintDwellPoint = Position(-1, -1);
+		applyOverlayVisibility();
+		return;
+	}
+	if (hintRevealed) return;
+
+	const Position aim = model.cursor;
+	const bool onBoard = model.isPointOnBoard(aim);
+	// Reset on a change of *intersection*, not of pixel: the cursor already
+	// snaps to a point, so anything finer would restart the wait on a shake of
+	// the hand.
+	if (!onBoard || !(hintDwellPoint == aim)) {
+		hintDwellPoint = onBoard ? aim : Position(-1, -1);
+		hintDwellSince = std::chrono::steady_clock::now();
+		return;
+	}
+	const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::steady_clock::now() - hintDwellSince).count();
+	if (waited >= hintDwellMs()) {
+		hintRevealed = true;
+		applyOverlayVisibility();
+	}
 }
 
 void GobanView::onBoardSized(int newBoardSize) {
@@ -1667,12 +2021,12 @@ void GobanView::onStonePlaced(const Move& move) {
     }
 }
 
-void GobanView::onGameMove(const Move& move, const std::string& comment) {
+void GobanView::onGameMove(const Move& move, const std::string& /*comment*/) {
     // Delegate visual/audio to onStonePlaced
     onStonePlaced(move);
 }
 
-void GobanView::onBoardChange(const Board& newBoard) {
+void GobanView::onBoardChange(const Board& /*newBoard*/) {
 	// Model already has the board (GobanModel::onBoardChange stores it).
 	// UI thread copies from model.board and updates overlays in Render().
 	requestRepaint(UPDATE_BOARD | UPDATE_STONES | UPDATE_OVERLAY);

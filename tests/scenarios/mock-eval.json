@@ -10,7 +10,7 @@
       "enabled": 1,
       "main": 1,
       "kibitz": 1,
-      "analysis_parameters": "--analyze-interval-ms 50"
+      "analysis_parameters": "--analyze-interval-ms 50 --analyze-noise 6"
     }
   ],
   "humans": [

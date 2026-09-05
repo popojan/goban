@@ -97,7 +97,7 @@ During navigation (not at the end of a game):
 After creating a variation:
 - If an AI is assigned to the responding color, it will play
 - Press **Space** to trigger a kibitz suggestion
-- Use Analysis mode to prevent automatic AI responses
+- Use Explore mode to prevent automatic AI responses
 
 ## SGF Metadata
 

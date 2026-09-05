@@ -71,6 +71,7 @@ chooser_select_file tsumego.sgf
 expect chooser_tsumego true
 chooser_confirm
 wait_idle
+expect mode tsumego
 expect tsumego true
 expect board_size 9
 expect view_position 0        # a puzzle opens at the root, not at the solution
@@ -86,6 +87,8 @@ chooser_confirm
 wait_idle
 expect tsumego false
 expect board_size 9
+# Not `expect mode match`: the same record loaded as an ordinary game gets
+# its mode from the result, so Explore is equally correct here.
 
 # --- A malformed SGF must not take the dialog down -------------------------
 chooser_open

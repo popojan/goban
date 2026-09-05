@@ -1,5 +1,6 @@
 /** \file
- *  \brief The application config (`config/*.json`) and the keybinding table.
+ *  \brief The application config (the JSON files under `config/`) and the
+ *  keybinding table.
  *
  * Read-only as far as the application is concerned — the user edits it by hand.
  * Distinct from UserSettings, which is what the application writes.

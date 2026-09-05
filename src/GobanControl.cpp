@@ -95,8 +95,9 @@ bool GobanControl::newGameNow(unsigned boardSize) const {
     // neither possible nor needed. See ADR-0001.
     engine.interrupt();
     engine.removeSgfPlayers();  // Remove temporary SGF players from previous load
-    model.tsumegoMode = false;
-    model.game.setSuppressSessionCopy(false);
+    // clearGame() drops the mode back to Match, and the tsumego flag and the
+    // session-copy suppression follow it from there — they used to be cleared
+    // here, a second writer of what the mode already says.
     if(!engine.clearGame(boardSize, model.state.komi, model.state.handicap)) {
         return false;
     }
@@ -457,13 +458,14 @@ void GobanControl::buildRegistry() {
 
         // Switching game replaces the one on screen, so a move still being
         // computed is worthless — defer past it rather than refusing.
-        const bool tsumego = view.isTsumegoMode();
+        // Asks the mode, not the view's copy of it: switchGame() ends in
+        // finalizeGameLoad(), which carries TSUMEGO across on its own, so the
+        // next problem in a collection needs nothing set by hand here.
+        const bool tsumego = engine.getGameMode() == GameMode::TSUMEGO;
         std::string busyEngine;
         const bool ran = engine.runWhenEngineFree([this, newIdx, tsumego]() {
             engine.switchGame(newIdx, tsumego);  // Start at root in tsumego mode
             if (tsumego) {
-                model.tsumegoMode = true;
-                model.game.setSuppressSessionCopy(true);
                 engine.autoPlayTsumegoSetup();
             }
         }, &busyEngine);
@@ -597,32 +599,61 @@ void GobanControl::buildRegistry() {
         view.requestRepaint();
     });
 
-    add("toggle_analysis_mode", 0, 0, "switch between match and analysis mode", [this](CommandContext& ctx) {
-        if (view.isTsumegoMode()) {
-            // Tsumego mode exits only via new game or loading ordinary SGF.
-            // Leave the menu toggle alone — OnUpdate keeps it lit for tsumego.
-            ctx.notifyMenu = false;
-            return;
+    // The one body behind both ways of changing the mode: the `game_mode`
+    // select and the `toggle_explore_mode` keybinding. Two of them is how the
+    // Space key and the Kibitz menu item came to disagree, and the mode already
+    // has three values for a pair of entry points to drift over.
+    auto requestGameMode = [this](GameMode wanted) -> bool {
+        const GameMode current = engine.getGameMode();
+        if (wanted == current) return false;
+        // A puzzle is entered by opening one and left by starting a new game.
+        // The select is greyed for exactly this, so nothing here contradicts a
+        // control (ADR-0005) — it refuses a script or a keybinding.
+        if (!actions().gameMode || wanted == GameMode::TSUMEGO) {
+            parent->showMessage(parent->templateText("tplTsumegoModeFixed",
+                "Tsumego mode follows the problem — open one to enter, "
+                "start a new game to leave"));
+            return false;
         }
-        if (engine.getGameMode() == GameMode::MATCH) {
-            if (engine.setGameMode(GameMode::ANALYSIS)) {
-                ctx.checked = true;
-            } else {
-                // Refused for a human-versus-human game, and silently until now:
-                // the menu entry simply failed to light up. Analysis mode answers
-                // every move with the kibitz engine regardless of who is assigned
-                // to a colour, so entering it here would quietly turn the game
-                // into human-versus-engine. Kibitz on demand needs no mode change
-                // — it already works in a match. See docs/game-modes.md.
-                parent->showMessage(parent->templateText("tplAnalysisAnswersEveryMove",
-                    "Analysis mode answers every move — use Kibitz in match mode instead"));
-            }
-        } else {
-            if (engine.setGameMode(GameMode::MATCH)) {
-                ctx.checked = false;
-            }
+        if (!engine.setGameMode(wanted)) {
+            // Refused for a human-versus-human game, and silently until this
+            // message: the menu entry simply failed to light up. Explore answers
+            // every move with the kibitz engine regardless of who is assigned to
+            // a colour, so entering it here would quietly turn the game into
+            // human-versus-engine. Kibitz on demand needs no mode change — it
+            // already works in a match. See docs/game-modes.md.
+            parent->showMessage(parent->templateText("tplAnalysisAnswersEveryMove",
+                "Analysis mode answers every move — use Kibitz in match mode instead"));
+            return false;
         }
         view.requestRepaint();
+        return true;
+    };
+
+    add("game_mode", 0, 1, "[match|explore|tsumego] — what produces the opponent's moves",
+        [this, requestGameMode](CommandContext& ctx) {
+        // The select follows GameThread in OnUpdate() rather than being driven
+        // from here, so a refusal leaves the widget showing the mode that is
+        // actually in force instead of the one that was asked for.
+        ctx.notifyMenu = false;
+        if (ctx.args.empty()) {
+            parent->showMessage(gameModeName(engine.getGameMode()));
+            return;
+        }
+        const auto wanted = parseGameMode(toLower(ctx.args[0]));
+        if (!wanted) {
+            spdlog::warn("game_mode: expected match, explore or tsumego, got '{}'",
+                         ctx.args[0]);
+            return;
+        }
+        requestGameMode(*wanted);
+    });
+
+    add("toggle_explore_mode", 0, 0, "switch between match and explore mode",
+        [this, requestGameMode](CommandContext& ctx) {
+        ctx.notifyMenu = false;
+        requestGameMode(engine.getGameMode() == GameMode::MATCH ? GameMode::EXPLORE
+                                                                : GameMode::MATCH);
     });
 
     add("toggle_evaluation", 0, 1, "[on|off] — show or hide the live evaluation overlay",
@@ -667,21 +698,33 @@ void GobanControl::buildRegistry() {
             ctx.notifyMenu = false;
             return;
         }
-        bool next = !view.isAnalysisOverlayShown();
-        if (!ctx.args.empty()) {
-            const std::string arg = toLower(ctx.args[0]);
-            if (arg != "on" && arg != "off" && arg != "true" && arg != "false"
-                && arg != "1" && arg != "0") {
-                spdlog::warn("toggle_evaluation_moves: expected on or off, got '{}'",
-                             ctx.args[0]);
+        using HintMode = GobanView::HintMode;
+        // Three states now (ADR-0014): off, revealed on a dwell once the player
+        // has aimed at a point, or always. `on`/`off` still work — they were the
+        // whole vocabulary before, and scenarios and keybindings use them.
+        // Seeded, though every path below assigns it: GCC cannot see that
+        // through the inlining at -O2 and warns, and a cycle starting from Off
+        // is the same answer the switch's default gives anyway.
+        HintMode next = HintMode::Off;
+        if (ctx.args.empty()) {
+            switch (view.analysisOverlayMode()) {
+                case HintMode::Off:      next = HintMode::OnDemand; break;
+                case HintMode::OnDemand: next = HintMode::Always;   break;
+                default:                 next = HintMode::Off;      break;
+            }
+        } else {
+            const auto parsed = parseHintMode(toLower(ctx.args[0]));
+            if (!parsed) {
+                spdlog::warn("toggle_evaluation_moves: expected off, on_demand or "
+                             "always, got '{}'", ctx.args[0]);
                 ctx.notifyMenu = false;
                 return;
             }
-            next = (arg == "on" || arg == "true" || arg == "1");
+            next = *parsed;
         }
-        view.setAnalysisOverlay(next);
-        UserSettings::instance().setEvaluationMoves(next);
-        ctx.checked = next;
+        view.setAnalysisOverlayMode(next);
+        UserSettings::instance().setEvaluationMoves(hintModeName(next));
+        ctx.checked = (next != HintMode::Off);
     });
 
     add("toggle_evaluation_readout", 0, 1,
@@ -738,7 +781,7 @@ void GobanControl::buildRegistry() {
         "[left|center|right] — where the board readout sits along the edge; "
         "with no argument, cycles through them",
         [this](CommandContext& ctx) {
-        TextAlign next;
+        TextAlign next = TextAlign::Center;
         if (ctx.args.empty()) {
             // Cycling is for judging it by eye, which is the only way this
             // choice can be made.
@@ -764,7 +807,7 @@ void GobanControl::buildRegistry() {
         "[gray|half-color|color|dubois] — how a stereo shader combines the two "
         "eyes; with no argument, cycles through them",
         [this](CommandContext& ctx) {
-        Stereo::Anaglyph next;
+        Stereo::Anaglyph next = Stereo::Anaglyph::Gray;
         if (ctx.args.empty()) {
             // Cycling, for the same reason evaluation_align cycles: the only way
             // to choose between these is to look at the board through the
@@ -881,6 +924,77 @@ void GobanControl::buildRegistry() {
         view.setPointerMode(*parsed);
         UserSettings::instance().setPointerMode(pointerModeName(*parsed));
         parent->showMessage(pointerModeName(*parsed));
+    });
+
+    add("prisoners", 0, 1,
+        "[auto|always|never] — when the captured-stone counts are drawn on the "
+        "board's right margin; auto means under a shader that draws no bowls, "
+        "where the prisoners would otherwise not be shown at all",
+        [this](CommandContext& ctx) {
+        if (ctx.args.empty()) {
+            parent->showMessage(prisonerModeName(view.prisonerMode_()));
+            ctx.notifyMenu = false;
+            return;
+        }
+        const auto parsed = parsePrisonerMode(ctx.args[0]);
+        if (!parsed) {
+            spdlog::warn("prisoners: expected auto, always or never, got '{}'", ctx.args[0]);
+            return;
+        }
+        view.setPrisonerMode(*parsed);
+        UserSettings::instance().setPrisonerMode(prisonerModeName(*parsed));
+        ctx.notifyMenu = false;
+    });
+
+    add("shader_param", 0, 2,
+        "[<name> [on|off|toggle]] — a scene feature the current shader exposes "
+        "(ADR-0017). With no arguments, lists what this shader offers and what "
+        "each is set to; with a name alone, reports that one. The shipped ones "
+        "are showBowls and showLids, and it is showLids that holds the "
+        "prisoners — switching it off brings the margin counts back",
+        [this](CommandContext& ctx) {
+        const auto& params = view.shaderParams();
+
+        if (ctx.args.empty()) {
+            if (params.empty()) {
+                parent->showMessage("no tunable parameters");
+                return;
+            }
+            std::string list;
+            for (const auto& p : params) {
+                if (!list.empty()) list += ", ";
+                list += p.name + (p.value ? " on" : " off");
+            }
+            parent->showMessage(list);
+            return;
+        }
+
+        const std::string& name = ctx.args[0];
+        const ShaderParam* p = findShaderParam(params, name);
+        if (!p) {
+            // Loud, not silent: either the name is a typo or this shader cannot
+            // do it, and the two look identical from the outside.
+            spdlog::warn("shader_param: the current shader offers no '{}'", name);
+            return;
+        }
+
+        if (ctx.args.size() == 1) {
+            parent->showMessage(name + (p->value ? " on" : " off"));
+            return;
+        }
+
+        const std::string& arg = ctx.args[1];
+        bool value;
+        if (arg == "on" || arg == "1" || arg == "true")        value = true;
+        else if (arg == "off" || arg == "0" || arg == "false") value = false;
+        else if (arg == "toggle")                              value = !p->value;
+        else {
+            spdlog::warn("shader_param: expected on, off or toggle, got '{}'", arg);
+            return;
+        }
+
+        view.setShaderParam(name, value);
+        parent->showMessage(name + (value ? " on" : " off"));
     });
 
     add("mouse_click", 2, 2,
@@ -1106,7 +1220,7 @@ void GobanControl::buildRegistry() {
         const auto snap = model.snapshot();
         if (snap->navigating && !snap->atEnd) {
             playVariationAt(Move(Move::PASS, snap->colorToMove));
-        } else if (engine.humanToMove() || engine.getGameMode() == GameMode::ANALYSIS) {
+        } else if (engine.humanToMove() || engine.getGameMode() == GameMode::EXPLORE) {
             model.start();
             if (!engine.isRunning()) engine.run();
             auto move = engine.getLocalMove(Move::PASS);
@@ -1230,44 +1344,64 @@ void GobanControl::buildRegistry() {
         }
     });
 
+    // The old name for toggle_explore_mode. Keybindings accumulate across an
+    // $include chain, so a user config naming the command that used to exist
+    // would otherwise silently fail to bind.
+    registry["toggle_analysis_mode"] = registry["toggle_explore_mode"];
+
     add("increase gamma", 0, 0, "raise gamma", [this](CommandContext&) {
         spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() + 0.025f);
+        view.saveShaderSettings();
     });
 
     add("decrease gamma", 0, 0, "lower gamma", [this](CommandContext&) {
         spdlog::debug("new gamma = {0}", view.getGamma() + 0.025f);
         view.setGamma(view.getGamma() - 0.025f);
+        view.saveShaderSettings();
     });
 
-    add("increase eof", 0, 0, "raise the stereo eye offset factor", [this](CommandContext&) {
+    // All six of these persist immediately, like `anaglyph`, `pointer` and the
+    // evaluation toggles. They used to be written only by `save camera` and
+    // re-read by `reset camera`, which meant tuning an anaglyph and then
+    // reframing the board threw the tuning away — they are not camera state.
+    add("increase eof", 0, 0, "ask for more stereo deviation", [this](CommandContext&) {
         view.setEof(view.getEof() + 0.0025f);
+        view.saveShaderSettings();
         spdlog::debug("new eof = {0}", view.getEof());
     });
 
-    add("decrease eof", 0, 0, "lower the stereo eye offset factor", [this](CommandContext&) {
+    add("decrease eof", 0, 0, "ask for less stereo deviation", [this](CommandContext&) {
         view.setEof(view.getEof() - 0.0025f);
+        view.saveShaderSettings();
         spdlog::debug("new eof = {0}", view.getEof());
     });
 
-    add("increase dof", 0, 0, "raise the depth of field", [this](CommandContext&) {
-        view.setDof(view.getDof() + 0.0025f);
-        spdlog::debug("new dof = {0}", view.getDof());
+    // The window rests on the near point at 0. Positive pushes the scene further
+    // behind the glass; negative brings it forward through the screen plane,
+    // which is more vivid and collides with the interface drawn at that plane.
+    add("increase dof", 0, 0, "push the stereoscopic window back", [this](CommandContext&) {
+        view.setDof(Stereo::clampWindowOffset(view.getDof() + 0.0025f));
+        view.saveShaderSettings();
+        spdlog::debug("new dof offset = {0}", view.getDof());
     });
 
-    add("decrease dof", 0, 0, "lower the depth of field", [this](CommandContext&) {
-        view.setDof(view.getDof() - 0.0025f);
-        spdlog::debug("new dof = {0}", view.getDof());
+    add("decrease dof", 0, 0, "pull the stereoscopic window forward", [this](CommandContext&) {
+        view.setDof(Stereo::clampWindowOffset(view.getDof() - 0.0025f));
+        view.saveShaderSettings();
+        spdlog::debug("new dof offset = {0}", view.getDof());
     });
 
     add("increase contrast", 0, 0, "raise contrast", [this](CommandContext&) {
         spdlog::debug("new contrast = {0}", view.getContrast() + 0.025f);
         view.setContrast(view.getContrast() + 0.025f);
+        view.saveShaderSettings();
     });
 
     add("decrease contrast", 0, 0, "lower contrast", [this](CommandContext&) {
         spdlog::debug("new contrast = {0}", view.getContrast() - 0.025f);
         view.setContrast(view.getContrast() - 0.025f);
+        view.saveShaderSettings();
     });
 
     add("reset contrast and gamma", 0, 0, "restore default contrast and gamma", [this](CommandContext&) {
@@ -1474,6 +1608,72 @@ void GobanControl::buildRegistry() {
     add("chooser_path", 1, 1, "<dir> — browse to a directory",
         [chooser](CommandContext& ctx) {
         if (auto* h = chooser()) h->SetPath(ctx.args[0]);
+    });
+
+    add("menu_select", 2, 2,
+        "<select-id> <value> — pick an option in a menu dropdown, as a user would. "
+        "Drives the widget, not the command behind it, which is the wiring "
+        "nothing else covers",
+        [this](CommandContext& ctx) {
+        // Every other scenario step dispatches a command directly, so the path
+        // from a widget to that command had no coverage at all — and three
+        // selects shipped with no branch in EventHandlerNewGame to lift the
+        // chosen value out of the change event. The symptom was quiet: the bare
+        // command ran, which for `prisoners` reports the setting instead of
+        // changing it, and for `toggle_evaluation` toggles whatever was picked.
+        auto* context = parent->GetContext();
+        auto* doc = context ? context->GetDocument("game_window") : nullptr;
+        auto* select = doc ? dynamic_cast<Rml::ElementFormControlSelect*>(
+                doc->GetElementById(ctx.args[0])) : nullptr;
+        if (!select) {
+            spdlog::warn("menu_select: no select element '{}'", ctx.args[0]);
+            return;
+        }
+        // Checked rather than assumed: SetValue() on a value no option carries
+        // leaves the control showing something nothing can act on, which is a
+        // worse failure than a refusal. Also catches a renamed option.
+        for (int i = 0; i < select->GetNumOptions(); ++i) {
+            auto* option = select->GetOption(i);
+            if (option && option->GetAttribute<Rml::String>("value", "") == ctx.args[1].c_str()) {
+                if (option->HasAttribute("disabled")) {
+                    spdlog::warn("menu_select: option '{}' of '{}' is disabled",
+                                 ctx.args[1], ctx.args[0]);
+                    return;
+                }
+                // SetValue dispatches EventId::Change exactly as a click does,
+                // so this runs the real handler chain rather than a shortcut.
+                select->SetValue(ctx.args[1].c_str());
+                return;
+            }
+        }
+        spdlog::warn("menu_select: '{}' has no option '{}'", ctx.args[0], ctx.args[1]);
+    });
+
+    add("menu_click", 1, 1,
+        "<element-id> — press a menu item, as a user would. The sibling of "
+        "menu_select for the items that are clicked rather than chosen from a "
+        "list, which is most of the menu and had no coverage at all",
+        [this](CommandContext& ctx) {
+        auto* context = parent->GetContext();
+        auto* doc = context ? context->GetDocument("game_window") : nullptr;
+        auto* el = doc ? doc->GetElementById(ctx.args[0]) : nullptr;
+        if (!el) {
+            spdlog::warn("menu_click: no element '{}'", ctx.args[0]);
+            return;
+        }
+        // Checked here rather than left to the style sheet. A greyed item is
+        // kept unclickable by `div.cmd.disabled { pointer-events: none }`, which
+        // a dispatched event goes straight past — so without this the harness
+        // could do what a user provably cannot, and would report a greyed
+        // control as working. Same refusal menu_select makes for a disabled
+        // option.
+        if (el->IsClassSet("disabled")) {
+            spdlog::warn("menu_click: '{}' is disabled", ctx.args[0]);
+            return;
+        }
+        // Dispatched, not shortcut: this runs the inline `onmouseup` through the
+        // real Event/EventManager chain, which is the wiring being tested.
+        el->DispatchEvent(Rml::EventId::Mouseup, Rml::Dictionary());
     });
 
     add("chooser_up", 0, 0, "browse to the parent directory", [chooser](CommandContext&) {
@@ -1692,6 +1892,11 @@ void GobanControl::buildRegistry() {
                 spdlog::warn("click: ignored, initialization is not complete");
                 return;
             }
+            // A real click always lands where the cursor already is —
+            // moveCursor() ran on the way there. The scripted one skipped that,
+            // so anything reading the cursor (the ghost stone, the pointer mark,
+            // the dwell that reveals the suggestions) saw the previous point.
+            model.setCursor(coord);
             boardClick(coord);
     });
 }
@@ -2033,7 +2238,7 @@ UiInputs GobanControl::uiInputs() const {
     // Bot-bot detection: the explicit toggle, or simply both sides being
     // engines. Analysis mode unlocks it, since that is the mode for stepping in.
     in.aiVsAiLocked      = (engine.isAiVsAi() || engine.areBothPlayersEngines())
-                           && engine.getGameMode() != GameMode::ANALYSIS;
+                           && engine.getGameMode() != GameMode::EXPLORE;
     in.tsumego           = model.tsumegoMode;
     // Everything about the record comes from the published snapshot, never from
     // the record itself: uiInputs() runs every frame on the UI thread, and
@@ -2053,7 +2258,11 @@ UiInputs GobanControl::uiInputs() const {
     // "Is there an engine that could answer", not "is it answering now". The
     // overlay's own state — starting, yielded, unavailable — belongs to the
     // panel, not to whether the toggle may be pressed.
-    in.evaluationAvailable = parent->getAnalysis().isConfigured();
+    // Configured *and* not found incapable. isConfigured() alone offered a
+    // toggle that could not work — the comment on evaluationAvailable already
+    // said "has not been found incapable", which nothing implemented.
+    in.evaluationAvailable = parent->getAnalysis().isConfigured()
+                          && parent->getAnalysis().state() != AnalysisState::Unavailable;
     return in;
 }
 
@@ -2070,6 +2279,12 @@ bool GobanControl::canResign() const {
 
 bool GobanControl::isIdle() const {
     if (!acceptsUiEvents()) return false;
+    // A shader still being linked in the background. Sixth term, and the only
+    // one that is not about the game: until it lands there is no board to read,
+    // so a scripted run that proceeded here would be asking questions of a view
+    // that has never drawn. It is bounded — a link finishes — so unlike
+    // EngineSync::Unsynced it is safe to wait on.
+    if (view.gobanShader.isBuilding()) return false;
     if (engine.isThinking()) return false;
     // Navigation is queued to the game thread, so it can still be outstanding
     // while no engine is thinking. Without this a script would read the board
@@ -2128,9 +2343,28 @@ nlohmann::json GobanControl::dumpState() const {
     // sounds_played and overlay_glyphs.
     s["prisoners_drawn_black"] = view.capturedBlackShown;
     s["prisoners_drawn_white"] = view.capturedWhiteShown;
+    // The margin counts: the mode, and what the glyph pass actually composed.
+    // Empty is the answer for a count of zero, which is deliberate — nothing is
+    // drawn until something has been taken. Same distinction as the two keys
+    // above: what was *drawn*, not what the board knows.
+    s["prisoner_mode"]  = prisonerModeName(view.prisonerMode_());
+    s["prisoner_shown"] = view.showPrisonerCounts();
+    // One key per tunable parameter the current shader offers (ADR-0017), so a
+    // scenario can assert what is *in force* rather than that a command ran.
+    // A shader offering none contributes no keys, which is itself assertable —
+    // `expect shader_param_showLids ...` fails on a Minimal scene, and should.
+    for (const auto& p : view.shaderParams()) {
+        s["shader_param_" + p.name] = p.value;
+    }
+    s["prisoner_text_black"] = view.prisonerTextBlack();
+    s["prisoner_text_white"] = view.prisonerTextWhite();
 
     // Lifecycle flags — the ones the Design Invariants are written about
-    s["mode"]           = (engine.getGameMode() == GameMode::ANALYSIS) ? "analysis" : "match";
+    // Three values since tsumego became a mode rather than a flag beside one.
+    // `tsumego` below is kept: it is the *published* copy the analysis loop and
+    // the view actually read, and a scenario asserting both catches the two
+    // drifting apart — which is the failure this consolidation removed.
+    s["mode"]           = gameModeName(engine.getGameMode());
     s["ai_vs_ai"]       = engine.isAiVsAi();
     s["phase"]          = phaseName(model.phase());
     s["running"]        = engine.isRunning();
@@ -2198,6 +2432,23 @@ nlohmann::json GobanControl::dumpState() const {
     s["stereo_base"]      = view.stereoHalfBase();
     s["stereo_near"]      = view.stereoNearPoint();
     s["stereo_deviation"] = view.stereoDeviation();
+    // Where the scene meets the glass — what `dof` decides, and the one thing
+    // none of the three above can answer. Reported with the board's own depth
+    // range beside it, because the question anybody asks of it ("is the screen
+    // plane at the back of the board?") is a comparison, not a distance.
+    float boardNear = 0.0f, boardFar = 0.0f;
+    view.stereoBoardDepth(boardNear, boardFar);
+    s["stereo_convergence"] = view.stereoConvergence();
+    s["stereo_board_near"]  = boardNear;
+    s["stereo_board_far"]   = boardFar;
+    // Where the window sits relative to the nearest thing in frame: 1 means it
+    // rests exactly on it, which is the default and the whole point of deriving
+    // it. Published as a ratio because that is the *invariant* — it holds at
+    // every zoom and aspect ratio, where the two distances above are camera
+    // specific, and "assert at more than one zoom" is the lesson this file's
+    // stereo scenario was written to enforce.
+    const float near = view.stereoNearPoint();
+    s["stereo_convergence_ratio"] = near > 0.0f ? view.stereoConvergence() / near : 0.0f;
     // Reported whatever shader is selected, for the same reason: it is a
     // property of the viewer, not of the shader, and it outlives a switch to
     // mono and back.
@@ -2252,6 +2503,7 @@ nlohmann::json GobanControl::dumpState() const {
     s["can_clear"]     = a.clear;
     s["can_save"]      = a.save;
     s["can_evaluation"] = a.evaluation;
+    s["can_game_mode"] = a.gameMode;
 
     // The evaluation overlay. `eval_state` is the one to wait on — `eval_enabled`
     // flips the instant the toggle is pressed, long before a process has started
@@ -2264,7 +2516,11 @@ nlohmann::json GobanControl::dumpState() const {
         // The move suggestions are a separate feature from the readout, and off
         // by default — `eval_labels` reading 0 with the evaluation running is
         // the normal case, not a fault.
+        // What is on screen now, and the mode that decides when it may be.
+        // Separate, because in on_demand they differ for most of a turn.
         s["eval_moves_shown"] = view.isAnalysisOverlayShown();
+        s["eval_moves_mode"]  = hintModeName(view.analysisOverlayMode());
+        s["eval_hint_waiting"] = view.hintDwellPending();
         s["eval_board_text"] = view.evaluationReadoutText();
         s["eval_readout_shown"] = view.isEvaluationReadoutShown();
         s["eval_align"] = GobanView::alignName(view.evaluationAlign());
@@ -2372,11 +2628,21 @@ void GobanControl::saveCurrentGame() const {
         settings.setSessionTreePathLength(treePath.length);
         settings.setSessionTreePath(treePath.branchChoices);
         settings.setSessionIsExternal(isExternal);
-        settings.setSessionTsumegoMode(model.tsumegoMode);
-        settings.setSessionAnalysisMode(engine.getGameMode() == GameMode::ANALYSIS);
-        spdlog::info("Saved session state: file={}, gameIndex={}, pathLen={}, branchChoices={}, tsumego={}, analysis={}",
+        settings.setSessionGameMode(engine.getGameMode());
+        // Who is playing *this* game, as against `game.*_player`, which is the
+        // default a new game starts from. The two shared one key, so switching
+        // engines mid-game and restarting came back to whoever the SGF names —
+        // PB/PW are written at the first move and never updated after it.
+        {
+            auto players = engine.getPlayers();
+            const size_t b = engine.getActivePlayer(0), w = engine.getActivePlayer(1);
+            settings.setSessionPlayers(
+                b < players.size() ? players[b]->getName() : std::string(),
+                w < players.size() ? players[w]->getName() : std::string());
+        }
+        spdlog::info("Saved session state: file={}, gameIndex={}, pathLen={}, branchChoices={}, mode={}",
             sessionFile, model.game.getLoadedGameIndex(), treePath.length, treePath.branchChoices.size(),
-            model.tsumegoMode.load(), engine.getGameMode() == GameMode::ANALYSIS);
+            gameModeName(engine.getGameMode()));
     } else {
         settings.clearSessionState();
     }
@@ -2389,6 +2655,12 @@ void GobanControl::saveCurrentGame() const {
 
 void GobanControl::requestScreenshot(const std::string& path) {
     view.requestScreenshot(path);
+}
+
+bool GobanControl::cameraAnimating() const {
+    // The same expression dumpState() reports as `camera_animating`, so a
+    // scenario asserting that key and the screenshot step agree by construction.
+    return view.animationRunning || view.cameraAnim.active;
 }
 
 bool GobanControl::screenshotPending() const {

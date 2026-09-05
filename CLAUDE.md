@@ -169,13 +169,13 @@ The application uses JSON configuration files:
 
 - Windows builds use vcpkg for dependency management (freetype, boost, portaudio, libsndfile)
 - Use the `x64-windows-static` triplet for static linking
-- **Patch file line endings**: Windows Git with `autocrlf=true` converts LF to CRLF on checkout, which corrupts patch files (like `deps/_patches/*.patch`). The `.gitattributes` file ensures patch files always use LF endings. The CMakeLists.txt also uses `git -c core.autocrlf=false apply --ignore-whitespace` to handle this robustly.
+- **Patch file line endings**: Windows Git with `autocrlf=true` converts LF to CRLF on checkout, which corrupts patch files (like `cmake/patches/*.patch`). `cmake/patches/.gitattributes` ensures patch files always use LF endings — it sits beside them rather than at the repository root because `.gitattributes` applies per-directory and every tracked `.patch` is in that one folder. The CMakeLists.txt also uses `git -c core.autocrlf=false apply --ignore-whitespace` to handle this robustly.
 
 ### Release Checklist
 
 Before creating a version tag (e.g., `v0.1.0`):
 1. **Update VERSION in CMakeLists.txt** (line 6) - this appears in the About dialog
-2. **Update RELEASE_NOTES.md** if needed
+2. **Update docs/RELEASE_NOTES.md** if needed
 3. **Commit all changes** before tagging
 4. Push the tag to trigger automatic GitHub Release creation
 
@@ -226,7 +226,7 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 ### Navigation & Engine Synchronization
 - **No genmove during navigation**: Navigation commands (back/forward/home/end) must not interleave with GTP genmove. Use `navigationInProgress` atomic flag.
 - **Block navigation while engine thinking**: `isThinking()` returns true only for ENGINE types (not human players). Navigation keys are blocked when engine is processing.
-- **Navigation in bot-bot matches**: Requires switching to Analysis mode first (pauses genmove loop).
+- **Navigation in bot-bot matches**: Requires switching to Explore mode first (pauses genmove loop).
 - **Engine sync invariant**: All enabled engines stay in sync at the same position. After load/new game, `EngineSync::Unsynced` triggers initial sync on the game thread: coach syncs first (enables scoring), then remaining engines. After initial sync, every move is sent to ALL engines via `syncOtherEngines`. No special cases for coach/player/kibitz roles.
 - **`Unsynced` is not "busy", `Syncing` is**: only `Syncing` — held while the game thread is actually replaying — may make `isIdle()` false. Waiting on `Unsynced` would never return, since nothing guarantees anyone will act on it. The replay always leaves `Syncing`, failure included.
 - **The sync starts when the board changes, not when the player moves — but only once the new record exists.** `GameThread::startSyncingNewGame()` is called from `newGameNow()` *after* `createNewRecord()`, never from `clearGame()`: the replay reads whatever record the model holds, and starting it inside `clearGame()` raced the empty record's installation. The engines were handed the game being discarded, the board drew empty, and GNU Go refused the player's opening move because that point was the old game's first stone. The function checks the precondition (`moveCount > 0` means the old record is still there) and logs an error rather than syncing — the failure is otherwise invisible until an engine disagrees with the board. A new game, a board size change and a handicap all begin the replay immediately — while the user is still looking at an empty board. It used to leave the engines `Unsynced` with the loop *stopped* until a click called `start()` + `run()`, which billed a several-second KataGo rebuild to the first move: stone stuck in hand, nothing on screen. The SGF load path had always started the thread early (`loadSGF`, "start game thread early"); the two paths had simply grown apart. Ordering matters twice — after `setFixedHandicap()`, because the replay carries its setup stones, and behind `if (!isRunning())`, because `clearGame()` also runs *on* the game thread when a discarding action was deferred, where `run()` would take a mutex that path may hold. Pinned by `tests/scenarios/sync_before_first_move.scn`, whose every assertion is "without a move having been played".
@@ -345,6 +345,48 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 - **Scoring is bounded more tightly than a genmove.** `GtpClient::scoringTimeout()` (30s, `scoring_timeout_ms` per engine) applies for the duration of `applyTerritory()` via `ScopedTimeout`. It never *raises* a stricter `timeout_ms`, and it does override a negative one — a wedged engine must not be able to freeze scoring for the full five-minute command timeout.
 - **The coach may not be the engine you configured.** `coach`/`kibitz` are indices whose "unset" value is 0, which is also a valid engine, so `PlayerManager` tracks `coachConfigured`/`kibitzConfigured` separately. When the engine carrying `main` fails to load, `currentCoach()` still hands out `players[0]` — an arbitrary engine under parallel loading — and that promotion is now warned about. Keep the warning: an engine that cannot count silently refereeing is the top of this whole failure chain.
 - **A missing engine folder is not fatal.** `path` only supplies the working directory; if `command` resolves from `PATH` the engine runs from the application folder with a warning. Making it an error regressed the stock `"path": "./engine/gnugo"` + `"command": "gnugo"` config on every machine with a distribution GNU Go — and that regression is what removed the real coach.
+
+### Game Mode
+See `docs/adr/0015-tsumego-is-a-game-mode.md`.
+- **`GameThread::gameMode` is the source of truth; `GobanModel::tsumegoMode` is
+  the copy published from it.** `applyGameMode()` is the one writer — of the
+  enum, of that flag, and of `GameRecord::suppressSessionCopy` — so nothing sets
+  a puzzle's session-copy suppression beside the mode any more. Same rule as
+  `GobanModel::transitionTo()`. Ask `getGameMode()`; the published flag exists
+  for the analysis loop and the view, which cannot reach `GameThread`.
+- **`TSUMEGO` is never refused, `EXPLORE` still is.** A puzzle ignores player
+  assignment entirely; Explore answers every move with the kibitz engine, so in
+  a human-versus-human game it would quietly turn the game into
+  human-versus-engine. The refusal carries a message — an explanation a greyed
+  control cannot give, which is why `availableActions()` deliberately does not
+  pre-empt it.
+- **The mode survives a load because nothing between the request and
+  `finalizeGameLoad()` writes it.** The file chooser and `load_tsumego` ask for
+  `TSUMEGO` *before* the load runs. `applyLoadedGame()` used to reset to `MATCH`
+  in between — harmless while tsumego was an independent flag, silently
+  destructive once merged. Don't reintroduce a reset there; `finalizeGameLoad()`
+  always follows and settles it.
+- **Tsumego is the value the menu reports, never one it offers.** A puzzle is
+  entered by opening one and left by starting a new game, in both directions:
+  the option carries RmlUi's `disabled` attribute (`SetSelection()` ignores it,
+  which is what lets the mode still be *displayed*), and `UiActions::gameMode`
+  greys the whole select while a puzzle is open. Offering Match mid-puzzle would
+  restore `promote=true` in `playVariationAt()`, letting the solver's next
+  attempt overwrite the recorded answer.
+- **`game_mode` and `toggle_explore_mode` share one body.** Two entry points to
+  a three-valued setting is how the Space key and the Kibitz menu item came to
+  disagree. The select follows `GameThread` in `OnUpdate()` rather than being
+  driven by the command, so a refusal leaves the widget showing what is actually
+  in force.
+- **The enum's declaration order is the option order** in every
+  `config/gui/<lang>/goban.rml`: `OnUpdate()` casts the mode straight to a
+  selection index, as `selectEvaluationMoves` already does. Nothing enforces it.
+- **`user.json` carries one `game_mode` key.** `tsumego_mode` / `analysis_mode`
+  are read for migration only, tsumego winning if a stale file has both.
+  `UserSettings` stores the enum; `gameModeName()` / `parseGameMode()` are
+  crossed once, at the JSON edge. An unreadable name falls back to Match with a
+  warning — it must not silently mean "whichever value is listed first", which
+  is why `NLOHMANN_JSON_SERIALIZE_ENUM` is not used here.
 
 ### Replacing the Game on Screen
 - **Three paths replace the game, and all three confirm first**: `clear`, the board-size dropdown and the handicap dropdown. `GobanModel::hasGameWorthKeeping()` is the gate — a record with moves, in a game that is not finished and not tsumego — and `GobanControl::requestNewGame()` / `requestHandicap()` route the dropdowns through it. Anything new that discards the current game belongs on the same route; a silent replacement is the bug this fixed.
@@ -493,6 +535,35 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 - **Keep `availableActions()` pure over plain data.** It must not take a `GobanModel` or `GameThread`: `isThinking()` reads a member only the game loop sets, so the engine-thinking cases would stop being testable — and they are half of what it decides.
 - **The UI thread must not read the SGF tree *or* `GameState`'s strings — it reads `GobanModel::snapshot()`.** The game thread owns that tree and mutates it freely; `GameRecord`'s const accessors take no lock, and its own mutex covers neither the readers nor half the mutators. `uiInputs()` and `dumpState()` take every record fact from the published `GameSnapshot` (ADR-0006). **Whoever changes what the UI displays must publish it**: `onBoardChange()` is the funnel that covers moves, navigation, load, switch, scoring and handicap; `createNewRecord()` and `onBoardSized()` publish for themselves because the new-game path bypasses it. A missed publish shows up as stale UI and the scenario suite catches it — both misses in the original change were caught on the first run. A plain scalar that changes off the position-change path becomes atomic instead, as `GameRecord::unsavedChanges` did; saving is not a position change. **ADR-0006 is complete through stage 5**: `comment`, `markup`, `scoringError` and `passVariationLabel` are all published, so nothing on a per-frame or per-keystroke path reads the record *or* copies a `GameState` string. The player dropdowns compare `getActivePlayer()` — a `size_t` handed out under `PlayerManager::mutex` — rather than `state.black`/`state.white`, because the index is what the widget holds and the string was a race for no information. `GobanModel::onBoardSized()` does `state = GameState()`, reassigning every one of those strings at once, which is the sharpest version of the hazard. What remains by design is listed in the ADR — `hasGameWorthKeeping()`, save/archive, and the dialog seed — all on explicit user actions. Note that `ElementGame`'s old `positionNumber` guard was not wrong, only insufficient: an atomic edge makes a write *visible* but grants no exclusion, so copying a `std::string` or walking a `std::vector` across it is still a use-after-free. The same partial-locking shape has now been found three times — `GameRecord`, `PlayerManager` (writers unlocked while readers locked), and the process pipes — so when a reader crosses this boundary, check the writers before assuming a mutex means anything.
 - **Widget state reads the phase, not `state.reason`.** They diverge after navigating back from a finished game: the phase returns to `Paused` while the reason stays set. See the `state.reason` invariant above.
+- **Prisoner counts are drawn on the board, never in a panel** (ADR-0016). Two
+  numbers on the **right margin** — the only edge nothing else uses, since the
+  coordinates are pinned top and left and the bottom row is shared three ways.
+  The ink is the colour of the stones *counted*, which is what sits in the bowl,
+  and it survives `eyeInk()` because black against white is a brightness
+  difference. **Both counts are drawn together, always, a zero included.** A
+  lone digit has nothing to contrast against and the ink convention is legible
+  only as a pair. Hiding a nought was tried and withdrawn: "absent is not zero"
+  is about a quantity nobody has *computed*, and a prisoner count of zero is
+  known and exact — the rule made `always` show an empty margin, a control
+  disagreeing with its own name.
+  `PrisonerMode` is `Auto`/`Always`/`Never` on the `PointerMode` precedent, and
+  `Auto` asks the *shader*: `"bowls": 1` is declared in its config entry
+  (ADR-0011's rule) because only `scene/red.glsl` includes `bowl_stones.glsl`, so
+  four of the six shipped shaders showed no prisoners at all. The menu labels,
+  `syncPrisonerLabels()` and the two `display: none` corner elements it was still
+  writing to every frame are gone. **The bowls did become a user setting**
+  (ADR-0017), and the rule this entry predicted now holds:
+  `GobanShader::drawsPrisonerPile()` is `capability && showLids`, and
+  `showPrisonerCounts()` asks *it*, never the bare capability.
+- **The prisoners are in the lids, not the bowls.** `cc[0]` and `cc[1]` are the
+  lids and `bowl_stones.glsl` fills them from `iBlackCapturedCount` /
+  `iWhiteCapturedCount`; `cc[2]` and `cc[3]` are the bowls and hold the
+  reservoir. So `showLids` is the toggle `PrisonerMode::Auto` follows, and hiding
+  the *bowls* costs no information. One toggle for both — which is how the
+  request was phrased — would have hidden the pile with `Auto` still believing it
+  was there. Beware `bowls.glsl`, which names `oid` 0 and 1 `idCup*` and 2 and 3
+  `idLid*`: that is backwards against both `Metrics::calc()` and the contents,
+  and is a material name rather than an authority.
 - **Prisoner counts come from `Board`, published in `GameSnapshot`. `GameState`
   never held them.** `GameState::capturedBlack`/`capturedWhite` existed, were
   initialised to zero and were **never assigned anywhere in the program** — while
@@ -520,6 +591,101 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   it is what **White** has taken, and the game-over branch had the pairing
   backwards — every finished game showed both counts swapped. Same shape as the
   buttons that disagreed with their commands before ADR-0005.
+
+### Tunable Shader Parameters
+See `docs/adr/0017-tunable-shader-parameters-are-declared-in-configuration.md`.
+- **A tunable parameter is declared in `shader_params`; the GLSL declares only
+  the uniform.** The key *is* the uniform name — one identity, because two is how
+  keys drift apart. Metadata does not go in a GLSL comment: it cannot be
+  localised, it is a second parsing mechanism where `Configuration` already does
+  layered defaults, and the value the user picks has to live out here anyway.
+- **A capability is not a setting.** `"bowls": 1` on a shader entry says the
+  scene *contains* the vessels; `showBowls` says whether they are drawn.
+  `requires` links the two generically — a shader whose entry omits the
+  capability is never offered the parameter, and no C++ knows the word "bowls".
+- **Write and read the saved value through the same name.**
+  `GobanShader::currentShaderName()`, from the shader's config entry — *not*
+  `UserSettings::getShaderName()`, which is empty until something saves the
+  selection. Keying the write there and the read here put every value under `""`
+  where it persisted and was never loaded. Committed while implementing the
+  decision that forbids it.
+- **A boolean is a `uniform bool`, never a `#define`.** A `#define` needs a
+  relink — 2019 ms cold (ADR-0013) — which is the cost a live toggle exists to
+  avoid. Uploaded unconditionally from `draw()`, not behind an update flag: a
+  value travelling on one flag while what it affects travels on another is a
+  shape this codebase has produced twice.
+- **The gate goes inside the loop, shadows included.** `rBowls`, `sBowls` and
+  `rBowlStones` each iterate all four cups, so the toggle is a `continue` on the
+  index rather than a branch at the `rScene()` call site. Missing `sBowls` leaves
+  a hidden vessel casting its shadow, and it is largely the shadow that costs.
+- **The vessels cost half the frame rate fullscreen, so measure them there.**
+  `tests/bench/` 19x19: **17.2 → 25.8 fps at 1920x1080 (+50%)** against 27.8 →
+  33.6 windowed (+21%). That is 3.1x the cost for 1.9x the pixels — worse than
+  linear, most likely because the vessels sit at the far left and right and a
+  16:9 frame shows all four whole. A windowed benchmark understates the case the
+  feature exists for.
+- **A benchmark must set the state it measures, not inherit it.** A scripted run
+  with no `--user-settings` writes to a *single shared* `scenario-user.json`, so
+  an off-run persists its setting and the next on-run silently measures the same
+  scene again. This produced two plausible, entirely fictional results before the
+  fullscreen pair came back identical to three digits and gave it away.
+  `run_scenarios.sh` passes a per-scenario file and is unaffected; direct
+  `--script` runs — which is what benchmarking uses — are not. Prefer
+  `shader_param <name> on|off` over `toggle`, and assert the state with `expect`
+  before measuring.
+- **`menu_click <element-id>` is how a scenario presses a menu item**, the
+  sibling of `menu_select` for everything clicked rather than chosen from a list.
+  It refuses a `disabled` item on purpose: greying is `pointer-events: none`,
+  which a dispatched event goes straight past, so without the check the harness
+  could do what a user provably cannot.
+- **The scenario suite cannot see persistence.** `run_scenarios.sh` hands each
+  scenario a throwaway `user.json`, so nothing written by one run is read by
+  another. Anything that must survive a restart is verified by hand, or not at
+  all — which is how the two-identity bug above got in.
+
+### Building a Shader
+See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
+- **The cost is `glLinkProgram`, not compilation.** Measured on Intel/Mesa with
+  a cold driver cache: 19 ms to compile the fragment shader, **2019 ms** to link
+  it. Reproduce with `MESA_SHADER_CACHE_DIR=$(mktemp -d)` — faithful and
+  repeatable; `MESA_SHADER_CACHE_DISABLE=1` overstates it about 2.5x. And it is
+  paid for **every shader on first use**, not once per machine: cycling the View
+  menu on a fresh install froze the window once per shader.
+- **`KHR_parallel_shader_compile` does not work here and must not be retried
+  without re-measuring.** Mesa advertises it; measured, `glLinkProgram` itself
+  took 2065 ms and `GL_COMPLETION_STATUS_KHR` was complete on the *first* poll.
+- **The build splits by what is shared and what is context state.**
+  `buildProgram()` (create/compile/link) touches only locals and objects shared
+  between contexts, so it runs on the worker. `adoptProgram()` runs on the **UI
+  thread**, because `glBindBufferRange()` binds to the *context* — on the worker
+  it would leave the drawing context with no uniform buffer bound and the board
+  would draw its stones from whatever was there. Only the program name and a
+  finished flag cross the boundary; the ~50 uniform locations are queried on the
+  UI thread, where the lookup is free.
+- **`takeShaderBuild()` is called before `OnUpdate()`'s readiness gate**, because
+  it is what opens that gate. It used to sit at the end of `Update()`, which
+  `OnUpdate()` only reaches once the view is *already* ready — so the finished
+  program could never have been collected at all.
+- **A widget asks `selectedProgram()`, the renderer asks `getCurrentProgram()`.**
+  The latter is -1 during a build. `populateUIElements()` asked it, fell back to
+  entry 0, and the change event that fired **replaced the shader the user had
+  saved** — it was the one dropdown left out of the repopulation invariant below.
+  Fixed from both ends: the population takes a `WidgetEventGuard`, and the
+  `shader` branch in `EventHandlerNewGame` asks `acceptsUiEvents()` like its four
+  siblings.
+- **Quiescence counts a build, and `getIdleTimeout()` must cover it.** `isIdle()`
+  gained a sixth term — the first not about the game — so a scripted run cannot
+  question a view that has never drawn. Without the timeout the loop blocks in
+  `glfwWaitEvents()`, paints no message *and never collects the finished
+  program*. Third time that trap has been walked into; see the resync and the
+  genmove.
+- **Idle is not repainted.** `wait_idle` returns on the frame the program became
+  current; `overlay_glyphs` reports what the glyph pass last *drew*. Assert what
+  was rendered with `wait_until`, not `expect`.
+- **A wait with no estimate gets a count, not a bar.** Nothing can predict a
+  driver's link time, so a progress bar would be decoration — the same reasoning
+  that keeps the board's wait indicator to lapsing seconds. The message names the
+  cost as one-time, which is the fact that makes the pause acceptable.
 
 ### Rendering Across Threads
 - **A `GameObserver` callback may hand data over; it may not act on the view.**
@@ -705,6 +871,18 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   run with signal 13 *after* the scenario had passed.
 
 ### Persisted Settings
+- **`game.*_player` is the default a *new* game starts from;
+  `session.*_player` is who was playing the game being resumed.** One key served
+  both, and the resume path never read it — the settings branch of
+  `performDeferredInitialization()` runs only when *no* SGF was loaded, so a
+  restored session took its players from `matchSgfPlayers()`, i.e. from `PB`/`PW`.
+  Those are written at the first move and never updated, so switching engines
+  mid-game was undone by a restart. The session pair is now laid *over* the SGF
+  match rather than replacing it: never for `is_external` (matching a foreign
+  record's own names is what that path is for), and only when the name still
+  resolves to a non-SGF player — a renamed or removed engine keeps the SGF's
+  answer instead of silently dropping to Human, which is what a bare
+  `findPlayer()` does and what today's KataGo rename would have triggered.
 - **`user.json` is the runtime scratchpad and is not tracked.** Defaults that
   ship — the opening camera — live in `config/base.json`, which the application
   never writes. Keeping both in one file leaked local paths and language into the
@@ -790,6 +968,28 @@ of its decisions, and `tests/test_analysis.cpp` plus
   the next ordinary command read the tail of the stream as its reply — silently
   wrong results rather than an error. Bounded, on the `scoringTimeout()`
   precedent.
+- **The suggestions have three states, not two** (ADR-0014). `evaluation_moves`
+  is `off` / `on_demand` / `always`; the old boolean migrates on read. In
+  `on_demand` a stone in hand is the precondition and a dwell of
+  `annotations.hint_dwell_ms` is the trigger, and the reveal lasts until the
+  stone is placed or put back. `getIdleTimeout()` must cover a pending dwell — a
+  dwell ends with no input event by definition.
+- **The readout's numbers are always the position's; a contemplated move's cost
+  goes in a bracket.** They used to *become* the aimed-at candidate's — win rate
+  and score both — so one slot meant two things with nothing to separate them,
+  and aiming at the best move read identically to aiming at a point the engine
+  never searched. Anchoring loses nothing: the candidate's win rate is the
+  position's minus the loss, and its score lead is now readable too, which it was
+  not before. Each half of the bracket is dropped when it rounds to nothing, so
+  an unsearched point simply gets none.
+- **The engine's own first choice is marked `(=)`, and the mark is a symbol
+  because on-board text cannot be translated.** Every language config points
+  `fonts.overlay` at the same ASCII-only font, so a word there would be English
+  in every language — `pass` in the margin escapes that only by being a GTP
+  literal rather than prose. `(=)` reads as "level with the best"; the test is
+  `order == 0`, the engine saying so, which defaults to -1 so an engine that does
+  not rank never claims it. Any new on-board glyph must also be added to
+  `Wait::BASE_ATLAS`, or it silently does not draw.
 - **The panel and the board suggestions are two features, and the board one is
   off by default.** Not for clutter — for judgement. The numbers are read *after*
   a move, so a player can invent their own and evaluate it post-hoc; stars on the
@@ -966,6 +1166,22 @@ of its decisions, and `tests/test_analysis.cpp` plus
   but cannot remove one, and only the JSON looks replaced. Pinned by
   `tests/test_configuration.cpp`.
 
+- **A select's chosen value reaches its command only through a branch in
+  `EventHandlerNewGame::ProcessEvent`.** Nothing appends it automatically: each
+  dropdown lifts it out of the change event with
+  `event.GetParameter<Rml::String>("value", …)` and builds the command itself.
+  Three selects shipped without one in a single change, and the failure is
+  *quiet* — the bare command runs, so `prisoners` printed its current setting
+  into `#lblMessage` and the widget snapped back, and `toggle_evaluation`
+  toggled whichever option was picked. Adding a `<select>` means adding a branch.
+- **Scenarios drive commands, so a widget needs `menu_select`.** `menu_select
+  <select-id> <value>` picks an option through `SetValue()`, which dispatches
+  `EventId::Change` exactly as a click does — the only step in the suite that
+  exercises the widget-to-command wiring rather than the command. It refuses a
+  value no option carries and one carrying `disabled`, so it also pins the
+  greyed-option decisions (ADR-0015's Tsumego). Every earlier scenario passed
+  with all three selects broken.
+
 ### UI Event Suppression
 - **`syncingUI` flag**: `GobanControl::syncingUI` suppresses game actions triggered by UI change events during programmatic dropdown updates. Any method that repopulates dropdowns (player, board size, komi, handicap) must wrap the repopulation with `setSyncingUI(true/false)`. Event handlers in `EventHandlerNewGame` check `isSyncingUI()` and skip side effects when true. This prevents transient intermediate states (e.g. briefly activating an engine player during dropdown clear/repopulate) from triggering game actions.
 
@@ -990,7 +1206,7 @@ syntax. They are kept here as an index; the scenario file is the specification.
 | Player Switch During Navigation | `player_switch_during_navigation.scn` |
 | Space Key at Branch End | `navigation_keys.scn` |
 | SGF Modification and Save | `variation_promotes_main_line.scn` |
-| Analysis Mode Workflow | `analysis_mode_toggle.scn`, `analysis_mode_auto_reply.scn` |
+| Explore Mode Workflow | `explore_mode_toggle.scn`, `explore_mode_auto_reply.scn` |
 
 Areas covered since (each found at least one real defect): board clicking and
 the stone-in-hand model (`board_click_stone_in_hand.scn`), tsumego mode
@@ -1073,6 +1289,26 @@ argues for, each enforced by `tests/test_stereo.cpp` or
   times over. The shipped default asks 1/40.
 - **`dof` is the window, not the depth.** It slides the whole range through the
   screen plane and cancels in near-minus-far. Never trade one for the other.
+- **The window rests on the near point, and is derived exactly as the base is.**
+  `Stereo::window()` is `dev·aspect`, which by the algebra puts the zero-parallax
+  plane *on* the nearest thing in frame at every zoom and aspect — no camera term
+  in it. It was a bare constant (0.0925) while `eof` became aspect-aware, which
+  put the near point 3.6% of image width behind the glass at 4:3 and 1.9% at
+  16:9, values nobody chose, with the whole scene behind the screen. **Forward of
+  the near point is rejected on purpose**: the RmlUi interface is drawn flat *at*
+  the screen plane, so negative parallax intersects the menus — a window
+  violation whose frame is the UI. The stored `dof` is now an *offset* from that
+  resting place (default 0, clamped ±0.05); a value from the old meaning is out
+  of range and read as zero. Uploaded from `shadeIt()` beside the base and never
+  from `setMetrics()`, because it follows the aspect ratio — the same trap that
+  froze the base at the last shader switch. `stereo_convergence_ratio` is 1 when
+  it is resting; assert the ratio, not a distance.
+- **`eof`, `dof`, gamma and contrast are not camera state.** They describe the
+  screen and the glasses in front of it, so they are sticky like `anaglyph`,
+  `pointer` and the evaluation toggles: written by the commands that change them
+  (`GobanView::saveShaderSettings()`). They used to be saved only by
+  `save camera` and *re-read* by `reset camera`, so tuning an anaglyph and then
+  reframing the board silently threw the tuning away.
 - **One base, computed once, uploaded every frame.** `GobanView::stereoHalfBase()`
   goes to the vertex shader from `shadeIt()` — it lived in `setMetrics()` for one
   afternoon, which runs only on a board or shader change, so the board's base

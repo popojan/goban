@@ -43,10 +43,12 @@ public:
         view.updateNavigationOverlay();
     }
 
+    /// Enter or leave a puzzle. GameThread owns the mode — the model's flag and
+    /// the record's session-copy suppression are copies it publishes — so the
+    /// authoritative write goes there and only the view's own copy is set here.
     void setTsumegoMode(bool enabled) {
+        engine.setGameMode(enabled ? GameMode::TSUMEGO : GameMode::MATCH);
         view.setTsumegoMode(enabled);
-        model.tsumegoMode = enabled;
-        model.game.setSuppressSessionCopy(enabled);
         if (enabled) {
             cacheTsumegoHints();
         }
@@ -87,6 +89,11 @@ public:
     const GobanModel& getModel() const { return model; }
     void OnMenuToggle(const std::string& cmd, bool checked) const;
     void setElementDisabled(const std::string& elementId, bool disabled) const;
+
+    /// Follow the shader's tunable scene parameters into the View menu
+    /// (ADR-0017). Generic over the menu's own children, so a new boolean needs
+    /// no code here.
+    void syncSceneParamItems() const;
 
     /// Localised text for a template id, or `fallback` when the interface
     /// language's .rml does not define it.
@@ -160,8 +167,8 @@ private:
     int sessionTreePathLength{0};
     std::vector<int> sessionTreePath;  // Branch choices only (at multi-child nodes)
     bool sessionIsExternal{false};
-    bool sessionTsumegoMode{false};
-    bool sessionAnalysisMode{false};
+    GameMode sessionGameMode{GameMode::MATCH};
+    std::string sessionBlackPlayer, sessionWhitePlayer;
     bool sessionRestoreNeeded{false};
 
     void startAsyncEngineLoading();
@@ -177,7 +184,6 @@ private:
 
     /// The four prisoner labels, written from one place so the two callers
     /// cannot disagree about which colour took which stones — they did.
-    void syncPrisonerLabels();
 
     bool logPanelOpen{false};
     uint64_t logVersionShown{0};

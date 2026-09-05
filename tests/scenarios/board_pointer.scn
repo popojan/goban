@@ -46,10 +46,17 @@ pointer auto
 expect pointer_mark 0
 
 # Four steps along the shader list is [stereo] Red Carpet.
+#
+# wait_idle, because selecting a shader is asynchronous: it is linked on a
+# worker thread so the seconds a driver takes over it are not a frozen window,
+# and the program only becomes current once it lands. isIdle() counts that, so
+# this is the barrier rather than a guessed sleep — which is what the assertions
+# below need, since every one of them is about the shader that is *drawing*.
 cycle shaders
 cycle shaders
 cycle shaders
 cycle shaders
+wait_idle
 expect stereo true
 
 # On the wood: the mark is drawn, and the native pointer is hidden under it.
@@ -98,5 +105,6 @@ expect pointer_mark 1
 # parallax mismatch, and in mono there is none.
 cycle shaders
 cycle shaders
+wait_idle
 expect stereo false
 expect pointer_mark 0

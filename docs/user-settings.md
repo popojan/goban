@@ -68,7 +68,8 @@ separate from the camera you happen to be looking through — see below.
 | `session.tree_path_length` | Navigation depth to restore |
 | `session.tree_path` | Branch choices, recorded **only at multi-child nodes** |
 | `session.is_external` | Whether the file was an external SGF rather than the daily session |
-| `session.tsumego_mode`, `session.analysis_mode` | Modes that were active |
+| `session.game_mode` | `match`, `explore` or `tsumego`. Replaces the `tsumego_mode` / `analysis_mode` pair, which is still read once for migration |
+| `session.black_player`, `session.white_player` | Who was playing the game being resumed. Distinct from `game.*_player`, which is the default a **new** game starts from |
 
 On the next launch, startup peeks at `session.file` for the board size, renders
 the board immediately, and queues the tree-path navigation so it runs on the game
@@ -101,18 +102,18 @@ to today's daily session file.
     "board_size": 13,
     "handicap": 0,
     "komi": 7.5,
-    "white_player": "Katago #kata9x9 b18"
+    "white_player": "KataGo 9x9"
   },
   "last_config": "./config/cs.json",
   "last_sgf_path": "./games/2026-08-12.sgf",
   "session": {
-    "analysis_mode": false,
     "file": "./games/2026-08-12.sgf",
+    "black_player": "Human",
     "game_index": 1,
+    "game_mode": "match",
     "is_external": false,
     "tree_path": [],
-    "tree_path_length": 96,
-    "tsumego_mode": false
+    "tree_path_length": 96
   },
   "shader": {
     "contrast": 0.0,

@@ -193,7 +193,7 @@ struct Overlay {
 	/// label somebody else wrote — without needing a layer of its own. Possible
 	/// only since glyphy started carrying colour per glyph rather than per draw
 	/// call.
-	std::optional<glm::vec4> color;
+	std::optional<glm::vec4> color{};
 };
 
 //stonePlace

@@ -316,6 +316,33 @@ TEST_CASE("the evaluation overlay asks only whether an engine can answer") {
     CHECK_FALSE(availableActions(notReady).evaluation);
 }
 
+TEST_CASE("the mode select reports a puzzle, it does not negotiate one") {
+    // Tsumego is entered by opening a problem and left by starting a new game.
+    // There is no path from the menu either way, and one would be harmful:
+    // picking Match mid-puzzle restores promote=true in playVariationAt(), so
+    // the solver's next attempt overwrites the recorded answer — the failure
+    // tsumego_mode.scn pins.
+    UiInputs puzzle = playing();  puzzle.tsumego = true;
+    CHECK_FALSE(availableActions(puzzle).gameMode);
+
+    // Everywhere else it is offered, including the cases that grey most of the
+    // toolbar. Explore's own refusal for a human-versus-human game lives in
+    // setGameMode(), which says *why* — an explanation a greyed control cannot
+    // give, so the policy deliberately does not pre-empt it here.
+    UiInputs in = playing();
+    CHECK(availableActions(in).gameMode);
+    UiInputs thinking = in;  thinking.engineThinking = true;
+    CHECK(availableActions(thinking).gameMode);
+    UiInputs locked = in;    locked.aiVsAiLocked = true;
+    CHECK(availableActions(locked).gameMode);
+    UiInputs over = in;      over.phase = GamePhase::Finished;
+    CHECK(availableActions(over).gameMode);
+
+    // Startup, like everything else.
+    UiInputs notReady = in;  notReady.uiReady = false;
+    CHECK_FALSE(availableActions(notReady).gameMode);
+}
+
 TEST_CASE("kibitz stays available while reviewing mid-tree") {
     // Deliberately *not* gated on atEndOfNavigation, unlike resign. Away from
     // the end a move is a variation rather than a turn, which `pass` and board

@@ -38,7 +38,7 @@ function(build_glyphy)
             SOURCE_DIR    ${PROJECT_SOURCE_DIR}/deps/glyphy
             BINARY_DIR  ${PROJECT_BINARY_DIR}/deps/glyphy/build
             CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy
-                ${PROJECT_SOURCE_DIR}/deps/_patches/goban_glyphy.vcxproj
+                ${PROJECT_SOURCE_DIR}/cmake/patches/goban_glyphy.vcxproj
                 ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/
             BUILD_COMMAND ${CMAKE_VS_MSBUILD_COMMAND} ${PROJECT_SOURCE_DIR}/deps/glyphy/win32/goban_glyphy.vcxproj
                 /t:Build /p:Configuration=${CMAKE_BUILD_TYPE}
@@ -85,8 +85,8 @@ function(build_libsgfcplusplus)
             UPDATE_COMMAND ""
             PATCH_COMMAND git checkout -- .
             COMMAND git -C sgfc checkout -- .
-            COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/libsgfcplusplus-static-init-fix.patch
-            COMMAND git -C sgfc -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/deps/_patches/sgfc-save-buffer-uninitialised-byte.patch
+            COMMAND git -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/cmake/patches/libsgfcplusplus-static-init-fix.patch
+            COMMAND git -C sgfc -c core.autocrlf=false apply --ignore-whitespace ${CMAKE_SOURCE_DIR}/cmake/patches/sgfc-save-buffer-uninitialised-byte.patch
             INSTALL_COMMAND ""
             )
 
@@ -266,6 +266,29 @@ cmake_language(CALL fetch_clipp)
 cmake_language(CALL fetch_glm)
 cmake_language(CALL fetch_spdlog)
 cmake_language(CALL download_fonts)
+
+# Fetched dependencies are not ours to fix, and their diagnostics drown ours:
+# a full build reported 276 warnings, of which the great majority were the same
+# handful repeated once per translation unit. Marking their headers SYSTEM makes
+# the compiler stop reporting warnings raised inside them, without touching
+# -Wall for our own code.
+#
+# Done by promoting the interface include directories rather than with
+# FetchContent_Declare(... SYSTEM), which needs CMake 3.25 — this project still
+# declares a much older minimum.
+function(mark_includes_system)
+    foreach(tgt IN LISTS ARGN)
+        if(TARGET ${tgt})
+            get_target_property(dirs ${tgt} INTERFACE_INCLUDE_DIRECTORIES)
+            if(dirs)
+                set_target_properties(${tgt} PROPERTIES
+                    INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${dirs}")
+            endif()
+        endif()
+    endforeach()
+endfunction()
+mark_includes_system(spdlog spdlog_header_only clipp nlohmann_json glm doctest)
+
 find_package(Threads)
 find_package(OpenGL REQUIRED)
 
@@ -404,6 +427,7 @@ else()
         src/Quaternion.h
         src/ScenarioRecorder.h
         src/SGF.h
+        src/ShaderParams.h
         src/UserSettings.h
         src/Vector.h
         src/UiActions.h
@@ -426,6 +450,7 @@ else()
         src/player.cpp
         src/Quaternion.cpp
         src/ScenarioRecorder.cpp
+        src/ShaderParams.cpp
         src/UiActions.cpp
         src/UserSettings.cpp
         src/Vector.cpp

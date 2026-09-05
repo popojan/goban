@@ -2,6 +2,8 @@ void rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
     int isInCup = 0;
 
     for (int i = 0; i < 4; i++) {
+        // 0 and 1 are the lids, 2 and 3 the bowls — see scene/red.glsl.
+        if (i < 2 ? !showLids : !showBowls) continue;
         vec3 cc1 = cc[i].xyz;
         cc1.y = bnx.y - legh + bowlRadius2 - 0.5* (bowlRadius2 - bowlRadius);
         vec3 cc2 = cc1;
@@ -124,6 +126,9 @@ void rBowls(in vec3 ro, in vec3 rd, inout SortedLinkedList ret) {
 vec2 sBowls(in vec3 pos, in vec3 lig, float ldia2, in IP ipp) {
     vec2 ret = vec2(1.0);
     for (int j = 0; j <= 2; j += 2) {
+        // Same split as rBowls: j == 0 is the lid pair, j == 2 the bowls. A
+        // hidden vessel must not go on casting a shadow.
+        if (j == 0 ? !showLids : !showBowls) continue;
         int jj = pos.x < 0.0 ? j+0 : j+1;
         if(ipp.oid != idBowlBlackStone && ipp.oid != idBowlWhiteStone && ipp.uid != idCupBlack +jj) {
             vec3 cci = cc[jj].xyz;

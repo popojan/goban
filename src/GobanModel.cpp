@@ -217,7 +217,7 @@ void GobanModel::onGameMove(const Move& move, const std::string& comment) {
     changeTurn();
 }
 
-void GobanModel::onStonePlaced(const Move& move) {
+void GobanModel::onStonePlaced(const Move& /*move*/) {
     state.holdsStone = false;
 }
 
