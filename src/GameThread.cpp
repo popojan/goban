@@ -460,7 +460,12 @@ std::string GameThread::thinkingEngineName() const {
 
 bool GameThread::analysisMayRun() const {
     if (isThinking() || isSyncingEngines() || hasPendingNavigation()) return false;
-    return !(isRunning() && isCurrentPlayerEngine());
+    // Yield to a genmove in progress or about to start (ADR-0007 decision 6);
+    // the phase is the test, not isRunning(). The loop thread stays alive while
+    // review pauses the game, so asking whether it exists silenced the overlay
+    // on every reviewed position whose colour happens to belong to an engine —
+    // which is the case decision 7 exists for.
+    return !(model.phase() == GamePhase::Playing && isCurrentPlayerEngine());
 }
 
 bool GameThread::hasQueuedMove() const {

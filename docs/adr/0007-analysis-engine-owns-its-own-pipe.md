@@ -557,6 +557,31 @@ run a different backend, and `genmove` and `kata-analyze` are different searches
 in one binary with different budgets and move-selection randomness. Not fixed —
 detecting it would mean comparing every move — but not claimed either.
 
+### Correction, 2026-09-06: decision 6 was yielding to a game nobody was playing
+
+`analysisMayRun()` implemented the yield as `!(isRunning() && isCurrentPlayerEngine())`.
+Both halves misread review. `isCurrentPlayerEngine()` asks about the colour to
+move *under the cursor*, and `isRunning()` only asks whether the game-loop thread
+exists — which it does throughout review, sitting in its `phase() != Playing`
+early-out with nothing searching and the device free. So stepping back onto the
+move an engine had just played withdrew the overlay, in the one situation
+decision 7 exists to serve. Reported after a session where the only way to see
+the evaluation of a weak engine's move was to set the suggestions to `always`
+*and* swap the human and the engine.
+
+The test is now `model.phase() == GamePhase::Playing && isCurrentPlayerEngine()`.
+Decision 6 is unchanged and still covers the 500 ms inter-move sleep, since the
+phase stays `Playing` across it; what changes is that "the loop thread is alive"
+is no longer mistaken for "a game is being played". Pinned by
+`tests/scenarios/evaluation_reviews_an_engine_move.scn`, which asserts both
+directions.
+
+Deliberately no way to *play* the suggestion was added: clicking the starred
+point already makes it a variation and resumes the match from it, and a command
+doing the same by another route is the button-disagreeing-with-its-command
+failure ADR-0005 exists to prevent. The 2026-09-04 note above therefore still
+stands — worth deciding one day, not by adding a second command.
+
 ## What this does not change
 
 The coach, the kibitz engine, and the sync invariant are untouched. Space still

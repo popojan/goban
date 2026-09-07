@@ -936,9 +936,12 @@ of its decisions, and `tests/test_analysis.cpp` plus
 - **Yield with `analysisMayRun()`, not `isThinking()`.** The loop clears
   `playerToMove` *before* its 500 ms inter-move sleep, so a bare test flaps the
   stream on and off once per move in a bot-versus-bot match — the
-  two-searches-at-once case decision 6 exists to prevent. The predicate also asks
-  whether the *loop is running*, because a loaded game paused with an engine to
-  move has nobody searching, and review is when the numbers are worth most.
+  two-searches-at-once case decision 6 exists to prevent. **The second term is
+  the phase, not `isRunning()`**: the loop thread stays alive through review, so
+  that asked "is a game being played" and answered "does the thread exist" —
+  silencing the overlay on every reviewed position whose colour belonged to an
+  engine (`isCurrentPlayerEngine()` reads the colour under the *cursor*). Pinned
+  by `tests/scenarios/evaluation_reviews_an_engine_move.scn`.
 - **Absent is not zero, and stale is not absent.** No report hides the panel
   outright; a bar resting at 50% because nothing has been computed cannot be told
   from a genuine even game. The yield window is the one *stale* case — the
