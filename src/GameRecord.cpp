@@ -625,9 +625,14 @@ void GameRecord::finalizeGame(float scoreDelta) {
     std::shared_ptr<LibSgfcPlusPlus::ISgfcPropertyFactory> pF(F::CreatePropertyFactory());
 
     // Score-based result
+    // A drawn game is RE[0] in SGF. "B+0" named a winner there was not.
     std::ostringstream ss;
-    ss << (scoreDelta < 0.0 ? "W+" : "B+");
-    ss << std::abs(scoreDelta);
+    if (scoreDelta == 0.0f) {
+        ss << "0";
+    } else {
+        ss << (scoreDelta < 0.0 ? "W+" : "B+");
+        ss << std::abs(scoreDelta);
+    }
 
     auto value(vF->CreateSimpleTextPropertyValue(ss.str()));
 
@@ -1121,6 +1126,9 @@ GameState::Message GameRecord::getResultMessage() const {
             if (val.find("+R") != std::string::npos) {
                 // B+R means black resigned, white wins
                 return (val[0] == 'W') ? GameState::BLACK_RESIGNED : GameState::WHITE_RESIGNED;
+            }
+            if (val == "0" || val == "Draw" || val == "Jigo") {
+                return GameState::JIGO;
             }
             // Point result: B+5.5, W+3, etc.
             if (val[0] == 'B') {

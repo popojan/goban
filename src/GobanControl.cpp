@@ -2236,6 +2236,7 @@ const char* messageName(GameState::Message m) {
         case GameState::SCORING_FAILED:    return "scoring_failed";
         case GameState::TSUMEGO_SOLVED:    return "tsumego_solved";
         case GameState::TSUMEGO_WRONG:     return "tsumego_wrong";
+        case GameState::JIGO:              return "jigo";
     }
     return "unknown";
 }

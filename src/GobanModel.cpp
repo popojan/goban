@@ -51,8 +51,13 @@ GobanModel::~GobanModel() = default;
 float GobanModel::result(const Move& lastMove) {
     state.scoreDelta = board.score;
     if (state.reason == GameState::DOUBLE_PASS) {
-        state.winner = Color(state.scoreDelta < 0.0 ? Color::WHITE : Color::BLACK);
-        state.msg = state.winner == Color::WHITE ? GameState::WHITE_WON : GameState::BLACK_WON;
+        if (state.scoreDelta == 0.0f) {
+            state.winner = Color::EMPTY;
+            state.msg = GameState::JIGO;
+        } else {
+            state.winner = Color(state.scoreDelta < 0.0 ? Color::WHITE : Color::BLACK);
+            state.msg = state.winner == Color::WHITE ? GameState::WHITE_WON : GameState::BLACK_WON;
+        }
     }
     else if (state.reason == GameState::RESIGNATION) {
         // Winner may be set in onGameMove (live game) or derived from lastMove (SGF loading)

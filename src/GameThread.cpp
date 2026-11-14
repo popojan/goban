@@ -1098,7 +1098,9 @@ void GameThread::processScoring() {
     if (result.territoryReady) {
         model.state.scoreDelta = result.score;
         // Update message to show winner (replaces CALCULATING_SCORE)
-        model.state.msg = (result.score > 0) ? GameState::BLACK_WON : GameState::WHITE_WON;
+        model.state.msg = result.score > 0 ? GameState::BLACK_WON
+                        : result.score < 0 ? GameState::WHITE_WON
+                        : GameState::JIGO;
     } else if (engineSync.load() == EngineSync::Synced) {
         // Every engine was at the right position and none could score it, so
         // this position is not going to score. Latch it, or the guard above

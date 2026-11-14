@@ -1,0 +1,23 @@
+# A drawn game names no winner. With integer komi — a loaded SGF, or the `komi`
+# command — an even count was recorded as RE[B+0] and announced as a White win:
+# three places each resolved zero to a colour, and not to the same one.
+#
+# Empty board, komi 0, two passes: the mock scores it 0.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+komi 0
+wait_idle
+expect komi 0
+
+pass
+wait_until move_count >= 1
+pass
+wait_until has_result true
+wait_idle
+expect phase finished
+expect msg jigo
+expect result jigo

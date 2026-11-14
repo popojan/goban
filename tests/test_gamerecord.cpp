@@ -372,6 +372,29 @@ TEST_CASE("finalizeGame writes a score result and never overwrites a resignation
     CHECK(s.rec.getResultMessage() == GameState::WHITE_RESIGNED);
 }
 
+TEST_CASE("a drawn game is RE[0], not a win by nothing") {
+    Session s;
+    s.rec.initGame(9, 0.0f, 0, "B", "W");
+    s.rec.move(blackAt(4, 4));
+    // Two passes, or saving drops RE as belonging to an unfinished main line.
+    s.rec.move(Move(Move::PASS, Color::WHITE));
+    s.rec.move(Move(Move::PASS, Color::BLACK));
+
+    // It wrote "B+0", which reads back as a Black win.
+    s.rec.finalizeGame(0.0f);
+    CHECK(s.rec.hasGameResult());
+    CHECK(s.rec.getResultMessage() == GameState::JIGO);
+
+    const std::string out = s.path("jigo.sgf");
+    s.rec.saveAs(out);
+    CHECK(readAll(out).find("RE[0]") != std::string::npos);
+
+    GameRecord reloaded;
+    GameRecord::SGFGameInfo info;
+    REQUIRE(reloaded.loadFromSGF(out, info));
+    CHECK(reloaded.getResultMessage() == GameState::JIGO);
+}
+
 TEST_CASE("annotate appends to the current node's comment") {
     Session s;
     s.rec.initGame(9, 0.5f, 0, "B", "W");

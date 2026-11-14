@@ -174,6 +174,7 @@
                             <div class="template" id="templateResignBlackWon">Black wins by resignation.</div>
                             <div class="template" id="templateWhiteWon">White wins by %.1f</div>
                             <div class="template" id="templateBlackWon">Black wins by %.1f</div>
+                            <div class="template" id="templateJigo">The game is a draw.</div>
                             <div class="template" id="templateWhiteResigns">White resigns</div>
                             <div class="template" id="templateBlackResigns">Black resigns</div>
                             <div class="template" id="templateWhitePasses">({0}) White passes</div>
