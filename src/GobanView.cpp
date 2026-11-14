@@ -662,7 +662,7 @@ void GobanView::Render(int w, int h)
 	}
 
 	if (flags & UPDATE_STONES) {
-	    board.updateStones(model.board);
+	    model.withBoard([this](const Board& source) { board.updateStones(source); });
         updateCursor();
         promoteHintLabel();
 

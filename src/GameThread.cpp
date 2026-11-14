@@ -398,7 +398,9 @@ void GameThread::setKomi(float komi) {
     // the model and the engines played and scored the game with the old one.
     if (isRunning()) {
         std::lock_guard<std::mutex> lock(navQueueMutex);
-        navQueue.push({NavCommand::SET_KOMI});
+        NavCommand cmd{NavCommand::SET_KOMI};
+        cmd.komi = komi;   // carried, not read back: the caller writes the model next
+        navQueue.push(cmd);
         wakeGameThread();
     } else {
         // Nobody to send it: the next run() replays, komi included.
@@ -440,10 +442,12 @@ bool GameThread::setFixedHandicap(int handicap) {
 
     model.state.handicap = handicap;
     // Place handicap stones locally instead of using showboard()
-    for (const auto& pos : stones) {
-        model.board.updateStone(pos, Color::BLACK);
-    }
-    model.board.positionNumber += 1;
+    model.editBoard([&stones](Board& board) {
+        for (const auto& pos : stones) {
+            board.updateStone(pos, Color::BLACK);
+        }
+        board.positionNumber += 1;
+    });
 
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&stones](GameObserver* observer) { observer->onHandicapChange(stones); });
@@ -1241,7 +1245,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             // If at scored game end, set flags — scoring handled in game loop idle section
             if (success && model.game.isAtEndOfNavigation()
                 && model.game.shouldShowTerritory()) {
-                model.board.toggleTerritoryAuto(true);
+                model.editBoard([](Board& board) { board.toggleTerritoryAuto(true); });
             }
             // Update tsumego feedback on forward-navigation
             if (success && model.tsumegoMode) {
@@ -1377,9 +1381,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             break;
         }
         case NavCommand::SET_KOMI: {
-            // The model's value at the time it runs, so two changes in a row
-            // both send the last one.
-            const float komi = model.state.komi;
+            const float komi = cmd.komi;
             for (auto* p : playerManager->getPlayers()) {
                 if (p->isTypeOf(Player::ENGINE) && !p->komi(komi)) {
                     spdlog::warn("[{}] refused komi {} — it will play and score "
@@ -1801,7 +1803,7 @@ void GameThread::finalizeLoadedGame(Engine* /* engine */, const GameRecord::SGFG
 
     // Actual scoring happens in the game loop idle section
     if (endedWithPasses) {
-        model.board.toggleTerritoryAuto(true);
+        model.editBoard([](Board& board) { board.toggleTerritoryAuto(true); });
     }
     model.endGame(endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
 
@@ -1864,13 +1866,15 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
     model.setupBlackStones = gameInfo.setupBlackStones;
     model.setupWhiteStones = gameInfo.setupWhiteStones;
     if (!gameInfo.setupBlackStones.empty() || !gameInfo.setupWhiteStones.empty()) {
-        model.board.clear(gameInfo.boardSize);
-        for (const auto& stone : gameInfo.setupBlackStones) {
-            model.board.updateStone(stone, Color::BLACK);
-        }
-        for (const auto& stone : gameInfo.setupWhiteStones) {
-            model.board.updateStone(stone, Color::WHITE);
-        }
+        model.editBoard([&gameInfo](Board& board) {
+            board.clear(gameInfo.boardSize);
+            for (const auto& stone : gameInfo.setupBlackStones) {
+                board.updateStone(stone, Color::BLACK);
+            }
+            for (const auto& stone : gameInfo.setupWhiteStones) {
+                board.updateStone(stone, Color::WHITE);
+            }
+        });
     }
 
     // Notify observers of board size

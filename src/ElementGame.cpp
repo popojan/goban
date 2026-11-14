@@ -1225,8 +1225,10 @@ void ElementGame::OnUpdate()
     {
         std::vector<Rml::Element*> els;
         context->GetDocument("game_window")->GetElementsByClassName(els, "toggle_territory");
-        if (!els.empty() && els[0]->IsClassSet("selected") != model.board.showTerritory) {
-            OnMenuToggle("toggle_territory", model.board.showTerritory);
+        const bool territoryShown = model.withBoard(
+                [](const Board& board) { return board.showTerritory; });
+        if (!els.empty() && els[0]->IsClassSet("selected") != territoryShown) {
+            OnMenuToggle("toggle_territory", territoryShown);
         }
     }
     // Sync the evaluation select. It can move without the menu being touched:

@@ -542,7 +542,7 @@ void GobanControl::buildRegistry() {
         // there is no territory to show. The same answer greys the button.
         // On refusal the menu is still updated (with checked == false), unselecting it.
         if (actions().territory) {
-            ctx.checked = model.board.toggleTerritory();
+            model.editBoard([&ctx](Board& board) { ctx.checked = board.toggleTerritory(); });
             view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
         }
     });
@@ -2436,10 +2436,13 @@ nlohmann::json GobanControl::dumpState() const {
     s["handicap"]       = model.state.handicap;
 
     // Stones actually on the board, and prisoners
-    s["black_stones"]   = model.board.stonesOnBoard(Color::BLACK);
-    s["white_stones"]   = model.board.stonesOnBoard(Color::WHITE);
-    s["captured_black"] = model.board.capturedCount(Color::BLACK);
-    s["captured_white"] = model.board.capturedCount(Color::WHITE);
+    model.withBoard([&s](const Board& board) {
+        s["black_stones"]   = board.stonesOnBoard(Color::BLACK);
+        s["white_stones"]   = board.stonesOnBoard(Color::WHITE);
+        s["captured_black"] = board.capturedCount(Color::BLACK);
+        s["captured_white"] = board.capturedCount(Color::WHITE);
+        s["show_territory"] = board.showTerritory;
+    });
     // What the *renderer* was handed, as against what the board knows. These
     // are the uniforms that decide how many stones sit in the bowls, and they
     // were permanently zero while the two keys above were right — so a scenario
@@ -2578,7 +2581,6 @@ nlohmann::json GobanControl::dumpState() const {
     s["cursor_row"]         = model.cursor.row();
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
-    s["show_territory"] = model.board.showTerritory;
     s["unsaved_changes"] = model.game.hasUnsavedChanges();
     s["msg"]            = messageName(model.state.msg);
     // What the message tail and the board overlay are showing. Asserting these
@@ -2691,16 +2693,18 @@ nlohmann::json GobanControl::dumpState() const {
 
     // A cheap, order-independent fingerprint of the position, so a scenario can
     // assert "the board is the same as before" without spelling out 361 points.
-    unsigned long hash = 1469598103934665603UL;
-    for (int row = 0; row < snap->boardSize; ++row) {
-        for (int col = 0; col < snap->boardSize; ++col) {
-            const Color& stone = model.board[Position(col, row)].stone;
-            const unsigned long v = (stone == Color::BLACK) ? 2u
-                                  : (stone == Color::WHITE) ? 1u : 0u;
-            hash = (hash ^ v) * 1099511628211UL;
+    s["board_hash"] = model.withBoard([&snap](const Board& board) {
+        unsigned long hash = 1469598103934665603UL;
+        for (int row = 0; row < snap->boardSize; ++row) {
+            for (int col = 0; col < snap->boardSize; ++col) {
+                const Color stone = board[Position(col, row)].stone;
+                const unsigned long v = (stone == Color::BLACK) ? 2u
+                                      : (stone == Color::WHITE) ? 1u : 0u;
+                hash = (hash ^ v) * 1099511628211UL;
+            }
         }
-    }
-    s["board_hash"] = hash;
+        return hash;
+    });
 
     return s;
 }

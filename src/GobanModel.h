@@ -171,6 +171,26 @@ public:
         return board.isValidMove(m.pos, m.col);
     }
 
+    /// Ask the board something from another thread. The game thread rebuilds
+    /// `board` under this mutex in onBoardChange(); the UI thread read it bare,
+    /// every frame — and a Point carries std::strings, so that was not a stale
+    /// value but a copy racing an assignment. One locked question per call, the
+    /// same rule as PlayerManager.
+    template <typename Reader>
+    auto withBoard(Reader&& reader) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return reader(board);
+    }
+
+    /// The writing half of withBoard(), for the handful of board writes made
+    /// outside onBoardChange(). A reader's lock means nothing unless every
+    /// writer holds it too.
+    template <typename Writer>
+    void editBoard(Writer&& writer) {
+        std::lock_guard<std::mutex> lock(mutex);
+        writer(board);
+    }
+
     void setCursor(const Position& p) { cursor = p;}
 
 public:

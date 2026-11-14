@@ -16,7 +16,9 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"   # asset paths in the config are relative to the repo root
 
-BUILD="$ROOT/cmake-build-release"
+# Overridable so the suite can run against another build — a sanitizer one, say:
+#   GOBAN_SCENARIO_BUILD=cmake-build-tsan TSAN_OPTIONS=exitcode=0 tests/run_scenarios.sh
+BUILD="$ROOT/${GOBAN_SCENARIO_BUILD:-cmake-build-release}"
 GOBAN="$BUILD/goban"
 MOCK="$BUILD/mock_gtp_engine"
 # Overridable so a scenario can be run against another language's GUI —

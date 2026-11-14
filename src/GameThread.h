@@ -46,6 +46,7 @@ struct NavCommand {
     bool promote = true;  // For TO_VARIATION: promote to main line
     int pathLength = 0;                 // For TO_TREE_PATH
     std::vector<int> branchChoices{};   // For TO_TREE_PATH
+    float komi = 0.0f;                  // For SET_KOMI
 };
 
 /** \brief Whether the engines match the game record — ADR-0002 step 4.

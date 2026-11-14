@@ -6,10 +6,13 @@ void GobanModel::onBoardSized(int boardSize) {
 
     spdlog::info("{} {} {} {}", boardSize, state.komi, state.black, state.white);
 
-	board.clear(boardSize);
-    board.clearTerritory();
-	board.toggleTerritoryAuto(false);
-    board.positionNumber += 1;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        board.clear(boardSize);
+        board.clearTerritory();
+        board.toggleTerritoryAuto(false);
+        board.positionNumber += 1;
+    }
 
 	// Resizing the board abandons whatever was on it. The record is replaced
 	// separately, by createNewRecord() — until it is, restingPhase() still sees
@@ -237,7 +240,11 @@ void GobanModel::updateReservoirs() {
 
 void GobanModel::onBoardChange(const Board& result) {
     spdlog::debug("LOCK board");
-    std::lock_guard<std::mutex> lock(mutex);
+    // Released before anything is written to disk: the UI thread takes this
+    // lock to copy the board for a frame (withBoard), and must not wait on a
+    // save for it.
+    std::unique_lock<std::mutex> lock(mutex);
+    bool finalize = false, save = false;
 
     // Use updateStones to preserve existing fuzzy positions
     // Only changed stones get new fuzzy positions
@@ -262,10 +269,7 @@ void GobanModel::onBoardChange(const Board& result) {
         board.positionNumber += 1;
         // Finalize and save only once (live game ending, result not yet written).
         // Already inside the Finished branch, so only the record needs checking.
-        if (!game.hasGameResult()) {
-            game.finalizeGame(state.scoreDelta);
-            game.saveAs("");
-        }
+        finalize = save = !game.hasGameResult();
     } else if (phase() == GamePhase::Finished && game.isAtEndOfNavigation()
                && game.isResignationResult()) {
         // At end of resigned game - show resignation message
@@ -275,10 +279,12 @@ void GobanModel::onBoardChange(const Board& result) {
             // Shouldn't happen — RE was set during move(RESIGN) — but guard anyway
             spdlog::warn("onBoardChange: resignation detected but no RE property found");
         }
-        if (game.hasUnsavedChanges()) {
-            game.saveAs("");
-        }
+        save = game.hasUnsavedChanges();
     }
+    lock.unlock();
+
+    if (finalize) game.finalizeGame(state.scoreDelta);
+    if (save) game.saveAs("");
 
     // Last, so it reflects everything above — finalizeGame() writes RE, and the
     // snapshot carries hasResult. Every position change in the program funnels

@@ -580,7 +580,8 @@ public:
     float baseCameraDistance = 3.5f;            // committed distance (drag baseline)
     glm::vec2 resolution;
     float lastTime, startTime;
-    bool animationRunning;
+    // Written by the render loop, read by requestRepaint() on the game thread.
+    std::atomic<bool> animationRunning;
     /// Written by Render() on the UI thread, read by dumpState() — which the
     /// scenario runner may call from anywhere between frames, hence atomic.
     std::atomic<unsigned> overlayGlyphsDrawn{0};

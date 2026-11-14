@@ -447,6 +447,42 @@ GOBAN_SCENARIO_CONFIG=$PWD/tests/scenarios/mock-cs.json \
 `run_scenarios.sh` also redirects `user.json` and the games folder into a scratch
 directory; without it a scripted run saves over the real ones.
 
+## Sanitizer and Windows runs
+
+Two ways of running the same suite that find what an ordinary run cannot. Neither
+is part of CI; both are worth doing before a release.
+
+**ThreadSanitizer.** A separate build folder, then the scenario suite pointed at
+it. Reports go to files, one per process, and the run itself is not failed by
+them (`exitcode=0`), so the count is the result:
+
+```bash
+mkdir -p cmake-build-tsan && cd cmake-build-tsan
+export CC=clang CXX=clang++ LDFLAGS=-fsanitize=thread \
+       CFLAGS="-fsanitize=thread -g -O1" CXXFLAGS="-fsanitize=thread -g -O1"
+cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBuildPrerequisites=ON  && make -j6
+cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBuildPrerequisites=OFF && make -j6 goban
+cd .. && mkdir -p cmake-build-tsan/tsan-logs
+GOBAN_SCENARIO_BUILD=cmake-build-tsan \
+  TSAN_OPTIONS="exitcode=0 log_path=$PWD/cmake-build-tsan/tsan-logs/scn" \
+  tests/run_scenarios.sh
+grep -h 'SUMMARY: ThreadSanitizer' cmake-build-tsan/tsan-logs/* | sort | uniq -c | sort -rn
+```
+
+The suite takes about twenty minutes this way. GCC works as well as clang if
+`libtsan` is installed. The first run of this, on 2026-11-14, reported 485 races;
+see the note at the end of `docs/adr/0006-publish-a-game-snapshot.md` for what
+they were and which remain.
+
+**A Windows build under Wine.** Unpack a `goban-windows-x64` artifact from the
+Build workflow, put a `gnugo.exe` in `engine/gnugo/`, and run a scenario with
+`wine64 goban.exe --script x.scn --user-settings x.json`. This exercises the
+Win32 process, pipe and path code that no Linux run reaches — an engine argument
+split by a space in the install folder was found this way, from a folder named
+`Go Board`. It is not a test of a Windows graphics driver: OpenGL goes to the
+host's Mesa. There is no mock engine in the artifact, so scenarios that need one
+cannot run.
+
 ## What to test, and what not to
 
 Aim tests at where the bugs have actually been. In this project that is SGF

@@ -34,7 +34,7 @@ void GameNavigator::restoreFinishedStateAtEnd() {
 /// updateStones() would overwrite the territory flag.
 void GameNavigator::showEndOfGameResult() {
     if (model.game.shouldShowTerritory()) {
-        model.board.toggleTerritoryAuto(true);
+        model.editBoard([](Board& board) { board.toggleTerritoryAuto(true); });
         // processScoring() will set CALCULATING_SCORE then the result message
     } else if (model.phase() == GamePhase::Finished) {
         auto resultMsg = model.game.getResultMessage();
@@ -129,8 +129,10 @@ bool GameNavigator::navigateBack() {
     model.game.undo();
 
     // Hide territory unconditionally when navigating back (stale after undo)
-    model.board.showTerritory = false;
-    model.board.showTerritoryAuto = false;
+    model.editBoard([](Board& board) {
+        board.showTerritory = false;
+        board.showTerritoryAuto = false;
+    });
 
     // Pause active play - user is reviewing. Explicit "Start" needed to resume.
     // enterReview() rather than pause(): the position shown is no longer the end
@@ -334,8 +336,10 @@ bool GameNavigator::navigateToStart() {
         }
     }
 
-    model.board.showTerritory = false;
-    model.board.showTerritoryAuto = false;
+    model.editBoard([](Board& board) {
+        board.showTerritory = false;
+        board.showTerritoryAuto = false;
+    });
 
     // Pause active play - user is reviewing. Explicit "Start" needed to resume.
     model.enterReview();
