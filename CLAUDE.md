@@ -286,6 +286,17 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
   fixed for exactly this and its three siblings had not. `askEngine()` sets the
   slot under `playerMutex` and refuses when a game-replacing action has claimed
   the loop. Pinned by `kibitz_at_end_is_announced.scn`.
+- **Scoring and the replay are "engine busy" to `runWhenEngineFree()` too**
+  (`EngineCallScope`). It decided from `playerToMove` alone, and neither has a
+  player on move — so a new game asked for during "Calculating score…" ran
+  inline and its `interrupt()` joined the game thread from the UI thread:
+  measured, 3.06 s frozen against a 3 s scoring timeout, and the default is 30.
+  The scope does **not** wait for a claim to clear, only for one that has been
+  followed by a stop: the task holding a claim restarts the loop itself so the
+  replay begins before it returns, and waiting left the engines `Unsynced` —
+  reading as idle — for a poll interval after every load, which dropped the
+  second of two `navigate_back` in three scenarios. Pinned by
+  `replace_game_while_scoring.scn`.
 - **A komi change is sent to the engines by the game thread** (`NavCommand::
   SET_KOMI`). It used to ride on the sync that ran at the first move; ADR-0008
   moved that sync to the moment the board appears, so a komi chosen afterwards

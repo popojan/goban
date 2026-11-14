@@ -1,0 +1,37 @@
+# config: mock-slowscore.json
+#
+# A new game asked for while the game thread is scoring, or replaying a position
+# into the engines, must be deferred like one asked for during a genmove
+# (ADR-0001). runWhenEngineFree() decided "busy" from the player on move alone,
+# and neither of those has one — so it ran the action inline, and the
+# interrupt() inside it joined the game thread from the UI thread: the window
+# frozen for as long as the engine took, up to the 30 s scoring timeout.
+#
+# `deferred_task true` straight after the command is the evidence: deferred
+# means the UI thread came back at once; inline, it would be false, and late.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+# --- While scoring ----------------------------------------------------------
+pass
+wait_until move_count >= 1
+pass
+wait_until msg calculating_score
+new_game 13
+expect deferred_task true
+wait_idle
+expect board_size 13
+expect move_count 0
+
+# --- While the engines are being resynchronised -----------------------------
+new_game 9
+wait_until engine_sync syncing
+new_game 13
+expect deferred_task true
+wait_idle
+expect board_size 13
+expect engine_sync synced

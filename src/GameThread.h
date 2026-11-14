@@ -396,6 +396,20 @@ private:
 
     void processNavigationQueue();
     void executeNavCommand(const NavCommand& cmd);
+
+    /// See the definition. Both members are guarded by playerMutex.
+    class EngineCallScope {
+    public:
+        EngineCallScope(GameThread& gt, Player* engine);
+        ~EngineCallScope();
+        explicit operator bool() const { return entered; }
+    private:
+        GameThread& gt;
+        bool entered = false;
+        bool owner = false;
+    };
+    bool engineCallInFlight = false;
+    std::string engineCallName;
     void settleTsumegoVariation(const GameNavigator::VariationResult& varResult);
     void processScoring();
     void wakeGameThread();

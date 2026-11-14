@@ -95,6 +95,10 @@ bool GameThread::runWhenEngineFree(std::function<void()> task, std::string* busy
         Player* p = playerToMove.load();
         if (p != nullptr && p->isTypeOf(Player::ENGINE)) {
             busy = p->getName();
+        } else if (engineCallInFlight) {
+            // Scoring, or a replay: no player is on move, and the game thread
+            // is inside an engine all the same. See EngineCallScope.
+            busy = engineCallName;
         } else {
             // Claim the loop before releasing the lock. The genmove branches
             // test this inside the same critical section, so from here until the
@@ -130,6 +134,36 @@ bool GameThread::runWhenEngineFree(std::function<void()> task, std::string* busy
     navQueueCV.notify_one();
     spdlog::info("Deferred action until {} finishes thinking", busy);
     return false;
+}
+
+// A slow engine call that is not a genmove — scoring, or the replay of a
+// position. Nothing is on move during either, so runWhenEngineFree() saw a free
+// loop, ran its task inline, and the interrupt() inside it joined this thread
+// from the UI thread: frozen for as long as the engine took, which for scoring
+// is up to 30 s. Entered under the lock the claim is made with. Nests, because
+// scoring runs inside the replay.
+//
+// Refused only when a claim is held *and* the stop has arrived. A claim alone
+// is not enough: the task holding it restarts the loop itself, precisely so
+// that this replay begins before it returns — waiting for the claim to clear
+// left the engines Unsynced, and therefore reading as idle, for one poll
+// interval after every load. What remains is the few instructions between a
+// claim and the interrupt() that follows it.
+GameThread::EngineCallScope::EngineCallScope(GameThread& gt, Player* engine) : gt(gt) {
+    std::lock_guard<std::mutex> lock(gt.playerMutex);
+    if (gt.engineCallInFlight) {
+        entered = true;          // nested: the outer scope owns the flag
+        return;
+    }
+    if (gt.deferredPending.load() && gt.stopRequested()) return;
+    gt.engineCallInFlight = owner = entered = true;
+    gt.engineCallName = engine ? engine->getName() : std::string("engine");
+}
+
+GameThread::EngineCallScope::~EngineCallScope() {
+    if (!owner) return;
+    std::lock_guard<std::mutex> lock(gt.playerMutex);
+    gt.engineCallInFlight = false;
 }
 
 void GameThread::processDeferredTask() {
@@ -682,6 +716,8 @@ void GameThread::gameLoop() {
             // Visible to other threads for as long as the replay takes, so a
             // caller waiting for quiescence waits for it. Always left below,
             // failure included, so it cannot strand anyone.
+            EngineCallScope call(*this, coach);
+            if (!call) continue;   // stopping: the loop test ends it
             engineSync = EngineSync::Syncing;
 
             // 1. Sync coach first (fast, enables scoring)
@@ -1061,6 +1097,9 @@ void GameThread::processScoring() {
     Engine* coach = currentCoach();
     if (!coach) return;
 
+    EngineCallScope call(*this, coach);
+    if (!call) return;
+
     model.state.msg = GameState::CALCULATING_SCORE;
 
     Board result(model.game.getBoardSize());
@@ -1068,7 +1107,9 @@ void GameThread::processScoring() {
     model.game.buildBoardFromMoves(result, koPosition);
     const bool scored = coach->applyTerritory(result);
 
-    if (stopRequested()) return;
+    // Stopping, or a game-replacing action was deferred behind this call: the
+    // position just scored is on its way out.
+    if (shouldDiscardMove()) return;
 
     // The coach shaded territory but could not put a number on it. Another
     // engine may be able to — but only one that is actually at this position.
