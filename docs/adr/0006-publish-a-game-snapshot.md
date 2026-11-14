@@ -167,3 +167,36 @@ things were left:
 What still reads the record directly on the UI thread is unchanged from the list
 above, and deliberately so.
 
+
+## Measured, 2026-11-14: what a sanitizer says is left
+
+The scenario suite was run under ThreadSanitizer for the first time
+(`docs/testing.md`). It reported **485 data races**, and they sorted into three
+kinds:
+
+| What is shared | Reports | State |
+|---|---|---|
+| `GobanModel::board` — written under `GobanModel::mutex`, read bare by the renderer | 268 | fixed |
+| `GobanModel::state` scalars — `colorToMove`, `msg`, `holdsStone`, the reservoir counts, `reason` | about 100 | **open** |
+| `GobanModel::metrics` — recomputed on a board resize, read every frame | 15 | open |
+
+After the fix the same run reports 115.
+
+**The board got a lock, not a snapshot.** That is the opposite of this ADR's
+choice for the record, and for the reason the ADR itself gives: the recursive
+mutex was rejected because a reader would wait on disk I/O once per autosave.
+Here the writer's critical section could simply be shortened — `onBoardChange()`
+now releases the mutex before `finalizeGame()` and `saveAs()` — after which a
+reader waits for a copy of 361 points and nothing else. A snapshot would have
+copied those points on every change whether or not anyone drew them.
+`withBoard()` reads, `editBoard()` writes, and a handful of writers that had
+never taken the lock (`onBoardSized()`, the territory flags, handicap and setup
+stones) take it now.
+
+**The state scalars are the next stage of this ADR, and are not done.** They are
+plain values — a torn read is a wrong frame, not a crash — but there are 67 read
+sites across `ElementGame`, `GobanView` and `GobanControl`, and `holdsStone` has
+two writers, one on each thread. `GameSnapshot` already carries `colorToMove`
+and the prisoner counts; publishing `msg`, `reason`, the reservoirs and the score
+there, and reading them from it, is the same move this ADR made for the record.
+It was left for a change of its own rather than done at the end of a long one.

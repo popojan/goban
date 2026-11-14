@@ -789,6 +789,20 @@ See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
   cost as one-time, which is the fact that makes the pause acceptable.
 
 ### Rendering Across Threads
+- **`GobanModel::board` is read through `withBoard()` and written through
+  `editBoard()` or `onBoardChange()`** — all three under `GobanModel::mutex`.
+  The game thread had always rebuilt the board under that mutex, and the UI
+  thread read it bare: `GobanView::Render()` copied all 361 points every time the
+  stones changed, and a `Point` carries `std::string`s, so this was a copy racing
+  an assignment rather than a stale value. Writers locked, readers not — the same
+  partial-locking shape as `GameRecord` and `PlayerManager`, the other way up.
+  Then the reverse turned out to be true of a handful of writers
+  (`onBoardSized()`, the territory flags in `GameNavigator`, the handicap and
+  setup stones), which is the point: a lock is only as good as its least careful
+  user. **Disk I/O is outside the lock** — `onBoardChange()` releases it before
+  `finalizeGame()` and `saveAs()`, or a frame would wait on a save. Found by
+  running the scenario suite under ThreadSanitizer (`docs/testing.md`), which
+  no ordinary run can see.
 - **A `GameObserver` callback may hand data over; it may not act on the view.**
   `GobanView`'s callbacks arrive on the game thread — and during startup on the
   engine-loader thread, with the board already drawn — so its own file comment
