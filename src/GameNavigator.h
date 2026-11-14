@@ -50,7 +50,10 @@ public:
     // Navigation methods for SGF replay
     bool navigateBack();
     bool navigateForward();
-    VariationResult navigateToVariation(const Move& move, bool promote = true);
+    /// `holders` — engines that already hold `move` (a kibitz's own genmove,
+    /// and the coach once it has accepted it). They are not sent it again.
+    VariationResult navigateToVariation(const Move& move, bool promote = true,
+                                        const std::vector<const Engine*>& holders = {});
     bool navigateToStart();
     bool navigateToEnd();
     bool navigateToTreePath(int pathLength, const std::vector<int>& branchChoices);  // Navigate to specific tree position (for session restore)
@@ -77,7 +80,8 @@ private:
     };
 
     // Helper to sync move across all engines
-    void syncEngines(const Move& move, Engine* coach, bool isUndo) const;
+    void syncEngines(const Move& move, Engine* coach, bool isUndo,
+                     const std::vector<const Engine*>& holders = {}) const;
 
     // Set pass message with variation label (e.g. "11a Black passes")
     void setPassMessage(const Move& passMove);

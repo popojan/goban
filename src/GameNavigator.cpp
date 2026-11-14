@@ -60,11 +60,14 @@ GameNavigator::GameNavigator(GobanModel& model, CoachProvider getCoach,
 {
 }
 
-void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo) const {
+void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo,
+                                const std::vector<const Engine*>& holders) const {
     // Sync ALL engines (invariant: all engines stay at same position)
     for (auto player : getActivePlayers()) {
         if (!player->isTypeOf(Player::ENGINE)) continue;
         if (player == reinterpret_cast<Player*>(coach)) continue;
+        if (std::find(holders.begin(), holders.end(), static_cast<const Engine*>(player))
+                != holders.end()) continue;
 
         // Both results used to be discarded, which is how an engine quietly
         // stopped tracking the cursor: one refused `undo` somewhere in a run of
@@ -217,7 +220,8 @@ bool GameNavigator::navigateForward() {
     return true;
 }
 
-GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& move, bool promote) {
+GameNavigator::VariationResult GameNavigator::navigateToVariation(
+        const Move& move, bool promote, const std::vector<const Engine*>& holders) {
     VariationResult result;
     spdlog::debug("navigateToVariation: entry, move={}", move.toString());
 
@@ -235,12 +239,13 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
     NavigationGuard guard(navigationInProgress);
 
     // Play the move on the coach
-    if (!coach->play(move)) {
+    const bool coachHolds = std::find(holders.begin(), holders.end(), coach) != holders.end();
+    if (!coachHolds && !coach->play(move)) {
         spdlog::warn("navigateToVariation: coach->play() failed for move {}", move.toString());
         return result;
     }
 
-    syncEngines(move, coach, false);
+    syncEngines(move, coach, false, holders);
 
     // Navigate to the child node in the SGF tree
     // If child doesn't exist, create a new branch

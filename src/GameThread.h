@@ -392,6 +392,7 @@ private:
 
     void processNavigationQueue();
     void executeNavCommand(const NavCommand& cmd);
+    void settleTsumegoVariation(const GameNavigator::VariationResult& varResult);
     void processScoring();
     void wakeGameThread();
     void waitForCommandOrTimeout(int ms);

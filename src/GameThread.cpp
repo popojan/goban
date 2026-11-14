@@ -1169,44 +1169,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
         case NavCommand::TO_VARIATION: {
             auto varResult = navigator->navigateToVariation(cmd.move, cmd.promote);
 
-            // Tsumego logic: infer BM marking from context
-            if (varResult.success && model.tsumegoMode) {
-                if (varResult.newBranch && !model.game.isOnBadMovePath()) {
-                    // New branch from correct tree → first wrong move
-                    model.game.markBadMove();
-                }
-
-                if (model.game.isOnBadMovePath()) {
-                    // The record's refutation was never played, so the solver was
-                    // told "wrong" and not shown why. No engine is asked here;
-                    // that stays on request.
-                    if (model.game.hasNextMove()) {
-                        navigator->navigateForward();
-                    }
-                    // After the refutation: navigating clears the message.
-                    model.state.msg = GameState::TSUMEGO_WRONG;
-                } else if (model.game.isAtEndOfNavigation()) {
-                    model.state.msg = GameState::TSUMEGO_SOLVED;
-                } else if (model.game.hasNextMove()) {
-                    // Correct path: auto-play opponent's response from SGF
-                    navigator->navigateForward();
-                    if (model.game.isAtEndOfNavigation()) {
-                        model.state.msg = GameState::TSUMEGO_SOLVED;
-                    }
-                }
-
-                // markBadMove() writes the record *after* navigateToVariation()
-                // has already published, so the snapshot described the node as
-                // it was one instant before it was condemned: onBadMovePath
-                // false for exactly the move just marked, and nothing else on
-                // the way to republish it. Both readers fail closed on that —
-                // boardClick() refuses to take a stone out of the bowl and
-                // Space never reaches requestKibitzNav() — so a wrong move left
-                // the board as inert as a solved one and no engine ever
-                // refuted it. Invisible, because the "Wrong!" verdict is read
-                // from model.state rather than from the snapshot.
-                model.publishSnapshot();
-            }
+            settleTsumegoVariation(varResult);
 
             // In Analysis mode, auto-respond with kibitz engine after human variation
             if (varResult.success && gameMode == GameMode::EXPLORE) {
@@ -1294,6 +1257,14 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                     break;
                 }
             }
+            if (model.tsumegoMode) {
+                // A hint is a variation made the way the solver's own is: never
+                // promoted over the recorded answer, and following a move the
+                // record already has. processSuccessfulMove() does neither.
+                settleTsumegoVariation(
+                        navigator->navigateToVariation(response, false, {kibitz, coach}));
+                break;
+            }
             processSuccessfulMove(response, kibitz, coach, kibitz, false);
             break;
         }
@@ -1306,6 +1277,48 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
         }
     }
 
+}
+
+// What a variation means in a puzzle: the BM marking is inferred from where the
+// branch left the recorded tree, and the record's own reply is played. Shared
+// by a solver's click and by a hint, which is the engine clicking for them.
+void GameThread::settleTsumegoVariation(const GameNavigator::VariationResult& varResult) {
+    if (!(varResult.success && model.tsumegoMode)) return;
+    if (varResult.newBranch && !model.game.isOnBadMovePath()) {
+        // New branch from correct tree → first wrong move
+        model.game.markBadMove();
+    }
+
+    if (model.game.isOnBadMovePath()) {
+        // The record's refutation was never played, so the solver was
+        // told "wrong" and not shown why. No engine is asked here;
+        // that stays on request.
+        if (model.game.hasNextMove()) {
+            navigator->navigateForward();
+        }
+        // After the refutation: navigating clears the message.
+        model.state.msg = GameState::TSUMEGO_WRONG;
+    } else if (model.game.isAtEndOfNavigation()) {
+        model.state.msg = GameState::TSUMEGO_SOLVED;
+    } else if (model.game.hasNextMove()) {
+        // Correct path: auto-play opponent's response from SGF
+        navigator->navigateForward();
+        if (model.game.isAtEndOfNavigation()) {
+            model.state.msg = GameState::TSUMEGO_SOLVED;
+        }
+    }
+
+    // markBadMove() writes the record *after* navigateToVariation()
+    // has already published, so the snapshot described the node as
+    // it was one instant before it was condemned: onBadMovePath
+    // false for exactly the move just marked, and nothing else on
+    // the way to republish it. Both readers fail closed on that —
+    // boardClick() refuses to take a stone out of the bowl and
+    // Space never reaches requestKibitzNav() — so a wrong move left
+    // the board as inert as a solved one and no engine ever
+    // refuted it. Invisible, because the "Wrong!" verdict is read
+    // from model.state rather than from the snapshot.
+    model.publishSnapshot();
 }
 
 void GameThread::applyGameMode(GameMode mode) {

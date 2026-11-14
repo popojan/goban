@@ -518,6 +518,15 @@ See `docs/adr/0015-tsumego-is-a-game-mode.md`.
   whole-board answer, and both stock engines abandon the corner rather than
   punish the mistake — measured, KataGo `F7` and GNU Go `B6` where the kill was
   `B2`. Needs an ADR; do not assume asking works because the plumbing does.*
+- **A hint in a puzzle is the engine clicking for the solver.** `KIBITZ_NAV`
+  hands its answer to `navigateToVariation(move, false, {kibitz, coach})` and
+  then `GameThread::settleTsumegoVariation()`, the same two steps a click takes.
+  It went through `processSuccessfulMove()` instead, whose `GameRecord::move()`
+  inserts as the *first* child: a hint at the root demoted the recorded answer
+  (`main_line_moves` 2 → 1), marked nothing wrong, and left the position reading
+  as solved. The `holders` list exists because the kibitz has already played its
+  own genmove and the coach has already accepted it — sending either again is an
+  illegal move. Pinned by `tsumego_hint.scn` and `tsumego_hint_misses.scn`.
 - **A snapshot field written *after* the position change must be republished.**
   `notifyBoardChangeWithMove()` publishes from inside `navigateToVariation()`,
   but the tsumego verdict — `markBadMove()` — runs after it returns, in

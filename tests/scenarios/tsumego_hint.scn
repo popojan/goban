@@ -1,0 +1,31 @@
+# config: mock-hint.json
+#
+# A hint is the engine clicking for the solver, so it is recorded the way a
+# click is. It used to go through the match path instead: GameRecord::move()
+# inserted the engine's move as the *first* child, which demoted the recorded
+# answer (main_line_moves 2 -> 1) — and since nothing marked the move wrong, the
+# position then read as a solved end. Clicking the same point later said
+# "Solved!".
+#
+# tests/data/tsumego.sgf: solution B[bh] = B2, answered by W[ah]. Here the mock
+# is scripted to find it; the hint that misses is at the end of tsumego_mode.scn.
+
+load_tsumego tests/data/tsumego.sgf
+wait_idle
+expect view_position 0
+expect main_line_moves 2
+expect can_kibitz true
+
+# The engine finds the answer: follow it, do not duplicate it.
+play once
+wait_until view_position >= 2
+wait_idle
+expect view_position 2
+expect main_line_moves 2
+expect msg tsumego_solved
+expect phase paused
+
+navigate_start
+wait_idle
+expect view_position 0
+expect variations 1

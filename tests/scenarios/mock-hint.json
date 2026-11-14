@@ -1,0 +1,10 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "Scripted to answer B2, the solution of tests/data/tsumego.sgf. The stock mock plays the first legal point, which is not it.",
+  "bots": [
+    { "name": "mock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "--script B2", "enabled": 1, "main": 1, "kibitz": 1 }
+  ],
+  "humans": [ "Human" ],
+  "sgf_dialog": { "games_path": "./tests/scenarios/.games" }
+}
