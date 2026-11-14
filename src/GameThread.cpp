@@ -308,15 +308,13 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
     // newGameNow() used to clear by hand, on the model's published copy.
     applyGameMode(GameMode::MATCH);
 
-    // Only sync coach engine (needed for fixed_handicap computation).
-    // All other engines are synced lazily on the game thread when they
-    // first need to play, keeping the UI thread responsive.
-    Engine* coach = currentCoach();
-    if (coach) {
-        coach->boardsize(boardSize);
-        coach->clear();
-        coach->komi(komi);
-    }
+    // No engine is spoken to here. This runs on whichever thread asked for the
+    // new game — the UI thread, unless it was deferred — and it used to send the
+    // coach `boardsize`, `clear_board` and `komi` so that it could then be asked
+    // where the handicap stones go. With KataGo as coach a change of board size
+    // is a rebuild lasting seconds, all of it with the window frozen. The
+    // placement is computed locally now, and the replay started by
+    // startSyncingNewGame() tells every engine the rest, coach first.
 
     // Clear stale setup stones from previous game (e.g. tsumego with white stones)
     // before lazy sync uses them. setFixedHandicap() will set setupBlackStones below.
@@ -422,23 +420,21 @@ bool GameThread::setFixedHandicap(int handicap) {
         return false;
     }
 
-    Engine* coach = currentCoach();
-    if (!coach) {
-        spdlog::error("setFixedHandicap: no coach engine!");
-        return false;
-    }
-
     std::vector<Position> stones;
     if (handicap >= 2) {
-        // Handicap games use 0.5 komi by convention
-        model.state.komi = 0.5f;
-        coach->komi(0.5f);
-        model.game.updateKomi(0.5f);
-        UserSettings::instance().setKomi(0.5f);
-        if (!coach->fixed_handicap(handicap, stones)) {
+        // Standard placement, not the coach's `fixed_handicap`: see clearGame().
+        // Every engine gets the stones from the replay, as setup stones.
+        stones = Board::fixedHandicap(static_cast<int>(model.getBoardSize()), handicap);
+        if (stones.empty()) {
+            spdlog::warn("{} handicap stones cannot be placed on a {}x{} board; "
+                         "starting without", handicap, model.getBoardSize(),
+                         model.getBoardSize());
             return setFixedHandicap(0);  // Fall back to no handicap
         }
-        // Non-coach engines get handicap stones during lazy sync
+        // Handicap games use 0.5 komi by convention
+        model.state.komi = 0.5f;
+        model.game.updateKomi(0.5f);
+        UserSettings::instance().setKomi(0.5f);
         model.state.colorToMove = Color::WHITE;
     }
 
@@ -1636,7 +1632,6 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
         std::for_each(gameObservers.begin(), gameObservers.end(),
             [boardSize](GameObserver* observer) { observer->onBoardSized(boardSize); });
 
-        // Coach board is already clear — setFixedHandicap sends fixed_handicap
         setFixedHandicap(settings.getHandicap());
         model.createNewRecord();
     }

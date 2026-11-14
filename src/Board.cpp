@@ -921,3 +921,21 @@ int Board::replayMoves(const std::vector<Move>& moves) {
     }
     return applied;
 }
+
+std::vector<Position> Board::fixedHandicap(int size, int stones) {
+    const bool hasMiddle = size % 2 == 1 && size >= 9;
+    if (stones < 2 || size < 7 || !isSupportedSize(size)) return {};
+    if (stones > (hasMiddle ? 9 : 4)) return {};
+
+    const int lo = size >= 12 ? 3 : 2;     // fourth line from 12x12 up, else third
+    const int hi = size - 1 - lo;
+    const int mid = size / 2;
+
+    std::vector<Position> placed = {{lo, lo}, {hi, hi}};
+    if (stones >= 3) placed.emplace_back(lo, hi);
+    if (stones >= 4) placed.emplace_back(hi, lo);
+    if (stones >= 6) { placed.emplace_back(lo, mid); placed.emplace_back(hi, mid); }
+    if (stones >= 8) { placed.emplace_back(mid, hi); placed.emplace_back(mid, lo); }
+    if (stones % 2 == 1 && stones >= 5) placed.emplace_back(mid, mid);
+    return placed;
+}
