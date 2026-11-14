@@ -301,7 +301,8 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
         }
     );
 
-    setKomi(komi);
+    // Observers only: the replay that follows carries the komi to the engines.
+    notifyKomi(komi);
     setFixedHandicap(handicap);
     // The loop is deliberately *not* started here — see startSyncingNewGame(),
     // which the caller invokes once the model holds the new record.
@@ -350,13 +351,27 @@ void GameThread::startSyncingNewGame() {
     }
 }
 
-void GameThread::setKomi(float komi) {
+void GameThread::notifyKomi(float komi) {
     std::for_each(
         gameObservers.begin(), gameObservers.end(),
         [komi](GameObserver* observer){observer->onKomiChange(komi);}
     );
-    // Engine komi is set during lazy sync (syncEngineToPosition) or
-    // explicitly by clearGame for the coach engine.
+}
+
+void GameThread::setKomi(float komi) {
+    notifyKomi(komi);
+    // The engines have to hear it too, and from the game thread. This used to
+    // rely on the sync that ran at the first move — but since ADR-0008 that sync
+    // runs as soon as the board appears, so a komi chosen afterwards stayed in
+    // the model and the engines played and scored the game with the old one.
+    if (isRunning()) {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        navQueue.push({NavCommand::SET_KOMI});
+        wakeGameThread();
+    } else {
+        // Nobody to send it: the next run() replays, komi included.
+        engineSync = EngineSync::Unsynced;
+    }
 }
 
 size_t GameThread::getActivePlayer(int which) const {
@@ -1291,6 +1306,18 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                 break;
             }
             processSuccessfulMove(response, kibitz, coach, kibitz, false);
+            break;
+        }
+        case NavCommand::SET_KOMI: {
+            // The model's value at the time it runs, so two changes in a row
+            // both send the last one.
+            const float komi = model.state.komi;
+            for (auto* p : playerManager->getPlayers()) {
+                if (p->isTypeOf(Player::ENGINE) && !p->komi(komi)) {
+                    spdlog::warn("[{}] refused komi {} — it will play and score "
+                                 "with the komi it had", p->getName(), komi);
+                }
+            }
             break;
         }
         case NavCommand::TO_TREE_PATH: {

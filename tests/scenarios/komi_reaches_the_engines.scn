@@ -1,0 +1,28 @@
+# A komi chosen after the board appears has to reach the engines. It used to
+# ride on the sync that ran at the first move; since that sync moved to the
+# moment the board changes (ADR-0008), a later komi stayed in the model alone,
+# and the engines played and scored the game with the one they were given at
+# the new game.
+#
+# Empty board, two passes: the mock scores area minus komi, so who won says
+# which komi it was told. A reverse komi makes Black the winner; the stale 6.5
+# would make it White.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+expect komi 6.5
+
+komi -3.5
+wait_idle
+expect komi -3.5
+
+pass
+wait_until move_count >= 1
+pass
+wait_until has_result true
+wait_idle
+expect msg black_won
+expect result black_won

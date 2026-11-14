@@ -39,7 +39,8 @@ extern std::shared_ptr<Configuration> config;
 
 /** \brief Navigation command queued for execution on the game thread */
 struct NavCommand {
-    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION, KIBITZ_NAV, TO_TREE_PATH };
+    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION, KIBITZ_NAV, TO_TREE_PATH,
+                SET_KOMI };
     Type type;
     Move move{};  // For TO_VARIATION
     bool promote = true;  // For TO_VARIATION: promote to main line
@@ -243,6 +244,8 @@ public:
     void removeSgfPlayers() const;  // Remove temporary players created from SGF loading
 
     void setKomi(float komi);
+    /// Tells the observers and nobody else; setKomi() also tells the engines.
+    void notifyKomi(float komi);
 
     bool setFixedHandicap(int handicap);
 
