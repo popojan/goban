@@ -1,0 +1,11 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "The coach never answers final_status_list, and scoring is given 3 s before it is cut off — long enough to act while it is still out. Every other command takes 120 ms, so a replay into the engine is slow enough to act during as well.",
+  "bots": [
+    { "name": "slowscore", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "--hang-on final_status_list --delay-ms 120", "enabled": 1, "main": 1, "kibitz": 1,
+      "scoring_timeout_ms": 3000 }
+  ],
+  "humans": [ "Human" ],
+  "sgf_dialog": { "games_path": "./tests/scenarios/.games" }
+}

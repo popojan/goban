@@ -162,6 +162,7 @@
                             <div class="template" id="templateResignBlackWon">黒の投了勝ち</div>
                             <div class="template" id="templateWhiteWon">白 %.1f目勝ち</div>
                             <div class="template" id="templateBlackWon">黒 %.1f目勝ち</div>
+                            <div class="template" id="templateJigo">持碁</div>
                             <div class="template" id="templateWhiteResigns">白投了</div>
                             <div class="template" id="templateBlackResigns">黒投了</div>
                             <div class="template" id="templateWhitePasses">({0}) 白パス</div>

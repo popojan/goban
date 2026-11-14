@@ -1,0 +1,28 @@
+# config: mock-twoengine.json
+#
+# Kibitz on your own turn, at the end of the line — the common case, and the one
+# kibitz_two_engines.scn does not take (it asks mid-tree). The game loop ran the
+# engine's search with `playerToMove` still naming the human, so `thinking` was
+# false throughout: no clock, a lit toolbar, and a second press was accepted and
+# latched in the human player's slot, to be played as a second move the instant
+# the first one landed. The kibitz mock thinks for 2 s.
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white human
+wait_idle
+
+play once
+wait_until thinking true
+expect can_kibitz false
+expect can_play false
+wait_until wait_indicator thinking
+
+# Refused now. This press used to play a second move.
+play once
+wait_until move_count >= 1
+wait 2600
+wait_idle
+expect move_count 1
+expect thinking false

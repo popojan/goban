@@ -50,11 +50,11 @@
                         <!--
                         <div class="grp">
                             <div class="hr">Gamma correction</div>
-                            <div class="cmd" onmouseup="reset gamma and contrast">Reset gamma</div>
+                            <div class="cmd" onmouseup="reset contrast and gamma">Reset gamma</div>
                         </div>
                         <div class="grp">
                             <div class="hr">Contrast</div>
-                            <div class="cmd" onmouseup="reset gamma and contrast">Reset contrast</div>
+                            <div class="cmd" onmouseup="reset contrast and gamma">Reset contrast</div>
                         </div>
                         -->
                         <div class="grp">
@@ -174,6 +174,7 @@
                             <div class="template" id="templateResignBlackWon">黑中盘胜</div>
                             <div class="template" id="templateWhiteWon">白胜%.1f目</div>
                             <div class="template" id="templateBlackWon">黑胜%.1f目</div>
+                            <div class="template" id="templateJigo">和棋</div>
                             <div class="template" id="templateWhiteResigns">白方认输</div>
                             <div class="template" id="templateBlackResigns">黑方认输</div>
                             <div class="template" id="templateWhitePasses">({0}) 白方虚着</div>

@@ -662,7 +662,7 @@ void GobanView::Render(int w, int h)
 	}
 
 	if (flags & UPDATE_STONES) {
-	    board.updateStones(model.board);
+	    model.withBoard([this](const Board& source) { board.updateStones(source); });
         updateCursor();
         promoteHintLabel();
 
@@ -1108,7 +1108,7 @@ void GobanView::Update() {
 		updateFlag |= UPDATE_SHADER | UPDATE_OVERLAY;
 		currentProgram = newProgram;
 	}
-	if (board.getSize() != model.board.getSize()) {
+	if (board.getSize() != model.withBoard([](const Board& b) { return b.getSize(); })) {
 		// Only request UPDATE_BOARD for dimension change
 		// Don't request UPDATE_STONES - model.board might not have stones yet
 		updateFlag |= UPDATE_BOARD;

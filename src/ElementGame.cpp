@@ -1225,8 +1225,10 @@ void ElementGame::OnUpdate()
     {
         std::vector<Rml::Element*> els;
         context->GetDocument("game_window")->GetElementsByClassName(els, "toggle_territory");
-        if (!els.empty() && els[0]->IsClassSet("selected") != model.board.showTerritory) {
-            OnMenuToggle("toggle_territory", model.board.showTerritory);
+        const bool territoryShown = model.withBoard(
+                [](const Board& board) { return board.showTerritory; });
+        if (!els.empty() && els[0]->IsClassSet("selected") != territoryShown) {
+            OnMenuToggle("toggle_territory", territoryShown);
         }
     }
     // Sync the evaluation select. It can move without the menu being touched:
@@ -1412,6 +1414,7 @@ void ElementGame::OnUpdate()
     // Check if current message is important (game-related, should override engine messages)
     auto isImportantMessage = [](GameState::Message msg) {
         return msg == GameState::WHITE_WON || msg == GameState::BLACK_WON ||
+               msg == GameState::JIGO ||
                msg == GameState::WHITE_RESIGNED || msg == GameState::BLACK_RESIGNED ||
                msg == GameState::BLACK_PASS || msg == GameState::WHITE_PASS ||
                msg == GameState::CALCULATING_SCORE || msg == GameState::SCORING_FAILED ||
@@ -1478,11 +1481,14 @@ void ElementGame::OnUpdate()
             showMessage(msg);
             break;
         }
+        case GameState::JIGO:
         case GameState::BLACK_WON:
         case GameState::WHITE_WON: {
             // Build result message, combining with SGF comment if present
             std::string resultMsg;
-            if (model.state.winner == Color::WHITE)
+            if (model.state.msg == GameState::JIGO)
+                resultMsg = templateText("templateJigo", "The game is a draw.");
+            else if (model.state.winner == Color::WHITE)
                 resultMsg = Rml::CreateString(
                     getTemplateText(context, "templateWhiteWon").c_str(),
                     std::abs(model.state.scoreDelta)).c_str();

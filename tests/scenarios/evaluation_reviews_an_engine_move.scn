@@ -1,0 +1,73 @@
+# config: mock-eval.json
+#
+# Reviewing an engine's move is what the evaluation overlay is for — ADR-0007
+# decision 7, analysis follows the review cursor, is the decision that justifies
+# giving it its own process at all. It did not work.
+#
+# analysisMayRun() yielded on `isRunning() && isCurrentPlayerEngine()`, and both
+# halves misread the situation during review: isCurrentPlayerEngine() asks about
+# the colour to move *under the cursor*, and isRunning() only asks whether the
+# loop thread exists — which it does, sitting in its `phase() != Playing`
+# early-out, searching nothing. So stepping back onto the move an engine had just
+# played took the overlay away, in the one place it was worth most. The only way
+# to see it was to swap the players.
+#
+# The predicate is the phase now. Decision 6's yield is unchanged and asserted
+# below, because a match in progress really does keep the device.
+#
+#   ./tests/run_scenarios.sh tests/scenarios/evaluation_reviews_an_engine_move.scn
+
+new_game 9
+wait_idle
+switch_player black human
+switch_player white mock
+wait_idle
+
+toggle_evaluation on
+wait_until eval_state running
+
+# One move each: the human's, then the mock's reply. Black is to move at the end
+# of the line, and the mock reports 0.6 for whoever that is.
+click 2 2
+click 2 2
+wait_until move_count >= 2
+expect at_end true
+expect color_to_move B
+wait_until eval_winrate 60
+
+# Back onto the position the mock answered. White to move there, and White *is*
+# the mock — the exact shape that used to silence the stream. Nothing is
+# thinking: navigating called enterReview(), so the game is paused.
+navigate_back
+wait_idle
+expect view_position 1
+expect phase paused
+expect color_to_move W
+expect thinking false
+
+# The regression. `running` rather than `yielded`, and a live report for the
+# position under the cursor — 40, because the mock's 0.6 is for White here and
+# the client anchors to Black.
+wait_until eval_state running
+wait_until eval_winrate 40
+expect eval_stale false
+
+navigate_end
+wait_idle
+expect at_end true
+wait_until eval_winrate 60
+
+# Both sides the mock, still paused. Still analysed: the question is whether a
+# game is being *played*, not who the players are — a bot-versus-bot game being
+# reviewed is as much a review as any other.
+switch_player black mock
+wait_idle
+expect phase paused
+wait_until eval_state running
+
+# And the yield is intact (ADR-0007 decision 6). Once the match is running with
+# an engine to move the stream stands down and stays down, including the 500 ms
+# the loop sleeps between moves with playerToMove already cleared — which is why
+# this term cannot be a bare isThinking() and must survive any future tidying.
+start
+wait_until eval_state yielded

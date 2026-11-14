@@ -1,0 +1,40 @@
+# Asking the engine for a move while reviewing a finished game is a variation,
+# and a variation on a finished game is a *copy* — that is what a click there
+# has always made, "to preserve the historical record". The kibitz went through
+# the match path instead: the engine's move became the first child, the game
+# actually played was demoted to a side line, and RE was deleted — in place, on
+# the record being reviewed, which the next save then wrote into the session.
+#
+# tests/data/finished_9x9.sgf: 37 moves, RE[B+16.5].
+
+load_sgf tests/data/finished_9x9.sgf
+wait_idle
+expect main_line_moves 37
+expect has_result true
+
+navigate_start
+wait_idle
+navigate_forward
+wait_idle
+expect view_position 1
+expect variations 1
+expect can_kibitz true
+
+play once
+wait_until view_position >= 2
+wait_idle
+expect view_position 2
+# Asking once does not resume the match.
+expect phase paused
+# A copy: it no longer belongs to the file, and it holds the new line only. In
+# place, this node kept the old continuation beside the engine's move.
+expect sgf_file ""
+navigate_back
+wait_idle
+expect variations 1
+
+# And the file itself still opens as the game that was played.
+load_sgf tests/data/finished_9x9.sgf
+wait_idle
+expect main_line_moves 37
+expect has_result true

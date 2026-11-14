@@ -61,10 +61,7 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
     SetHandleInformation(hStderrRead_, HANDLE_FLAG_INHERIT, 0);
 
     // Build command line as wide string for Unicode support
-    std::string cmdLine = "\"" + program + "\"";
-    for (const auto& arg : args) {
-        cmdLine += " " + arg;
-    }
+    const std::string cmdLine = GtpClient::windowsCommandLine(program, args);
     auto wCmdLine = std::filesystem::u8path(cmdLine).wstring();
 
     STARTUPINFOW si;
@@ -499,9 +496,10 @@ void Process::closeStdin() {
 
 int Process::wait() const {
     if (pid_ < 0) return -1;
-    int status;
-    waitpid(pid_, &status, 0);
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    int status = 0;
+    const pid_t reaped = waitpid(pid_, &status, 0);
+    pid_ = -1;
+    return (reaped > 0 && WIFEXITED(status)) ? WEXITSTATUS(status) : -1;
 }
 
 bool Process::waitFor(int timeoutMs) const {
@@ -509,7 +507,10 @@ bool Process::waitFor(int timeoutMs) const {
     auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     while (std::chrono::steady_clock::now() < deadline) {
         int status;
-        if (waitpid(pid_, &status, WNOHANG) != 0) return true;
+        if (waitpid(pid_, &status, WNOHANG) != 0) {
+            pid_ = -1;   // reaped, or never ours
+            return true;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return false;
@@ -584,9 +585,67 @@ static std::string resolveAgainstAppRoot(const std::string& arg, const std::stri
 
     const std::filesystem::path absolute = std::filesystem::absolute(relative, ec);
     if (ec) return arg;
+    // u8string(), not string(): on Windows the latter is the ANSI code page,
+    // and everything downstream of here treats these strings as UTF-8.
+    const std::string resolved = absolute.u8string();
     spdlog::info("Engine argument '{}' does not exist in '{}' but does relative to the "
-                 "application folder; using '{}'", arg, workDir, absolute.string());
-    return absolute.string();
+                 "application folder; using '{}'", arg, workDir, resolved);
+    return resolved;
+}
+
+std::vector<std::string> GtpClient::splitArguments(const std::string& cmdline) {
+    std::vector<std::string> args;
+    std::string current;
+    bool quoted = false, any = false;
+    for (const char ch : cmdline) {
+        if (ch == '"') {
+            quoted = !quoted;
+            any = true;                 // "" is an argument, an empty one
+        } else if (!quoted && std::isspace(static_cast<unsigned char>(ch))) {
+            if (any) args.push_back(current);
+            current.clear();
+            any = false;
+        } else {
+            current += ch;
+            any = true;
+        }
+    }
+    if (any) args.push_back(current);
+    return args;
+}
+
+// The rules CommandLineToArgvW and the C runtimes undo: an argument with a space
+// or a quote is wrapped in quotes, a quote inside is escaped with a backslash,
+// and backslashes are doubled only where they run up against a quote.
+//
+// Arguments used to be joined bare. One that goban had itself rewritten to an
+// absolute path therefore broke in two wherever the install folder had a space
+// in its name, and the engine died on a model file called "C:\Users\John".
+std::string GtpClient::windowsCommandLine(const std::string& program,
+                                          const std::vector<std::string>& args) {
+    std::string line = "\"" + program + "\"";
+    for (const auto& arg : args) {
+        line += ' ';
+        if (!arg.empty() && arg.find_first_of(" \t\"") == std::string::npos) {
+            line += arg;
+            continue;
+        }
+        line += '"';
+        size_t backslashes = 0;
+        for (const char ch : arg) {
+            if (ch == '\\') {
+                ++backslashes;
+                continue;
+            }
+            if (ch == '"') line.append(backslashes * 2 + 1, '\\');
+            else line.append(backslashes, '\\');
+            backslashes = 0;
+            line += ch;
+        }
+        line.append(backslashes * 2, '\\');
+        line += '"';
+    }
+    return line;
 }
 
 // GtpClient implementation
@@ -654,9 +713,7 @@ GtpClient::GtpClient(const std::string& exe, const std::string& cmdline,
     std::string program = findExecutable(exe, workDir);
     spdlog::info("About to run GTP engine [{}]", program);
 
-    std::istringstream iss(cmdline);
-    std::vector<std::string> params((std::istream_iterator<std::string>(iss)),
-                                    std::istream_iterator<std::string>());
+    std::vector<std::string> params = splitArguments(cmdline);
     for (auto& param : params) {
         param = resolveAgainstAppRoot(param, workDir);
     }
@@ -705,7 +762,7 @@ bool GtpClient::revive() {
         // is reachable ten times a second otherwise.
         if (reviveCount_ == MAX_REVIVES) {
             ++reviveCount_;
-            spdlog::error("{}: has stopped responding {} times; leaving it down for "
+            spdlog::error("{}: has failed {} times; leaving it down for "
                           "the rest of the session", exe, MAX_REVIVES);
         }
         return false;
@@ -720,6 +777,7 @@ bool GtpClient::revive() {
     {
         std::lock_guard<std::mutex> lock(lastLineMutex_);
         lastLine.clear();   // belonged to the process that just died
+        stderrTail_.clear();
     }
 
     try {
@@ -732,7 +790,7 @@ bool GtpClient::revive() {
     // Only now: a command arriving between the spawn and this would be written
     // into a pipe nobody is reading yet.
     failed_ = false;
-    spdlog::warn("{}: restarted after it stopped responding (attempt {} of {}). It "
+    spdlog::warn("{}: restarted after it failed (attempt {} of {}). It "
                  "knows nothing of the game yet and must be resynchronised.",
                  exe, reviveCount_, MAX_REVIVES);
     return true;
@@ -773,8 +831,23 @@ static std::string& rtrim(std::string & str) {
     return str;
 }
 
+std::string GtpClient::stderrTail() const {
+    std::lock_guard<std::mutex> lock(lastLineMutex_);
+    std::string joined;
+    for (const auto& line : stderrTail_) {
+        if (!joined.empty()) joined += " | ";
+        joined += line;
+    }
+    return joined;
+}
+
 void GtpClient::operator()(const std::string& line) {
     spdlog::debug("gtp err = {}", line);
+    if (!line.empty()) {
+        std::lock_guard<std::mutex> lock(lastLineMutex_);
+        stderrTail_.push_back(line);
+        if (stderrTail_.size() > STDERR_TAIL_LINES) stderrTail_.pop_front();
+    }
     for (auto &re: outputFilters) {
         std::smatch m;
         if(std::regex_search(line, m,  re.compiled)) {
@@ -844,8 +917,9 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
     spdlog::log(trafficLevel(quiet_), "{1} << {0}", command, exe);
 
     if (!proc_->write(command + "\n")) {
-        if (!terminated_) spdlog::error("Failed to write command");
-        return terminated_ ? CommandOutput{"= "} : ret;
+        if (terminated_) return {"= "};
+        markExited(command);
+        return {};
     }
 
     spdlog::log(trafficLevel(quiet_), "getting response...");
@@ -876,7 +950,13 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
             return {};   // success() == false
         }
 
-        if (status == Process::ReadStatus::Eof) break;
+        if (status == Process::ReadStatus::Eof) {
+            // A response ends with a blank line, so end-of-file before one is
+            // the process gone, not an answer.
+            if (terminated_) return {"= "};
+            markExited(command);
+            return {};
+        }
 
         line.erase(line.find_last_not_of(" \n\r\t") + 1);
         if(ret.empty()) {
@@ -981,6 +1061,9 @@ bool GtpClient::success(const CommandOutput& ret) {
 }
 
 GtpClient::~GtpClient() {
+    // Nothing to tear down: revive() drops the dead process before spawning its
+    // replacement, and that spawn can fail.
+    if (!proc_) return;
     // Only an engine that is still alive gets asked to leave politely. Writing
     // into the stdin of a process we killed ourselves raises SIGPIPE, and the
     // only reason that has never shown up is that main.cpp ignores the signal
@@ -1005,6 +1088,17 @@ GtpClient::~GtpClient() {
         stderrReader_->stop();
     }
     spdlog::debug("~GtpClient: {} cleanup complete", exe);
+}
+
+void GtpClient::markExited(const std::string& command) {
+    // Failed, exactly as after a timeout: every later command then fails fast
+    // instead of being written into a closed pipe with an error line each, and
+    // revive() applies. Only a timeout used to set this.
+    failed_ = true;
+    killProcess();   // reap it; a no-op kill if it is already gone
+    const std::string tail = stderrTail();
+    spdlog::error("{}: the engine process has exited (command: {}){}{}", exe, command,
+                  tail.empty() ? "" : " — it said: ", tail);
 }
 
 void GtpClient::killProcess() {

@@ -95,6 +95,10 @@ bool GameThread::runWhenEngineFree(std::function<void()> task, std::string* busy
         Player* p = playerToMove.load();
         if (p != nullptr && p->isTypeOf(Player::ENGINE)) {
             busy = p->getName();
+        } else if (engineCallInFlight) {
+            // Scoring, or a replay: no player is on move, and the game thread
+            // is inside an engine all the same. See EngineCallScope.
+            busy = engineCallName;
         } else {
             // Claim the loop before releasing the lock. The genmove branches
             // test this inside the same critical section, so from here until the
@@ -130,6 +134,36 @@ bool GameThread::runWhenEngineFree(std::function<void()> task, std::string* busy
     navQueueCV.notify_one();
     spdlog::info("Deferred action until {} finishes thinking", busy);
     return false;
+}
+
+// A slow engine call that is not a genmove — scoring, or the replay of a
+// position. Nothing is on move during either, so runWhenEngineFree() saw a free
+// loop, ran its task inline, and the interrupt() inside it joined this thread
+// from the UI thread: frozen for as long as the engine took, which for scoring
+// is up to 30 s. Entered under the lock the claim is made with. Nests, because
+// scoring runs inside the replay.
+//
+// Refused only when a claim is held *and* the stop has arrived. A claim alone
+// is not enough: the task holding it restarts the loop itself, precisely so
+// that this replay begins before it returns — waiting for the claim to clear
+// left the engines Unsynced, and therefore reading as idle, for one poll
+// interval after every load. What remains is the few instructions between a
+// claim and the interrupt() that follows it.
+GameThread::EngineCallScope::EngineCallScope(GameThread& gt, Player* engine) : gt(gt) {
+    std::lock_guard<std::mutex> lock(gt.playerMutex);
+    if (gt.engineCallInFlight) {
+        entered = true;          // nested: the outer scope owns the flag
+        return;
+    }
+    if (gt.deferredPending.load() && gt.stopRequested()) return;
+    gt.engineCallInFlight = owner = entered = true;
+    gt.engineCallName = engine ? engine->getName() : std::string("engine");
+}
+
+GameThread::EngineCallScope::~EngineCallScope() {
+    if (!owner) return;
+    std::lock_guard<std::mutex> lock(gt.playerMutex);
+    gt.engineCallInFlight = false;
 }
 
 void GameThread::processDeferredTask() {
@@ -274,15 +308,13 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
     // newGameNow() used to clear by hand, on the model's published copy.
     applyGameMode(GameMode::MATCH);
 
-    // Only sync coach engine (needed for fixed_handicap computation).
-    // All other engines are synced lazily on the game thread when they
-    // first need to play, keeping the UI thread responsive.
-    Engine* coach = currentCoach();
-    if (coach) {
-        coach->boardsize(boardSize);
-        coach->clear();
-        coach->komi(komi);
-    }
+    // No engine is spoken to here. This runs on whichever thread asked for the
+    // new game — the UI thread, unless it was deferred — and it used to send the
+    // coach `boardsize`, `clear_board` and `komi` so that it could then be asked
+    // where the handicap stones go. With KataGo as coach a change of board size
+    // is a rebuild lasting seconds, all of it with the window frozen. The
+    // placement is computed locally now, and the replay started by
+    // startSyncingNewGame() tells every engine the rest, coach first.
 
     // Clear stale setup stones from previous game (e.g. tsumego with white stones)
     // before lazy sync uses them. setFixedHandicap() will set setupBlackStones below.
@@ -301,7 +333,8 @@ bool GameThread::clearGame(int boardSize, float komi, int handicap) {
         }
     );
 
-    setKomi(komi);
+    // Observers only: the replay that follows carries the komi to the engines.
+    notifyKomi(komi);
     setFixedHandicap(handicap);
     // The loop is deliberately *not* started here — see startSyncingNewGame(),
     // which the caller invokes once the model holds the new record.
@@ -350,13 +383,29 @@ void GameThread::startSyncingNewGame() {
     }
 }
 
-void GameThread::setKomi(float komi) {
+void GameThread::notifyKomi(float komi) {
     std::for_each(
         gameObservers.begin(), gameObservers.end(),
         [komi](GameObserver* observer){observer->onKomiChange(komi);}
     );
-    // Engine komi is set during lazy sync (syncEngineToPosition) or
-    // explicitly by clearGame for the coach engine.
+}
+
+void GameThread::setKomi(float komi) {
+    notifyKomi(komi);
+    // The engines have to hear it too, and from the game thread. This used to
+    // rely on the sync that ran at the first move — but since ADR-0008 that sync
+    // runs as soon as the board appears, so a komi chosen afterwards stayed in
+    // the model and the engines played and scored the game with the old one.
+    if (isRunning()) {
+        std::lock_guard<std::mutex> lock(navQueueMutex);
+        NavCommand cmd{NavCommand::SET_KOMI};
+        cmd.komi = komi;   // carried, not read back: the caller writes the model next
+        navQueue.push(cmd);
+        wakeGameThread();
+    } else {
+        // Nobody to send it: the next run() replays, komi included.
+        engineSync = EngineSync::Unsynced;
+    }
 }
 
 size_t GameThread::getActivePlayer(int which) const {
@@ -373,32 +422,32 @@ bool GameThread::setFixedHandicap(int handicap) {
         return false;
     }
 
-    Engine* coach = currentCoach();
-    if (!coach) {
-        spdlog::error("setFixedHandicap: no coach engine!");
-        return false;
-    }
-
     std::vector<Position> stones;
     if (handicap >= 2) {
-        // Handicap games use 0.5 komi by convention
-        model.state.komi = 0.5f;
-        coach->komi(0.5f);
-        model.game.updateKomi(0.5f);
-        UserSettings::instance().setKomi(0.5f);
-        if (!coach->fixed_handicap(handicap, stones)) {
+        // Standard placement, not the coach's `fixed_handicap`: see clearGame().
+        // Every engine gets the stones from the replay, as setup stones.
+        stones = Board::fixedHandicap(static_cast<int>(model.getBoardSize()), handicap);
+        if (stones.empty()) {
+            spdlog::warn("{} handicap stones cannot be placed on a {}x{} board; "
+                         "starting without", handicap, model.getBoardSize(),
+                         model.getBoardSize());
             return setFixedHandicap(0);  // Fall back to no handicap
         }
-        // Non-coach engines get handicap stones during lazy sync
+        // Handicap games use 0.5 komi by convention
+        model.state.komi = 0.5f;
+        model.game.updateKomi(0.5f);
+        UserSettings::instance().setKomi(0.5f);
         model.state.colorToMove = Color::WHITE;
     }
 
     model.state.handicap = handicap;
     // Place handicap stones locally instead of using showboard()
-    for (const auto& pos : stones) {
-        model.board.updateStone(pos, Color::BLACK);
-    }
-    model.board.positionNumber += 1;
+    model.editBoard([&stones](Board& board) {
+        for (const auto& pos : stones) {
+            board.updateStone(pos, Color::BLACK);
+        }
+        board.positionNumber += 1;
+    });
 
     std::for_each(gameObservers.begin(), gameObservers.end(),
         [&stones](GameObserver* observer) { observer->onHandicapChange(stones); });
@@ -460,7 +509,12 @@ std::string GameThread::thinkingEngineName() const {
 
 bool GameThread::analysisMayRun() const {
     if (isThinking() || isSyncingEngines() || hasPendingNavigation()) return false;
-    return !(isRunning() && isCurrentPlayerEngine());
+    // Yield to a genmove in progress or about to start (ADR-0007 decision 6);
+    // the phase is the test, not isRunning(). The loop thread stays alive while
+    // review pauses the game, so asking whether it exists silenced the overlay
+    // on every reviewed position whose colour happens to belong to an engine —
+    // which is the case decision 7 exists for.
+    return !(model.phase() == GamePhase::Playing && isCurrentPlayerEngine());
 }
 
 bool GameThread::hasQueuedMove() const {
@@ -547,11 +601,29 @@ void GameThread::notifyMoveComplete(Engine* /*coach*/, const Move& move,
         });
 }
 
+// A genmove from an engine that is not the player on move — a kibitz, or
+// Explore mode's reply. `playerToMove` names the engine for the duration:
+// without that isThinking() is false for the whole search, so nothing is drawn,
+// nothing is refused, and a game-replacing action joins the loop from the UI
+// thread instead of deferring (ADR-0001). Refuses when such an action has
+// already claimed the loop, under the lock it claimed it with.
+Move GameThread::askEngine(Engine* engine, const Color& color) {
+    Player* previous = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(playerMutex);
+        if (deferredPending.load()) return Move(Move::INVALID, color);
+        previous = playerToMove.exchange(engine);
+    }
+    Move move = engine->genmove(color);
+    playerToMove = previous;
+    return move;
+}
+
 Move GameThread::handleKibitzRequest(Move move, Engine* kibitzEngine,
                                       const Color& colorToMove, bool& wasKibitz) {
     if (move == Move::KIBITZED) {
         if (kibitzEngine) {
-            move = kibitzEngine->genmove(colorToMove);
+            move = askEngine(kibitzEngine, colorToMove);
             wasKibitz = true;
         } else {
             spdlog::warn("Kibitz requested but no kibitz engine available");
@@ -644,6 +716,8 @@ void GameThread::gameLoop() {
             // Visible to other threads for as long as the replay takes, so a
             // caller waiting for quiescence waits for it. Always left below,
             // failure included, so it cannot strand anyone.
+            EngineCallScope call(*this, coach);
+            if (!call) continue;   // stopping: the loop test ends it
             engineSync = EngineSync::Syncing;
 
             // 1. Sync coach first (fast, enables scoring)
@@ -740,6 +814,13 @@ void GameThread::gameLoop() {
                 continue;
             }
 
+            // As in Match mode below: an engine's answer to a game that is
+            // being replaced is dropped, not recorded.
+            if (wasKibitz && shouldDiscardMove()) {
+                playerToMove = nullptr;
+                continue;
+            }
+
             bool success = false;
             if (move) {
                 success = move == Move::RESIGN
@@ -761,7 +842,7 @@ void GameThread::gameLoop() {
                 if (!wasKibitz && model.phase() != GamePhase::Finished && kibitzEngine) {
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis: triggering kibitz response for {}", responseColor.toString());
-                    Move response = kibitzEngine->genmove(responseColor);
+                    Move response = askEngine(kibitzEngine, responseColor);
                     if (response && response != Move::RESIGN) {
                         if (kibitzEngine == coach || coach->play(response)) {
                             processSuccessfulMove(response, kibitzEngine, coach, kibitzEngine, false);
@@ -889,6 +970,20 @@ void GameThread::reviveFailedEngines() {
         if (!gtp || !gtp->hasFailed()) continue;
         if (gtp->revive()) revived = true;
     }
+
+    // An engine that could not be put back cannot be asked for a move. Left
+    // Playing, the loop asked it anyway, twenty times a second, each refusal a
+    // line in the log. Pausing is the truthful state: the game is waiting for
+    // the user to choose somebody else.
+    if (!revived && model.phase() == GamePhase::Playing) {
+        auto* onMove = dynamic_cast<GtpEngine*>(currentPlayer());
+        if (onMove && onMove->hasFailed()) {
+            spdlog::error("[{}] is not running, so the game is paused. Choose another "
+                          "player for {} to continue.", onMove->getName(),
+                          model.state.colorToMove.toString());
+            model.pause();
+        }
+    }
     if (!revived) return;
 
     // A replacement process holds an empty board and has never heard of this
@@ -1002,6 +1097,9 @@ void GameThread::processScoring() {
     Engine* coach = currentCoach();
     if (!coach) return;
 
+    EngineCallScope call(*this, coach);
+    if (!call) return;
+
     model.state.msg = GameState::CALCULATING_SCORE;
 
     Board result(model.game.getBoardSize());
@@ -1009,7 +1107,9 @@ void GameThread::processScoring() {
     model.game.buildBoardFromMoves(result, koPosition);
     const bool scored = coach->applyTerritory(result);
 
-    if (stopRequested()) return;
+    // Stopping, or a game-replacing action was deferred behind this call: the
+    // position just scored is on its way out.
+    if (shouldDiscardMove()) return;
 
     // The coach shaded territory but could not put a number on it. Another
     // engine may be able to — but only one that is actually at this position.
@@ -1053,7 +1153,9 @@ void GameThread::processScoring() {
     if (result.territoryReady) {
         model.state.scoreDelta = result.score;
         // Update message to show winner (replaces CALCULATING_SCORE)
-        model.state.msg = (result.score > 0) ? GameState::BLACK_WON : GameState::WHITE_WON;
+        model.state.msg = result.score > 0 ? GameState::BLACK_WON
+                        : result.score < 0 ? GameState::WHITE_WON
+                        : GameState::JIGO;
     } else if (engineSync.load() == EngineSync::Synced) {
         // Every engine was at the right position and none could score it, so
         // this position is not going to score. Latch it, or the guard above
@@ -1143,7 +1245,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
             // If at scored game end, set flags — scoring handled in game loop idle section
             if (success && model.game.isAtEndOfNavigation()
                 && model.game.shouldShowTerritory()) {
-                model.board.toggleTerritoryAuto(true);
+                model.editBoard([](Board& board) { board.toggleTerritoryAuto(true); });
             }
             // Update tsumego feedback on forward-navigation
             if (success && model.tsumegoMode) {
@@ -1164,54 +1266,21 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
         case NavCommand::TO_VARIATION: {
             auto varResult = navigator->navigateToVariation(cmd.move, cmd.promote);
 
-            // Tsumego logic: infer BM marking from context
-            if (varResult.success && model.tsumegoMode) {
-                if (varResult.newBranch && !model.game.isOnBadMovePath()) {
-                    // New branch from correct tree → first wrong move
-                    model.game.markBadMove();
-                }
+            settleTsumegoVariation(varResult);
 
-                if (model.game.isOnBadMovePath()) {
-                    // The record's refutation was never played, so the solver was
-                    // told "wrong" and not shown why. No engine is asked here;
-                    // that stays on request.
-                    if (model.game.hasNextMove()) {
-                        navigator->navigateForward();
-                    }
-                    // After the refutation: navigating clears the message.
-                    model.state.msg = GameState::TSUMEGO_WRONG;
-                } else if (model.game.isAtEndOfNavigation()) {
-                    model.state.msg = GameState::TSUMEGO_SOLVED;
-                } else if (model.game.hasNextMove()) {
-                    // Correct path: auto-play opponent's response from SGF
-                    navigator->navigateForward();
-                    if (model.game.isAtEndOfNavigation()) {
-                        model.state.msg = GameState::TSUMEGO_SOLVED;
-                    }
-                }
-
-                // markBadMove() writes the record *after* navigateToVariation()
-                // has already published, so the snapshot described the node as
-                // it was one instant before it was condemned: onBadMovePath
-                // false for exactly the move just marked, and nothing else on
-                // the way to republish it. Both readers fail closed on that —
-                // boardClick() refuses to take a stone out of the bowl and
-                // Space never reaches requestKibitzNav() — so a wrong move left
-                // the board as inert as a solved one and no engine ever
-                // refuted it. Invisible, because the "Wrong!" verdict is read
-                // from model.state rather than from the snapshot.
-                model.publishSnapshot();
-            }
-
-            // In Analysis mode, auto-respond with kibitz engine after human variation
-            if (varResult.success && gameMode == GameMode::EXPLORE) {
+            // Explore mode answers a move the human *made*. One the record
+            // already had is followed, not made — the Right arrow with a mouse,
+            // and the Right arrow gets no reply. Answering it put the engine's
+            // move over the recorded continuation and deleted the result of a
+            // finished game, for nothing more than clicking the next-move marker.
+            if (varResult.success && varResult.newBranch && gameMode == GameMode::EXPLORE) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
                 if (kibitz && coach && model.phase() != GamePhase::Finished) {
                     // All engines are synced after initial sync
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis nav: triggering kibitz response for {}", responseColor.toString());
-                    Move response = kibitz->genmove(responseColor);
+                    Move response = askEngine(kibitz, responseColor);
                     if (response && response != Move::RESIGN) {
                         if (kibitz == coach || coach->play(response)) {
                             processSuccessfulMove(response, kibitz, coach, kibitz, false);
@@ -1289,7 +1358,36 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                     break;
                 }
             }
+            if (model.tsumegoMode) {
+                // A hint is a variation made the way the solver's own is: never
+                // promoted over the recorded answer, and following a move the
+                // record already has. processSuccessfulMove() does neither.
+                settleTsumegoVariation(
+                        navigator->navigateToVariation(response, false, {kibitz, coach}));
+                break;
+            }
+            // Away from the end of the line a kibitz is a variation, so it is
+            // made the way a click makes one: a move the record already has is
+            // followed, and a finished game is branched as a copy rather than
+            // rewritten. processSuccessfulMove() did neither — GameRecord::move()
+            // put the engine's move first, demoted the game actually played and
+            // deleted its result. At the end of the line the two are the same
+            // act, and the match path keeps its engine comment and its scoring.
+            if (!model.game.isAtEndOfNavigation()) {
+                navigator->navigateToVariation(response, true, {kibitz, coach}, false);
+                break;
+            }
             processSuccessfulMove(response, kibitz, coach, kibitz, false);
+            break;
+        }
+        case NavCommand::SET_KOMI: {
+            const float komi = cmd.komi;
+            for (auto* p : playerManager->getPlayers()) {
+                if (p->isTypeOf(Player::ENGINE) && !p->komi(komi)) {
+                    spdlog::warn("[{}] refused komi {} — it will play and score "
+                                 "with the komi it had", p->getName(), komi);
+                }
+            }
             break;
         }
         case NavCommand::TO_TREE_PATH: {
@@ -1301,6 +1399,48 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
         }
     }
 
+}
+
+// What a variation means in a puzzle: the BM marking is inferred from where the
+// branch left the recorded tree, and the record's own reply is played. Shared
+// by a solver's click and by a hint, which is the engine clicking for them.
+void GameThread::settleTsumegoVariation(const GameNavigator::VariationResult& varResult) {
+    if (!(varResult.success && model.tsumegoMode)) return;
+    if (varResult.newBranch && !model.game.isOnBadMovePath()) {
+        // New branch from correct tree → first wrong move
+        model.game.markBadMove();
+    }
+
+    if (model.game.isOnBadMovePath()) {
+        // The record's refutation was never played, so the solver was
+        // told "wrong" and not shown why. No engine is asked here;
+        // that stays on request.
+        if (model.game.hasNextMove()) {
+            navigator->navigateForward();
+        }
+        // After the refutation: navigating clears the message.
+        model.state.msg = GameState::TSUMEGO_WRONG;
+    } else if (model.game.isAtEndOfNavigation()) {
+        model.state.msg = GameState::TSUMEGO_SOLVED;
+    } else if (model.game.hasNextMove()) {
+        // Correct path: auto-play opponent's response from SGF
+        navigator->navigateForward();
+        if (model.game.isAtEndOfNavigation()) {
+            model.state.msg = GameState::TSUMEGO_SOLVED;
+        }
+    }
+
+    // markBadMove() writes the record *after* navigateToVariation()
+    // has already published, so the snapshot described the node as
+    // it was one instant before it was condemned: onBadMovePath
+    // false for exactly the move just marked, and nothing else on
+    // the way to republish it. Both readers fail closed on that —
+    // boardClick() refuses to take a stone out of the bowl and
+    // Space never reaches requestKibitzNav() — so a wrong move left
+    // the board as inert as a solved one and no engine ever
+    // refuted it. Invisible, because the "Wrong!" verdict is read
+    // from model.state rather than from the snapshot.
+    model.publishSnapshot();
 }
 
 void GameThread::applyGameMode(GameMode mode) {
@@ -1494,7 +1634,6 @@ void GameThread::loadEnginesParallel(std::shared_ptr<Configuration> conf,
         std::for_each(gameObservers.begin(), gameObservers.end(),
             [boardSize](GameObserver* observer) { observer->onBoardSized(boardSize); });
 
-        // Coach board is already clear — setFixedHandicap sends fixed_handicap
         setFixedHandicap(settings.getHandicap());
         model.createNewRecord();
     }
@@ -1664,7 +1803,7 @@ void GameThread::finalizeLoadedGame(Engine* /* engine */, const GameRecord::SGFG
 
     // Actual scoring happens in the game loop idle section
     if (endedWithPasses) {
-        model.board.toggleTerritoryAuto(true);
+        model.editBoard([](Board& board) { board.toggleTerritoryAuto(true); });
     }
     model.endGame(endedByResignation ? GameState::RESIGNATION : GameState::DOUBLE_PASS);
 
@@ -1727,13 +1866,15 @@ bool GameThread::applyLoadedGame(const GameRecord::SGFGameInfo& gameInfo, Engine
     model.setupBlackStones = gameInfo.setupBlackStones;
     model.setupWhiteStones = gameInfo.setupWhiteStones;
     if (!gameInfo.setupBlackStones.empty() || !gameInfo.setupWhiteStones.empty()) {
-        model.board.clear(gameInfo.boardSize);
-        for (const auto& stone : gameInfo.setupBlackStones) {
-            model.board.updateStone(stone, Color::BLACK);
-        }
-        for (const auto& stone : gameInfo.setupWhiteStones) {
-            model.board.updateStone(stone, Color::WHITE);
-        }
+        model.editBoard([&gameInfo](Board& board) {
+            board.clear(gameInfo.boardSize);
+            for (const auto& stone : gameInfo.setupBlackStones) {
+                board.updateStone(stone, Color::BLACK);
+            }
+            for (const auto& stone : gameInfo.setupWhiteStones) {
+                board.updateStone(stone, Color::WHITE);
+            }
+        });
     }
 
     // Notify observers of board size

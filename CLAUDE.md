@@ -167,6 +167,20 @@ The application uses JSON configuration files:
 
 ### Windows Build Notes
 
+- **Engine arguments are quoted for `CreateProcessW` by
+  `GtpClient::windowsCommandLine()`**, and `parameters` is split by
+  `splitArguments()`, which honours double quotes. They were joined bare — and
+  goban itself rewrites a relative argument that resolves against the
+  application folder into an absolute path, so installing under a folder with a
+  space in its name split the model path in two and the engine died with
+  "Failed to write command". Both functions are pure and compiled everywhere,
+  so `tests/test_gtpclient.cpp` covers the Windows one on Linux.
+- **A Windows build can be exercised under Wine.** `wine64 goban.exe --script
+  x.scn` from an unpacked CI artifact runs the real Win32 process, pipe and
+  path code against `gnugo.exe`, and screenshots work. It is not a driver test:
+  OpenGL goes to the host's Mesa. The quoting bug above was reproduced this way,
+  from a folder called `Go Board`.
+
 - Windows builds use vcpkg for dependency management (freetype, boost, portaudio, libsndfile)
 - Use the `x64-windows-static` triplet for static linking
 - **Patch file line endings**: Windows Git with `autocrlf=true` converts LF to CRLF on checkout, which corrupts patch files (like `cmake/patches/*.patch`). `cmake/patches/.gitattributes` ensures patch files always use LF endings — it sits beside them rather than at the repository root because `.gitattributes` applies per-directory and every tracked `.patch` is in that one folder. The CMakeLists.txt also uses `git -c core.autocrlf=false apply --ignore-whitespace` to handle this robustly.
@@ -230,6 +244,15 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **Engine sync invariant**: All enabled engines stay in sync at the same position. After load/new game, `EngineSync::Unsynced` triggers initial sync on the game thread: coach syncs first (enables scoring), then remaining engines. After initial sync, every move is sent to ALL engines via `syncOtherEngines`. No special cases for coach/player/kibitz roles.
 - **`Unsynced` is not "busy", `Syncing` is**: only `Syncing` — held while the game thread is actually replaying — may make `isIdle()` false. Waiting on `Unsynced` would never return, since nothing guarantees anyone will act on it. The replay always leaves `Syncing`, failure included.
 - **The sync starts when the board changes, not when the player moves — but only once the new record exists.** `GameThread::startSyncingNewGame()` is called from `newGameNow()` *after* `createNewRecord()`, never from `clearGame()`: the replay reads whatever record the model holds, and starting it inside `clearGame()` raced the empty record's installation. The engines were handed the game being discarded, the board drew empty, and GNU Go refused the player's opening move because that point was the old game's first stone. The function checks the precondition (`moveCount > 0` means the old record is still there) and logs an error rather than syncing — the failure is otherwise invisible until an engine disagrees with the board. A new game, a board size change and a handicap all begin the replay immediately — while the user is still looking at an empty board. It used to leave the engines `Unsynced` with the loop *stopped* until a click called `start()` + `run()`, which billed a several-second KataGo rebuild to the first move: stone stuck in hand, nothing on screen. The SGF load path had always started the thread early (`loadSGF`, "start game thread early"); the two paths had simply grown apart. Ordering matters twice — after `setFixedHandicap()`, because the replay carries its setup stones, and behind `if (!isRunning())`, because `clearGame()` also runs *on* the game thread when a discarding action was deferred, where `run()` would take a mutex that path may hold. Pinned by `tests/scenarios/sync_before_first_move.scn`, whose every assertion is "without a move having been played".
+- **A new game speaks to no engine from the calling thread.** `clearGame()` used
+  to send the coach `boardsize`, `clear_board` and `komi` so that it could be
+  asked `fixed_handicap` — on the UI thread, unless the action was deferred, and
+  with KataGo as coach a change of board size is a rebuild lasting seconds.
+  `Board::fixedHandicap()` computes the standard placement instead (GNU Go's
+  answers, pinned in `tests/test_board_rules.cpp`), and the replay delivers the
+  stones like any other setup. Consequence worth knowing: the engines now learn
+  a handicap only as `play B` setup stones, which was already the case after any
+  resync, load or restart, and always for every engine but the coach.
 - **All GTP from game thread**: Engine commands during active game must go through the game thread (navigation queue, initial sync). Direct GTP from UI thread is only safe when game thread is stopped (after `interrupt()`).
 - **`LoopState` has one writer outside the loop, and `run()` is a no-op on the
   game thread.** `GameThread::reset()` was a second writer, and because it wrote
@@ -264,6 +287,45 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
   **`terminated_` means "shut down on purpose" and nothing else** — an engine
   flagged that way is deliberately not revivable, which is why the timeout path
   calls the private `killProcess()` instead.
+- **An engine that exits has failed, exactly as one that times out has.** Only
+  the timeout path set `failed_`, so a process that simply died — a crash, a
+  model file it could not open — was never restarted, and every later command
+  went into a closed pipe with an error line of its own. `GtpClient::markExited()`
+  covers a failed write and an end-of-file before the blank line that ends a
+  response, and logs `stderrTail()`: the engine's last few raw stderr lines are
+  usually the whole explanation. Two consequences are handled where they land.
+  `PlayerManager` refuses an engine that died answering `list_commands` instead
+  of registering a dead player, possibly as coach. And when the engine *on move*
+  cannot be put back, `reviveFailedEngines()` pauses the game and says so — left
+  Playing, the loop asked it again twenty times a second. Pinned by
+  `engine_that_exits.scn` and two cases in `tests/test_gtpclient.cpp`; the mock's
+  `--exit-on <cmd>` is how a test kills an engine.
+- **A genmove from an engine that is not the player on move goes through
+  `GameThread::askEngine()`.** A kibitz at the end of the line and Explore
+  mode's reply both ran with `playerToMove` still naming the human, so
+  `isThinking()` was false for the whole search: no clock, a lit toolbar, a
+  second press latched and played as a second move, and `runWhenEngineFree()`
+  joining the loop from the UI thread instead of deferring. `KIBITZ_NAV` had been
+  fixed for exactly this and its three siblings had not. `askEngine()` sets the
+  slot under `playerMutex` and refuses when a game-replacing action has claimed
+  the loop. Pinned by `kibitz_at_end_is_announced.scn`.
+- **Scoring and the replay are "engine busy" to `runWhenEngineFree()` too**
+  (`EngineCallScope`). It decided from `playerToMove` alone, and neither has a
+  player on move — so a new game asked for during "Calculating score…" ran
+  inline and its `interrupt()` joined the game thread from the UI thread:
+  measured, 3.06 s frozen against a 3 s scoring timeout, and the default is 30.
+  The scope does **not** wait for a claim to clear, only for one that has been
+  followed by a stop: the task holding a claim restarts the loop itself so the
+  replay begins before it returns, and waiting left the engines `Unsynced` —
+  reading as idle — for a poll interval after every load, which dropped the
+  second of two `navigate_back` in three scenarios. Pinned by
+  `replace_game_while_scoring.scn`.
+- **A komi change is sent to the engines by the game thread** (`NavCommand::
+  SET_KOMI`). It used to ride on the sync that ran at the first move; ADR-0008
+  moved that sync to the moment the board appears, so a komi chosen afterwards
+  stayed in the model and the engines played and scored with the old one.
+  `clearGame()` calls `notifyKomi()` — observers only — because the replay that
+  follows it carries the komi anyway. Pinned by `komi_reaches_the_engines.scn`.
 - **`PlayerManager::getPlayers()` returns a copy, taken under the mutex.** It
   used to hand out a reference to the vector with no lock, which is the
   partial-locking shape the file comment warns about, only inverted.
@@ -319,6 +381,16 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **`pause()` cannot un-finish a game**: it means "stop playing", and is a no-op in `Finished`. Use `enterReview()`, and only once the position has actually moved off the end.
 - **`state.reason` is not part of the phase and outlives it**: `enterReview()` leaves it set, and the UI's own "is over" test (`ElementGame::OnUpdate`, `GobanControl::setHandicap`) reads `state.reason != NO_REASON`, not the phase. Only `start()` and `onBoardSized()` clear it. Known inconsistency, pinned by `tests/test_gamephase.cpp`; don't add readers of `state.reason` as a lifecycle test.
 
+- **`Board::isSupportedSize()` bounds the board at every entry point.** SGF
+  allows `SZ` up to 52, `new_game` accepted 25 and `board_size` took any number,
+  while `Board` holds 19×19 in fixed arrays — a 25×25 record loaded and indexed
+  past them on the first replay. Asked by `GameRecord::loadFromSGF()` (before
+  anything of the record is replaced), `peekBoardSize()`, `UserSettings::load()`
+  and `GobanControl::newGame()`, the funnel for both commands and the dropdown.
+  The lower bound is 2, not `MIN_BOARD`: a 7×7 record loads and renders
+  correctly, and refusing it would be a regression. Pinned by
+  `board_size_is_bounded.scn` and `tests/test_gamerecord.cpp`.
+
 ### Scoring
 See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 - **A failed score is not a score of zero.** `Engine::final_score()` returns `std::optional<float>` because 0.0 is a legitimate result (jigo) and a bare float cannot tell the two apart. Reading failure as zero is what made `applyTerritory()` claim a drawn game, which tripped the "suspiciously zero, ask someone else" fallback and took the whole chain down. Same for `applyTerritory()`, which returns whether a *score* was obtained: shading can be valid when the number is not, and it signals that with `showTerritory` set but `territoryReady` clear.
@@ -340,6 +412,13 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   dead list at all. The gate is now `engineSync == Synced` alone: another engine
   is asked for `final_score`, and the board stays unshaded, which is truthful
   because nobody could compute the shading.
+- **A drawn game is `RE[0]` and names no winner.** Three places each resolved a
+  score of zero to a colour, and not to the same one: the record wrote `B+0`,
+  `GobanModel::result()` chose Black and `processScoring()` announced White.
+  `GameState::JIGO` is the message, `templateJigo` its text, and
+  `getResultMessage()` reads `0`, `Draw` and `Jigo` back. Reachable only with
+  integer komi — a loaded SGF or the `komi` command. Pinned by
+  `jigo_is_a_draw.scn`.
 - **Only ask a synced engine to score.** The initial sync runs coach → score → everyone else, so the other engines are at whatever position they still held when `processScoring()` runs inside it. Asking one there is not merely wrong, it blocks: a CPU KataGo asked to score the empty 19×19 board it was never told about does not answer for minutes, with the game thread inside the sync block and the UI stuck on "Calculating score…". The cross-engine fallback is gated on `engineSync == Synced`; the loop calls scoring again once that holds, so nothing is lost by deferring.
 - **A position that failed to score must not be retried.** `territoryReady == false` alone would re-enter `processScoring()` on every loop iteration, ten times a second, hammering the engines. `Board::territoryFailed` latches it — and clears *itself*, because every position change builds a fresh `Board` and `updateStones()` copies the flag in. Never clear it by hand.
 - **Scoring is bounded more tightly than a genmove.** `GtpClient::scoringTimeout()` (30s, `scoring_timeout_ms` per engine) applies for the duration of `applyTerritory()` via `ScopedTimeout`. It never *raises* a stricter `timeout_ms`, and it does override a negative one — a wedged engine must not be able to freeze scoring for the full five-minute command timeout.
@@ -500,6 +579,19 @@ See `docs/adr/0015-tsumego-is-a-game-mode.md`.
   matching an identical existing child. That is the "resume from here" case and
   it is not addressed — if it should be, the fix is in `move()`, not at a call
   site.
+- **An engine's move away from the end of the line is recorded the way a
+  click's is.** Two paths wrote it through `processSuccessfulMove()` instead,
+  whose `GameRecord::move()` inserts the move as the *first* child and deletes
+  `RE` when the cursor already has one: `KIBITZ_NAV`, and Explore mode's reply
+  after `TO_VARIATION`. So one Kibitz press while reviewing a finished game
+  demoted the game actually played and dropped its result (`main_line_moves`
+  37 → 2), in place. `KIBITZ_NAV` now hands a mid-tree answer to
+  `navigateToVariation(move, true, {kibitz, coach}, false)` — following a child
+  the record already has, branching a finished game as a copy — with
+  `resume = false`, because asking once must not start the match. **And Explore
+  replies only to a new branch**: a followed move was not made, and answering it
+  rewrote a game for nothing more than clicking its next-move marker. Pinned by
+  `kibitz_in_a_finished_game.scn` and `explore_follows_without_replying.scn`.
 - **A solved puzzle is not asked for a move, and a puzzle is never asked through
   `playKibitzMove()`.** `a.kibitz` carries a `tsumego && atEnd && !onBadMovePath`
   term, so the Kibitz item — *Nápověda*, Hint, in Czech — greys exactly where the
@@ -518,6 +610,15 @@ See `docs/adr/0015-tsumego-is-a-game-mode.md`.
   whole-board answer, and both stock engines abandon the corner rather than
   punish the mistake — measured, KataGo `F7` and GNU Go `B6` where the kill was
   `B2`. Needs an ADR; do not assume asking works because the plumbing does.*
+- **A hint in a puzzle is the engine clicking for the solver.** `KIBITZ_NAV`
+  hands its answer to `navigateToVariation(move, false, {kibitz, coach})` and
+  then `GameThread::settleTsumegoVariation()`, the same two steps a click takes.
+  It went through `processSuccessfulMove()` instead, whose `GameRecord::move()`
+  inserts as the *first* child: a hint at the root demoted the recorded answer
+  (`main_line_moves` 2 → 1), marked nothing wrong, and left the position reading
+  as solved. The `holders` list exists because the kibitz has already played its
+  own genmove and the coach has already accepted it — sending either again is an
+  illegal move. Pinned by `tsumego_hint.scn` and `tsumego_hint_misses.scn`.
 - **A snapshot field written *after* the position change must be republished.**
   `notifyBoardChangeWithMove()` publishes from inside `navigateToVariation()`,
   but the tsumego verdict — `markBadMove()` — runs after it returns, in
@@ -688,6 +789,20 @@ See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
   cost as one-time, which is the fact that makes the pause acceptable.
 
 ### Rendering Across Threads
+- **`GobanModel::board` is read through `withBoard()` and written through
+  `editBoard()` or `onBoardChange()`** — all three under `GobanModel::mutex`.
+  The game thread had always rebuilt the board under that mutex, and the UI
+  thread read it bare: `GobanView::Render()` copied all 361 points every time the
+  stones changed, and a `Point` carries `std::string`s, so this was a copy racing
+  an assignment rather than a stale value. Writers locked, readers not — the same
+  partial-locking shape as `GameRecord` and `PlayerManager`, the other way up.
+  Then the reverse turned out to be true of a handful of writers
+  (`onBoardSized()`, the territory flags in `GameNavigator`, the handicap and
+  setup stones), which is the point: a lock is only as good as its least careful
+  user. **Disk I/O is outside the lock** — `onBoardChange()` releases it before
+  `finalizeGame()` and `saveAs()`, or a frame would wait on a save. Found by
+  running the scenario suite under ThreadSanitizer (`docs/testing.md`), which
+  no ordinary run can see.
 - **A `GameObserver` callback may hand data over; it may not act on the view.**
   `GobanView`'s callbacks arrive on the game thread — and during startup on the
   engine-loader thread, with the board already drawn — so its own file comment
@@ -715,6 +830,12 @@ See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
 - **The audio callback locks like everyone else.** It shares `data` with the UI
   thread, which `push_back`s into it — the writers-locked-readers-not shape
   again, and a reallocation mid-mix invalidates the iterator it is walking.
+- **No output device is said once, not per stone.** `ensureInitialized()`
+  retried `Pa_Initialize()`/`Pa_OpenStream()` on every sound and logged an error
+  and a warning each time: two entries per move for the session, on any machine
+  without audio. It latches now, retries quietly after 30 s, and reports a
+  warning — no sound is a degraded mode, not an error. Verified by hand with
+  `ALSA_CONFIG_PATH=/dev/null`; the runner has no way to take a device away.
 - **`sounds_played` counts what was *heard*, not what was asked for.** A request
   the mixer never saw looked exactly like one it played, which is why a swallowed
   stone sound had no symptom to assert on. It is an atomic incremented by the
@@ -883,6 +1004,12 @@ See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
   resolves to a non-SGF player — a renamed or removed engine keeps the SGF's
   answer instead of silently dropping to Human, which is what a bare
   `findPlayer()` does and what today's KataGo rename would have triggered.
+- **One unreadable key costs that key, not the ones after it.**
+  `UserSettings::load()` read everything inside a single `try`, so the first
+  value of the wrong type — a hand edit, or a key whose type changed between
+  versions — ended the load, and the next save wrote the defaults back over the
+  rest. Each read now goes through `read()` / `guarded()`, which warn and move
+  on; a truncated file still fails as a whole, before anything is assigned.
 - **`user.json` is the runtime scratchpad and is not tracked.** Defaults that
   ship — the opening camera — live in `config/base.json`, which the application
   never writes. Keeping both in one file leaked local paths and language into the
@@ -936,9 +1063,12 @@ of its decisions, and `tests/test_analysis.cpp` plus
 - **Yield with `analysisMayRun()`, not `isThinking()`.** The loop clears
   `playerToMove` *before* its 500 ms inter-move sleep, so a bare test flaps the
   stream on and off once per move in a bot-versus-bot match — the
-  two-searches-at-once case decision 6 exists to prevent. The predicate also asks
-  whether the *loop is running*, because a loaded game paused with an engine to
-  move has nobody searching, and review is when the numbers are worth most.
+  two-searches-at-once case decision 6 exists to prevent. **The second term is
+  the phase, not `isRunning()`**: the loop thread stays alive through review, so
+  that asked "is a game being played" and answered "does the thread exist" —
+  silencing the overlay on every reviewed position whose colour belonged to an
+  engine (`isCurrentPlayerEngine()` reads the colour under the *cursor*). Pinned
+  by `tests/scenarios/evaluation_reviews_an_engine_move.scn`.
 - **Absent is not zero, and stale is not absent.** No report hides the panel
   outright; a bar resting at 50% because nothing has been computed cannot be told
   from a genuine even game. The yield window is the one *stale* case — the
@@ -1174,6 +1304,14 @@ of its decisions, and `tests/test_analysis.cpp` plus
   *quiet* — the bare command runs, so `prisoners` printed its current setting
   into `#lblMessage` and the widget snapped back, and `toggle_evaluation`
   toggled whichever option was picked. Adding a `<select>` means adding a branch.
+- **Every template's `on<event>` value is checked against the dispatch chain.**
+  `check_menu_wiring` reads all five languages' `goban.rml` and `open.rml` as
+  text and asks what a click would ask: `EventManager`'s three generic words,
+  the handler's own branches (`EventHandler::Handles()`, listed beside the
+  `if` chain it describes), then `GobanControl::resolves()`. A new branch in
+  either handler needs its name added to `Handles()` or the check reports it —
+  the loud direction. Commented-out markup is skipped. Pinned by
+  `tests/scenarios/menu_wiring.scn`.
 - **Scenarios drive commands, so a widget needs `menu_select`.** `menu_select
   <select-id> <value>` picks an option through `SetValue()`, which dispatches
   `EventId::Change` exactly as a click does — the only step in the suite that

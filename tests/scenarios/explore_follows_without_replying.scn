@@ -1,0 +1,33 @@
+# A loaded game opens in Explore mode, and Explore answers every move the human
+# makes. A click on the move the record already has is not one: it follows, as
+# the Right arrow does. The engine replied to it all the same — and its reply
+# went in as the first child, over the game actually played, taking RE with it.
+# Reviewing a finished game by clicking its next-move marker rewrote it.
+#
+# tests/data/finished_9x9.sgf opens with B[fe], which is `click 5 4`.
+
+load_sgf tests/data/finished_9x9.sgf
+wait_idle
+expect mode explore
+navigate_start
+wait_idle
+expect view_position 0
+
+click 5 4
+click 5 4
+wait_until view_position >= 1
+wait 800
+wait_idle
+expect view_position 1
+expect main_line_moves 37
+expect has_result true
+expect unsaved_changes false
+expect phase paused
+
+# A move the record does not have is still answered — in a copy.
+click 0 0
+click 0 0
+wait_until view_position >= 3
+wait_idle
+expect view_position 3
+expect sgf_file ""

@@ -162,6 +162,7 @@
                             <div class="template" id="templateResignBlackWon">흑 불계승</div>
                             <div class="template" id="templateWhiteWon">백 %.1f집 승</div>
                             <div class="template" id="templateBlackWon">흑 %.1f집 승</div>
+                            <div class="template" id="templateJigo">무승부</div>
                             <div class="template" id="templateWhiteResigns">백 불계</div>
                             <div class="template" id="templateBlackResigns">흑 불계</div>
                             <div class="template" id="templateWhitePasses">({0}) 백 패스</div>

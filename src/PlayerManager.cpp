@@ -157,6 +157,14 @@ Engine* PlayerManager::loadSingleEngine(const nlohmann::json& botConfig) {
             if (line == "kata-analyze" || line == "lz-analyze") canAnalyse = true;
         }
 
+        // It started and then left — a model file it could not open, typically.
+        // Registering it anyway handed out a dead player, possibly as coach,
+        // with nothing said. GtpClient has already logged what the engine said.
+        if (engine->hasFailed()) {
+            delete engine;
+            throw std::runtime_error("it exited during startup");
+        }
+
         // Optional per-engine response timeout. Engines differ enormously here:
         // a CPU KataGo can spend a minute loading weights, while a scripted test
         // engine should fail in seconds.

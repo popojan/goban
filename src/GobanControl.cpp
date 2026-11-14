@@ -9,6 +9,9 @@
 #include "UserSettings.h"
 #include "ScenarioRecorder.h"
 #include <algorithm>
+#include <regex>
+#include <fstream>
+#include <filesystem>
 #include <cctype>
 #include <cmath>
 #include <ctime>
@@ -67,6 +70,13 @@ std::string toLower(std::string text) {
 } // namespace
 
 bool GobanControl::newGame(unsigned boardSize) const {
+    // The funnel for every way of asking: the dropdown, both commands, and a
+    // size restored from user.json.
+    if (!Board::isSupportedSize(static_cast<int>(boardSize))) {
+        spdlog::warn("a {}x{} board is not supported (2..{})", boardSize, boardSize,
+                     Board::MAX_BOARD);
+        return false;
+    }
     // Starting a new game discards the current one, so a move the engine is
     // still computing is worthless. Rather than block the UI waiting for it
     // (GTP cannot abort a command in flight), hand the work to the game thread,
@@ -532,7 +542,7 @@ void GobanControl::buildRegistry() {
         // there is no territory to show. The same answer greys the button.
         // On refusal the menu is still updated (with checked == false), unselecting it.
         if (actions().territory) {
-            ctx.checked = model.board.toggleTerritory();
+            model.editBoard([&ctx](Board& board) { ctx.checked = board.toggleTerritory(); });
             view.requestRepaint(GobanView::UPDATE_STONES | GobanView::UPDATE_OVERLAY);
         }
     });
@@ -1472,7 +1482,13 @@ void GobanControl::buildRegistry() {
     add("archive", 0, 0, "move the daily record to a timestamped file", [this](CommandContext& ctx) {
         // Save any pending changes to the daily file
         std::string dailyFile = model.game.getDefaultFileName();
-        model.game.saveAs("");
+        // A failed save must stop here: what is on disk is then stale, and
+        // archiving it would drop the unsaved games with clearSession() below.
+        if (!model.game.saveAs("")) {
+            parent->showMessage(parent->templateText("tplArchiveFailed", "Archive failed"));
+            ctx.notifyMenu = false;
+            return;
+        }
 
         // Check if there's actually a file to archive
         if (!std::filesystem::exists(dailyFile)) {
@@ -1676,6 +1692,67 @@ void GobanControl::buildRegistry() {
         el->DispatchEvent(Rml::EventId::Mouseup, Rml::Dictionary());
     });
 
+    add("check_menu_wiring", 0, 0,
+        "check that every on<event>=\"...\" in every language's templates "
+        "reaches a handler; each one that does not is logged as an error",
+        [this](CommandContext&) {
+        // Text, not the live document: one run covers all five languages, and
+        // nothing is dispatched, so `quit` and `language` are safe to look at.
+        namespace fs = std::filesystem;
+        const fs::path gui = fs::u8path(config->data.value("gui", std::string("./config/gui/en")));
+        static const std::regex attr(R"re(\bon[a-z]+\s*=\s*"([^"]*)")re");
+        int checked = 0, missing = 0;
+        std::error_code ec;
+        for (const auto& lang : fs::directory_iterator(gui.parent_path(), ec)) {
+            for (const char* file : {"goban.rml", "open.rml"}) {
+                const fs::path path = lang.path() / file;
+                std::ifstream in(path);
+                if (!in) continue;
+                std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                // Commented-out markup is not wiring. Blanked rather than
+                // erased, so the line numbers reported below stay true.
+                for (size_t open = 0; (open = text.find("<!--", open)) != std::string::npos; ) {
+                    size_t close = text.find("-->", open);
+                    close = close == std::string::npos ? text.size() : close + 3;
+                    for (size_t i = open; i < close; ++i)
+                        if (text[i] != '\n') text[i] = ' ';
+                    open = close;
+                }
+                auto* handler = EventManager::GetEventHandler(
+                        std::string(file) == "open.rml" ? "open" : "goban");
+                const bool commands = std::string(file) == "goban.rml";
+                std::istringstream lines(text);
+                std::string line;
+                for (int lineNo = 1; std::getline(lines, line); ++lineNo) {
+                    for (std::sregex_iterator it(line.begin(), line.end(), attr), end; it != end; ++it) {
+                        // EventManager splits on ';' and takes three words itself.
+                        std::istringstream parts((*it)[1].str());
+                        std::string part;
+                        while (std::getline(parts, part, ';')) {
+                            ++checked;
+                            const auto first = part.substr(0, part.find(' '));
+                            const bool generic = (first == "load" && first != part)
+                                    || first == "close" || first == "exit";
+                            if (generic || (handler && handler->Handles(part.c_str()))
+                                    || (commands && resolves(part)))
+                                continue;
+                            ++missing;
+                            spdlog::error("scenario: check_menu_wiring: {}:{}: '{}' reaches no handler",
+                                          path.generic_string(), lineNo, part);
+                        }
+                    }
+                }
+            }
+        }
+        // "scenario:" is what run_scenarios.sh surfaces from a failed run.
+        // A check that found nothing to check must not read as a pass.
+        if (checked == 0)
+            spdlog::error("scenario: check_menu_wiring: no event attributes found under {}",
+                          gui.parent_path().generic_string());
+        else
+            spdlog::info("check_menu_wiring: {} checked, {} unresolved", checked, missing);
+    });
+
     add("chooser_up", 0, 0, "browse to the parent directory", [chooser](CommandContext&) {
         if (auto* h = chooser()) h->NavigateUp();
     });
@@ -1767,8 +1844,9 @@ void GobanControl::buildRegistry() {
     add("new_game", 1, 1, "<size> — start a new game on a size x size board",
         [this](CommandContext& ctx) {
             int boardSize = 0;
-            if (!parseInt(ctx.args[0], boardSize) || boardSize < 2 || boardSize > 25) {
-                spdlog::warn("new_game: '{}' is not a valid board size (2..25)", ctx.args[0]);
+            if (!parseInt(ctx.args[0], boardSize) || !Board::isSupportedSize(boardSize)) {
+                spdlog::warn("new_game: '{}' is not a valid board size (2..{})", ctx.args[0],
+                             Board::MAX_BOARD);
                 return;
             }
             if (!newGame(static_cast<unsigned>(boardSize))) {
@@ -1923,6 +2001,25 @@ void GobanControl::command(const std::string& cmd) {
         return;  // blank line — nothing to dispatch
     }
     command(tokens.front(), std::vector<std::string>(tokens.begin() + 1, tokens.end()));
+}
+
+bool GobanControl::resolves(const std::string& cmd) {
+    if (registry.empty()) {
+        buildRegistry();
+    }
+    // Same two steps as command(): the whole line first, then its first token.
+    std::string name = cmd;
+    std::vector<std::string> args;
+    if (registry.find(cmd) == registry.end()) {
+        const auto tokens = splitCommand(cmd);
+        if (tokens.empty()) return false;
+        name = tokens.front();
+        args.assign(tokens.begin() + 1, tokens.end());
+    }
+    const auto entry = registry.find(name);
+    if (entry == registry.end()) return false;
+    const int argc = static_cast<int>(args.size());
+    return argc >= entry->second.minArgs && argc <= entry->second.maxArgs;
 }
 
 void GobanControl::command(const std::string& name, const std::vector<std::string>& args) {
@@ -2153,6 +2250,7 @@ const char* messageName(GameState::Message m) {
         case GameState::SCORING_FAILED:    return "scoring_failed";
         case GameState::TSUMEGO_SOLVED:    return "tsumego_solved";
         case GameState::TSUMEGO_WRONG:     return "tsumego_wrong";
+        case GameState::JIGO:              return "jigo";
     }
     return "unknown";
 }
@@ -2194,6 +2292,12 @@ void GobanControl::confirmGameReplacement(std::function<void()> replace,
 }
 
 void GobanControl::requestNewGame(unsigned boardSize, std::function<void(bool)> onSettled) const {
+    // Asked before the prompt: a confirmation newGame() would then refuse.
+    if (!Board::isSupportedSize(static_cast<int>(boardSize))) {
+        newGame(boardSize);   // says why
+        if (onSettled) onSettled(false);
+        return;
+    }
     confirmGameReplacement(
         [this, boardSize, onSettled]() {
             // Board size is about to change, so the game on screen is going
@@ -2332,10 +2436,13 @@ nlohmann::json GobanControl::dumpState() const {
     s["handicap"]       = model.state.handicap;
 
     // Stones actually on the board, and prisoners
-    s["black_stones"]   = model.board.stonesOnBoard(Color::BLACK);
-    s["white_stones"]   = model.board.stonesOnBoard(Color::WHITE);
-    s["captured_black"] = model.board.capturedCount(Color::BLACK);
-    s["captured_white"] = model.board.capturedCount(Color::WHITE);
+    model.withBoard([&s](const Board& board) {
+        s["black_stones"]   = board.stonesOnBoard(Color::BLACK);
+        s["white_stones"]   = board.stonesOnBoard(Color::WHITE);
+        s["captured_black"] = board.capturedCount(Color::BLACK);
+        s["captured_white"] = board.capturedCount(Color::WHITE);
+        s["show_territory"] = board.showTerritory;
+    });
     // What the *renderer* was handed, as against what the board knows. These
     // are the uniforms that decide how many stones sit in the bowls, and they
     // were permanently zero while the two keys above were right — so a scenario
@@ -2474,7 +2581,6 @@ nlohmann::json GobanControl::dumpState() const {
     s["cursor_row"]         = model.cursor.row();
     s["tsumego"]        = model.tsumegoMode.load();
     s["holds_stone"]    = model.state.holdsStone;
-    s["show_territory"] = model.board.showTerritory;
     s["unsaved_changes"] = model.game.hasUnsavedChanges();
     s["msg"]            = messageName(model.state.msg);
     // What the message tail and the board overlay are showing. Asserting these
@@ -2587,16 +2693,18 @@ nlohmann::json GobanControl::dumpState() const {
 
     // A cheap, order-independent fingerprint of the position, so a scenario can
     // assert "the board is the same as before" without spelling out 361 points.
-    unsigned long hash = 1469598103934665603UL;
-    for (int row = 0; row < snap->boardSize; ++row) {
-        for (int col = 0; col < snap->boardSize; ++col) {
-            const Color& stone = model.board[Position(col, row)].stone;
-            const unsigned long v = (stone == Color::BLACK) ? 2u
-                                  : (stone == Color::WHITE) ? 1u : 0u;
-            hash = (hash ^ v) * 1099511628211UL;
+    s["board_hash"] = model.withBoard([&snap](const Board& board) {
+        unsigned long hash = 1469598103934665603UL;
+        for (int row = 0; row < snap->boardSize; ++row) {
+            for (int col = 0; col < snap->boardSize; ++col) {
+                const Color stone = board[Position(col, row)].stone;
+                const unsigned long v = (stone == Color::BLACK) ? 2u
+                                      : (stone == Color::WHITE) ? 1u : 0u;
+                hash = (hash ^ v) * 1099511628211UL;
+            }
         }
-    }
-    s["board_hash"] = hash;
+        return hash;
+    });
 
     return s;
 }

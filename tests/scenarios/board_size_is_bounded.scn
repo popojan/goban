@@ -1,0 +1,27 @@
+# The board arrays hold 19x19 and nothing bounded what was asked of them: an
+# SGF may declare SZ up to 52, `new_game` accepted 25, and `board_size` took any
+# number. A 25x25 record loaded, listed itself in the file chooser, and indexed
+# past the arrays on the first replay. Small boards are fine and stay allowed.
+
+new_game 9
+wait_idle
+expect board_size 9
+
+new_game 25
+wait_idle
+expect board_size 9
+
+# The dropdown's route: refused before the prompt, not after a yes.
+click 4 4
+click 4 4
+wait_until move_count >= 1
+board_size 21
+wait_idle
+expect prompt_active false
+expect board_size 9
+expect move_count 1
+
+load_sgf tests/data/sz25.sgf
+wait_idle
+expect board_size 9
+expect move_count 1

@@ -239,6 +239,71 @@ TEST_CASE("an engine that keeps wedging is eventually left down") {
     CHECK(client->hasFailed());
 }
 
+TEST_CASE("configured parameters split on whitespace, and quotes keep a value whole") {
+    using Args = std::vector<std::string>;
+    CHECK(GtpClient::splitArguments("") == Args{});
+    CHECK(GtpClient::splitArguments("  --mode gtp   --japanese-rules ")
+          == Args{"--mode", "gtp", "--japanese-rules"});
+    // The only way to name a file in a folder with a space in it.
+    CHECK(GtpClient::splitArguments(R"(gtp -model "C:/My Models/b18.bin.gz" -config a.cfg)")
+          == Args{"gtp", "-model", "C:/My Models/b18.bin.gz", "-config", "a.cfg"});
+    CHECK(GtpClient::splitArguments(R"(--name "" x)") == Args{"--name", "", "x"});
+}
+
+TEST_CASE("a Windows command line survives a space in the install folder") {
+    // Arguments were joined bare. goban rewrites a relative path that resolves
+    // against the application folder into an absolute one, so installing under
+    // "C:\Program Files" or a user name with a space split the model path in two.
+    CHECK(GtpClient::windowsCommandLine(R"(C:\Go Board\engine\gnugo.exe)",
+              {"--mode", "gtp", "--infile", R"(C:\Go Board\games\start.sgf)"})
+          == R"("C:\Go Board\engine\gnugo.exe" --mode gtp --infile "C:\Go Board\games\start.sgf")");
+    // Backslashes are doubled only where they meet a quote; a quote is escaped.
+    CHECK(GtpClient::windowsCommandLine("e.exe", {R"(C:\dir with space\)", R"(say "hi")", ""})
+          == R"("e.exe" "C:\dir with space\\" "say \"hi\"" "")");
+    // Nothing to quote, nothing changed.
+    CHECK(GtpClient::windowsCommandLine("e.exe", {R"(C:\plain\path)", "-v"})
+          == R"("e.exe" C:\plain\path -v)");
+}
+
+TEST_CASE("an engine that exits is marked failed, and can be put back") {
+    // Only a timeout set failed_. An engine that simply died — a crash, or a
+    // model file it could not open — returned an empty reply and nothing else,
+    // so nothing ever restarted it and every later command was written into a
+    // closed pipe, each with its own error line.
+    auto client = makeClient("--exit-on genmove");
+    REQUIRE(GtpClient::success(client->issueCommand("boardsize 9")));
+
+    CHECK_FALSE(GtpClient::success(client->issueCommand("genmove B")));
+    CHECK(client->hasFailed());
+    // What it said on the way out is the only explanation there will be.
+    CHECK(client->stderrTail().find("cannot go on") != std::string::npos);
+
+    CHECK(client->revive());
+    CHECK(GtpClient::success(client->issueCommand("name")));
+}
+
+TEST_CASE("an engine that cannot be restarted is still safe to destroy") {
+    // revive() drops the dead process before spawning its replacement, and the
+    // destructor used that pointer unconditionally.
+    quietLogging();
+    const MockSpawn spawn = mockSpawn();
+    const auto dir = std::filesystem::temp_directory_path() / "goban_revive_test";
+    std::filesystem::create_directories(dir);
+    const auto copy = dir / spawn.exe;
+    std::filesystem::copy_file(std::filesystem::path(spawn.dir) / spawn.exe, copy,
+                               std::filesystem::copy_options::overwrite_existing);
+    {
+        GtpClient client(spawn.exe, "--exit-on name", dir.string(), nlohmann::json::array());
+        REQUIRE_FALSE(GtpClient::success(client.issueCommand("name")));
+        REQUIRE(client.hasFailed());
+        std::filesystem::remove(copy);
+        CHECK_FALSE(client.revive());
+        CHECK(client.hasFailed());
+        CHECK_FALSE(GtpClient::success(client.issueCommand("name")));
+    }   // ~GtpClient
+    std::filesystem::remove_all(dir);
+}
+
 TEST_CASE("a slow but responsive engine is not cut off early") {
     // The timeout must not punish an engine that is merely slow.
     auto client = makeClient("--delay-ms 300 --script E5");

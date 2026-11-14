@@ -17,6 +17,7 @@
 #ifndef GTPCLIENT_H
 #define GTPCLIENT_H
 
+#include <deque>
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -71,7 +72,9 @@ private:
     HANDLE hStdoutRead_ = INVALID_HANDLE_VALUE;
     HANDLE hStderrRead_ = INVALID_HANDLE_VALUE;
 #else
-    pid_t pid_ = -1;
+    // mutable: wait() and waitFor() are const and must forget a reaped pid, or a
+    // later terminate() signals whoever the system has since given that number.
+    mutable pid_t pid_ = -1;
     int stdinFd_ = -1;
     int stdoutFd_ = -1;
     int stderrFd_ = -1;
@@ -107,6 +110,10 @@ private:
     std::string workDir_;
     std::string lastLine;
     mutable std::mutex lastLineMutex_;
+    /// The engine's last few stderr lines, raw. When a process dies, this is
+    /// usually the whole explanation ("could not open model file ...").
+    std::deque<std::string> stderrTail_;
+    static constexpr size_t STDERR_TAIL_LINES = 4;
     std::vector<OutputFilter> outputFilters;
     std::unique_ptr<StderrReaderThread> stderrReader_;
     // Killed deliberately during shutdown: further commands answer "= " so
@@ -128,6 +135,8 @@ private:
     /// Kills and reaps the process without claiming it was shut down on purpose.
     /// `terminateProcess()` is this plus the `terminated_` flag; the timeout
     /// path wants only the killing, or the engine could never be revived.
+    /// The process went away under a command. Marks it failed and says why.
+    void markExited(const std::string& command);
     void killProcess();
 
     nlohmann::json vars;
@@ -151,6 +160,8 @@ public:
     void addOutputFilter(const std::string &msg, const std::string &format, const std::string &var);
 
     std::string lastError();
+    /// The engine's last few stderr lines, joined with " | ".
+    [[nodiscard]] std::string stderrTail() const;
 
     CommandOutput name();
 
@@ -191,6 +202,17 @@ public:
     void setQuiet(bool quiet) { quiet_ = quiet; }
 
     static bool success(const CommandOutput &ret);
+
+    /// Splits a configured `parameters` string into arguments. Whitespace
+    /// separates; double quotes keep a value with spaces in one piece, which is
+    /// the only way to name a model in a folder such as "My Documents".
+    static std::vector<std::string> splitArguments(const std::string& cmdline);
+
+    /// The single string CreateProcessW takes, quoted so that the child's own
+    /// parser gives back exactly `args`. Pure, and compiled everywhere, so it is
+    /// tested on the platform that never calls it.
+    static std::string windowsCommandLine(const std::string& program,
+                                          const std::vector<std::string>& args);
 
     /// Kill the engine process immediately (unblocks any blocking readLine).
     void terminateProcess();

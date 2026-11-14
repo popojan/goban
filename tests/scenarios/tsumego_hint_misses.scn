@@ -1,0 +1,23 @@
+# The other half of tsumego_hint.scn: the stock mock answers with the first
+# legal point, which is not the solution. That is a wrong branch beside the
+# recorded answer — marked wrong, as the same move clicked by the solver would
+# be — and never a new main line over it.
+
+load_tsumego tests/data/tsumego.sgf
+wait_idle
+expect view_position 0
+expect main_line_moves 2
+
+play once
+wait_until msg tsumego_wrong
+wait_idle
+expect view_position 1
+expect main_line_moves 2
+expect phase paused
+
+# The recorded answer is still the first move.
+navigate_start
+wait_idle
+navigate_forward
+wait_idle
+expect comment correct

@@ -372,6 +372,29 @@ TEST_CASE("finalizeGame writes a score result and never overwrites a resignation
     CHECK(s.rec.getResultMessage() == GameState::WHITE_RESIGNED);
 }
 
+TEST_CASE("a drawn game is RE[0], not a win by nothing") {
+    Session s;
+    s.rec.initGame(9, 0.0f, 0, "B", "W");
+    s.rec.move(blackAt(4, 4));
+    // Two passes, or saving drops RE as belonging to an unfinished main line.
+    s.rec.move(Move(Move::PASS, Color::WHITE));
+    s.rec.move(Move(Move::PASS, Color::BLACK));
+
+    // It wrote "B+0", which reads back as a Black win.
+    s.rec.finalizeGame(0.0f);
+    CHECK(s.rec.hasGameResult());
+    CHECK(s.rec.getResultMessage() == GameState::JIGO);
+
+    const std::string out = s.path("jigo.sgf");
+    s.rec.saveAs(out);
+    CHECK(readAll(out).find("RE[0]") != std::string::npos);
+
+    GameRecord reloaded;
+    GameRecord::SGFGameInfo info;
+    REQUIRE(reloaded.loadFromSGF(out, info));
+    CHECK(reloaded.getResultMessage() == GameState::JIGO);
+}
+
 TEST_CASE("annotate appends to the current node's comment") {
     Session s;
     s.rec.initGame(9, 0.5f, 0, "B", "W");
@@ -627,6 +650,39 @@ TEST_CASE("peekBoardSize reads the last game's board size without a full load") 
     CHECK(GameRecord::peekBoardSize(fixture("malformed.sgf")) == -1);
 }
 
+TEST_CASE("writeFileContent replaces a file whole and leaves no temporary behind") {
+    Session s;
+    const std::string p = s.path("replace.sgf");
+    REQUIRE(GameRecord::writeFileContent(p, "(;FF[4]GM[1]SZ[9];B[ee];W[cc])"));
+    REQUIRE(GameRecord::writeFileContent(p, "(;FF[4]GM[1]SZ[9])"));
+    CHECK(readAll(p) == "(;FF[4]GM[1]SZ[9])");
+    int entries = 0;
+    for (const auto& e : std::filesystem::directory_iterator(s.dir)) { (void)e; ++entries; }
+    CHECK(entries == 1);
+}
+
+TEST_CASE("an unreadable session file is set aside, not rotated out of the backups") {
+    Session s;
+    const std::string daily = s.path(todayStamp() + ".sgf");
+    // Not SGF at all — the parser repairs a merely truncated file — with the
+    // last good copy beside it.
+    REQUIRE(GameRecord::writeFileContent(daily, "not an sgf file"));
+    REQUIRE(GameRecord::writeFileContent(daily + ".bak", "GOOD"));
+
+    s.rec.initGame(9, 0.5f, 0, "B", "W");
+    s.rec.move(blackAt(4, 4));
+    s.rec.saveAs("");
+
+    // It used to become the new .bak, pushing the good copy to .bak.old — and
+    // the save after that one overwrote it.
+    CHECK(readAll(daily + ".bak") == "GOOD");
+    CHECK(readAll(daily + ".unreadable") == "not an sgf file");
+
+    GameRecord reloaded;
+    GameRecord::SGFGameInfo info;
+    CHECK(reloaded.loadFromSGF(daily, info));
+}
+
 TEST_CASE("readFileContent / writeFileContent handle non-ASCII paths") {
     Session s;
     const std::string p = s.path(u8"日本の囲碁.sgf");
@@ -640,6 +696,19 @@ TEST_CASE("readFileContent / writeFileContent handle non-ASCII paths") {
 // ---------------------------------------------------------------------------
 // Malformed input
 // ---------------------------------------------------------------------------
+
+TEST_CASE("a board larger than the board arrays is refused, not loaded") {
+    quietLogging();
+    // SGF allows SZ up to 52; Board holds 19x19. Position::fromSgf() bounds a
+    // point against the file's own size, so nothing else stood in the way.
+    GameRecord rec;
+    GameRecord::SGFGameInfo info;
+    CHECK_FALSE(rec.loadFromSGF(fixture("sz25.sgf"), info));
+    CHECK_FALSE(rec.isNavigating());
+    CHECK(rec.moveCount() == 0);
+    // Session restore asks this first, and sizes the board from the answer.
+    CHECK(GameRecord::peekBoardSize(fixture("sz25.sgf")) == -1);
+}
 
 TEST_CASE("malformed and empty SGF input fails cleanly") {
     quietLogging();

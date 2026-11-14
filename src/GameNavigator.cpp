@@ -34,7 +34,7 @@ void GameNavigator::restoreFinishedStateAtEnd() {
 /// updateStones() would overwrite the territory flag.
 void GameNavigator::showEndOfGameResult() {
     if (model.game.shouldShowTerritory()) {
-        model.board.toggleTerritoryAuto(true);
+        model.editBoard([](Board& board) { board.toggleTerritoryAuto(true); });
         // processScoring() will set CALCULATING_SCORE then the result message
     } else if (model.phase() == GamePhase::Finished) {
         auto resultMsg = model.game.getResultMessage();
@@ -60,11 +60,14 @@ GameNavigator::GameNavigator(GobanModel& model, CoachProvider getCoach,
 {
 }
 
-void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo) const {
+void GameNavigator::syncEngines(const Move& move, Engine* coach, bool isUndo,
+                                const std::vector<const Engine*>& holders) const {
     // Sync ALL engines (invariant: all engines stay at same position)
     for (auto player : getActivePlayers()) {
         if (!player->isTypeOf(Player::ENGINE)) continue;
         if (player == reinterpret_cast<Player*>(coach)) continue;
+        if (std::find(holders.begin(), holders.end(), static_cast<const Engine*>(player))
+                != holders.end()) continue;
 
         // Both results used to be discarded, which is how an engine quietly
         // stopped tracking the cursor: one refused `undo` somewhere in a run of
@@ -126,8 +129,10 @@ bool GameNavigator::navigateBack() {
     model.game.undo();
 
     // Hide territory unconditionally when navigating back (stale after undo)
-    model.board.showTerritory = false;
-    model.board.showTerritoryAuto = false;
+    model.editBoard([](Board& board) {
+        board.showTerritory = false;
+        board.showTerritoryAuto = false;
+    });
 
     // Pause active play - user is reviewing. Explicit "Start" needed to resume.
     // enterReview() rather than pause(): the position shown is no longer the end
@@ -217,7 +222,9 @@ bool GameNavigator::navigateForward() {
     return true;
 }
 
-GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& move, bool promote) {
+GameNavigator::VariationResult GameNavigator::navigateToVariation(
+        const Move& move, bool promote, const std::vector<const Engine*>& holders,
+        bool resume) {
     VariationResult result;
     spdlog::debug("navigateToVariation: entry, move={}", move.toString());
 
@@ -235,12 +242,13 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
     NavigationGuard guard(navigationInProgress);
 
     // Play the move on the coach
-    if (!coach->play(move)) {
+    const bool coachHolds = std::find(holders.begin(), holders.end(), coach) != holders.end();
+    if (!coachHolds && !coach->play(move)) {
         spdlog::warn("navigateToVariation: coach->play() failed for move {}", move.toString());
         return result;
     }
 
-    syncEngines(move, coach, false);
+    syncEngines(move, coach, false, holders);
 
     // Navigate to the child node in the SGF tree
     // If child doesn't exist, create a new branch
@@ -260,7 +268,7 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(const Move& mo
         // Clear game over state - we're continuing the game in a new branch
         // Skip for non-promoted branches (e.g. tsumego wrong moves) to stay in navigation mode.
         // Kibitz (space key) handles its own model.start() independently.
-        if (promote) {
+        if (promote && resume) {
             model.start();
         }
     } else {
@@ -328,8 +336,10 @@ bool GameNavigator::navigateToStart() {
         }
     }
 
-    model.board.showTerritory = false;
-    model.board.showTerritoryAuto = false;
+    model.editBoard([](Board& board) {
+        board.showTerritory = false;
+        board.showTerritoryAuto = false;
+    });
 
     // Pause active play - user is reviewing. Explicit "Start" needed to resume.
     model.enterReview();

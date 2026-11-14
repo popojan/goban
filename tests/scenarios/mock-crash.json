@@ -1,0 +1,14 @@
+{
+  "$include": "../../config/en.json",
+  "_comment": "`crasher` exits the first time it is asked for a move, every time it is restarted. `stillborn` exits before it has answered anything, as an engine does when it cannot open its model.",
+  "bots": [
+    { "name": "mock", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "", "enabled": 1, "main": 1, "kibitz": 1 },
+    { "name": "crasher", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "--exit-on genmove", "enabled": 1 },
+    { "name": "stillborn", "path": "./cmake-build-release", "command": "mock_gtp_engine",
+      "parameters": "--exit-on list_commands", "enabled": 1 }
+  ],
+  "humans": [ "Human" ],
+  "sgf_dialog": { "games_path": "./tests/scenarios/.games" }
+}

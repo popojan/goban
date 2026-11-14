@@ -39,12 +39,14 @@ extern std::shared_ptr<Configuration> config;
 
 /** \brief Navigation command queued for execution on the game thread */
 struct NavCommand {
-    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION, KIBITZ_NAV, TO_TREE_PATH };
+    enum Type { BACK, FORWARD, TO_START, TO_END, TO_VARIATION, KIBITZ_NAV, TO_TREE_PATH,
+                SET_KOMI };
     Type type;
     Move move{};  // For TO_VARIATION
     bool promote = true;  // For TO_VARIATION: promote to main line
     int pathLength = 0;                 // For TO_TREE_PATH
     std::vector<int> branchChoices{};   // For TO_TREE_PATH
+    float komi = 0.0f;                  // For SET_KOMI
 };
 
 /** \brief Whether the engines match the game record — ADR-0002 step 4.
@@ -243,6 +245,8 @@ public:
     void removeSgfPlayers() const;  // Remove temporary players created from SGF loading
 
     void setKomi(float komi);
+    /// Tells the observers and nobody else; setKomi() also tells the engines.
+    void notifyKomi(float komi);
 
     bool setFixedHandicap(int handicap);
 
@@ -318,6 +322,7 @@ private:
 
     // Helper methods for game loop
     Move handleKibitzRequest(Move move, Engine* kibitzEngine, const Color& colorToMove, bool& wasKibitz);
+    Move askEngine(Engine* engine, const Color& color);
     std::string collectEngineComments() const;
     void processSuccessfulMove(const Move& move, const Player* movePlayer, Engine* coach,
                               Engine* kibitzEngine, bool wasKibitz);
@@ -392,6 +397,21 @@ private:
 
     void processNavigationQueue();
     void executeNavCommand(const NavCommand& cmd);
+
+    /// See the definition. Both members are guarded by playerMutex.
+    class EngineCallScope {
+    public:
+        EngineCallScope(GameThread& gt, Player* engine);
+        ~EngineCallScope();
+        explicit operator bool() const { return entered; }
+    private:
+        GameThread& gt;
+        bool entered = false;
+        bool owner = false;
+    };
+    bool engineCallInFlight = false;
+    std::string engineCallName;
+    void settleTsumegoVariation(const GameNavigator::VariationResult& varResult);
     void processScoring();
     void wakeGameThread();
     void waitForCommandOrTimeout(int ms);

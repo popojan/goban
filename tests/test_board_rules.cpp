@@ -1352,3 +1352,54 @@ TEST_CASE("removing an overlay that never laid a patch asks for no upload") {
     board.removeBoardOverlay(p);
     CHECK(board.takeAnnotationDirty() == false);
 }
+
+// ---------------------------------------------------------------------------
+// Handicap placement
+// ---------------------------------------------------------------------------
+
+namespace {
+// Sorted GTP vertices, so the comparison is of the *set* placed.
+std::string vertices(int size, int stones) {
+    std::vector<std::string> names;
+    for (const auto& p : Board::fixedHandicap(size, stones)) {
+        std::ostringstream ss;
+        ss << Position::columnLabel(p.col()) << Position::rowLabel(p.row());
+        names.push_back(ss.str());
+    }
+    std::sort(names.begin(), names.end());
+    std::string joined;
+    for (const auto& n : names) joined += (joined.empty() ? "" : " ") + n;
+    return joined;
+}
+}  // namespace
+
+TEST_CASE("handicap stones are placed where GNU Go's fixed_handicap puts them") {
+    // The placement used to be asked of the coach engine, which is why starting
+    // a game had to talk to an engine from the UI thread. These are GNU Go 3.8's
+    // own answers, sorted.
+    CHECK(vertices(19, 2) == "D4 Q16");
+    CHECK(vertices(19, 3) == "D16 D4 Q16");
+    CHECK(vertices(19, 4) == "D16 D4 Q16 Q4");
+    CHECK(vertices(19, 5) == "D16 D4 K10 Q16 Q4");
+    CHECK(vertices(19, 6) == "D10 D16 D4 Q10 Q16 Q4");
+    CHECK(vertices(19, 7) == "D10 D16 D4 K10 Q10 Q16 Q4");
+    CHECK(vertices(19, 8) == "D10 D16 D4 K16 K4 Q10 Q16 Q4");
+    CHECK(vertices(19, 9) == "D10 D16 D4 K10 K16 K4 Q10 Q16 Q4");
+    CHECK(vertices(13, 2) == "D4 K10");
+    CHECK(vertices(13, 9) == "D10 D4 D7 G10 G4 G7 K10 K4 K7");
+    CHECK(vertices(9, 2) == "C3 G7");
+    CHECK(vertices(9, 5) == "C3 C7 E5 G3 G7");
+    CHECK(vertices(9, 9) == "C3 C5 C7 E3 E5 E7 G3 G5 G7");
+    // Third line up to 11, fourth from 12.
+    CHECK(vertices(11, 2) == "C3 J9");
+    CHECK(vertices(12, 4) == "D4 D9 J4 J9");
+
+    // No middle points on an even board or a 7x7, and nothing under 7.
+    CHECK(vertices(7, 4) == "C3 C5 E3 E5");
+    CHECK(Board::fixedHandicap(7, 5).empty());
+    CHECK(Board::fixedHandicap(8, 5).empty());
+    CHECK(Board::fixedHandicap(12, 5).empty());
+    CHECK(Board::fixedHandicap(5, 2).empty());
+    CHECK(Board::fixedHandicap(19, 1).empty());
+    CHECK(Board::fixedHandicap(19, 10).empty());
+}

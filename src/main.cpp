@@ -560,11 +560,16 @@ int main(int argc, char** argv)
     // Only when an X server is actually reachable: forcing X11 without one
     // makes glfwInit() fail outright, and a scenario suite that cannot start is
     // worse than one that cannot screenshot.
+    //
+    // Linux only: nowhere else is there a Wayland to avoid, and a Windows build
+    // run under Wine inherits DISPLAY, asks for X11, and warns twice.
+#ifdef __linux__
     if (!scenarioFile.empty() && platform.empty() && getenv("DISPLAY") != nullptr) {
         platform = "x11";
         spdlog::debug("scripted run: preferring X11, since a hidden Wayland "
                       "surface renders nothing");
     }
+#endif
 
     if (!platform.empty()) {
 #ifdef GLFW_PLATFORM
