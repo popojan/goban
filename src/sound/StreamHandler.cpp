@@ -27,11 +27,11 @@
     }
 #endif
 
-int StreamHandler::PortAudioCallback(const void * input,
+int StreamHandler::PortAudioCallback(const void * /*input*/,
                                      void * output,
                                      unsigned long frameCount,
-                                     const PaStreamCallbackTimeInfo * paTimeInfo,
-                                     PaStreamCallbackFlags statusFlags,
+                                     const PaStreamCallbackTimeInfo * /*paTimeInfo*/,
+                                     PaStreamCallbackFlags /*statusFlags*/,
                                      void * userData)
 {
         StreamHandler * handler = static_cast<StreamHandler *>(userData);
@@ -155,7 +155,7 @@ void StreamHandler::processEvent(AudioEventType audioEventType, AudioFile * audi
         case start:
                 ensureInitialized();
                 if (!initialized) {
-                        spdlog::warn("Audio: init failed, skipping sound");
+                        // Said once, by ensureInitialized().
                         return;
                 }
 
@@ -250,10 +250,26 @@ void StreamHandler::init() {
 void StreamHandler::ensureInitialized() {
         if (initialized) return;
 
+        // A missing output device is not going to appear between two stones.
+        // Without this every sound re-ran Pa_Initialize()/Pa_Terminate() on the
+        // UI thread and put an error and a warning in the message log — two per
+        // move, for the whole session. Tried again after a while, quietly, so
+        // headphones plugged in later still work.
+        const auto now = std::chrono::steady_clock::now();
+        if (initFailed && now - initFailedAt < std::chrono::seconds(30)) return;
+        const bool firstFailure = !initFailed;
+
         // Pre-allocate mixing buffer to match fixed frames per buffer
         mixBuffer.resize(FRAMES_PER_BUFFER * CHANNEL_COUNT);
 
-        Pa_Initialize();
+        if (const PaError initError = Pa_Initialize(); initError != paNoError) {
+                initFailed = true;
+                initFailedAt = now;
+                if (firstFailure)
+                        spdlog::warn("Audio is unavailable ({}); playing without sound",
+                                     Pa_GetErrorText(initError));
+                return;
+        }
         PaStreamParameters outputParameters;
         outputParameters.device = Pa_GetDefaultOutputDevice();
         outputParameters.channelCount = CHANNEL_COUNT;
@@ -273,11 +289,15 @@ void StreamHandler::ensureInitialized() {
         if (errorCode)
         {
                 Pa_Terminate();
-                stringstream error;
-                error << "Unable to open stream for output. Portaudio error code: " << errorCode;
-                spdlog::error(error.str());
+                initFailed = true;
+                initFailedAt = now;
+                // A warning, once: no sound is a degraded mode, not an error.
+                if (firstFailure)
+                        spdlog::warn("Audio is unavailable ({}); playing without sound",
+                                     Pa_GetErrorText(errorCode));
                 return;  // Don't throw - just disable audio
         }
+        initFailed = false;
         initialized = true;
 }
 

@@ -793,6 +793,12 @@ See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
 - **The audio callback locks like everyone else.** It shares `data` with the UI
   thread, which `push_back`s into it — the writers-locked-readers-not shape
   again, and a reallocation mid-mix invalidates the iterator it is walking.
+- **No output device is said once, not per stone.** `ensureInitialized()`
+  retried `Pa_Initialize()`/`Pa_OpenStream()` on every sound and logged an error
+  and a warning each time: two entries per move for the session, on any machine
+  without audio. It latches now, retries quietly after 30 s, and reports a
+  warning — no sound is a degraded mode, not an error. Verified by hand with
+  `ALSA_CONFIG_PATH=/dev/null`; the runner has no way to take a device away.
 - **`sounds_played` counts what was *heard*, not what was asked for.** A request
   the mixer never saw looked exactly like one it played, which is why a swallowed
   stone sound had no symptom to assert on. It is an atomic incremented by the

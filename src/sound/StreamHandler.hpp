@@ -69,6 +69,9 @@ class StreamHandler
         vector<Playback *> data;
         std::mutex mut;
         bool initialized = false;
+        // Set when the device could not be opened; cleared when it could.
+        bool initFailed = false;
+        std::chrono::steady_clock::time_point initFailedAt{};
         std::chrono::steady_clock::time_point lastActivityTime;
         static constexpr int IDLE_SHUTDOWN_SECONDS = 180;  // 3 minutes
         std::vector<int> mixBuffer;  // Pre-allocated mixing buffer
