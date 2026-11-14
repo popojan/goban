@@ -264,6 +264,34 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
   **`terminated_` means "shut down on purpose" and nothing else** — an engine
   flagged that way is deliberately not revivable, which is why the timeout path
   calls the private `killProcess()` instead.
+- **An engine that exits has failed, exactly as one that times out has.** Only
+  the timeout path set `failed_`, so a process that simply died — a crash, a
+  model file it could not open — was never restarted, and every later command
+  went into a closed pipe with an error line of its own. `GtpClient::markExited()`
+  covers a failed write and an end-of-file before the blank line that ends a
+  response, and logs `stderrTail()`: the engine's last few raw stderr lines are
+  usually the whole explanation. Two consequences are handled where they land.
+  `PlayerManager` refuses an engine that died answering `list_commands` instead
+  of registering a dead player, possibly as coach. And when the engine *on move*
+  cannot be put back, `reviveFailedEngines()` pauses the game and says so — left
+  Playing, the loop asked it again twenty times a second. Pinned by
+  `engine_that_exits.scn` and two cases in `tests/test_gtpclient.cpp`; the mock's
+  `--exit-on <cmd>` is how a test kills an engine.
+- **A genmove from an engine that is not the player on move goes through
+  `GameThread::askEngine()`.** A kibitz at the end of the line and Explore
+  mode's reply both ran with `playerToMove` still naming the human, so
+  `isThinking()` was false for the whole search: no clock, a lit toolbar, a
+  second press latched and played as a second move, and `runWhenEngineFree()`
+  joining the loop from the UI thread instead of deferring. `KIBITZ_NAV` had been
+  fixed for exactly this and its three siblings had not. `askEngine()` sets the
+  slot under `playerMutex` and refuses when a game-replacing action has claimed
+  the loop. Pinned by `kibitz_at_end_is_announced.scn`.
+- **A komi change is sent to the engines by the game thread** (`NavCommand::
+  SET_KOMI`). It used to ride on the sync that ran at the first move; ADR-0008
+  moved that sync to the moment the board appears, so a komi chosen afterwards
+  stayed in the model and the engines played and scored with the old one.
+  `clearGame()` calls `notifyKomi()` — observers only — because the replay that
+  follows it carries the komi anyway. Pinned by `komi_reaches_the_engines.scn`.
 - **`PlayerManager::getPlayers()` returns a copy, taken under the mutex.** It
   used to hand out a reference to the vector with no lock, which is the
   partial-locking shape the file comment warns about, only inverted.
@@ -319,6 +347,16 @@ See `docs/adr/0001-engine-exclusive-ui-actions.md` for the reasoning.
 - **`pause()` cannot un-finish a game**: it means "stop playing", and is a no-op in `Finished`. Use `enterReview()`, and only once the position has actually moved off the end.
 - **`state.reason` is not part of the phase and outlives it**: `enterReview()` leaves it set, and the UI's own "is over" test (`ElementGame::OnUpdate`, `GobanControl::setHandicap`) reads `state.reason != NO_REASON`, not the phase. Only `start()` and `onBoardSized()` clear it. Known inconsistency, pinned by `tests/test_gamephase.cpp`; don't add readers of `state.reason` as a lifecycle test.
 
+- **`Board::isSupportedSize()` bounds the board at every entry point.** SGF
+  allows `SZ` up to 52, `new_game` accepted 25 and `board_size` took any number,
+  while `Board` holds 19×19 in fixed arrays — a 25×25 record loaded and indexed
+  past them on the first replay. Asked by `GameRecord::loadFromSGF()` (before
+  anything of the record is replaced), `peekBoardSize()`, `UserSettings::load()`
+  and `GobanControl::newGame()`, the funnel for both commands and the dropdown.
+  The lower bound is 2, not `MIN_BOARD`: a 7×7 record loads and renders
+  correctly, and refusing it would be a regression. Pinned by
+  `board_size_is_bounded.scn` and `tests/test_gamerecord.cpp`.
+
 ### Scoring
 See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
 - **A failed score is not a score of zero.** `Engine::final_score()` returns `std::optional<float>` because 0.0 is a legitimate result (jigo) and a bare float cannot tell the two apart. Reading failure as zero is what made `applyTerritory()` claim a drawn game, which tripped the "suspiciously zero, ask someone else" fallback and took the whole chain down. Same for `applyTerritory()`, which returns whether a *score* was obtained: shading can be valid when the number is not, and it signals that with `showTerritory` set but `territoryReady` clear.
@@ -340,6 +378,13 @@ See `tests/test_scoring.cpp`; every rule here comes from one hang on 2026-08-13.
   dead list at all. The gate is now `engineSync == Synced` alone: another engine
   is asked for `final_score`, and the board stays unshaded, which is truthful
   because nobody could compute the shading.
+- **A drawn game is `RE[0]` and names no winner.** Three places each resolved a
+  score of zero to a colour, and not to the same one: the record wrote `B+0`,
+  `GobanModel::result()` chose Black and `processScoring()` announced White.
+  `GameState::JIGO` is the message, `templateJigo` its text, and
+  `getResultMessage()` reads `0`, `Draw` and `Jigo` back. Reachable only with
+  integer komi — a loaded SGF or the `komi` command. Pinned by
+  `jigo_is_a_draw.scn`.
 - **Only ask a synced engine to score.** The initial sync runs coach → score → everyone else, so the other engines are at whatever position they still held when `processScoring()` runs inside it. Asking one there is not merely wrong, it blocks: a CPU KataGo asked to score the empty 19×19 board it was never told about does not answer for minutes, with the game thread inside the sync block and the UI stuck on "Calculating score…". The cross-engine fallback is gated on `engineSync == Synced`; the loop calls scoring again once that holds, so nothing is lost by deferring.
 - **A position that failed to score must not be retried.** `territoryReady == false` alone would re-enter `processScoring()` on every loop iteration, ten times a second, hammering the engines. `Board::territoryFailed` latches it — and clears *itself*, because every position change builds a fresh `Board` and `updateStones()` copies the flag in. Never clear it by hand.
 - **Scoring is bounded more tightly than a genmove.** `GtpClient::scoringTimeout()` (30s, `scoring_timeout_ms` per engine) applies for the duration of `applyTerritory()` via `ScopedTimeout`. It never *raises* a stricter `timeout_ms`, and it does override a negative one — a wedged engine must not be able to freeze scoring for the full five-minute command timeout.
@@ -892,6 +937,12 @@ See `docs/adr/0013-shaders-are-linked-off-the-ui-thread.md`.
   resolves to a non-SGF player — a renamed or removed engine keeps the SGF's
   answer instead of silently dropping to Human, which is what a bare
   `findPlayer()` does and what today's KataGo rename would have triggered.
+- **One unreadable key costs that key, not the ones after it.**
+  `UserSettings::load()` read everything inside a single `try`, so the first
+  value of the wrong type — a hand edit, or a key whose type changed between
+  versions — ended the load, and the next save wrote the defaults back over the
+  rest. Each read now goes through `read()` / `guarded()`, which warn and move
+  on; a truncated file still fails as a whole, before anything is assigned.
 - **`user.json` is the runtime scratchpad and is not tracked.** Defaults that
   ship — the opening camera — live in `config/base.json`, which the application
   never writes. Keeping both in one file leaked local paths and language into the
