@@ -116,6 +116,28 @@ TEST_CASE("a board size the board cannot hold is not restored") {
     CHECK(f.settings().getKomi() == doctest::Approx(5.5f));
 }
 
+TEST_CASE("one key of the wrong type costs that key, not the ones after it") {
+    SettingsFixture f;
+    f.settings().setBoardSize(9);
+    f.settings().save();
+
+    // A hand edit, or a key whose type changed between versions. Everything was
+    // read inside one try block, so the first bad key ended the load — and the
+    // next save wrote the defaults back over the rest.
+    f.write(R"({"fullscreen": "yes",
+                "anaglyph_leak": ["a", 0, 0],
+                "game": {"board_size": 13, "komi": "six", "handicap": 2},
+                "shader": 7,
+                "camera": {"rotation": 1, "distance": 4.5},
+                "session": {"game_index": "x", "tree_path_length": 3}})");
+    CHECK_NOTHROW(f.settings().load());
+    CHECK(f.settings().getBoardSize() == 13);
+    CHECK(f.settings().getHandicap() == 2);
+    REQUIRE(f.settings().hasSavedCamera());
+    CHECK(f.settings().getSavedCamera().distance == doctest::Approx(4.5f));
+    CHECK(f.settings().getSessionTreePathLength() == 3);
+}
+
 TEST_CASE("a malformed settings file does not throw and does not half-apply") {
     SettingsFixture f;
     f.settings().setBoardSize(9);
@@ -292,7 +314,7 @@ TEST_CASE("concurrent writers do not corrupt the file or each other") {
 
     const std::string contents = f.read();
     CHECK_FALSE(contents.empty());
-    CHECK_NOTHROW((void)nlohmann::json::parse(contents));
+    CHECK_NOTHROW([&] { const auto parsed = nlohmann::json::parse(contents); (void)parsed; }());
 
     CHECK_NOTHROW(f.settings().load());
     CHECK(f.settings().hasGameSettings());

@@ -1,5 +1,6 @@
 #include "UserSettings.h"
 #include "Board.h"
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <system_error>
@@ -9,6 +10,31 @@ UserSettings& UserSettings::instance() {
     static UserSettings instance;
     return instance;
 }
+
+namespace {
+
+// One unreadable key costs that key, not every setting after it. The whole file
+// used to be read inside a single try block, so the first value of the wrong
+// type ended the load, and the next save wrote the defaults back over the rest.
+template <typename Body>
+void guarded(const char* key, Body&& body) {
+    try {
+        body();
+    } catch (const nlohmann::json::exception& e) {
+        spdlog::warn("user.json: ignoring '{}': {}", key, e.what());
+    }
+}
+
+// Leaves `out` alone when the key is absent or unreadable. Safe on a value that
+// is not an object at all: find() then simply finds nothing.
+template <typename T>
+void read(const nlohmann::json& obj, const char* key, T& out) {
+    const auto it = obj.find(key);
+    if (it == obj.end()) return;
+    guarded(key, [&] { out = it->template get<T>(); });
+}
+
+}  // namespace
 
 void UserSettings::load() {
     std::lock_guard<std::mutex> lock(mutex);
@@ -25,21 +51,13 @@ void UserSettings::load() {
 
         settingsLoaded = true;
 
-        if (user.contains("last_config")) {
-            lastConfig = user["last_config"].get<std::string>();
-        }
+        read(user, "last_config", lastConfig);
 
-        if (user.contains("fullscreen")) {
-            fullscreen = user["fullscreen"].get<bool>();
-        }
+        read(user, "fullscreen", fullscreen);
 
-        if (user.contains("sound_enabled")) {
-            soundEnabled = user["sound_enabled"].get<bool>();
-        }
+        read(user, "sound_enabled", soundEnabled);
 
-        if (user.contains("evaluation_enabled")) {
-            evaluationEnabled = user["evaluation_enabled"].get<bool>();
-        }
+        read(user, "evaluation_enabled", evaluationEnabled);
 
         if (user.contains("evaluation_moves")) {
             // Was a boolean before the three-state mode: true meant the
@@ -49,106 +67,81 @@ void UserSettings::load() {
             else if (v.is_string()) evaluationMoves = v.get<std::string>();
         }
 
-        if (user.contains("coordinates")) {
-            coordinates = user["coordinates"].get<bool>();
-        }
+        read(user, "coordinates", coordinates);
 
-        if (user.contains("evaluation_readout")) {
-            evaluationReadout = user["evaluation_readout"].get<bool>();
-        }
+        read(user, "evaluation_readout", evaluationReadout);
 
-        if (user.contains("wait_clock")) {
-            waitClock = user["wait_clock"].get<bool>();
-        }
+        read(user, "wait_clock", waitClock);
 
-        if (user.contains("evaluation_align")) {
-            evaluationAlign = user["evaluation_align"].get<std::string>();
-        }
+        read(user, "evaluation_align", evaluationAlign);
 
-        if (user.contains("evaluation_color")) {
-            evaluationColor = user["evaluation_color"].get<std::string>();
-        }
+        read(user, "evaluation_color", evaluationColor);
 
-        if (user.contains("anaglyph")) {
-            anaglyph = user["anaglyph"].get<std::string>();
-        }
+        read(user, "anaglyph", anaglyph);
 
-        if (user.contains("anaglyph_strength")) {
-            anaglyphStrength = user["anaglyph_strength"].get<float>();
-        }
+        read(user, "anaglyph_strength", anaglyphStrength);
 
         if (user.contains("anaglyph_leak") && user["anaglyph_leak"].is_array()
             && user["anaglyph_leak"].size() == 3) {
-            anaglyphLeakR = user["anaglyph_leak"][0].get<float>();
-            anaglyphLeakG = user["anaglyph_leak"][1].get<float>();
-            anaglyphLeakB = user["anaglyph_leak"][2].get<float>();
-            anaglyphLeakSet = true;
+            guarded("anaglyph_leak", [&] {
+                const auto leak = user["anaglyph_leak"].get<std::array<float, 3>>();
+                anaglyphLeakR = leak[0];
+                anaglyphLeakG = leak[1];
+                anaglyphLeakB = leak[2];
+                anaglyphLeakSet = true;
+            });
         }
 
         if (user.contains("anaglyph_balance") && user["anaglyph_balance"].is_array()
             && user["anaglyph_balance"].size() == 2) {
-            anaglyphBalanceL = user["anaglyph_balance"][0].get<float>();
-            anaglyphBalanceR = user["anaglyph_balance"][1].get<float>();
-            anaglyphBalanceSet = true;
+            guarded("anaglyph_balance", [&] {
+                const auto balance = user["anaglyph_balance"].get<std::array<float, 2>>();
+                anaglyphBalanceL = balance[0];
+                anaglyphBalanceR = balance[1];
+                anaglyphBalanceSet = true;
+            });
         }
 
-        if (user.contains("glasses")) {
-            glasses = user["glasses"].get<std::string>();
-        }
+        read(user, "glasses", glasses);
 
-        if (user.contains("anaglyph_green")) {
-            anaglyphGreen = user["anaglyph_green"].get<float>();
-        }
+        read(user, "anaglyph_green", anaglyphGreen);
 
-        if (user.contains("pointer_mode")) {
-            pointerMode = user["pointer_mode"].get<std::string>();
-        }
+        read(user, "pointer_mode", pointerMode);
         if (user.contains("prisoner_mode") && user["prisoner_mode"].is_string()) {
             prisonerMode = user["prisoner_mode"].get<std::string>();
         }
 
-        if (user.contains("coordinate_color")) {
-            coordinateColor = user["coordinate_color"].get<std::string>();
-        }
+        read(user, "coordinate_color", coordinateColor);
 
-        if (user.contains("last_sgf_path")) {
-            lastSgfPath = user["last_sgf_path"].get<std::string>();
-        }
+        read(user, "last_sgf_path", lastSgfPath);
 
-        if (user.contains("start_fresh")) {
-            startFresh = user["start_fresh"].get<bool>();
-        }
+        read(user, "start_fresh", startFresh);
 
-        if (user.contains("game")) {
+        if (user.contains("game") && user["game"].is_object()) {
             gameSettingsLoaded = true;
             auto& game = user["game"];
-            const int savedSize = game.value("board_size", boardSize);
+            int savedSize = boardSize;
+            read(game, "board_size", savedSize);
             if (Board::isSupportedSize(savedSize)) {
                 boardSize = savedSize;
             } else {
                 spdlog::warn("user.json: board_size {} is not supported; keeping {}",
                              savedSize, boardSize);
             }
-            komi = game.value("komi", komi);
-            handicap = game.value("handicap", handicap);
-            if (game.contains("black_player")) {
-                blackPlayer = game["black_player"].get<std::string>();
-            }
-            if (game.contains("white_player")) {
-                whitePlayer = game["white_player"].get<std::string>();
-            }
+            read(game, "komi", komi);
+            read(game, "handicap", handicap);
+            read(game, "black_player", blackPlayer);
+            read(game, "white_player", whitePlayer);
         }
 
-        if (user.contains("shader")) {
+        if (user.contains("shader") && user["shader"].is_object()) {
             shaderLoaded = true;
             auto& shader = user["shader"];
-            if (shader.contains("name")) {
-                shaderName = shader["name"].get<std::string>();
-            }
-            shaderEof = shader.value("eof", shaderEof);
-            shaderDof = shader.value("dof", shaderDof);
-            shaderGamma = shader.value("gamma", shaderGamma);
-            shaderContrast = shader.value("contrast", shaderContrast);
+            read(shader, "name", shaderName);
+            read(shader, "eof", shaderEof);
+            read(shader, "dof", shaderDof);
+            read(shader, "gamma", shaderGamma);
+            read(shader, "contrast", shaderContrast);
         }
 
         if (user.contains("shader_params") && user["shader_params"].is_object()) {
@@ -159,43 +152,42 @@ void UserSettings::load() {
         auto parseCamera = [](const nlohmann::json& j, CameraState& cam) {
             if (j.contains("rotation")) {
                 auto& rot = j["rotation"];
-                cam.rotX = rot.value("x", cam.rotX);
-                cam.rotY = rot.value("y", cam.rotY);
-                cam.rotZ = rot.value("z", cam.rotZ);
-                cam.rotW = rot.value("w", cam.rotW);
+                read(rot, "x", cam.rotX);
+                read(rot, "y", cam.rotY);
+                read(rot, "z", cam.rotZ);
+                read(rot, "w", cam.rotW);
             }
             if (j.contains("pan")) {
                 auto& pan = j["pan"];
-                cam.panX = pan.value("x", cam.panX);
-                cam.panY = pan.value("y", cam.panY);
+                read(pan, "x", cam.panX);
+                read(pan, "y", cam.panY);
             }
-            cam.distance = j.value("distance", cam.distance);
+            read(j, "distance", cam.distance);
         };
 
-        if (user.contains("camera")) {
+        if (user.contains("camera") && user["camera"].is_object()) {
             savedCameraLoaded = true;
             parseCamera(user["camera"], savedCamera);
         }
 
-        if (user.contains("camera_current")) {
+        if (user.contains("camera_current") && user["camera_current"].is_object()) {
             currentCameraLoaded = true;
             parseCamera(user["camera_current"], currentCamera);
         }
 
-        if (user.contains("session")) {
+        if (user.contains("session") && user["session"].is_object()) {
             auto& session = user["session"];
-            if (session.contains("file")) {
-                sessionFile = session["file"].get<std::string>();
-            }
-            sessionGameIndex = session.value("game_index", 0);
-            sessionTreePathLength = session.value("tree_path_length", 0);
+            read(session, "file", sessionFile);
+            sessionGameIndex = 0;
+            read(session, "game_index", sessionGameIndex);
+            sessionTreePathLength = 0;
+            read(session, "tree_path_length", sessionTreePathLength);
             if (session.contains("tree_path") && session["tree_path"].is_array()) {
                 sessionTreePath.clear();
-                for (const auto& idx : session["tree_path"]) {
-                    sessionTreePath.push_back(idx.get<int>());
-                }
+                read(session, "tree_path", sessionTreePath);
             }
-            sessionIsExternal = session.value("is_external", false);
+            sessionIsExternal = false;
+            read(session, "is_external", sessionIsExternal);
             // One key since the modes became one enum. `tsumego_mode` and
             // `analysis_mode` are the two booleans it replaced — read only when
             // the new key is absent, so an existing user.json still restores,
@@ -203,23 +195,29 @@ void UserSettings::load() {
             // An unreadable name falls back rather than throwing: a settings
             // file is not a command line, and Match is the harmless answer.
             sessionGameMode = GameMode::MATCH;
+            std::string modeName;
+            bool oldTsumego = false, oldAnalysis = false;
+            read(session, "game_mode", modeName);
+            read(session, "tsumego_mode", oldTsumego);
+            read(session, "analysis_mode", oldAnalysis);
             if (session.contains("game_mode")) {
-                const auto parsed = parseGameMode(
-                    session.value("game_mode", std::string()));
+                const auto parsed = parseGameMode(modeName);
                 if (parsed) {
                     sessionGameMode = *parsed;
                 } else {
                     spdlog::warn("Unknown session game_mode '{}' — starting in {}",
-                        session.value("game_mode", std::string()),
+                        modeName,
                         gameModeName(sessionGameMode));
                 }
-            } else if (session.value("tsumego_mode", false)) {
+            } else if (oldTsumego) {
                 sessionGameMode = GameMode::TSUMEGO;
-            } else if (session.value("analysis_mode", false)) {
+            } else if (oldAnalysis) {
                 sessionGameMode = GameMode::EXPLORE;
             }
-            sessionBlackPlayer = session.value("black_player", std::string());
-            sessionWhitePlayer = session.value("white_player", std::string());
+            sessionBlackPlayer.clear();
+            sessionWhitePlayer.clear();
+            read(session, "black_player", sessionBlackPlayer);
+            read(session, "white_player", sessionWhitePlayer);
         }
 
         spdlog::debug("User settings loaded");
