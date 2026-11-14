@@ -61,10 +61,7 @@ Process::Process(const std::string& program, const std::vector<std::string>& arg
     SetHandleInformation(hStderrRead_, HANDLE_FLAG_INHERIT, 0);
 
     // Build command line as wide string for Unicode support
-    std::string cmdLine = "\"" + program + "\"";
-    for (const auto& arg : args) {
-        cmdLine += " " + arg;
-    }
+    const std::string cmdLine = GtpClient::windowsCommandLine(program, args);
     auto wCmdLine = std::filesystem::u8path(cmdLine).wstring();
 
     STARTUPINFOW si;
@@ -588,9 +585,67 @@ static std::string resolveAgainstAppRoot(const std::string& arg, const std::stri
 
     const std::filesystem::path absolute = std::filesystem::absolute(relative, ec);
     if (ec) return arg;
+    // u8string(), not string(): on Windows the latter is the ANSI code page,
+    // and everything downstream of here treats these strings as UTF-8.
+    const std::string resolved = absolute.u8string();
     spdlog::info("Engine argument '{}' does not exist in '{}' but does relative to the "
-                 "application folder; using '{}'", arg, workDir, absolute.string());
-    return absolute.string();
+                 "application folder; using '{}'", arg, workDir, resolved);
+    return resolved;
+}
+
+std::vector<std::string> GtpClient::splitArguments(const std::string& cmdline) {
+    std::vector<std::string> args;
+    std::string current;
+    bool quoted = false, any = false;
+    for (const char ch : cmdline) {
+        if (ch == '"') {
+            quoted = !quoted;
+            any = true;                 // "" is an argument, an empty one
+        } else if (!quoted && std::isspace(static_cast<unsigned char>(ch))) {
+            if (any) args.push_back(current);
+            current.clear();
+            any = false;
+        } else {
+            current += ch;
+            any = true;
+        }
+    }
+    if (any) args.push_back(current);
+    return args;
+}
+
+// The rules CommandLineToArgvW and the C runtimes undo: an argument with a space
+// or a quote is wrapped in quotes, a quote inside is escaped with a backslash,
+// and backslashes are doubled only where they run up against a quote.
+//
+// Arguments used to be joined bare. One that goban had itself rewritten to an
+// absolute path therefore broke in two wherever the install folder had a space
+// in its name, and the engine died on a model file called "C:\Users\John".
+std::string GtpClient::windowsCommandLine(const std::string& program,
+                                          const std::vector<std::string>& args) {
+    std::string line = "\"" + program + "\"";
+    for (const auto& arg : args) {
+        line += ' ';
+        if (!arg.empty() && arg.find_first_of(" \t\"") == std::string::npos) {
+            line += arg;
+            continue;
+        }
+        line += '"';
+        size_t backslashes = 0;
+        for (const char ch : arg) {
+            if (ch == '\\') {
+                ++backslashes;
+                continue;
+            }
+            if (ch == '"') line.append(backslashes * 2 + 1, '\\');
+            else line.append(backslashes, '\\');
+            backslashes = 0;
+            line += ch;
+        }
+        line.append(backslashes * 2, '\\');
+        line += '"';
+    }
+    return line;
 }
 
 // GtpClient implementation
@@ -658,9 +713,7 @@ GtpClient::GtpClient(const std::string& exe, const std::string& cmdline,
     std::string program = findExecutable(exe, workDir);
     spdlog::info("About to run GTP engine [{}]", program);
 
-    std::istringstream iss(cmdline);
-    std::vector<std::string> params((std::istream_iterator<std::string>(iss)),
-                                    std::istream_iterator<std::string>());
+    std::vector<std::string> params = splitArguments(cmdline);
     for (auto& param : params) {
         param = resolveAgainstAppRoot(param, workDir);
     }

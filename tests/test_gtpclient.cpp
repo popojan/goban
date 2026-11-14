@@ -239,6 +239,32 @@ TEST_CASE("an engine that keeps wedging is eventually left down") {
     CHECK(client->hasFailed());
 }
 
+TEST_CASE("configured parameters split on whitespace, and quotes keep a value whole") {
+    using Args = std::vector<std::string>;
+    CHECK(GtpClient::splitArguments("") == Args{});
+    CHECK(GtpClient::splitArguments("  --mode gtp   --japanese-rules ")
+          == Args{"--mode", "gtp", "--japanese-rules"});
+    // The only way to name a file in a folder with a space in it.
+    CHECK(GtpClient::splitArguments(R"(gtp -model "C:/My Models/b18.bin.gz" -config a.cfg)")
+          == Args{"gtp", "-model", "C:/My Models/b18.bin.gz", "-config", "a.cfg"});
+    CHECK(GtpClient::splitArguments(R"(--name "" x)") == Args{"--name", "", "x"});
+}
+
+TEST_CASE("a Windows command line survives a space in the install folder") {
+    // Arguments were joined bare. goban rewrites a relative path that resolves
+    // against the application folder into an absolute one, so installing under
+    // "C:\Program Files" or a user name with a space split the model path in two.
+    CHECK(GtpClient::windowsCommandLine(R"(C:\Go Board\engine\gnugo.exe)",
+              {"--mode", "gtp", "--infile", R"(C:\Go Board\games\start.sgf)"})
+          == R"("C:\Go Board\engine\gnugo.exe" --mode gtp --infile "C:\Go Board\games\start.sgf")");
+    // Backslashes are doubled only where they meet a quote; a quote is escaped.
+    CHECK(GtpClient::windowsCommandLine("e.exe", {R"(C:\dir with space\)", R"(say "hi")", ""})
+          == R"("e.exe" "C:\dir with space\\" "say \"hi\"" "")");
+    // Nothing to quote, nothing changed.
+    CHECK(GtpClient::windowsCommandLine("e.exe", {R"(C:\plain\path)", "-v"})
+          == R"("e.exe" C:\plain\path -v)");
+}
+
 TEST_CASE("an engine that exits is marked failed, and can be put back") {
     // Only a timeout set failed_. An engine that simply died — a crash, or a
     // model file it could not open — returned an empty reply and nothing else,

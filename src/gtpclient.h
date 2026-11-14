@@ -203,6 +203,17 @@ public:
 
     static bool success(const CommandOutput &ret);
 
+    /// Splits a configured `parameters` string into arguments. Whitespace
+    /// separates; double quotes keep a value with spaces in one piece, which is
+    /// the only way to name a model in a folder such as "My Documents".
+    static std::vector<std::string> splitArguments(const std::string& cmdline);
+
+    /// The single string CreateProcessW takes, quoted so that the child's own
+    /// parser gives back exactly `args`. Pure, and compiled everywhere, so it is
+    /// tested on the platform that never calls it.
+    static std::string windowsCommandLine(const std::string& program,
+                                          const std::vector<std::string>& args);
+
     /// Kill the engine process immediately (unblocks any blocking readLine).
     void terminateProcess();
 

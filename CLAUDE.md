@@ -167,6 +167,20 @@ The application uses JSON configuration files:
 
 ### Windows Build Notes
 
+- **Engine arguments are quoted for `CreateProcessW` by
+  `GtpClient::windowsCommandLine()`**, and `parameters` is split by
+  `splitArguments()`, which honours double quotes. They were joined bare — and
+  goban itself rewrites a relative argument that resolves against the
+  application folder into an absolute path, so installing under a folder with a
+  space in its name split the model path in two and the engine died with
+  "Failed to write command". Both functions are pure and compiled everywhere,
+  so `tests/test_gtpclient.cpp` covers the Windows one on Linux.
+- **A Windows build can be exercised under Wine.** `wine64 goban.exe --script
+  x.scn` from an unpacked CI artifact runs the real Win32 process, pipe and
+  path code against `gnugo.exe`, and screenshots work. It is not a driver test:
+  OpenGL goes to the host's Mesa. The quoting bug above was reproduced this way,
+  from a folder called `Go Board`.
+
 - Windows builds use vcpkg for dependency management (freetype, boost, portaudio, libsndfile)
 - Use the `x64-windows-static` triplet for static linking
 - **Patch file line endings**: Windows Git with `autocrlf=true` converts LF to CRLF on checkout, which corrupts patch files (like `cmake/patches/*.patch`). `cmake/patches/.gitattributes` ensures patch files always use LF endings — it sits beside them rather than at the repository root because `.gitattributes` applies per-directory and every tracked `.patch` is in that one folder. The CMakeLists.txt also uses `git -c core.autocrlf=false apply --ignore-whitespace` to handle this robustly.

@@ -154,6 +154,15 @@ cannot start './katago' in '../user_folder/katago': No such file or directory
 **Absolute paths always work**, in both `path` and `parameters`, and are the
 simplest option for an engine installed outside the application folder.
 
+**A path with a space in it needs double quotes** in `parameters`, escaped for
+JSON:
+
+```json
+"parameters": "gtp -model \"C:/My Models/kata1.bin.gz\" -config ./default_gtp.cfg"
+```
+
+The application folder itself may contain spaces; nothing needs quoting for that.
+
 ### Engine Roles
 
 - **Main engine** (`main: 1`), called the *coach* in the code: every move is
