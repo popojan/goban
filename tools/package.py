@@ -153,6 +153,12 @@ def main() -> int:
                          "executable and installs it as engine/NAME/NAME<ext>, which "
                          "is what config/base.json's \"command\" expects. Used for "
                          "the hraj.si bundle; CI never passes it.")
+    ap.add_argument("--from-bundle", metavar="DIR", default=None,
+                    help="take config/ and the documents from an unpacked bundle "
+                         "instead of from this checkout. The hraj.si bundle is made "
+                         "this way from the CI artifact, so that its assets are the "
+                         "ones built with its binary — and so that a local edit to "
+                         "config/base.json cannot ride along into a release.")
     ap.add_argument("--out", default="dist", help="where to write the archive")
     ap.add_argument("--format", choices=["tar", "zip"], default=None,
                     help="default: zip for windows, tar for everything else")
@@ -174,10 +180,14 @@ def main() -> int:
     shutil.copy2(binary, staging / binary.name)
     os.chmod(staging / binary.name, 0o755)
 
-    copy_tree(ROOT / "config", staging / "config")
+    source = Path(args.from_bundle) if args.from_bundle else ROOT
+    if not (source / "config").is_dir():
+        sys.exit("error: no config/ in %s" % source)
+    copy_tree(source / "config", staging / "config")
 
     for doc in DOCS:
-        src = ROOT / doc
+        # A bundle has already flattened the documents to its root.
+        src = source / (Path(doc).name if args.from_bundle else doc)
         if src.is_file():
             shutil.copy2(src, staging / Path(doc).name)
         else:
