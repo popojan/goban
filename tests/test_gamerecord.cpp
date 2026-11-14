@@ -650,6 +650,39 @@ TEST_CASE("peekBoardSize reads the last game's board size without a full load") 
     CHECK(GameRecord::peekBoardSize(fixture("malformed.sgf")) == -1);
 }
 
+TEST_CASE("writeFileContent replaces a file whole and leaves no temporary behind") {
+    Session s;
+    const std::string p = s.path("replace.sgf");
+    REQUIRE(GameRecord::writeFileContent(p, "(;FF[4]GM[1]SZ[9];B[ee];W[cc])"));
+    REQUIRE(GameRecord::writeFileContent(p, "(;FF[4]GM[1]SZ[9])"));
+    CHECK(readAll(p) == "(;FF[4]GM[1]SZ[9])");
+    int entries = 0;
+    for (const auto& e : std::filesystem::directory_iterator(s.dir)) { (void)e; ++entries; }
+    CHECK(entries == 1);
+}
+
+TEST_CASE("an unreadable session file is set aside, not rotated out of the backups") {
+    Session s;
+    const std::string daily = s.path(todayStamp() + ".sgf");
+    // Not SGF at all — the parser repairs a merely truncated file — with the
+    // last good copy beside it.
+    REQUIRE(GameRecord::writeFileContent(daily, "not an sgf file"));
+    REQUIRE(GameRecord::writeFileContent(daily + ".bak", "GOOD"));
+
+    s.rec.initGame(9, 0.5f, 0, "B", "W");
+    s.rec.move(blackAt(4, 4));
+    s.rec.saveAs("");
+
+    // It used to become the new .bak, pushing the good copy to .bak.old — and
+    // the save after that one overwrote it.
+    CHECK(readAll(daily + ".bak") == "GOOD");
+    CHECK(readAll(daily + ".unreadable") == "not an sgf file");
+
+    GameRecord reloaded;
+    GameRecord::SGFGameInfo info;
+    CHECK(reloaded.loadFromSGF(daily, info));
+}
+
 TEST_CASE("readFileContent / writeFileContent handle non-ASCII paths") {
     Session s;
     const std::string p = s.path(u8"日本の囲碁.sgf");

@@ -1482,7 +1482,13 @@ void GobanControl::buildRegistry() {
     add("archive", 0, 0, "move the daily record to a timestamped file", [this](CommandContext& ctx) {
         // Save any pending changes to the daily file
         std::string dailyFile = model.game.getDefaultFileName();
-        model.game.saveAs("");
+        // A failed save must stop here: what is on disk is then stale, and
+        // archiving it would drop the unsaved games with clearSession() below.
+        if (!model.game.saveAs("")) {
+            parent->showMessage(parent->templateText("tplArchiveFailed", "Archive failed"));
+            ctx.notifyMenu = false;
+            return;
+        }
 
         // Check if there's actually a file to archive
         if (!std::filesystem::exists(dailyFile)) {

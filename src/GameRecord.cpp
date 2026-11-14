@@ -649,6 +649,22 @@ void GameRecord::finalizeGame(float scoreDelta) {
     game->GetRootNode()->SetProperties(properties);
 }
 
+void GameRecord::setAsideUnreadableSession() {
+    // Out of the way of the next save, which would otherwise rotate it into
+    // .bak and push the last good copy one step nearer to being overwritten.
+    const std::string aside = defaultFileName + ".unreadable";
+    std::error_code ec;
+    std::filesystem::rename(std::filesystem::u8path(defaultFileName),
+                            std::filesystem::u8path(aside), ec);
+    if (ec) {
+        spdlog::error("Session file [{}] could not be read, and could not be set aside: {}",
+                      defaultFileName, ec.message());
+    } else {
+        spdlog::error("Session file [{}] could not be read. It has been kept as [{}]; "
+                      "today's games start a new file.", defaultFileName, aside);
+    }
+}
+
 void GameRecord::markGameInSessionDocument() {
     // Caller must hold the mutex.
     //
@@ -697,7 +713,7 @@ void GameRecord::appendGameToDocument() {
                     numGames = doc->GetGames().size();
                     spdlog::info("appendGameToDocument: loaded existing session file with {} games", numGames);
                 } else {
-                    spdlog::warn("appendGameToDocument: existing session file invalid, creating new doc");
+                    setAsideUnreadableSession();
                     doc = F::CreateDocument(game);
                     numGames = 1;
                     markGameInSessionDocument();
@@ -705,6 +721,7 @@ void GameRecord::appendGameToDocument() {
                 }
             } catch (const std::exception& e) {
                 spdlog::error("appendGameToDocument: failed to load existing session: {}", e.what());
+                setAsideUnreadableSession();
                 doc = F::CreateDocument(game);
                 numGames = 1;
                 markGameInSessionDocument();
@@ -1742,10 +1759,37 @@ bool GameRecord::writeFileContent(const std::string& filePath, const std::string
             return false;
         }
     }
-    std::ofstream file(path, std::ios::binary);
-    if (!file) return false;
-    file << content;
-    return file.good();
+    // A sibling temporary, renamed over the target: std::ofstream truncates on
+    // open, so writing in place left a window in which the only copy of the
+    // day's games was empty or half-written. Same reasoning, and the same
+    // Windows fallback, as UserSettings::saveLocked().
+    auto tmp = path;
+    tmp += ".tmp";
+    {
+        std::ofstream file(tmp, std::ios::binary | std::ios::trunc);
+        if (!file) return false;
+        file << content;
+        file.flush();
+        if (!file) {
+            file.close();
+            std::filesystem::remove(tmp, ec);
+            return false;
+        }
+    }
+    std::filesystem::rename(tmp, path, ec);
+#ifdef _WIN32
+    if (ec) {
+        std::filesystem::remove(path, ec);
+        std::filesystem::rename(tmp, path, ec);
+    }
+#endif
+    if (ec) {
+        spdlog::error("Could not replace [{}]: {}", path.string(), ec.message());
+        std::error_code ignored;
+        std::filesystem::remove(tmp, ignored);
+        return false;
+    }
+    return true;
 }
 
 GameRecord::TreePath GameRecord::getTreePath() const {
