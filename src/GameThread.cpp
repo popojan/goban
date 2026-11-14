@@ -1227,8 +1227,12 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
 
             settleTsumegoVariation(varResult);
 
-            // In Analysis mode, auto-respond with kibitz engine after human variation
-            if (varResult.success && gameMode == GameMode::EXPLORE) {
+            // Explore mode answers a move the human *made*. One the record
+            // already had is followed, not made — the Right arrow with a mouse,
+            // and the Right arrow gets no reply. Answering it put the engine's
+            // move over the recorded continuation and deleted the result of a
+            // finished game, for nothing more than clicking the next-move marker.
+            if (varResult.success && varResult.newBranch && gameMode == GameMode::EXPLORE) {
                 Engine* kibitz = currentKibitz();
                 Engine* coach = currentCoach();
                 if (kibitz && coach && model.phase() != GamePhase::Finished) {
@@ -1319,6 +1323,17 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                 // record already has. processSuccessfulMove() does neither.
                 settleTsumegoVariation(
                         navigator->navigateToVariation(response, false, {kibitz, coach}));
+                break;
+            }
+            // Away from the end of the line a kibitz is a variation, so it is
+            // made the way a click makes one: a move the record already has is
+            // followed, and a finished game is branched as a copy rather than
+            // rewritten. processSuccessfulMove() did neither — GameRecord::move()
+            // put the engine's move first, demoted the game actually played and
+            // deleted its result. At the end of the line the two are the same
+            // act, and the match path keeps its engine comment and its scoring.
+            if (!model.game.isAtEndOfNavigation()) {
+                navigator->navigateToVariation(response, true, {kibitz, coach}, false);
                 break;
             }
             processSuccessfulMove(response, kibitz, coach, kibitz, false);

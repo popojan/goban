@@ -52,8 +52,11 @@ public:
     bool navigateForward();
     /// `holders` — engines that already hold `move` (a kibitz's own genmove,
     /// and the coach once it has accepted it). They are not sent it again.
+    /// `resume` — whether a new promoted branch starts the game. A human's
+    /// variation does; an engine asked once must not.
     VariationResult navigateToVariation(const Move& move, bool promote = true,
-                                        const std::vector<const Engine*>& holders = {});
+                                        const std::vector<const Engine*>& holders = {},
+                                        bool resume = true);
     bool navigateToStart();
     bool navigateToEnd();
     bool navigateToTreePath(int pathLength, const std::vector<int>& branchChoices);  // Navigate to specific tree position (for session restore)

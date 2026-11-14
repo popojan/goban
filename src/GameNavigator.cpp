@@ -221,7 +221,8 @@ bool GameNavigator::navigateForward() {
 }
 
 GameNavigator::VariationResult GameNavigator::navigateToVariation(
-        const Move& move, bool promote, const std::vector<const Engine*>& holders) {
+        const Move& move, bool promote, const std::vector<const Engine*>& holders,
+        bool resume) {
     VariationResult result;
     spdlog::debug("navigateToVariation: entry, move={}", move.toString());
 
@@ -265,7 +266,7 @@ GameNavigator::VariationResult GameNavigator::navigateToVariation(
         // Clear game over state - we're continuing the game in a new branch
         // Skip for non-promoted branches (e.g. tsumego wrong moves) to stay in navigation mode.
         // Kibitz (space key) handles its own model.start() independently.
-        if (promote) {
+        if (promote && resume) {
             model.start();
         }
     } else {

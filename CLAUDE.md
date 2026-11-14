@@ -545,6 +545,19 @@ See `docs/adr/0015-tsumego-is-a-game-mode.md`.
   matching an identical existing child. That is the "resume from here" case and
   it is not addressed — if it should be, the fix is in `move()`, not at a call
   site.
+- **An engine's move away from the end of the line is recorded the way a
+  click's is.** Two paths wrote it through `processSuccessfulMove()` instead,
+  whose `GameRecord::move()` inserts the move as the *first* child and deletes
+  `RE` when the cursor already has one: `KIBITZ_NAV`, and Explore mode's reply
+  after `TO_VARIATION`. So one Kibitz press while reviewing a finished game
+  demoted the game actually played and dropped its result (`main_line_moves`
+  37 → 2), in place. `KIBITZ_NAV` now hands a mid-tree answer to
+  `navigateToVariation(move, true, {kibitz, coach}, false)` — following a child
+  the record already has, branching a finished game as a copy — with
+  `resume = false`, because asking once must not start the match. **And Explore
+  replies only to a new branch**: a followed move was not made, and answering it
+  rewrote a game for nothing more than clicking its next-move marker. Pinned by
+  `kibitz_in_a_finished_game.scn` and `explore_follows_without_replying.scn`.
 - **A solved puzzle is not asked for a move, and a puzzle is never asked through
   `playKibitzMove()`.** `a.kibitz` carries a `tsumego && atEnd && !onBadMovePath`
   term, so the Kibitz item — *Nápověda*, Hint, in Czech — greys exactly where the
