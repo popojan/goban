@@ -106,6 +106,16 @@ TEST_CASE("settings round-trip through save and load") {
     CHECK(back.distance == doctest::Approx(3.1f));
 }
 
+TEST_CASE("a board size the board cannot hold is not restored") {
+    SettingsFixture f;
+    f.settings().setBoardSize(13);
+    f.write(R"({"game": {"board_size": 25, "komi": 5.5}})");
+    f.settings().load();
+    // Startup sizes the board from this before anything else looks at it.
+    CHECK(f.settings().getBoardSize() == 13);
+    CHECK(f.settings().getKomi() == doctest::Approx(5.5f));
+}
+
 TEST_CASE("a malformed settings file does not throw and does not half-apply") {
     SettingsFixture f;
     f.settings().setBoardSize(9);
@@ -282,7 +292,7 @@ TEST_CASE("concurrent writers do not corrupt the file or each other") {
 
     const std::string contents = f.read();
     CHECK_FALSE(contents.empty());
-    CHECK_NOTHROW(nlohmann::json::parse(contents));
+    CHECK_NOTHROW((void)nlohmann::json::parse(contents));
 
     CHECK_NOTHROW(f.settings().load());
     CHECK(f.settings().hasGameSettings());

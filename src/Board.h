@@ -214,6 +214,10 @@ public:
     static constexpr int BOARD_SIZE = MAX_BOARD * MAX_BOARD;
     static constexpr int DEFAULT_SIZE = 19;
 
+    /// Whether a board this size fits the fixed arrays below. SGF allows up to
+    /// 52 and nothing else bounds what a file, a setting or a command asks for.
+    static constexpr bool isSupportedSize(int n) { return n >= 2 && n <= MAX_BOARD; }
+
     enum Change { NO_CHANGE = 0, STONE_PLACED = 1, STONE_REMOVED = 2, TERRITORY_CHANGED = 4, SIZE_CHANGED = 8};
 
 public:

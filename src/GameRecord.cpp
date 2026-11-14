@@ -889,6 +889,14 @@ bool GameRecord::loadFromSGF(const std::string& fileName, SGFGameInfo& gameInfo,
 
         extractGameInfo(rootNode, gameInfo);
 
+        // Before anything of this record is replaced.
+        if (!Board::isSupportedSize(gameInfo.boardSize)) {
+            spdlog::error("SGF file [{}] is a {}x{} game; boards up to {}x{} are supported",
+                          fileName, gameInfo.boardSize, gameInfo.boardSize,
+                          Board::MAX_BOARD, Board::MAX_BOARD);
+            return false;
+        }
+
         // Keep the game tree (SGF is single source of truth)
         game = loadedGame;
         gameHasNewMoves = false;
@@ -1475,7 +1483,8 @@ int GameRecord::peekBoardSize(const std::string& fileName) {
         for (auto property : rootNode->GetProperties()) {
             if (property->GetPropertyType() == SgfcPropertyType::SZ) {
                 if (auto numberValue = std::dynamic_pointer_cast<ISgfcNumberPropertyValue>(property->GetPropertyValue())) {
-                    return numberValue->GetNumberValue();
+                    const int size = static_cast<int>(numberValue->GetNumberValue());
+                    return Board::isSupportedSize(size) ? size : -1;
                 }
             }
         }

@@ -664,6 +664,19 @@ TEST_CASE("readFileContent / writeFileContent handle non-ASCII paths") {
 // Malformed input
 // ---------------------------------------------------------------------------
 
+TEST_CASE("a board larger than the board arrays is refused, not loaded") {
+    quietLogging();
+    // SGF allows SZ up to 52; Board holds 19x19. Position::fromSgf() bounds a
+    // point against the file's own size, so nothing else stood in the way.
+    GameRecord rec;
+    GameRecord::SGFGameInfo info;
+    CHECK_FALSE(rec.loadFromSGF(fixture("sz25.sgf"), info));
+    CHECK_FALSE(rec.isNavigating());
+    CHECK(rec.moveCount() == 0);
+    // Session restore asks this first, and sizes the board from the answer.
+    CHECK(GameRecord::peekBoardSize(fixture("sz25.sgf")) == -1);
+}
+
 TEST_CASE("malformed and empty SGF input fails cleanly") {
     quietLogging();
 

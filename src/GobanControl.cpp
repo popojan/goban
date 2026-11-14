@@ -70,6 +70,13 @@ std::string toLower(std::string text) {
 } // namespace
 
 bool GobanControl::newGame(unsigned boardSize) const {
+    // The funnel for every way of asking: the dropdown, both commands, and a
+    // size restored from user.json.
+    if (!Board::isSupportedSize(static_cast<int>(boardSize))) {
+        spdlog::warn("a {}x{} board is not supported (2..{})", boardSize, boardSize,
+                     Board::MAX_BOARD);
+        return false;
+    }
     // Starting a new game discards the current one, so a move the engine is
     // still computing is worthless. Rather than block the UI waiting for it
     // (GTP cannot abort a command in flight), hand the work to the game thread,
@@ -1831,8 +1838,9 @@ void GobanControl::buildRegistry() {
     add("new_game", 1, 1, "<size> — start a new game on a size x size board",
         [this](CommandContext& ctx) {
             int boardSize = 0;
-            if (!parseInt(ctx.args[0], boardSize) || boardSize < 2 || boardSize > 25) {
-                spdlog::warn("new_game: '{}' is not a valid board size (2..25)", ctx.args[0]);
+            if (!parseInt(ctx.args[0], boardSize) || !Board::isSupportedSize(boardSize)) {
+                spdlog::warn("new_game: '{}' is not a valid board size (2..{})", ctx.args[0],
+                             Board::MAX_BOARD);
                 return;
             }
             if (!newGame(static_cast<unsigned>(boardSize))) {
@@ -2278,6 +2286,12 @@ void GobanControl::confirmGameReplacement(std::function<void()> replace,
 }
 
 void GobanControl::requestNewGame(unsigned boardSize, std::function<void(bool)> onSettled) const {
+    // Asked before the prompt: a confirmation newGame() would then refuse.
+    if (!Board::isSupportedSize(static_cast<int>(boardSize))) {
+        newGame(boardSize);   // says why
+        if (onSettled) onSettled(false);
+        return;
+    }
     confirmGameReplacement(
         [this, boardSize, onSettled]() {
             // Board size is about to change, so the game on screen is going

@@ -1,4 +1,5 @@
 #include "UserSettings.h"
+#include "Board.h"
 #include <filesystem>
 #include <fstream>
 #include <system_error>
@@ -121,7 +122,13 @@ void UserSettings::load() {
         if (user.contains("game")) {
             gameSettingsLoaded = true;
             auto& game = user["game"];
-            boardSize = game.value("board_size", boardSize);
+            const int savedSize = game.value("board_size", boardSize);
+            if (Board::isSupportedSize(savedSize)) {
+                boardSize = savedSize;
+            } else {
+                spdlog::warn("user.json: board_size {} is not supported; keeping {}",
+                             savedSize, boardSize);
+            }
             komi = game.value("komi", komi);
             handicap = game.value("handicap", handicap);
             if (game.contains("black_player")) {
