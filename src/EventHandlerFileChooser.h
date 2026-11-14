@@ -26,6 +26,7 @@ public:
     ~EventHandlerFileChooser() override;
 
     void ProcessEvent(Rml::Event& event, const Rml::String& value) override;
+    bool Handles(const Rml::String& value) const override;
 
     // Instance methods for managing the dialog document
     void LoadDialog(Rml::Context* context);

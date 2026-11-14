@@ -45,6 +45,18 @@ EventHandlerFileChooser::~EventHandlerFileChooser() {
     }
 }
 
+bool EventHandlerFileChooser::Handles(const Rml::String& value) const {
+    static const char* const branches[] = {
+        "load", "cancel", "refresh", "open_file", "files_prev_page",
+        "files_next_page", "games_prev_page", "games_next_page",
+    };
+    for (const char* b : branches)
+        if (value == b) return true;
+    // "select_file:<index>" and "select_game:<index>", attached to generated rows
+    const auto prefix = value.substr(0, 11);
+    return prefix == "select_file" || prefix == "select_game";
+}
+
 void EventHandlerFileChooser::ProcessEvent(Rml::Event& event, const Rml::String& value) {
     spdlog::debug("EventHandlerFileChooser::ProcessEvent value: '{}' type: '{}'", value.c_str(), event.GetType().c_str());
 

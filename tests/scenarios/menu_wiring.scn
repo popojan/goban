@@ -1,0 +1,9 @@
+# Every on<event>="..." in every language's templates must reach a handler.
+#
+# A menu item whose command was renamed, or mistyped, logs "Unknown command" and
+# does nothing — and no scenario presses most of the menu. This reads the
+# templates instead, all five languages in one run, and asks the same lookup a
+# click would. Commented-out markup is skipped.
+
+check_menu_wiring
+expect log_badge none

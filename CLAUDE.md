@@ -1177,6 +1177,14 @@ of its decisions, and `tests/test_analysis.cpp` plus
   *quiet* — the bare command runs, so `prisoners` printed its current setting
   into `#lblMessage` and the widget snapped back, and `toggle_evaluation`
   toggled whichever option was picked. Adding a `<select>` means adding a branch.
+- **Every template's `on<event>` value is checked against the dispatch chain.**
+  `check_menu_wiring` reads all five languages' `goban.rml` and `open.rml` as
+  text and asks what a click would ask: `EventManager`'s three generic words,
+  the handler's own branches (`EventHandler::Handles()`, listed beside the
+  `if` chain it describes), then `GobanControl::resolves()`. A new branch in
+  either handler needs its name added to `Handles()` or the check reports it —
+  the loud direction. Commented-out markup is skipped. Pinned by
+  `tests/scenarios/menu_wiring.scn`.
 - **Scenarios drive commands, so a widget needs `menu_select`.** `menu_select
   <select-id> <value>` picks an option through `SetValue()`, which dispatches
   `EventId::Change` exactly as a click does — the only step in the suite that

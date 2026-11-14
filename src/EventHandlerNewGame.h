@@ -9,6 +9,7 @@ public:
 	~EventHandlerNewGame() override;
 
 	void ProcessEvent(Rml::Event& event, const Rml::String& value) override;
+	bool Handles(const Rml::String& value) const override;
 private:
     int lastKomiSelection = -1;
     int lastBoardSelection = -1;

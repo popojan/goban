@@ -17,6 +17,19 @@ EventHandlerNewGame::~EventHandlerNewGame()
 {
 }
 
+// The branches below that are not commands. Everything else falls through to
+// GobanControl::command(), which answers for itself.
+bool EventHandlerNewGame::Handles(const Rml::String& value) const
+{
+    static const char* const branches[] = {
+        "boardsize", "mdown", "mup", "handicap", "engine", "evaluation_moves",
+        "game_mode", "prisoners", "toggle_evaluation", "shader", "komi", "language",
+    };
+    for (const char* b : branches)
+        if (value == b) return true;
+    return false;
+}
+
 void EventHandlerNewGame::ProcessEvent(Rml::Event& event, const Rml::String& value)
 {
     spdlog::debug("EventHandlerNewGame recieved event");

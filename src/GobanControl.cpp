@@ -9,6 +9,9 @@
 #include "UserSettings.h"
 #include "ScenarioRecorder.h"
 #include <algorithm>
+#include <regex>
+#include <fstream>
+#include <filesystem>
 #include <cctype>
 #include <cmath>
 #include <ctime>
@@ -1676,6 +1679,67 @@ void GobanControl::buildRegistry() {
         el->DispatchEvent(Rml::EventId::Mouseup, Rml::Dictionary());
     });
 
+    add("check_menu_wiring", 0, 0,
+        "check that every on<event>=\"...\" in every language's templates "
+        "reaches a handler; each one that does not is logged as an error",
+        [this](CommandContext&) {
+        // Text, not the live document: one run covers all five languages, and
+        // nothing is dispatched, so `quit` and `language` are safe to look at.
+        namespace fs = std::filesystem;
+        const fs::path gui = fs::u8path(config->data.value("gui", std::string("./config/gui/en")));
+        static const std::regex attr(R"re(\bon[a-z]+\s*=\s*"([^"]*)")re");
+        int checked = 0, missing = 0;
+        std::error_code ec;
+        for (const auto& lang : fs::directory_iterator(gui.parent_path(), ec)) {
+            for (const char* file : {"goban.rml", "open.rml"}) {
+                const fs::path path = lang.path() / file;
+                std::ifstream in(path);
+                if (!in) continue;
+                std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                // Commented-out markup is not wiring. Blanked rather than
+                // erased, so the line numbers reported below stay true.
+                for (size_t open = 0; (open = text.find("<!--", open)) != std::string::npos; ) {
+                    size_t close = text.find("-->", open);
+                    close = close == std::string::npos ? text.size() : close + 3;
+                    for (size_t i = open; i < close; ++i)
+                        if (text[i] != '\n') text[i] = ' ';
+                    open = close;
+                }
+                auto* handler = EventManager::GetEventHandler(
+                        std::string(file) == "open.rml" ? "open" : "goban");
+                const bool commands = std::string(file) == "goban.rml";
+                std::istringstream lines(text);
+                std::string line;
+                for (int lineNo = 1; std::getline(lines, line); ++lineNo) {
+                    for (std::sregex_iterator it(line.begin(), line.end(), attr), end; it != end; ++it) {
+                        // EventManager splits on ';' and takes three words itself.
+                        std::istringstream parts((*it)[1].str());
+                        std::string part;
+                        while (std::getline(parts, part, ';')) {
+                            ++checked;
+                            const auto first = part.substr(0, part.find(' '));
+                            const bool generic = (first == "load" && first != part)
+                                    || first == "close" || first == "exit";
+                            if (generic || (handler && handler->Handles(part.c_str()))
+                                    || (commands && resolves(part)))
+                                continue;
+                            ++missing;
+                            spdlog::error("scenario: check_menu_wiring: {}:{}: '{}' reaches no handler",
+                                          path.generic_string(), lineNo, part);
+                        }
+                    }
+                }
+            }
+        }
+        // "scenario:" is what run_scenarios.sh surfaces from a failed run.
+        // A check that found nothing to check must not read as a pass.
+        if (checked == 0)
+            spdlog::error("scenario: check_menu_wiring: no event attributes found under {}",
+                          gui.parent_path().generic_string());
+        else
+            spdlog::info("check_menu_wiring: {} checked, {} unresolved", checked, missing);
+    });
+
     add("chooser_up", 0, 0, "browse to the parent directory", [chooser](CommandContext&) {
         if (auto* h = chooser()) h->NavigateUp();
     });
@@ -1923,6 +1987,25 @@ void GobanControl::command(const std::string& cmd) {
         return;  // blank line — nothing to dispatch
     }
     command(tokens.front(), std::vector<std::string>(tokens.begin() + 1, tokens.end()));
+}
+
+bool GobanControl::resolves(const std::string& cmd) {
+    if (registry.empty()) {
+        buildRegistry();
+    }
+    // Same two steps as command(): the whole line first, then its first token.
+    std::string name = cmd;
+    std::vector<std::string> args;
+    if (registry.find(cmd) == registry.end()) {
+        const auto tokens = splitCommand(cmd);
+        if (tokens.empty()) return false;
+        name = tokens.front();
+        args.assign(tokens.begin() + 1, tokens.end());
+    }
+    const auto entry = registry.find(name);
+    if (entry == registry.end()) return false;
+    const int argc = static_cast<int>(args.size());
+    return argc >= entry->second.minArgs && argc <= entry->second.maxArgs;
 }
 
 void GobanControl::command(const std::string& name, const std::vector<std::string>& args) {

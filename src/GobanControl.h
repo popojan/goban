@@ -79,6 +79,9 @@ public:
     void command(const std::string& cmd);
     // Dispatches an already split command (scripting channel entry point).
     void command(const std::string& name, const std::vector<std::string>& args);
+    /// Whether command(cmd) would reach a handler: a known name, with an
+    /// argument count it accepts.
+    [[nodiscard]] bool resolves(const std::string& cmd);
     void saveCurrentGame() const;
 
     /// Machine-readable snapshot of the state a scenario can assert on.

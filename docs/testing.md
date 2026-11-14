@@ -167,6 +167,7 @@ assert on pixels, so a committed screenshot scenario guards nothing.
 | `wait <ms>` | unconditional delay — prefer `wait_idle` |
 | `key [mod+]<name>` | press a key, down then up |
 | `menu_select <id> <value>` | pick an option in a menu dropdown, as a user would |
+| `check_menu_wiring` | check every `on<event>="…"` in every language's templates against the real dispatch chain; each miss is an error in the log |
 | `dump_state [label]` | log the whole state; use this when authoring |
 | `fail_fast on\|off` | stop at the first failure (default on) |
 
