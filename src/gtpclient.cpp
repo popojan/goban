@@ -499,9 +499,10 @@ void Process::closeStdin() {
 
 int Process::wait() const {
     if (pid_ < 0) return -1;
-    int status;
-    waitpid(pid_, &status, 0);
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    int status = 0;
+    const pid_t reaped = waitpid(pid_, &status, 0);
+    pid_ = -1;
+    return (reaped > 0 && WIFEXITED(status)) ? WEXITSTATUS(status) : -1;
 }
 
 bool Process::waitFor(int timeoutMs) const {
@@ -509,7 +510,10 @@ bool Process::waitFor(int timeoutMs) const {
     auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     while (std::chrono::steady_clock::now() < deadline) {
         int status;
-        if (waitpid(pid_, &status, WNOHANG) != 0) return true;
+        if (waitpid(pid_, &status, WNOHANG) != 0) {
+            pid_ = -1;   // reaped, or never ours
+            return true;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return false;
@@ -705,7 +709,7 @@ bool GtpClient::revive() {
         // is reachable ten times a second otherwise.
         if (reviveCount_ == MAX_REVIVES) {
             ++reviveCount_;
-            spdlog::error("{}: has stopped responding {} times; leaving it down for "
+            spdlog::error("{}: has failed {} times; leaving it down for "
                           "the rest of the session", exe, MAX_REVIVES);
         }
         return false;
@@ -720,6 +724,7 @@ bool GtpClient::revive() {
     {
         std::lock_guard<std::mutex> lock(lastLineMutex_);
         lastLine.clear();   // belonged to the process that just died
+        stderrTail_.clear();
     }
 
     try {
@@ -732,7 +737,7 @@ bool GtpClient::revive() {
     // Only now: a command arriving between the spawn and this would be written
     // into a pipe nobody is reading yet.
     failed_ = false;
-    spdlog::warn("{}: restarted after it stopped responding (attempt {} of {}). It "
+    spdlog::warn("{}: restarted after it failed (attempt {} of {}). It "
                  "knows nothing of the game yet and must be resynchronised.",
                  exe, reviveCount_, MAX_REVIVES);
     return true;
@@ -773,8 +778,23 @@ static std::string& rtrim(std::string & str) {
     return str;
 }
 
+std::string GtpClient::stderrTail() const {
+    std::lock_guard<std::mutex> lock(lastLineMutex_);
+    std::string joined;
+    for (const auto& line : stderrTail_) {
+        if (!joined.empty()) joined += " | ";
+        joined += line;
+    }
+    return joined;
+}
+
 void GtpClient::operator()(const std::string& line) {
     spdlog::debug("gtp err = {}", line);
+    if (!line.empty()) {
+        std::lock_guard<std::mutex> lock(lastLineMutex_);
+        stderrTail_.push_back(line);
+        if (stderrTail_.size() > STDERR_TAIL_LINES) stderrTail_.pop_front();
+    }
     for (auto &re: outputFilters) {
         std::smatch m;
         if(std::regex_search(line, m,  re.compiled)) {
@@ -844,8 +864,9 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
     spdlog::log(trafficLevel(quiet_), "{1} << {0}", command, exe);
 
     if (!proc_->write(command + "\n")) {
-        if (!terminated_) spdlog::error("Failed to write command");
-        return terminated_ ? CommandOutput{"= "} : ret;
+        if (terminated_) return {"= "};
+        markExited(command);
+        return {};
     }
 
     spdlog::log(trafficLevel(quiet_), "getting response...");
@@ -876,7 +897,13 @@ GtpClient::CommandOutput GtpClient::issueCommand(const std::string& command) {
             return {};   // success() == false
         }
 
-        if (status == Process::ReadStatus::Eof) break;
+        if (status == Process::ReadStatus::Eof) {
+            // A response ends with a blank line, so end-of-file before one is
+            // the process gone, not an answer.
+            if (terminated_) return {"= "};
+            markExited(command);
+            return {};
+        }
 
         line.erase(line.find_last_not_of(" \n\r\t") + 1);
         if(ret.empty()) {
@@ -981,6 +1008,9 @@ bool GtpClient::success(const CommandOutput& ret) {
 }
 
 GtpClient::~GtpClient() {
+    // Nothing to tear down: revive() drops the dead process before spawning its
+    // replacement, and that spawn can fail.
+    if (!proc_) return;
     // Only an engine that is still alive gets asked to leave politely. Writing
     // into the stdin of a process we killed ourselves raises SIGPIPE, and the
     // only reason that has never shown up is that main.cpp ignores the signal
@@ -1005,6 +1035,17 @@ GtpClient::~GtpClient() {
         stderrReader_->stop();
     }
     spdlog::debug("~GtpClient: {} cleanup complete", exe);
+}
+
+void GtpClient::markExited(const std::string& command) {
+    // Failed, exactly as after a timeout: every later command then fails fast
+    // instead of being written into a closed pipe with an error line each, and
+    // revive() applies. Only a timeout used to set this.
+    failed_ = true;
+    killProcess();   // reap it; a no-op kill if it is already gone
+    const std::string tail = stderrTail();
+    spdlog::error("{}: the engine process has exited (command: {}){}{}", exe, command,
+                  tail.empty() ? "" : " — it said: ", tail);
 }
 
 void GtpClient::killProcess() {

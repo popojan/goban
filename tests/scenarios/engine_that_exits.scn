@@ -1,0 +1,38 @@
+# config: mock-crash.json
+#
+# An engine process that goes away — a crash, or a model file it cannot open.
+# Only a *timeout* marked an engine failed, so one that exited was never
+# restarted, and the game loop went on asking it for a move twenty times a
+# second, each attempt an error and a warning in the log.
+
+# --- One that dies before answering anything is not offered as a player ------
+wait_idle
+expect log_badge error
+expect white_player mock
+# Not in the list, so the request is refused and White stays as it was.
+switch_player white stillborn
+wait_idle
+expect white_player mock
+log_clear
+
+# --- One that dies when asked to move is restarted, then given up on ---------
+new_game 9
+wait_idle
+switch_player black human
+switch_player white crasher
+wait_idle
+expect white_player crasher
+
+click 4 4
+click 4 4
+wait_until move_count >= 1
+
+# Restarted GtpClient::MAX_REVIVES times, each restart dying the same way, and
+# then the game stops asking: paused, with the reason in the log.
+wait_until phase paused
+wait 1500
+wait_idle
+expect phase paused
+expect move_count 1
+expect log_badge error
+expect log_count < 30

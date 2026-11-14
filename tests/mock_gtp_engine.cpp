@@ -30,6 +30,8 @@
 //                       that GtpClient applies a read timeout instead of
 //                       deadlocking the game thread.
 //   --fail-on <cmd>     answer <cmd> with a GTP error response
+//   --exit-on <cmd>     say why on stderr and exit without answering <cmd> — an
+//                       engine that crashes, or one that cannot find its model
 //   --unknown <cmd>     answer <cmd> with "unknown command", to exercise the
 //                       graceful-degradation paths (e.g. engines lacking
 //                       final_status_list)
@@ -76,6 +78,7 @@ struct Options {
     int delayMs = 0;
     std::string hangOn;
     std::string failOn;
+    std::string exitOn;
     std::string unknownCmd;
     std::string logFile;
     std::string stderrFile;
@@ -398,6 +401,10 @@ public:
 
             logCommand(line);
 
+            if (!opts_.exitOn.empty() && command == opts_.exitOn) {
+                std::cerr << "mock: cannot go on (--exit-on " << command << ")" << std::endl;
+                std::exit(3);
+            }
             if (!opts_.hangOn.empty() && command == opts_.hangOn) {
                 // Deliberately never answer. The client must time out.
                 for (;;) std::this_thread::sleep_for(std::chrono::hours(1));
@@ -835,6 +842,7 @@ int main(int argc, char** argv) {
         else if (flag == "--think-ms") opts.thinkMs = std::atoi(next().c_str());
         else if (flag == "--hang-on") opts.hangOn = next();
         else if (flag == "--fail-on") opts.failOn = next();
+        else if (flag == "--exit-on") opts.exitOn = next();
         else if (flag == "--unknown") opts.unknownCmd = next();
         else if (flag == "--log") opts.logFile = next();
         else if (flag == "--stderr-file") opts.stderrFile = next();

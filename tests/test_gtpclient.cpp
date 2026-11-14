@@ -239,6 +239,45 @@ TEST_CASE("an engine that keeps wedging is eventually left down") {
     CHECK(client->hasFailed());
 }
 
+TEST_CASE("an engine that exits is marked failed, and can be put back") {
+    // Only a timeout set failed_. An engine that simply died — a crash, or a
+    // model file it could not open — returned an empty reply and nothing else,
+    // so nothing ever restarted it and every later command was written into a
+    // closed pipe, each with its own error line.
+    auto client = makeClient("--exit-on genmove");
+    REQUIRE(GtpClient::success(client->issueCommand("boardsize 9")));
+
+    CHECK_FALSE(GtpClient::success(client->issueCommand("genmove B")));
+    CHECK(client->hasFailed());
+    // What it said on the way out is the only explanation there will be.
+    CHECK(client->stderrTail().find("cannot go on") != std::string::npos);
+
+    CHECK(client->revive());
+    CHECK(GtpClient::success(client->issueCommand("name")));
+}
+
+TEST_CASE("an engine that cannot be restarted is still safe to destroy") {
+    // revive() drops the dead process before spawning its replacement, and the
+    // destructor used that pointer unconditionally.
+    quietLogging();
+    const MockSpawn spawn = mockSpawn();
+    const auto dir = std::filesystem::temp_directory_path() / "goban_revive_test";
+    std::filesystem::create_directories(dir);
+    const auto copy = dir / spawn.exe;
+    std::filesystem::copy_file(std::filesystem::path(spawn.dir) / spawn.exe, copy,
+                               std::filesystem::copy_options::overwrite_existing);
+    {
+        GtpClient client(spawn.exe, "--exit-on name", dir.string(), nlohmann::json::array());
+        REQUIRE_FALSE(GtpClient::success(client.issueCommand("name")));
+        REQUIRE(client.hasFailed());
+        std::filesystem::remove(copy);
+        CHECK_FALSE(client.revive());
+        CHECK(client.hasFailed());
+        CHECK_FALSE(GtpClient::success(client.issueCommand("name")));
+    }   // ~GtpClient
+    std::filesystem::remove_all(dir);
+}
+
 TEST_CASE("a slow but responsive engine is not cut off early") {
     // The timeout must not punish an engine that is merely slow.
     auto client = makeClient("--delay-ms 300 --script E5");

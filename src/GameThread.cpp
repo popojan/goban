@@ -934,6 +934,20 @@ void GameThread::reviveFailedEngines() {
         if (!gtp || !gtp->hasFailed()) continue;
         if (gtp->revive()) revived = true;
     }
+
+    // An engine that could not be put back cannot be asked for a move. Left
+    // Playing, the loop asked it anyway, twenty times a second, each refusal a
+    // line in the log. Pausing is the truthful state: the game is waiting for
+    // the user to choose somebody else.
+    if (!revived && model.phase() == GamePhase::Playing) {
+        auto* onMove = dynamic_cast<GtpEngine*>(currentPlayer());
+        if (onMove && onMove->hasFailed()) {
+            spdlog::error("[{}] is not running, so the game is paused. Choose another "
+                          "player for {} to continue.", onMove->getName(),
+                          model.state.colorToMove.toString());
+            model.pause();
+        }
+    }
     if (!revived) return;
 
     // A replacement process holds an empty board and has never heard of this

@@ -100,3 +100,17 @@ kills and reaps without raising it.
   than the saved replays.
 - **Unlimited restarts.** An engine that fails every command would be respawned
   ten times a second — a fork bomb driven by a misconfigured binary.
+
+## Correction, 2026-11-14: an engine that exits was never covered
+
+The decision reads "a killed engine", and the code took that literally: only
+the timeout path set `failed_`. An engine that *left* — a crash, or a model file
+it could not open — returned an empty reply and stayed unmarked, so nothing
+restarted it and the game loop asked it for a move twenty times a second.
+
+A failed write, and an end-of-file before the blank line that ends a response,
+now mark the engine failed too (`GtpClient::markExited()`), with the engine's
+last stderr lines in the log. Two things follow that the original did not need:
+an engine that dies during `list_commands` is not registered at all, and when
+the engine on move has used up its restarts the game is paused rather than left
+Playing against nobody.
