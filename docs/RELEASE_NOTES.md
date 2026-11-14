@@ -51,6 +51,11 @@ paused rather than left waiting for a move that will never come.
   a second move.
 - Starting a new game while the score was being calculated, or while the engines
   were being resynchronised, froze the window until the engine answered.
+- On Windows, an engine could fail to start when Goban was unpacked into a
+  folder with a space in its name. A path with a space can also be written in
+  an engine's `parameters` now, in double quotes.
+- Starting a new game waited for the main engine before the window responded —
+  seconds, when that engine is KataGo and the board size changed.
 - An SGF with a board larger than 19×19 was loaded and read past the board.
 - A drawn game was recorded as `B+0` and announced as a win.
 - One value of the wrong type in `user.json` discarded every setting after it.
