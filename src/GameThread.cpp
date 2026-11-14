@@ -552,11 +552,29 @@ void GameThread::notifyMoveComplete(Engine* /*coach*/, const Move& move,
         });
 }
 
+// A genmove from an engine that is not the player on move — a kibitz, or
+// Explore mode's reply. `playerToMove` names the engine for the duration:
+// without that isThinking() is false for the whole search, so nothing is drawn,
+// nothing is refused, and a game-replacing action joins the loop from the UI
+// thread instead of deferring (ADR-0001). Refuses when such an action has
+// already claimed the loop, under the lock it claimed it with.
+Move GameThread::askEngine(Engine* engine, const Color& color) {
+    Player* previous = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(playerMutex);
+        if (deferredPending.load()) return Move(Move::INVALID, color);
+        previous = playerToMove.exchange(engine);
+    }
+    Move move = engine->genmove(color);
+    playerToMove = previous;
+    return move;
+}
+
 Move GameThread::handleKibitzRequest(Move move, Engine* kibitzEngine,
                                       const Color& colorToMove, bool& wasKibitz) {
     if (move == Move::KIBITZED) {
         if (kibitzEngine) {
-            move = kibitzEngine->genmove(colorToMove);
+            move = askEngine(kibitzEngine, colorToMove);
             wasKibitz = true;
         } else {
             spdlog::warn("Kibitz requested but no kibitz engine available");
@@ -745,6 +763,13 @@ void GameThread::gameLoop() {
                 continue;
             }
 
+            // As in Match mode below: an engine's answer to a game that is
+            // being replaced is dropped, not recorded.
+            if (wasKibitz && shouldDiscardMove()) {
+                playerToMove = nullptr;
+                continue;
+            }
+
             bool success = false;
             if (move) {
                 success = move == Move::RESIGN
@@ -766,7 +791,7 @@ void GameThread::gameLoop() {
                 if (!wasKibitz && model.phase() != GamePhase::Finished && kibitzEngine) {
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis: triggering kibitz response for {}", responseColor.toString());
-                    Move response = kibitzEngine->genmove(responseColor);
+                    Move response = askEngine(kibitzEngine, responseColor);
                     if (response && response != Move::RESIGN) {
                         if (kibitzEngine == coach || coach->play(response)) {
                             processSuccessfulMove(response, kibitzEngine, coach, kibitzEngine, false);
@@ -1179,7 +1204,7 @@ void GameThread::executeNavCommand(const NavCommand& cmd) {
                     // All engines are synced after initial sync
                     Color responseColor = model.state.colorToMove;
                     spdlog::debug("Analysis nav: triggering kibitz response for {}", responseColor.toString());
-                    Move response = kibitz->genmove(responseColor);
+                    Move response = askEngine(kibitz, responseColor);
                     if (response && response != Move::RESIGN) {
                         if (kibitz == coach || coach->play(response)) {
                             processSuccessfulMove(response, kibitz, coach, kibitz, false);

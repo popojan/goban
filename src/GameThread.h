@@ -318,6 +318,7 @@ private:
 
     // Helper methods for game loop
     Move handleKibitzRequest(Move move, Engine* kibitzEngine, const Color& colorToMove, bool& wasKibitz);
+    Move askEngine(Engine* engine, const Color& color);
     std::string collectEngineComments() const;
     void processSuccessfulMove(const Move& move, const Player* movePlayer, Engine* coach,
                               Engine* kibitzEngine, bool wasKibitz);
